@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "eslint": "9.39.1",
-    "typescript": "5.9.2",
+    "typescript": "5.9.3",
     "vitest": "4.0.14"
   },
   "author": "Joe Mearman",
