@@ -33,7 +33,7 @@
     "@vitest/coverage-v8": "4.0.14",
     "eslint": "9.39.1",
     "immer": "11.0.0",
-    "memfs": "4.47.0",
+    "memfs": "4.51.1",
     "msw": "2.12.3",
     "typescript": "5.9.2",
     "vitest": "4.0.14",
