@@ -22,7 +22,7 @@
     "@bibgraph/client": "workspace:*",
     "@bibgraph/types": "workspace:*",
     "@bibgraph/utils": "workspace:*",
-    "commander": "14.0.1",
+    "commander": "14.0.2",
     "zod": "4.1.13"
   },
   "devDependencies": {
