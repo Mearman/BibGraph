@@ -35,7 +35,7 @@
     "immer": "11.0.0",
     "memfs": "4.47.0",
     "msw": "2.12.3",
-    "typescript": "5.9.2",
+    "typescript": "5.9.3",
     "vitest": "4.0.14",
     "vitest-axe": "0.1.0"
   },
