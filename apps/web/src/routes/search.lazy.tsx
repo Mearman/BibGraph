@@ -187,6 +187,16 @@ const SearchPage = () => {
   // Update searchFilters when URL parameters change
   useEffect(() => {
     setSearchFilters(initialSearchFilters);
+
+    // Store search query in session storage for "back to search" functionality
+    try {
+      const query = initialSearchFilters.query;
+      if (query && query.trim()) {
+        sessionStorage.setItem('lastSearchQuery', query.trim());
+      }
+    } catch {
+      // Session storage might not be available in all contexts
+    }
   }, [initialSearchFilters]);
 
   // Memoize filters to prevent unnecessary re-renders
@@ -218,12 +228,32 @@ const SearchPage = () => {
   const handleSearch = async (filters: SearchFilters) => {
     setSearchStartTime(Date.now());
     setSearchFilters(filters);
+
+    // Store search query in session storage for "back to search" functionality
+    try {
+      if (filters.query.trim()) {
+        sessionStorage.setItem('lastSearchQuery', filters.query.trim());
+      }
+    } catch {
+      // Session storage might not be available in all contexts
+    }
+
     // Auto-tracking in useUserInteractions will handle page visit recording
   };
 
   const handleQuickSearch = async (query: string) => {
     setSearchFilters({ query });
     setRetryCount(0); // Reset retry count on new search
+
+    // Store search query in session storage for "back to search" functionality
+    try {
+      if (query.trim()) {
+        sessionStorage.setItem('lastSearchQuery', query.trim());
+      }
+    } catch {
+      // Session storage might not be available in all contexts
+    }
+
     // Auto-tracking in useUserInteractions will handle page visit recording
   };
 
