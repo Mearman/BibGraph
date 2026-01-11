@@ -234,8 +234,9 @@ const groupFields = (data: Record<string, unknown>): SectionData[] => {
     const ids = processedData.ids as Record<string, unknown>;
     const openalexId = typeof ids.openalex === "string" ? ids.openalex.toLowerCase() : null;
     if (openalexId && mainId.includes(openalexId.split("/").pop() ?? "")) {
-      // Remove openalex from ids since it's redundant with main id
-      const { openalex: _, ...remainingIds } = ids;
+      // Create a copy and remove openalex from ids since it's redundant with main id
+      const remainingIds = { ...ids };
+      delete remainingIds.openalex;
       if (Object.keys(remainingIds).length > 0) {
         processedData.ids = remainingIds;
       } else {
