@@ -170,13 +170,20 @@ interface SectionData {
 }
 
 /**
- * Check if a value should be displayed (not null, undefined, empty string, or empty array)
+ * Check if a value should be displayed (not null, undefined, empty string, empty array, or empty object)
  * @param value
  */
 const isDisplayableValue = (value: unknown): boolean => {
   if (value === null || value === undefined) return false;
   if (typeof value === "string" && value.trim() === "") return false;
   if (Array.isArray(value) && value.length === 0) return false;
+  // Check if object has any displayable properties
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return false;
+    // Recursively check if any property is displayable
+    return entries.some(([, val]) => isDisplayableValue(val));
+  }
   return true;
 };
 
@@ -220,6 +227,24 @@ const groupFields = (data: Record<string, unknown>): SectionData[] => {
     "Other": {},
   };
 
+  // Preprocess: Remove redundant ids.openalex if it matches the main id field
+  const mainId = typeof data.id === "string" ? data.id.toLowerCase() : null;
+  const processedData = { ...data };
+  if (processedData.ids && typeof processedData.ids === "object" && mainId) {
+    const ids = processedData.ids as Record<string, unknown>;
+    const openalexId = typeof ids.openalex === "string" ? ids.openalex.toLowerCase() : null;
+    if (openalexId && mainId.includes(openalexId.split("/").pop() ?? "")) {
+      // Remove openalex from ids since it's redundant with main id
+      const { openalex: _, ...remainingIds } = ids;
+      if (Object.keys(remainingIds).length > 0) {
+        processedData.ids = remainingIds;
+      } else {
+        // Delete the key entirely if no other ids remain
+        delete processedData.ids;
+      }
+    }
+  }
+
   const identifierKeys = ["id", "ids", "doi", "orcid", "issn", "ror", "mag", "openalex_id", "pmid", "pmcid"];
   const metricKeys = ["cited_by_count", "works_count", "h_index", "i10_index", "counts_by_year", "summary_stats", "fwci", "citation_normalized_percentile", "cited_by_percentile_year"];
   const relationshipKeys = ["authorships", "institutions", "concepts", "topics", "keywords", "grants", "sustainable_development_goals", "mesh", "affiliations", "last_known_institutions", "primary_location", "locations", "best_oa_location", "alternate_host_venues", "x_concepts"];
@@ -227,7 +252,7 @@ const groupFields = (data: Record<string, unknown>): SectionData[] => {
   const geoKeys = ["country_code", "countries_distinct_count", "geo", "latitude", "longitude"];
   const basicKeys = ["display_name", "title", "type", "description", "homepage_url", "image_url", "thumbnail_url", "is_oa", "oa_status", "has_fulltext"];
 
-  Object.entries(data).forEach(([key, value]) => {
+  Object.entries(processedData).forEach(([key, value]) => {
     // Skip hidden fields and non-displayable values
     if (HIDDEN_FIELDS.has(key) || !isDisplayableValue(value)) {
       return;
