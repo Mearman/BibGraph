@@ -19,7 +19,7 @@
     "zod": "4.1.13"
   },
   "devDependencies": {
-    "eslint": "9.39.1",
+    "eslint": "9.39.2",
     "typescript": "5.9.2",
     "vitest": "4.0.14"
   },
