@@ -168,7 +168,7 @@ function createWebConfig(): UserConfig {
       alias: {
         '@': resolve(__dirname, 'src'),
       },
-      dedupe: ['react', 'react-dom', '@tanstack/react-virtual'],
+      dedupe: ['react', 'react-dom', '@tanstack/react-virtual', 'react-force-graph-2d', 'react-force-graph-3d', 'three'],
     },
 
     // Development server configuration
@@ -226,6 +226,10 @@ function createWebConfig(): UserConfig {
         '@tanstack/react-virtual',
         '@mantine/core',
         '@mantine/hooks',
+        'react-force-graph-2d',
+        'react-force-graph-3d',
+        'three',
+        'three-spritetext',
       ],
       exclude: [
         '@bibgraph/client',
