@@ -168,7 +168,7 @@ function createWebConfig(): UserConfig {
       alias: {
         '@': resolve(__dirname, 'src'),
       },
-      dedupe: ['react', 'react-dom'],
+      dedupe: ['react', 'react-dom', '@tanstack/react-virtual'],
     },
 
     // Development server configuration
@@ -223,6 +223,7 @@ function createWebConfig(): UserConfig {
         'react-dom/client',
         '@tanstack/react-router',
         '@tanstack/react-query',
+        '@tanstack/react-virtual',
         '@mantine/core',
         '@mantine/hooks',
       ],
