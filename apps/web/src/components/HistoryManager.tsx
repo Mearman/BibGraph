@@ -3,6 +3,7 @@
  * Refactored to use catalogue-based history system via useUserInteractions hook
  */
 
+import type { EntityType } from "@bibgraph/types";
 import { logError, logger } from "@bibgraph/utils/logger";
 import { type CatalogueEntity,catalogueService } from "@bibgraph/utils/storage/catalogue-db";
 import {
@@ -11,6 +12,7 @@ import {
   Card,
   Divider,
   Group,
+  Skeleton,
   Stack,
   Text,
   TextInput,
@@ -27,8 +29,132 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { useEntityDisplayName } from "@/hooks/use-entity-display-name";
+
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
 import { useUserInteractions } from "@/hooks/use-user-interactions";
+
+/** Non-entity pages that shouldn't trigger display name fetches */
+const NON_ENTITY_URL_PATTERNS = ["/about", "/settings", "/history", "/bookmarks", "/catalogue"];
+
+/**
+ * Sub-component for rendering a single history entry with display name resolution
+ */
+interface HistoryEntryCardProps {
+  entry: CatalogueEntity;
+  onNavigate: (entry: CatalogueEntity) => void;
+  onDelete: (entityRecordId: string, title?: string) => void;
+  formatDate: (date: Date) => string;
+}
+
+const HistoryEntryCard = ({ entry, onNavigate, onDelete, formatDate }: HistoryEntryCardProps) => {
+  // Check if this is a special ID (search or list)
+  const isSpecialId = entry.entityId.startsWith("search-") || entry.entityId.startsWith("list-");
+
+  // Try to extract URL and title from notes
+  const urlFromNotes = entry.notes?.match(/URL: ([^\n]+)/)?.[1];
+  const titleFromNotes = entry.notes?.match(/Title: ([^\n]+)/)?.[1];
+
+  // Check if URL points to a non-entity page
+  const isNonEntityUrl = urlFromNotes && NON_ENTITY_URL_PATTERNS.some(pattern => urlFromNotes.includes(pattern));
+
+  // Only fetch display name for valid entity URLs
+  const { displayName, isLoading } = useEntityDisplayName({
+    entityId: entry.entityId,
+    entityType: entry.entityType as EntityType,
+    enabled: !isSpecialId && !isNonEntityUrl,
+  });
+
+  // Format entity type for display (e.g., "works" -> "Work")
+  const formatEntityType = (entityType: string): string => {
+    const singular = entityType.endsWith("s") ? entityType.slice(0, -1) : entityType;
+    return singular.charAt(0).toUpperCase() + singular.slice(1);
+  };
+
+  // Format entity ID for display (shortened if long)
+  const formatEntityId = (entityId: string): string => {
+    const idMatch = entityId.match(/([A-Z]\d+)$/);
+    if (idMatch) {
+      const id = idMatch[1];
+      return id.length > 8 ? `${id.slice(0, 8)}...` : id;
+    }
+    return entityId.length > 15 ? `${entityId.slice(0, 15)}...` : entityId;
+  };
+
+  // Determine the title to display with proper priority
+  let title: string;
+  if (isSpecialId) {
+    title = entry.entityId.startsWith("search-")
+      ? `Search: ${entry.entityId.replace("search-", "").split("-")[0]}`
+      : `List: ${entry.entityId.replace("list-", "")}`;
+  } else if (isNonEntityUrl && urlFromNotes) {
+    // For non-entity pages, show the page name
+    const pageName = urlFromNotes.replace(/.*[#/]/, "").split("/")[0];
+    title = pageName.charAt(0).toUpperCase() + pageName.slice(1);
+  } else if (displayName) {
+    // Prefer freshly fetched display name
+    title = displayName;
+  } else if (titleFromNotes) {
+    // Fall back to stored title from notes
+    title = titleFromNotes;
+  } else {
+    // Improved fallback: "Work W1234567..." instead of "works: W123456789012345"
+    title = `${formatEntityType(entry.entityType)} ${formatEntityId(entry.entityId)}`;
+  }
+
+  return (
+    <Card
+      key={`${entry.entityId}-${entry.addedAt.getTime()}`}
+      style={{ border: BORDER_STYLE_GRAY_3 }}
+      padding="md"
+      shadow="sm"
+    >
+      <Group justify="space-between" align="flex-start">
+        <Stack gap="xs" style={{ flex: 1 }}>
+          {isLoading && !titleFromNotes ? (
+            <Skeleton height={16} width="60%" />
+          ) : (
+            <Text size="sm" fw={500}>
+              {title}
+            </Text>
+          )}
+          {entry.notes && (
+            <Text size="xs" c="dimmed" lineClamp={2}>
+              {entry.notes.split('\n').filter(line => !line.startsWith('URL:') && !line.startsWith('Title:')).join('\n')}
+            </Text>
+          )}
+          <Text size="xs" c="dimmed">
+            {formatDate(new Date(entry.addedAt))}
+          </Text>
+        </Stack>
+        <Group gap="xs">
+          <Tooltip label="Navigate to this entry">
+            <ActionIcon
+              variant="light"
+              color="blue"
+              onClick={() => onNavigate(entry)}
+              aria-label={`Navigate to ${title}`}
+            >
+              <IconExternalLink size={ICON_SIZE.MD} />
+            </ActionIcon>
+          </Tooltip>
+          {entry.id && (
+            <Tooltip label="Delete history entry">
+              <ActionIcon
+                variant="light"
+                color="red"
+                aria-label={`Delete ${title} from history`}
+                onClick={() => onDelete(entry.id!, title)}
+              >
+                <IconTrash size={ICON_SIZE.MD} />
+              </ActionIcon>
+            </Tooltip>
+          )}
+        </Group>
+      </Group>
+    </Card>
+  );
+};
 
 interface HistoryManagerProps {
   onNavigate?: (url: string) => void;
@@ -238,73 +364,15 @@ export const HistoryManager = ({ onNavigate }: HistoryManagerProps) => {
                   {entries.length} {entries.length === 1 ? 'item' : 'items'}
                 </Text>
               </Group>
-              {entries.map((entry) => {
-                // Extract title from entry notes or use entity ID
-                let title = entry.entityId;
-                const titleMatch = entry.notes?.match(/Title: ([^\n]+)/);
-                if (titleMatch) {
-                  title = titleMatch[1];
-                } else if (entry.entityId.startsWith("search-")) {
-                  title = `Search: ${entry.entityId.replace("search-", "").split("-")[0]}`;
-                } else if (entry.entityId.startsWith("list-")) {
-                  title = `List: ${entry.entityId.replace("list-", "")}`;
-                } else {
-                  title = `${entry.entityType}: ${entry.entityId}`;
-                }
-
-                return (
-                  <Card
-                    key={`${entry.entityId}-${entry.addedAt.getTime()}`}
-                    style={{ border: BORDER_STYLE_GRAY_3 }}
-                    padding="md"
-                    shadow="sm"
-                  >
-                    <Group justify="space-between" align="flex-start">
-                      <Stack gap="xs" style={{ flex: 1 }}>
-                        <Text size="sm" fw={500}>
-                          {title}
-                        </Text>
-                        {entry.notes && (
-                          <Text size="xs" c="dimmed" lineClamp={2}>
-                            {entry.notes.split('\n').filter(line => !line.startsWith('URL:') && !line.startsWith('Title:')).join('\n')}
-                          </Text>
-                        )}
-                        <Text size="xs" c="dimmed">
-                          {formatDate(new Date(entry.addedAt))}
-                        </Text>
-                      </Stack>
-                      <Group gap="xs">
-                        <Tooltip label="Navigate to this entry">
-                          <ActionIcon
-                            variant="light"
-                            color="blue"
-                            onClick={() => handleNavigate(entry)}
-                            aria-label={`Navigate to ${title}`}
-                          >
-                            <IconExternalLink size={ICON_SIZE.MD} />
-                          </ActionIcon>
-                        </Tooltip>
-                        {entry.id && (
-                          <Tooltip label="Delete history entry">
-                            <ActionIcon
-                              variant="light"
-                              color="red"
-                              aria-label={`Delete ${title} from history`}
-                              onClick={() => {
-                                if (entry.id) {
-                                  handleDeleteHistoryEntry(entry.id, title);
-                                }
-                              }}
-                            >
-                              <IconTrash size={ICON_SIZE.MD} />
-                            </ActionIcon>
-                          </Tooltip>
-                        )}
-                      </Group>
-                    </Group>
-                  </Card>
-                );
-              })}
+              {entries.map((entry) => (
+                <HistoryEntryCard
+                  key={`${entry.entityId}-${entry.addedAt.getTime()}`}
+                  entry={entry}
+                  onNavigate={handleNavigate}
+                  onDelete={handleDeleteHistoryEntry}
+                  formatDate={formatDate}
+                />
+              ))}
               {groupKey !== Object.keys(groupedEntries)[Object.keys(groupedEntries).length - 1] && (
                 <Divider size="xs" my="xs" />
               )}
