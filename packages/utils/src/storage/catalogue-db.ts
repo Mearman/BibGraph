@@ -52,7 +52,10 @@ export const catalogueEventEmitter = new CatalogueEventEmitter();
 // Constants
 const LOG_CATEGORY = "catalogue";
 const DB_NAME = "bibgraph-catalogue";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
+
+// Pattern for corrupted history entries (from location.search object concatenation bug)
+const CORRUPTED_ENTITY_ID_PATTERN = "[object Object]";
 
 // Special list identifiers
 export const SPECIAL_LIST_IDS = {
@@ -132,13 +135,45 @@ class CatalogueDB extends Dexie {
     super(DB_NAME);
 
     // T076: Optimized indexes for common query patterns
-    this.version(DB_VERSION).stores({
+    this.version(1).stores({
       catalogueLists: "id, title, type, createdAt, updatedAt, isPublic, shareToken, *tags",
       // Added compound index [listId+position] for efficient reordering and sorted entity retrieval
       // Added compound index [listId+entityType+entityId] for duplicate detection
       catalogueEntities: "id, listId, entityType, entityId, addedAt, position, [listId+position], [listId+entityType+entityId]",
       catalogueShares: "id, listId, shareToken, createdAt, expiresAt",
     });
+
+    // Migration v2: Clean up corrupted history entries containing [object Object]
+    // This fixes data corruption from the useNavigationEnhancements.ts bug where
+    // TanStack Router's location.search (an object) was concatenated with strings
+    this.version(2)
+      .stores({
+        // Same schema as v1 - no structural changes
+        catalogueLists: "id, title, type, createdAt, updatedAt, isPublic, shareToken, *tags",
+        catalogueEntities: "id, listId, entityType, entityId, addedAt, position, [listId+position], [listId+entityType+entityId]",
+        catalogueShares: "id, listId, shareToken, createdAt, expiresAt",
+      })
+      .upgrade(async (tx) => {
+        const entities = tx.table("catalogueEntities");
+        const corruptedEntries = await entities
+          .filter((entity: CatalogueEntity) =>
+            entity.entityId.includes(CORRUPTED_ENTITY_ID_PATTERN)
+          )
+          .toArray();
+
+        if (corruptedEntries.length > 0) {
+          const corruptedIds = corruptedEntries
+            .map((e: CatalogueEntity) => e.id)
+            .filter((id): id is string => id !== undefined);
+
+          await entities.bulkDelete(corruptedIds);
+
+          // Log cleanup (console.log since logger not available in migration context)
+          console.log(
+            `[catalogue-db] Migration v2: Cleaned up ${corruptedIds.length} corrupted history entries`
+          );
+        }
+      });
   }
 }
 
