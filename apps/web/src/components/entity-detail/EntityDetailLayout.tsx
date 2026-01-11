@@ -1,6 +1,6 @@
 import type { EntityType } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
-import { ActionIcon, Badge, Box, Code, Group, Modal, Paper, SegmentedControl, Stack, Text, Title, Tooltip } from "@mantine/core";
+import { ActionIcon, Affix, Badge, Box, Code, Group, Modal, Paper, SegmentedControl, Stack, Text, Title, Tooltip } from "@mantine/core";
 import { IconBookmark, IconBookmarkFilled, IconBookmarkOff, IconCode, IconListCheck, IconMenu2, IconX } from "@tabler/icons-react";
 import React, { ReactNode, useState } from "react";
 
@@ -93,6 +93,7 @@ export const EntityDetailLayout = ({
   return (
     <Box
       p={isMobile() ? "sm" : "xl"}
+      pb={isMobile() ? 80 : undefined}
       bg="var(--mantine-color-body)"
       style={{ minHeight: '100%' }}
       data-testid="entity-detail-layout"
@@ -387,6 +388,86 @@ export const EntityDetailLayout = ({
             }}
           />
         </Modal>
+
+        {/* Mobile Sticky Bottom Action Bar */}
+        {isMobile() && (
+          <Affix position={{ bottom: 0, left: 0, right: 0 }}>
+            <Paper
+              p="sm"
+              shadow="lg"
+              style={{
+                borderTop: '1px solid var(--mantine-color-gray-3)',
+                borderRadius: 0,
+                backgroundColor: 'var(--mantine-color-body)',
+              }}
+            >
+              <Group justify="space-around" gap="xs">
+                <Tooltip label="Add to list" position="top">
+                  <ActionIcon
+                    size="lg"
+                    variant="light"
+                    color="green"
+                    onClick={() => setShowAddToListModal(true)}
+                    aria-label="Add to catalogue list"
+                  >
+                    <IconListCheck size={ICON_SIZE.LG} />
+                  </ActionIcon>
+                </Tooltip>
+
+                <Tooltip
+                  label={userInteractions.isBookmarked ? "Remove bookmark" : "Bookmark"}
+                  position="top"
+                >
+                  <ActionIcon
+                    size="lg"
+                    variant={userInteractions.isBookmarked ? "filled" : "light"}
+                    color={userInteractions.isBookmarked ? "yellow" : "gray"}
+                    onClick={handleBookmarkToggle}
+                    loading={userInteractions.isLoadingBookmarks}
+                    aria-label={userInteractions.isBookmarked ? "Remove bookmark" : "Add bookmark"}
+                  >
+                    {userInteractions.isBookmarked ? (
+                      <IconBookmark size={ICON_SIZE.LG} fill="currentColor" />
+                    ) : (
+                      <IconBookmarkOff size={ICON_SIZE.LG} />
+                    )}
+                  </ActionIcon>
+                </Tooltip>
+
+                {(selectParam || Object.keys(queryBookmarking.currentQueryParams).length > 0) && (
+                  <Tooltip
+                    label={queryBookmarking.isQueryBookmarked ? "Remove query bookmark" : "Bookmark query"}
+                    position="top"
+                  >
+                    <ActionIcon
+                      size="lg"
+                      variant={queryBookmarking.isQueryBookmarked ? "filled" : "light"}
+                      color={queryBookmarking.isQueryBookmarked ? "blue" : "gray"}
+                      onClick={handleQueryBookmarkToggle}
+                      aria-label={queryBookmarking.isQueryBookmarked ? "Remove query bookmark" : "Add query bookmark"}
+                    >
+                      {queryBookmarking.isQueryBookmarked ? (
+                        <IconBookmarkFilled size={ICON_SIZE.LG} />
+                      ) : (
+                        <IconBookmark size={ICON_SIZE.LG} />
+                      )}
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+
+                <SegmentedControl
+                  size="xs"
+                  value={viewMode}
+                  onChange={(value) => onViewModeChange(value as DetailViewMode)}
+                  data={[
+                    { label: 'Rich', value: 'rich' },
+                    { label: 'Raw', value: 'raw' },
+                  ]}
+                />
+              </Group>
+            </Paper>
+          </Affix>
+        )}
     </Box>
   );
 };
