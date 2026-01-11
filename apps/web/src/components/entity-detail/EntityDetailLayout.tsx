@@ -1,7 +1,8 @@
 import type { EntityType } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
 import { ActionIcon, Affix, Badge, Box, Code, Group, Modal, Paper, SegmentedControl, Stack, Text, Title, Tooltip } from "@mantine/core";
-import { IconBookmark, IconBookmarkFilled, IconBookmarkOff, IconCode, IconListCheck, IconMenu2, IconX } from "@tabler/icons-react";
+import { notifications } from "@mantine/notifications";
+import { IconBookmark, IconBookmarkFilled, IconBookmarkOff, IconCode, IconGraph, IconListCheck, IconMenu2, IconX } from "@tabler/icons-react";
 import React, { ReactNode, useState } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
@@ -9,6 +10,7 @@ import { useQueryBookmarking } from "@/hooks/use-query-bookmarking";
 import { useResponsiveDesign } from "@/hooks/use-sprinkles";
 import { useThemeColors } from "@/hooks/use-theme-colors";
 import { useUserInteractions } from "@/hooks/use-user-interactions";
+import { useGraphList } from "@/hooks/useGraphList";
 
 import { AddToListModal } from "../catalogue/AddToListModal";
 import { EntityDataDisplay } from "../EntityDataDisplay";
@@ -68,6 +70,13 @@ export const EntityDetailLayout = ({
   // Mobile navigation state
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
 
+  // Graph list hook for adding entities to the graph
+  const graphList = useGraphList();
+  const [isAddingToGraph, setIsAddingToGraph] = useState(false);
+
+  // Check if entity is already in graph
+  const isInGraph = graphList.nodes.some(node => node.entityId === entityId);
+
   const handleBookmarkToggle = async () => {
     try {
       await (userInteractions.isBookmarked ? userInteractions.unbookmarkEntity() : userInteractions.bookmarkEntity({
@@ -91,6 +100,42 @@ export const EntityDetailLayout = ({
       logger.error("ui", "Failed to toggle query bookmark", { error, entityType, entityId });
     }
   };
+
+  const handleAddToGraphToggle = async () => {
+    setIsAddingToGraph(true);
+    try {
+      if (isInGraph) {
+        await graphList.removeNode(entityId);
+        notifications.show({
+          title: "Removed from Graph",
+          message: `${displayName} removed from graph`,
+          color: "gray",
+        });
+      } else {
+        await graphList.addNode({
+          entityId,
+          entityType,
+          label: displayName,
+          provenance: "user",
+        });
+        notifications.show({
+          title: "Added to Graph",
+          message: `${displayName} added to graph for analysis`,
+          color: "green",
+        });
+      }
+    } catch (error) {
+      logger.error("ui", "Failed to toggle graph list", { error, entityType, entityId });
+      notifications.show({
+        title: "Error",
+        message: isInGraph ? "Failed to remove from graph" : "Failed to add to graph",
+        color: "red",
+      });
+    } finally {
+      setIsAddingToGraph(false);
+    }
+  };
+
   return (
     <Box
       p={isMobile() ? "sm" : "xl"}
@@ -155,6 +200,19 @@ export const EntityDetailLayout = ({
 
                   <Group gap="sm">
                     {/* Desktop Action Buttons */}
+                    <Tooltip label={isInGraph ? "Remove from graph" : "Add to graph for analysis"} position="bottom">
+                      <ActionIcon
+                        size="lg"
+                        variant={isInGraph ? "filled" : "light"}
+                        color="grape"
+                        onClick={handleAddToGraphToggle}
+                        loading={isAddingToGraph || graphList.loading}
+                        data-testid="add-to-graph-button"
+                      >
+                        <IconGraph size={ICON_SIZE.XL} />
+                      </ActionIcon>
+                    </Tooltip>
+
                     <Tooltip label="Add to catalogue list" position="bottom">
                       <ActionIcon
                         size="lg"
@@ -236,6 +294,20 @@ export const EntityDetailLayout = ({
                       <Stack gap="sm">
                         <Text size="sm" fw={600} c="dimmed">Actions</Text>
                         <Group gap="sm" justify="space-around">
+                          <ActionIcon
+                            size="lg"
+                            variant={isInGraph ? "filled" : "light"}
+                            color="grape"
+                            onClick={() => {
+                              handleAddToGraphToggle();
+                              setMobileActionsOpen(false);
+                            }}
+                            loading={isAddingToGraph || graphList.loading}
+                            data-testid="mobile-add-to-graph-button"
+                          >
+                            <IconGraph size={ICON_SIZE.LG} />
+                          </ActionIcon>
+
                           <ActionIcon
                             size="lg"
                             variant="light"
@@ -403,6 +475,19 @@ export const EntityDetailLayout = ({
               }}
             >
               <Group justify="space-around" gap="xs">
+                <Tooltip label={isInGraph ? "Remove from graph" : "Add to graph"} position="top">
+                  <ActionIcon
+                    size="lg"
+                    variant={isInGraph ? "filled" : "light"}
+                    color="grape"
+                    onClick={handleAddToGraphToggle}
+                    loading={isAddingToGraph || graphList.loading}
+                    aria-label={isInGraph ? "Remove from graph" : "Add to graph"}
+                  >
+                    <IconGraph size={ICON_SIZE.LG} />
+                  </ActionIcon>
+                </Tooltip>
+
                 <Tooltip label="Add to list" position="top">
                   <ActionIcon
                     size="lg"
