@@ -148,8 +148,22 @@ const singularToPluralEntityType: Record<string, EntityType> = {
 export const transformAutocompleteResultToGridItem = (result: AutocompleteResult): EntityGridItem => {
   const entityType = singularToPluralEntityType[result.entity_type] || (result.entity_type as EntityType)
 
+  // Extract ID from OpenAlex URL, removing the base URL
+  let id = result.id.replace("https://openalex.org/", "")
+
+  // For entity types where the ID includes the type prefix (e.g., "keywords/machine-learning"),
+  // strip it since EntityCard will add it back via entityType
+  if (id.includes("/")) {
+    const parts = id.split("/")
+    // Check if first part matches a known entity type plural
+    const knownPrefixes = ["keywords", "domains", "fields", "subfields"]
+    if (knownPrefixes.includes(parts[0])) {
+      id = parts.slice(1).join("/")
+    }
+  }
+
   return {
-    id: result.id.replace("https://openalex.org/", ""),
+    id,
     displayName: result.display_name,
     entityType,
     worksCount: result.works_count,
