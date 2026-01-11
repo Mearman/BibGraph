@@ -1,6 +1,6 @@
-import type { Bookmark,EntityType } from "@bibgraph/types";
-import { BookmarkGrid,BookmarkList, BookmarkSearchFilters, BookmarkTable } from "@bibgraph/ui";
-import type { CatalogueEntity,ExportFormat, ExportOptions } from "@bibgraph/utils";
+import type { Bookmark, EntityType } from "@bibgraph/types";
+import { BookmarkGrid, BookmarkList, BookmarkSearchFilters, BookmarkTable } from "@bibgraph/ui";
+import type { CatalogueEntity, ExportFormat, ExportOptions } from "@bibgraph/utils";
 import { applyFilters, downloadExport, exportBookmarks, logger, SPECIAL_LIST_IDS } from "@bibgraph/utils";
 import {
 	Alert,
@@ -35,6 +35,7 @@ import { useCallback,useEffect, useMemo, useState } from "react";
 import { RATE_LIMIT_CONFIG } from "@/config/rate-limit";
 import { ICON_SIZE } from "@/config/style-constants";
 import { useStorageProvider } from "@/contexts/storage-provider-context";
+import { useEnrichedBookmarks } from "@/hooks/use-enriched-bookmarks";
 import { useBookmarks } from "@/hooks/useBookmarks";
 
 import type { BookmarksSearch, BookmarkViewMode } from "./bookmarks";
@@ -89,10 +90,13 @@ const BookmarksIndexPage = () => {
 	const search = useSearch({ from: "/bookmarks" });
 
 	// Convert CatalogueEntity[] to Bookmark[]
-	const bookmarks = useMemo(
+	const rawBookmarks = useMemo(
 		() => catalogueBookmarks.map((entity) => convertToBookmark(entity)),
 		[catalogueBookmarks]
 	);
+
+	// Enrich bookmarks with display names from OpenAlex
+	const { bookmarks } = useEnrichedBookmarks(rawBookmarks);
 
 	// Initialize filter state from URL parameters
 	const [searchQuery, setSearchQuery] = useState(search.search || "");
