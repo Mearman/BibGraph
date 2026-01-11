@@ -15,11 +15,14 @@ import { useStorageProvider } from '@/contexts/storage-provider-context';
 
 const LOG_PREFIX = 'use-graph-list';
 
+/** Minimal node input for adding to graph list - only needs identifying info */
+export type GraphNodeInput = Pick<GraphNode, 'entityId' | 'entityType' | 'label'>;
+
 export interface UseGraphListReturn {
 	nodes: GraphListNode[];
 	loading: boolean;
 	error: Error | null;
-	addNode: (node: GraphNode, provenance: GraphProvenance) => Promise<void>;
+	addNode: (node: GraphNodeInput, provenance: GraphProvenance) => Promise<void>;
 	removeNode: (entityId: string) => Promise<void>;
 	clearList: () => Promise<void>;
 }
@@ -74,7 +77,7 @@ export const useGraphList = (): UseGraphListReturn => {
 	 * Uses optimistic updates for better UX
 	 */
 	const addNode = useCallback(
-		async (node: GraphNode, provenance: GraphProvenance): Promise<void> => {
+		async (node: GraphNodeInput, provenance: GraphProvenance): Promise<void> => {
 			const newEntry: GraphListNode = {
 				id: node.entityId, // Use entityId as temporary id for optimistic update
 				entityId: node.entityId,
