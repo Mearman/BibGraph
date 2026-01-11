@@ -66,7 +66,7 @@ export const convertToRelativeUrl = (urlOrId: string): string => {
 
 	// If the ID already includes an entity type path (e.g., "topics/T10211", "keywords/machine-learning"),
 	// return it directly
-	const pathBasedPattern = /^(works|authors|sources|institutions|topics|publishers|funders|concepts|fields|domains|subfields|keywords)\//i;
+	const pathBasedPattern = /^(?:works|authors|sources|institutions|topics|publishers|funders|concepts|fields|domains|subfields|keywords)\//i;
 	if (pathBasedPattern.test(id)) {
 		return `#/${id}`;
 	}
