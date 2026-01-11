@@ -1,6 +1,6 @@
 import type { EntityType } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
-import { ActionIcon, AppShell, Badge, Code, Group, Modal, Paper, SegmentedControl, Stack, Text, Title, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Box, Code, Group, Modal, Paper, SegmentedControl, Stack, Text, Title, Tooltip } from "@mantine/core";
 import { IconBookmark, IconBookmarkFilled, IconBookmarkOff, IconCode, IconListCheck, IconMenu2, IconX } from "@tabler/icons-react";
 import React, { ReactNode, useState } from "react";
 
@@ -91,14 +91,13 @@ export const EntityDetailLayout = ({
     }
   };
   return (
-    <AppShell
-      padding={isMobile() ? "sm" : "xl"}
+    <Box
+      p={isMobile() ? "sm" : "xl"}
       bg="var(--mantine-color-body)"
-      style={{ minHeight: '100vh' }}
+      style={{ minHeight: '100%' }}
       data-testid="entity-detail-layout"
     >
-      <AppShell.Main>
-        <Stack gap={isMobile() ? "lg" : "xl"}>
+      <Stack gap={isMobile() ? "lg" : "xl"}>
           {/* Header Section */}
           <Paper p={isMobile() ? "lg" : "xl"} radius="xl">
             <Stack gap="lg">
@@ -388,7 +387,6 @@ export const EntityDetailLayout = ({
             }}
           />
         </Modal>
-      </AppShell.Main>
-    </AppShell>
+    </Box>
   );
 };
