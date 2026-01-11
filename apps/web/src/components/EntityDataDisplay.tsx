@@ -278,8 +278,25 @@ const renderValueContent = (value: unknown, fieldName?: string): import("react")
       return null;
     }
 
-    // Primitive arrays - inline badges
+    // Primitive arrays - handle inline or as links depending on content
     if (value.every(item => typeof item !== "object" || item === null)) {
+      // Check if any items are URLs that need special rendering
+      const hasUrls = value.some(item =>
+        typeof item === "string" && /^https?:\/\//i.test(item)
+      );
+
+      if (hasUrls) {
+        // URLs need individual rendering for proper link handling
+        return (
+          <Group wrap="wrap" gap={4}>
+            {value.map((item, index) => (
+              <Box key={index}>{renderPrimitiveValue(item)}</Box>
+            ))}
+          </Group>
+        );
+      }
+
+      // Non-URL primitives render as badges
       return (
         <Group wrap="wrap" gap={4}>
           {value.map((item, index) => (
