@@ -133,6 +133,55 @@ const getEntityTypeColor = (entityType: AutocompleteResult["entity_type"]) => {
   return "gray";
 };
 
+/**
+ * Name cell component - extracted to use hooks properly
+ * React hooks must be called at the top level of a component, not in render functions
+ */
+const SearchResultNameCell = ({ result }: { result: AutocompleteResult }) => {
+  const entityUrl = convertToRelativeUrl(result.id);
+  const hover = useSearchResultHover(result);
+
+  return (
+    <>
+      <div {...hover.props}>
+        {entityUrl ? (
+          <Anchor
+            href={entityUrl}
+            size="sm"
+            fw={500}
+            style={{ textDecoration: "none" }}
+            aria-label={`View ${result.entity_type} ${result.display_name}`}
+          >
+            {result.display_name}
+          </Anchor>
+        ) : (
+          <Text fw={500} size="sm">
+            {result.display_name}
+          </Text>
+        )}
+        {result.hint && (
+          <Text size="xs" c="dimmed" lineClamp={1}>
+            {result.hint}
+          </Text>
+        )}
+        {result.external_id && (
+          <Text size="xs" c="dimmed">
+            {result.external_id}
+          </Text>
+        )}
+      </div>
+
+      {/* Hover preview card */}
+      <SearchResultPreview
+        entity={result}
+        opened={hover.opened}
+        onToggle={hover.toggle}
+        targetElement={hover.targetElement}
+      />
+    </>
+  );
+};
+
 // Extract column definitions to reduce complexity
 const createSearchColumns = (): ColumnDef<AutocompleteResult>[] => [
   {
@@ -155,55 +204,7 @@ const createSearchColumns = (): ColumnDef<AutocompleteResult>[] => [
   {
     accessorKey: "display_name",
     header: "Name",
-    cell: ({ row }) => {
-      const result = row.original;
-      // result.id is already a full URL like "https://openalex.org/T10044"
-      // Don't prepend another domain prefix
-      const entityUrl = convertToRelativeUrl(result.id);
-
-      // Set up hover functionality
-      const hover = useSearchResultHover(result);
-
-      return (
-        <>
-          <div {...hover.props}>
-            {entityUrl ? (
-              <Anchor
-                href={entityUrl}
-                size="sm"
-                fw={500}
-                style={{ textDecoration: "none" }}
-                aria-label={`View ${result.entity_type} ${result.display_name}`}
-              >
-                {result.display_name}
-              </Anchor>
-            ) : (
-              <Text fw={500} size="sm">
-                {result.display_name}
-              </Text>
-            )}
-            {result.hint && (
-              <Text size="xs" c="dimmed" lineClamp={1}>
-                {result.hint}
-              </Text>
-            )}
-            {result.external_id && (
-              <Text size="xs" c="dimmed">
-                {result.external_id}
-              </Text>
-            )}
-          </div>
-
-          {/* Hover preview card */}
-          <SearchResultPreview
-            entity={result}
-            opened={hover.opened}
-            onToggle={hover.toggle}
-            targetElement={hover.targetElement}
-          />
-        </>
-      );
-    },
+    cell: ({ row }) => <SearchResultNameCell result={row.original} />,
   },
   {
     accessorKey: "cited_by_count",
