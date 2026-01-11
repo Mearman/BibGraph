@@ -1084,6 +1084,19 @@ export class CatalogueService {
     // Runtime cleanup: filter out corrupted entries that may have been created after migration
     // Check both entityId and notes (which contains URL) for corruption patterns
     const urlEncodedPattern = "[object%20Object]";
+
+    // Entity ID prefix to URL path mapping for validation
+    const entityPrefixToPath: Record<string, string> = {
+      W: "/works/",
+      A: "/authors/",
+      I: "/institutions/",
+      S: "/sources/",
+      P: "/publishers/",
+      F: "/funders/",
+      T: "/topics/",
+      C: "/concepts/",
+    };
+
     return entities.filter((entity) => {
       if (entity.entityId.length === 0) return false;
       if (entity.entityId.includes(CORRUPTED_ENTITY_ID_PATTERN)) return false;
@@ -1091,6 +1104,20 @@ export class CatalogueService {
       // Also check notes for corrupted URLs
       if (entity.notes?.includes(CORRUPTED_ENTITY_ID_PATTERN)) return false;
       if (entity.notes?.includes(urlEncodedPattern)) return false;
+
+      // Validate entityId matches URL path (detect mismatch like Work ID with Author URL)
+      const urlMatch = entity.notes?.match(/URL: ([^\n]+)/);
+      if (urlMatch) {
+        const url = urlMatch[1];
+        const entityPrefix = entity.entityId.charAt(0).toUpperCase();
+        const expectedPath = entityPrefixToPath[entityPrefix];
+        // If we have a known prefix and URL doesn't match expected path, filter it out
+        // Skip validation for non-entity pages like /about, /settings
+        if (expectedPath && !url.includes(expectedPath) && !url.startsWith("/about") && !url.startsWith("/settings")) {
+          return false;
+        }
+      }
+
       return true;
     });
   }

@@ -27,6 +27,12 @@ const DECIMAL_PRECISION_FIELD_PATTERNS = ["score", "share", "percentile", "fwci"
 const DECIMAL_PRECISION_DIGITS = 4;
 
 /**
+ * Threshold below which we use significant figures instead of fixed decimals
+ * Values smaller than this would round to 0 with DECIMAL_PRECISION_DIGITS
+ */
+const SMALL_VALUE_THRESHOLD = 0.0001;
+
+/**
  * Check if a field name indicates a year value
  * @param fieldName - The field name to check
  */
@@ -83,6 +89,10 @@ export const formatNumber = (value: number, fieldName?: string): string => {
 
 	// For score/share/percentile fields, preserve decimal precision
 	if (fieldName && isDecimalPrecisionField(fieldName) && !Number.isInteger(value)) {
+		// For very small values, use significant figures to avoid showing "0"
+		if (Math.abs(value) > 0 && Math.abs(value) < SMALL_VALUE_THRESHOLD) {
+			return value.toPrecision(2);
+		}
 		return value.toLocaleString(undefined, {
 			minimumFractionDigits: 0,
 			maximumFractionDigits: DECIMAL_PRECISION_DIGITS,
