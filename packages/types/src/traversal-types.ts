@@ -22,8 +22,8 @@ export type WeightableEdgeProperty = 'score' | 'weight';
 /**
  * Generic weight function signature.
  * Allows weight calculation based on edge and optionally source/target nodes.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @example
  * ```typescript
  * // Simple edge property weight
@@ -38,8 +38,8 @@ export type WeightFunction<N, E> = (edge: E, sourceNode: N, targetNode: N) => nu
 
 /**
  * Configuration for how edge weights are calculated.
- * @typeParam N - Node type (default: GraphNodeRecord)
- * @typeParam E - Edge type (default: GraphEdgeRecord)
+ * @template N - Node type (default: GraphNodeRecord)
+ * @template E - Edge type (default: GraphEdgeRecord)
  * @example
  * ```typescript
  * // Use score property as weight
@@ -98,8 +98,8 @@ export type TraversalDirection = 'outbound' | 'inbound' | 'both';
  *
  * Combines filtering, weight configuration, and traversal parameters
  * for flexible graph exploration.
- * @typeParam N - Node type (default: GraphNodeRecord)
- * @typeParam E - Edge type (default: GraphEdgeRecord)
+ * @template N - Node type (default: GraphNodeRecord)
+ * @template E - Edge type (default: GraphEdgeRecord)
  * @example
  * ```typescript
  * // Find shortest weighted path through authors only

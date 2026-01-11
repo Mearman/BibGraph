@@ -495,7 +495,7 @@ export type HierarchicalError =
 
 /**
  * Result of Louvain community detection.
- * @typeParam T - Node identifier type (typically string)
+ * @template T - Node identifier type (typically string)
  * @remarks
  * This interface defines the data structure returned by the Louvain algorithm.
  * The actual function returns `Result<LouvainResult<string>, ClusteringError>`.

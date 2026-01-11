@@ -276,8 +276,8 @@ const extractRemainingComponent = (state: TarjanState): BiconnectedComponent<str
  * 3. Detect articulation points: low[child] ≥ disc[v]
  * 4. Extract components by popping edge stack on backtrack
  * 5. Handle disconnected graphs (DFS from each unvisited node)
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Undirected graph to analyze
  * @returns Result containing biconnected components and articulation points, or error
  * @example

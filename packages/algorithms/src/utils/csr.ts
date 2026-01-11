@@ -11,8 +11,8 @@ import { type Edge,type Node } from '../types/graph';
 
 /**
  * Compressed Sparse Row (CSR) graph representation.
- * @typeParam N - Node type (must extend Node interface)
- * @typeParam E - Edge type (must extend Edge interface)
+ * @template N - Node type (must extend Node interface)
+ * @template E - Edge type (must extend Edge interface)
  * @remarks
  * CSR stores the graph in three typed arrays for optimal memory access:
  *
@@ -100,8 +100,8 @@ export interface CSRGraph<N extends Node, E extends Edge> {
 
 /**
  * Convert a Graph to Compressed Sparse Row (CSR) format.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph to convert
  * @returns CSR representation of the graph
  * @throws {RangeError} If graph is too large for typed arrays (>4 billion nodes or edges)

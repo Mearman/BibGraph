@@ -119,8 +119,8 @@ export const shuffle = <T>(array: T[], seed?: number): T[] => {
  *
  * The Louvain method is a greedy optimization method that attempts to optimize
  * the modularity of a partition of the network.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph (directed or undirected)
  * @param options - Optional configuration (combines legacy and optimization parameters)
  * @param options.weightFn - Weight function for edges (default: all edges weight 1.0) [Legacy]

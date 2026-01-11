@@ -1,8 +1,8 @@
 /**
  * Result type for operations that can fail.
  * Discriminated union with `ok` field for pattern matching.
- * @typeParam T - Success value type
- * @typeParam E - Error type
+ * @template T - Success value type
+ * @template E - Error type
  * @example
  * ```typescript
  * const result: Result<number, string> = Ok(42);
@@ -19,7 +19,7 @@ export type Result<T, E> =
 
 /**
  * Create a successful Result.
- * @typeParam T - Success value type
+ * @template T - Success value type
  * @param value - The success value
  * @returns Result with ok: true
  * @example
@@ -32,7 +32,7 @@ export const Ok = <T>(value: T): Result<T, never> => ({ ok: true, value });
 
 /**
  * Create a failed Result.
- * @typeParam E - Error type
+ * @template E - Error type
  * @param error - The error value
  * @returns Result with ok: false
  * @example

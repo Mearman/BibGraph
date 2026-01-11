@@ -22,8 +22,8 @@ import type { Edge,Node } from '../types/graph';
  * - Lower values indicate better cluster quality (fewer boundary edges)
  * - φ < 0.1 typically indicates strong cluster cohesion
  * - φ > 0.5 indicates weak cluster structure
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph
  * @param clusterNodes - Set of nodes in the cluster
  * @returns Conductance score in range [0.0, 1.0]
@@ -112,8 +112,8 @@ export const calculateConductance = <N extends Node, E extends Edge>(graph: Grap
 
 /**
  * Calculate average conductance across multiple clusters.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph
  * @param clusters - Array of node sets representing clusters
  * @returns Average conductance score
@@ -146,8 +146,8 @@ export const calculateAverageConductance = <N extends Node, E extends Edge>(grap
  * Calculate weighted average conductance (weighted by cluster size).
  *
  * Larger clusters have more influence on the average.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph
  * @param clusters - Array of node sets representing clusters
  * @returns Weighted average conductance score

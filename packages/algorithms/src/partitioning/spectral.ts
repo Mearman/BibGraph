@@ -24,8 +24,8 @@ import type { WeightFunction } from '../types/weight-function';
  *
  * Divides graph into k balanced partitions by analyzing the spectral properties
  * of the graph Laplacian matrix.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph (directed or undirected)
  * @param k - Number of partitions to create
  * @param options - Optional configuration

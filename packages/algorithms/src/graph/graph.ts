@@ -9,8 +9,8 @@ import { Err,Ok, type Result } from '../types/result';
 /**
  * Generic graph data structure supporting both directed and undirected graphs.
  * Uses adjacency list representation for efficient neighbor lookup (O(1) average case).
- * @typeParam N - Node type (must extend Node interface with id and type fields)
- * @typeParam E - Edge type (must extend Edge interface with source, target fields)
+ * @template N - Node type (must extend Node interface with id and type fields)
+ * @template E - Edge type (must extend Edge interface with source, target fields)
  * @example
  * ```typescript
  * type WorkNode = { id: string; type: 'work'; title: string };

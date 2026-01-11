@@ -40,8 +40,8 @@ interface InternalCommunity {
  *
  * The Leiden algorithm improves upon Louvain by adding a refinement phase that
  * guarantees all detected communities are connected subgraphs.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph (directed or undirected)
  * @param options - Optional configuration
  * @param options.weightFn - Weight function for edges (default: all edges weight 1.0)

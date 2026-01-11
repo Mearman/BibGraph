@@ -25,8 +25,8 @@ import type { Edge,Node } from '../types/graph';
  * - Higher values indicate stronger community structure
  * - Q > 0.3 typically indicates significant community structure
  * - Q < 0 indicates worse than random partitioning
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph
  * @param communities - Community assignments
  * @returns Modularity score in range [-0.5, 1.0]
@@ -155,8 +155,8 @@ export const calculateModularity = <N extends Node, E extends Edge>(graph: Graph
  * Calculate modularity contribution for a single community.
  *
  * Used for incremental modularity updates during optimization.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph
  * @param community - Community to evaluate
  * @param totalEdges - Total number of edges in graph

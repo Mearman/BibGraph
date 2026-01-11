@@ -49,8 +49,8 @@ export interface CorePeripheryOptions {
  * Identifies a dense core of highly connected nodes and a sparse periphery.
  * Core nodes have high coreness scores (> threshold) and are densely connected to each other.
  * Periphery nodes have low coreness scores and are sparsely connected.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph (directed or undirected)
  * @param options - Optional parameters (threshold, iterations, epsilon)
  * @returns Result with core-periphery structure or error

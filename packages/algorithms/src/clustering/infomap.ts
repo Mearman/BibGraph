@@ -48,8 +48,8 @@ interface Transition {
  *
  * Infomap uses information theory to find communities by minimizing the
  * description length (map equation) of random walks on the network.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph (directed or undirected)
  * @param options - Optional configuration
  * @param options.weightFn - Weight function for edges (default: all edges weight 1.0)

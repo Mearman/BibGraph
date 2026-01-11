@@ -294,8 +294,8 @@ const buildDendrogram = <N extends Node>(nodes: N[], merges: MergeStep[], height
 
 /**
  * Perform hierarchical clustering on a graph.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph (directed or undirected)
  * @param options - Configuration options
  * @param options.linkage - Linkage method: 'single', 'complete', or 'average' (default: 'average')

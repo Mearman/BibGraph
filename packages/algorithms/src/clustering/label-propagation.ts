@@ -30,8 +30,8 @@ import type { WeightFunction } from '../types/weight-function';
  * Fast semi-supervised clustering algorithm that propagates labels through
  * the network based on neighbor voting. Nodes iteratively adopt the most
  * frequent label among their neighbors.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph (directed or undirected)
  * @param options - Optional configuration
  * @param options.weightFn - Weight function for edges (default: all edges weight 1.0)

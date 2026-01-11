@@ -28,8 +28,8 @@ import { calculateModularity } from './modularity';
  * - 1.0 = complete graph (all possible edges present)
  * - 0.0 = no internal edges
  * - Higher density indicates tighter community structure
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph
  * @param clusterNodes - Set of nodes in the cluster
  * @returns Density score in range [0.0, 1.0]
@@ -93,8 +93,8 @@ export const calculateDensity = <N extends Node, E extends Edge>(graph: Graph<N,
 
 /**
  * Calculate average density across multiple clusters.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph
  * @param clusters - Array of node sets representing clusters
  * @returns Average density score
@@ -130,8 +130,8 @@ export const calculateAverageDensity = <N extends Node, E extends Edge>(graph: G
  * Range: [0.0, 1.0]
  * - Higher coverage means most edges are within communities
  * - Lower coverage means many inter-community edges
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph
  * @param clusters - Array of node sets representing clusters
  * @returns Coverage ratio
@@ -191,8 +191,8 @@ export const calculateCoverageRatio = <N extends Node, E extends Edge>(graph: Gr
  *
  * Computes modularity, average conductance, average density, coverage ratio,
  * and cluster count for a complete clustering.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph
  * @param communities - Array of communities
  * @returns Aggregated ClusterMetrics
@@ -234,8 +234,8 @@ export const calculateClusterMetrics = <N extends Node, E extends Edge>(graph: G
  * Update ClusterMetrics with per-community density values.
  *
  * Modifies community objects to include their individual density scores.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * @param graph - Input graph
  * @param communities - Array of communities (modified in place)
  * @example

@@ -3,7 +3,7 @@ import { type Edge,type Node } from './graph';
 /**
  * Result from graph traversal algorithms (DFS, BFS).
  * Contains visit order, parent relationships, and timing metadata.
- * @typeParam N - Node type
+ * @template N - Node type
  * visitOrder - Nodes in the order they were visited
  * parents - Parent relationship map (node ID → parent ID or null for root)
  * discovered - Discovery timestamps (DFS only, undefined for BFS)
@@ -34,8 +34,8 @@ export interface TraversalResult<N extends Node> {
 /**
  * Path from source to destination node.
  * Contains ordered nodes, connecting edges, and total weight.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * nodes - Nodes in path order (source to destination)
  * edges - Edges connecting consecutive nodes
  * totalWeight - Sum of edge weights
@@ -67,7 +67,7 @@ export interface Path<N extends Node, E extends Edge> {
 /**
  * Connected component of nodes.
  * Represents a maximal set of mutually reachable nodes.
- * @typeParam N - Node type
+ * @template N - Node type
  * id - Component identifier (0-indexed)
  * nodes - Nodes in this component
  * size - Number of nodes in component
@@ -97,8 +97,8 @@ export interface Component<N extends Node> {
 /**
  * Information about a detected cycle.
  * Contains the nodes and edges that form the cycle.
- * @typeParam N - Node type
- * @typeParam E - Edge type
+ * @template N - Node type
+ * @template E - Edge type
  * nodes - Nodes forming the cycle
  * edges - Edges connecting the cycle nodes
  * @invariant nodes.length >= 2 (at least two nodes form a cycle)
