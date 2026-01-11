@@ -25,7 +25,6 @@ interface EntityDetailLayoutProps {
   entityId: string;
   displayName: string;
   selectParam?: string;
-  selectFields: string[];
   viewMode: DetailViewMode;
   onViewModeChange: (mode: DetailViewMode) => void;
   data: Record<string, unknown>;
@@ -38,7 +37,6 @@ export const EntityDetailLayout = ({
   entityId,
   displayName,
   selectParam,
-  selectFields,
   viewMode,
   onViewModeChange,
   data,
@@ -208,6 +206,7 @@ export const EntityDetailLayout = ({
                         onClick={handleAddToGraphToggle}
                         loading={isAddingToGraph || graphList.loading}
                         data-testid="add-to-graph-button"
+                        aria-label={isInGraph ? "Remove from graph" : "Add to graph for analysis"}
                       >
                         <IconGraph size={ICON_SIZE.XL} />
                       </ActionIcon>
@@ -220,6 +219,7 @@ export const EntityDetailLayout = ({
                         color="green"
                         onClick={() => setShowAddToListModal(true)}
                         data-testid="add-to-catalogue-button"
+                        aria-label="Add to catalogue list"
                       >
                         <IconListCheck size={ICON_SIZE.XL} />
                       </ActionIcon>
@@ -236,6 +236,7 @@ export const EntityDetailLayout = ({
                         onClick={handleBookmarkToggle}
                         loading={userInteractions.isLoadingBookmarks}
                         data-testid="entity-bookmark-button"
+                        aria-label={userInteractions.isBookmarked ? "Remove entity bookmark" : "Bookmark this entity"}
                       >
                         {userInteractions.isBookmarked ? (
                           <IconBookmark size={ICON_SIZE.XL} fill="currentColor" />
@@ -259,6 +260,7 @@ export const EntityDetailLayout = ({
                           variant={queryBookmarking.isQueryBookmarked ? "filled" : "light"}
                           color={queryBookmarking.isQueryBookmarked ? "blue" : "gray"}
                           onClick={handleQueryBookmarkToggle}
+                          aria-label={queryBookmarking.isQueryBookmarked ? "Remove query bookmark" : "Bookmark this query"}
                         >
                           {queryBookmarking.isQueryBookmarked ? (
                             <IconBookmarkFilled size={ICON_SIZE.XL} />
@@ -304,6 +306,7 @@ export const EntityDetailLayout = ({
                             }}
                             loading={isAddingToGraph || graphList.loading}
                             data-testid="mobile-add-to-graph-button"
+                            aria-label={isInGraph ? "Remove from graph" : "Add to graph"}
                           >
                             <IconGraph size={ICON_SIZE.LG} />
                           </ActionIcon>
@@ -317,6 +320,7 @@ export const EntityDetailLayout = ({
                               setMobileActionsOpen(false);
                             }}
                             data-testid="mobile-add-to-catalogue-button"
+                            aria-label="Add to catalogue list"
                           >
                             <IconListCheck size={ICON_SIZE.LG} />
                           </ActionIcon>
@@ -331,6 +335,7 @@ export const EntityDetailLayout = ({
                             }}
                             loading={userInteractions.isLoadingBookmarks}
                             data-testid="mobile-entity-bookmark-button"
+                            aria-label={userInteractions.isBookmarked ? "Remove bookmark" : "Add bookmark"}
                           >
                             {userInteractions.isBookmarked ? (
                               <IconBookmark size={ICON_SIZE.LG} fill="currentColor" />
@@ -348,6 +353,7 @@ export const EntityDetailLayout = ({
                                 handleQueryBookmarkToggle();
                                 setMobileActionsOpen(false);
                               }}
+                              aria-label={queryBookmarking.isQueryBookmarked ? "Remove query bookmark" : "Add query bookmark"}
                             >
                               {queryBookmarking.isQueryBookmarked ? (
                                 <IconBookmarkFilled size={ICON_SIZE.LG} />
