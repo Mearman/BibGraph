@@ -30,9 +30,8 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { useEntityDisplayName } from "@/hooks/use-entity-display-name";
-
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
+import { useEntityDisplayName } from "@/hooks/use-entity-display-name";
 import { useUserInteractions } from "@/hooks/use-user-interactions";
 
 /** Non-entity pages that shouldn't trigger display name fetches */
