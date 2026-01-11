@@ -1,5 +1,5 @@
 // Matcher utilities for entity views
-import type { OpenAlexEntity } from "@bibgraph/types";
+import type { EntityType, OpenAlexEntity } from "@bibgraph/types";
 import type { ComponentType } from "react";
 
 export interface EntityMatcher {
@@ -29,12 +29,54 @@ export const defaultMatchers: EntityMatcher[] = [
 ];
 
 /**
- * Converts an OpenAlex URL or ID to a relative URL path
+ * Map of OpenAlex ID prefixes to entity types
+ */
+const OPENALEX_PREFIX_TO_ENTITY_TYPE: Record<string, EntityType> = {
+	W: "works",
+	A: "authors",
+	S: "sources",
+	I: "institutions",
+	P: "publishers",
+	C: "concepts",
+	F: "funders",
+	T: "topics",
+	K: "keywords",
+	V: "sources", // Venues (deprecated, now sources)
+};
+
+/**
+ * Extracts the entity type from an OpenAlex ID prefix
+ * @param id - OpenAlex ID (e.g., "W1234567890", "T10211")
+ * @returns EntityType or null if not recognized
+ */
+const getEntityTypeFromIdPrefix = (id: string): EntityType | null => {
+	const prefix = id.charAt(0).toUpperCase();
+	return OPENALEX_PREFIX_TO_ENTITY_TYPE[prefix] ?? null;
+};
+
+/**
+ * Converts an OpenAlex URL or ID to a relative URL path with proper entity type prefix
  * @param urlOrId - Either a full OpenAlex URL (https://openalex.org/A123) or just an ID (A123)
- * @returns A hash-based relative URL (e.g., #/A123)
+ * @returns A hash-based relative URL with entity type (e.g., #/authors/A123, #/topics/T10211)
  */
 export const convertToRelativeUrl = (urlOrId: string): string => {
 	// Extract just the ID part if it's a full URL
-	const id = urlOrId.replace(/^https?:\/\/[^/]+\//, '');
+	// Handle both direct ID URLs (openalex.org/T10211) and path-based URLs (openalex.org/topics/T10211)
+	let id = urlOrId.replace(/^https?:\/\/(?:api\.)?openalex\.org\//, '');
+
+	// If the ID already includes an entity type path (e.g., "topics/T10211", "keywords/machine-learning"),
+	// return it directly
+	const pathBasedPattern = /^(works|authors|sources|institutions|topics|publishers|funders|concepts|fields|domains|subfields|keywords)\//i;
+	if (pathBasedPattern.test(id)) {
+		return `#/${id}`;
+	}
+
+	// For bare IDs like "T10211" or "W1234567890", detect entity type from prefix
+	const entityType = getEntityTypeFromIdPrefix(id);
+	if (entityType) {
+		return `#/${entityType}/${id}`;
+	}
+
+	// Fallback: return as-is (shouldn't happen for valid OpenAlex IDs)
 	return `#/${id}`;
 };
