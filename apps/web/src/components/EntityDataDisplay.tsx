@@ -245,6 +245,39 @@ const groupFields = (data: Record<string, unknown>): SectionData[] => {
     }
   }
 
+  // Preprocess: Remove last_known_institutions if it duplicates affiliations data
+  // For authors, affiliations contains historical data with years, while last_known_institutions
+  // is just the current institution(s). When they contain the same institutions, showing both is redundant.
+  if (
+    Array.isArray(processedData.affiliations) &&
+    Array.isArray(processedData.last_known_institutions) &&
+    processedData.affiliations.length > 0 &&
+    processedData.last_known_institutions.length > 0
+  ) {
+    // Extract institution IDs from affiliations
+    const affiliationIds = new Set(
+      (processedData.affiliations as Array<Record<string, unknown>>)
+        .map(aff => {
+          const inst = aff.institution as Record<string, unknown> | undefined;
+          return inst?.id;
+        })
+        .filter(Boolean)
+    );
+
+    // Check if all last_known_institutions are already in affiliations
+    const lastKnownIds = (processedData.last_known_institutions as Array<Record<string, unknown>>)
+      .map(inst => inst.id)
+      .filter(Boolean);
+
+    const allLastKnownInAffiliations = lastKnownIds.length > 0 &&
+      lastKnownIds.every(id => affiliationIds.has(id));
+
+    if (allLastKnownInAffiliations) {
+      // Remove last_known_institutions since affiliations already shows this data with more context
+      delete processedData.last_known_institutions;
+    }
+  }
+
   const identifierKeys = ["id", "ids", "doi", "orcid", "issn", "ror", "mag", "openalex_id", "pmid", "pmcid"];
   const metricKeys = ["cited_by_count", "works_count", "h_index", "i10_index", "counts_by_year", "summary_stats", "fwci", "citation_normalized_percentile", "cited_by_percentile_year"];
   const relationshipKeys = ["authorships", "institutions", "concepts", "topics", "keywords", "grants", "sustainable_development_goals", "mesh", "affiliations", "last_known_institutions", "primary_location", "locations", "best_oa_location", "alternate_host_venues", "x_concepts"];
