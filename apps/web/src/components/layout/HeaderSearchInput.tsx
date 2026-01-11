@@ -11,6 +11,7 @@ import {
   Stack,
   Text,
   TextInput,
+  Tooltip,
 } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { notifications } from "@mantine/notifications";
@@ -19,6 +20,7 @@ import {
   IconBook,
   IconBuilding,
   IconBulb,
+  IconChevronDown,
   IconClock,
   IconHistory,
   IconSearch,
@@ -426,8 +428,9 @@ export const HeaderSearchInput = () => {
             size="sm"
             styles={{
               root: {
-                width: focused ? "420px" : "350px",
-                transition: "width 200ms ease",
+                width: "100%",
+                maxWidth: focused ? "420px" : "350px",
+                transition: "max-width 200ms ease",
               },
               input: {
                 borderRadius: "8px",
@@ -440,23 +443,37 @@ export const HeaderSearchInput = () => {
             aria-autocomplete="list"
             role="combobox"
             rightSection={
-              isLoadingSuggestions ? (
-                <Loader size={ICON_SIZE.XS} />
-              ) : query ? (
-                <ActionIcon
-                  size="sm"
-                  variant="transparent"
-                  onClick={() => {
-                    setQuery("");
-                    setSuggestions([]);
-                    setHighlightedIndex(-1);
-                    inputRef.current?.focus();
-                  }}
-                  aria-label="Clear search"
-                >
-                  <IconX size={ICON_SIZE.SM} />
-                </ActionIcon>
-              ) : null
+              <Group gap={2}>
+                {query && (
+                  <ActionIcon
+                    size="sm"
+                    variant="transparent"
+                    onClick={() => {
+                      setQuery("");
+                      setSuggestions([]);
+                      setHighlightedIndex(-1);
+                      inputRef.current?.focus();
+                    }}
+                    aria-label="Clear search"
+                  >
+                    <IconX size={ICON_SIZE.SM} />
+                  </ActionIcon>
+                )}
+                <Tooltip label="Search suggestions enabled" position="left" offset={-5} withinPortal>
+                  <ActionIcon
+                    size="sm"
+                    variant="transparent"
+                    color="gray"
+                    onClick={() => inputRef.current?.focus()}
+                    aria-label="Search with autocomplete"
+                  >
+                    <IconChevronDown size={ICON_SIZE.XS} />
+                  </ActionIcon>
+                </Tooltip>
+                {isLoadingSuggestions && (
+                  <Loader size={ICON_SIZE.XS} />
+                )}
+              </Group>
             }
           />
         </Popover.Target>
