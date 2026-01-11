@@ -98,6 +98,8 @@ const renderPrimitiveValue = (value: unknown, fieldName?: string): import("react
     const converted = convertOpenAlexToInternalLink(value);
 
     if (converted.isOpenAlexLink) {
+      // Normalize URL display to lowercase for consistency
+      const normalizedUrl = value.toLowerCase();
       return (
         <Anchor
           component={Link}
@@ -108,7 +110,7 @@ const renderPrimitiveValue = (value: unknown, fieldName?: string): import("react
         >
           <Group gap={4}>
             <IconLink size={ICON_SIZE.SM} />
-            <Text size="sm" span>{value}</Text>
+            <Text size="sm" span>{normalizedUrl}</Text>
           </Group>
         </Anchor>
       );
