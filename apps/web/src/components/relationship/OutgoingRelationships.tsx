@@ -160,15 +160,17 @@ export const OutgoingRelationships: React.FC<OutgoingRelationshipsProps> = ({
         title="Filter Outgoing Relationships"
       />
 
-      {outgoing.map((section) => (
-        <RelationshipSection
-          key={section.id}
-          section={section}
-          onPageChange={hasApiData ? (page) => goToPage(section.id, page) : undefined}
-          onPageSizeChange={hasApiData ? (size) => setPageSize(section.id, size) : undefined}
-          isLoading={hasApiData ? isLoadingMore(section.id) : false}
-        />
-      ))}
+      {outgoing
+        .filter((section) => section.totalCount > 0)
+        .map((section) => (
+          <RelationshipSection
+            key={section.id}
+            section={section}
+            onPageChange={hasApiData ? (page) => goToPage(section.id, page) : undefined}
+            onPageSizeChange={hasApiData ? (size) => setPageSize(section.id, size) : undefined}
+            isLoading={hasApiData ? isLoadingMore(section.id) : false}
+          />
+        ))}
     </Stack>
   );
 };

@@ -17,12 +17,31 @@ const MAX_REASONABLE_YEAR = 2100;
 const YEAR_FIELD_PATTERNS = ["year", "publication_year"] as const;
 
 /**
+ * Field names that contain decimal scores/shares requiring precision
+ */
+const DECIMAL_PRECISION_FIELD_PATTERNS = ["score", "share", "percentile", "fwci"] as const;
+
+/**
+ * Maximum decimal places to show for score/share fields
+ */
+const DECIMAL_PRECISION_DIGITS = 4;
+
+/**
  * Check if a field name indicates a year value
  * @param fieldName - The field name to check
  */
 const isYearField = (fieldName: string): boolean => {
 	const lowerName = fieldName.toLowerCase();
 	return YEAR_FIELD_PATTERNS.some((pattern) => lowerName.includes(pattern));
+};
+
+/**
+ * Check if a field name indicates a score/share value requiring decimal precision
+ * @param fieldName - The field name to check
+ */
+const isDecimalPrecisionField = (fieldName: string): boolean => {
+	const lowerName = fieldName.toLowerCase();
+	return DECIMAL_PRECISION_FIELD_PATTERNS.some((pattern) => lowerName.includes(pattern));
 };
 
 /**
@@ -60,6 +79,14 @@ export const formatNumber = (value: number, fieldName?: string): string => {
 	// Skip separator for 4-digit numbers in year range
 	if (isReasonableYear(value)) {
 		return value.toString();
+	}
+
+	// For score/share/percentile fields, preserve decimal precision
+	if (fieldName && isDecimalPrecisionField(fieldName) && !Number.isInteger(value)) {
+		return value.toLocaleString(undefined, {
+			minimumFractionDigits: 0,
+			maximumFractionDigits: DECIMAL_PRECISION_DIGITS,
+		});
 	}
 
 	// Default: use locale formatting with thousands separator

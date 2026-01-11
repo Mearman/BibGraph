@@ -160,15 +160,17 @@ export const IncomingRelationships: React.FC<IncomingRelationshipsProps> = ({
         title="Filter Incoming Relationships"
       />
 
-      {incoming.map((section) => (
-        <RelationshipSection
-          key={section.id}
-          section={section}
-          onPageChange={hasApiData ? (page) => goToPage(section.id, page) : undefined}
-          onPageSizeChange={hasApiData ? (size) => setPageSize(section.id, size) : undefined}
-          isLoading={hasApiData ? isLoadingMore(section.id) : false}
-        />
-      ))}
+      {incoming
+        .filter((section) => section.totalCount > 0)
+        .map((section) => (
+          <RelationshipSection
+            key={section.id}
+            section={section}
+            onPageChange={hasApiData ? (page) => goToPage(section.id, page) : undefined}
+            onPageSizeChange={hasApiData ? (size) => setPageSize(section.id, size) : undefined}
+            isLoading={hasApiData ? isLoadingMore(section.id) : false}
+          />
+        ))}
     </Stack>
   );
 };

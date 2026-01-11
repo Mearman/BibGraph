@@ -243,6 +243,16 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
     }
   }, [entityId, entityType, searchQuery, url]);
 
+  // Track which entityId a displayName was loaded for to prevent mismatches
+  const displayNameEntityRef = useRef<string | undefined>(undefined);
+
+  // Update displayName entity reference when displayName changes
+  useEffect(() => {
+    if (displayName && entityId) {
+      displayNameEntityRef.current = entityId;
+    }
+  }, [displayName, entityId]);
+
   // Auto-track page visits when enabled
   useEffect(() => {
     if (autoTrackVisits && entityId && entityType) {
@@ -259,12 +269,16 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
 
           const currentUrl = location.pathname + serializeSearch(location.search);
 
+          // Only pass displayName if it matches the current entityId
+          // This prevents race conditions where a stale displayName is stored
+          const safeDisplayName = displayNameEntityRef.current === entityId ? displayName : undefined;
+
           await catalogueService.addToHistory({
             entityType: entityType as EntityType,
             entityId: entityId,
             url: currentUrl,
-            // Pass display name for proper history titles
-            title: displayName,
+            // Pass display name only if it's verified to match this entity
+            title: safeDisplayName,
           });
 
           // Record for debounce

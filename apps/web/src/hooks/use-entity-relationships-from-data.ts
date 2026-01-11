@@ -468,8 +468,15 @@ const extractWorkRelationships = (data: Record<string, unknown>, workId: string,
   }> | undefined;
 
   if (concepts && concepts.length > 0) {
+    // Deduplicate concepts by ID (OpenAlex API may return duplicates)
+    const seenConceptIds = new Set<string>();
     const conceptItems: RelationshipItem[] = concepts
-      .filter(concept => concept.id && concept.display_name)
+      .filter(concept => {
+        if (!concept.id || !concept.display_name) return false;
+        if (seenConceptIds.has(concept.id)) return false;
+        seenConceptIds.add(concept.id);
+        return true;
+      })
       .map(concept => {
         const conceptId = safeStringId(concept.id);
         const conceptName = safeStringId(concept.display_name);

@@ -40,6 +40,23 @@ import { humanizeFieldName } from "@/utils/field-labels";
 import { formatNumber } from "@/utils/format-number";
 import { convertOpenAlexToInternalLink, isOpenAlexId } from "@/utils/openalex-link-conversion";
 
+/**
+ * Decode HTML entities in text
+ * Handles common entities like &amp;, &lt;, &gt;, &quot;, etc.
+ */
+const decodeHtmlEntities = (text: string): string => {
+  const entities: Record<string, string> = {
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&#39;": "'",
+    "&apos;": "'",
+    "&nbsp;": " ",
+  };
+  return text.replaceAll(/&(?:amp|lt|gt|quot|apos|nbsp|#39);/g, (match) => entities[match] ?? match);
+};
+
 /** Section priority for consistent ordering */
 const SECTION_PRIORITY: Record<string, number> = {
   Identifiers: 1,
@@ -148,7 +165,7 @@ const renderPrimitiveValue = (value: unknown, fieldName?: string): import("react
       );
     }
 
-    return <Text size="sm">{value}</Text>;
+    return <Text size="sm">{decodeHtmlEntities(value)}</Text>;
   }
 
   return <Text c="dimmed" fs="italic" size="sm">{String(value)}</Text>;
@@ -200,6 +217,7 @@ const HIDDEN_FIELDS = new Set([
   // Other internal fields
   "relevance_score",
   "filter_key",
+  "longest_name",
 ]);
 
 const groupFields = (data: Record<string, unknown>): SectionData[] => {
@@ -306,9 +324,10 @@ const renderValueContent = (value: unknown, fieldName?: string): import("react")
 
   // Objects - key-value pairs
   if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>);
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, val]) => isDisplayableValue(val));
     if (entries.length === 0) {
-      return <Text c="dimmed" fs="italic" size="sm">{"{ }"}</Text>;
+      return null;
     }
 
     return (

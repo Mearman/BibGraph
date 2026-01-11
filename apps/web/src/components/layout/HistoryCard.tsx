@@ -36,11 +36,12 @@ export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardProps) =>
   // Try to extract title from notes first
   const titleFromNotes = entry.notes?.match(/Title: ([^\n]+)/)?.[1];
 
-  // Fetch display name from API if not a special ID and no title in notes
+  // Always try to fetch display name from API for non-special IDs
+  // This ensures fresh titles even if stale ones were stored in notes
   const { displayName, isLoading } = useEntityDisplayName({
     entityId: entry.entityId,
     entityType: entry.entityType as EntityType,
-    enabled: !isSpecialId && !titleFromNotes,
+    enabled: !isSpecialId,
   });
 
   // Format entity type for display (e.g., "works" -> "Work", "authors" -> "Author")
@@ -63,13 +64,17 @@ export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardProps) =>
   };
 
   // Determine the title to display
+  // Priority: fetched displayName > stored titleFromNotes > fallback
+  // This ensures fresh titles even if stale ones were stored
   let title: string;
-  if (titleFromNotes) {
-    title = titleFromNotes;
-  } else if (isSpecialId) {
+  if (isSpecialId) {
     title = entry.entityId.startsWith("search-") ? `Search: ${entry.entityId.replace("search-", "").split("-")[0]}` : `List: ${entry.entityId.replace("list-", "")}`;
   } else if (displayName) {
+    // Prefer freshly fetched display name
     title = displayName;
+  } else if (titleFromNotes) {
+    // Fall back to stored title from notes
+    title = titleFromNotes;
   } else if (isLoading) {
     title = "Loading...";
   } else {
