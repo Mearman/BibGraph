@@ -3,7 +3,7 @@
  */
 
 import type { EntityType } from "@bibgraph/types";
-import { logger } from "@bibgraph/utils";
+import { logger, SPECIAL_LIST_IDS } from "@bibgraph/utils";
 import {
   Alert,
   Button,
@@ -20,6 +20,9 @@ import React, { useState } from "react";
 
 import { ICON_SIZE } from '@/config/style-constants';
 import { useCatalogue } from "@/hooks/useCatalogue";
+
+// Set of special list IDs that shouldn't be shown in the add-to-list modal
+const SPECIAL_LIST_ID_SET: Set<string> = new Set(Object.values(SPECIAL_LIST_IDS));
 
 
 interface AddToListModalProps {
@@ -40,9 +43,14 @@ export const AddToListModal = ({
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Filter lists based on entity type
+  // Filter lists based on entity type and exclude special system lists
   // Bibliographies can only contain works
+  // Special lists (History, Graph, Bookmarks) should not appear in add-to-list modal
   const availableLists = lists.filter(list => {
+    // Exclude special system lists
+    if (list.id && SPECIAL_LIST_ID_SET.has(list.id)) {
+      return false;
+    }
     if (list.type === "bibliography") {
       return entityType === "works";
     }
