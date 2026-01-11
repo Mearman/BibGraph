@@ -175,6 +175,15 @@ function createWebConfig(): UserConfig {
         overlay: true,
         port: 5174,
       },
+      // Proxy OpenAlex API requests to avoid CORS issues in development
+      proxy: {
+        '/api/openalex': {
+          target: 'https://api.openalex.org',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/openalex/, ''),
+          secure: true,
+        },
+      },
       fs: {
         strict: false,
         allow: [
