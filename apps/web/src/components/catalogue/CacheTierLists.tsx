@@ -180,13 +180,13 @@ const CacheTierCard = ({
             </Badge>
           )}
           <Tooltip label="Refresh">
-            <ActionIcon variant="subtle" size="sm" onClick={onRefresh} loading={isLoading}>
+            <ActionIcon variant="subtle" size="sm" onClick={onRefresh} loading={isLoading} aria-label={`Refresh ${title} cache`}>
               <IconRefresh size={ICON_SIZE.SM} />
             </ActionIcon>
           </Tooltip>
           {onClear && entities.length > 0 && (
             <Tooltip label="Clear cache tier">
-              <ActionIcon variant="subtle" color="red" size="sm" onClick={onClear}>
+              <ActionIcon variant="subtle" color="red" size="sm" onClick={onClear} aria-label={`Clear ${title} cache`}>
                 <IconTrash size={ICON_SIZE.SM} />
               </ActionIcon>
             </Tooltip>
@@ -310,6 +310,7 @@ const CacheTierCard = ({
                                   variant="subtle"
                                   size="xs"
                                   onClick={() => handleEntityClick(entity)}
+                                  aria-label={`View ${entity.entityType} ${entity.entityId}`}
                                 >
                                   <IconExternalLink size={ICON_SIZE.XS} />
                                 </ActionIcon>
@@ -375,7 +376,7 @@ const StaticCacheTierCard = ({
         <Group gap="xs">
           {badges}
           <Tooltip label="Refresh">
-            <ActionIcon variant="subtle" size="sm" onClick={onRefresh} loading={isLoading}>
+            <ActionIcon variant="subtle" size="sm" onClick={onRefresh} loading={isLoading} aria-label={`Refresh ${title} cache`}>
               <IconRefresh size={ICON_SIZE.SM} />
             </ActionIcon>
           </Tooltip>
@@ -503,6 +504,7 @@ const StaticCacheTierCard = ({
                                     variant="subtle"
                                     size="xs"
                                     onClick={() => handleEntityClick(entity)}
+                                    aria-label={`View ${entity.entityType} ${entity.entityId}`}
                                   >
                                     <IconExternalLink size={ICON_SIZE.XS} />
                                   </ActionIcon>

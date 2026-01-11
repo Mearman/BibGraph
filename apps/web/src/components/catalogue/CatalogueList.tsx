@@ -140,6 +140,7 @@ const ListCard = ({ list, isSelected, onSelect, onEdit, onDelete, onShare }: Lis
                 e.stopPropagation();
                 handleCopyLink();
               }}
+              aria-label={`Copy link for ${list.title}`}
             >
               <IconCopy size={ICON_SIZE.SM} />
             </ActionIcon>
@@ -153,6 +154,7 @@ const ListCard = ({ list, isSelected, onSelect, onEdit, onDelete, onShare }: Lis
                 e.stopPropagation();
                 onShare();
               }}
+              aria-label={`Share ${list.title}`}
             >
               <IconExternalLink size={ICON_SIZE.SM} />
             </ActionIcon>
@@ -167,6 +169,7 @@ const ListCard = ({ list, isSelected, onSelect, onEdit, onDelete, onShare }: Lis
                 onEdit();
               }}
               data-testid={`edit-list-${list.id}`}
+              aria-label={`Edit ${list.title}`}
             >
               <IconEdit size={ICON_SIZE.SM} />
             </ActionIcon>
@@ -182,6 +185,7 @@ const ListCard = ({ list, isSelected, onSelect, onEdit, onDelete, onShare }: Lis
                 onDelete();
               }}
               data-testid={`delete-list-${list.id}`}
+              aria-label={`Delete ${list.title}`}
             >
               <IconTrash size={ICON_SIZE.SM} />
             </ActionIcon>
