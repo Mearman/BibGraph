@@ -1097,6 +1097,9 @@ export class CatalogueService {
       C: "/concepts/",
     };
 
+    // Non-entity pages that shouldn't be validated against entity patterns
+    const nonEntityPatterns = ["/about", "/settings", "/history", "/bookmarks", "/catalogue", "/search"];
+
     return entities.filter((entity) => {
       if (entity.entityId.length === 0) return false;
       if (entity.entityId.includes(CORRUPTED_ENTITY_ID_PATTERN)) return false;
@@ -1105,15 +1108,28 @@ export class CatalogueService {
       if (entity.notes?.includes(CORRUPTED_ENTITY_ID_PATTERN)) return false;
       if (entity.notes?.includes(urlEncodedPattern)) return false;
 
-      // Validate entityId matches URL path (detect mismatch like Work ID with Author URL)
+      // Validate entityId/entityType matches URL path (detect race condition mismatches)
       const urlMatch = entity.notes?.match(/URL: ([^\n]+)/);
       if (urlMatch) {
         const url = urlMatch[1];
+
+        // Skip validation for non-entity pages
+        const isNonEntityUrl = nonEntityPatterns.some(pattern => url.includes(pattern));
+        if (isNonEntityUrl) {
+          return true;
+        }
+
+        // Validate entityType matches URL path
+        // This catches race conditions where entity A's props were recorded with entity B's URL
+        const entityTypeUrlPath = `/${entity.entityType}/`;
+        if (!url.includes(entityTypeUrlPath)) {
+          return false;
+        }
+
+        // Also validate entityId matches URL path for prefixed IDs
         const entityPrefix = entity.entityId.charAt(0).toUpperCase();
         const expectedPath = entityPrefixToPath[entityPrefix];
-        // If we have a known prefix and URL doesn't match expected path, filter it out
-        // Skip validation for non-entity pages like /about, /settings
-        if (expectedPath && !url.includes(expectedPath) && !url.startsWith("/about") && !url.startsWith("/settings")) {
+        if (expectedPath && !url.includes(expectedPath)) {
           return false;
         }
       }

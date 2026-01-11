@@ -245,6 +245,20 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
     if (autoTrackVisits && entityId && entityType) {
       const trackPageVisit = async () => {
         try {
+          // Validate URL matches current entity to prevent race conditions during navigation
+          // When navigating from entity A to entity B, location updates before component unmounts,
+          // which could cause recording entity A with entity B's URL
+          const currentUrl = location.pathname + serializeSearch(location.search);
+          const urlMatchesEntity = currentUrl.includes(`/${entityType}/`) && currentUrl.includes(entityId);
+          if (!urlMatchesEntity) {
+            logger.debug(
+              USER_INTERACTIONS_LOGGER_CONTEXT,
+              "Skipping history record - URL doesn't match entity (navigation race condition)",
+              { entityId, entityType, currentUrl }
+            );
+            return;
+          }
+
           // Debounce: skip if same entity was recorded recently
           const now = Date.now();
           if (
@@ -253,8 +267,6 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
           ) {
             return;
           }
-
-          const currentUrl = location.pathname + serializeSearch(location.search);
 
           // Only pass displayName if it matches the current entityId
           // This prevents race conditions where a stale displayName is stored
