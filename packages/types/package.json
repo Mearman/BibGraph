@@ -16,7 +16,7 @@
     "typecheck": "nx run types:typecheck"
   },
   "dependencies": {
-    "zod": "4.1.13"
+    "zod": "4.3.5"
   },
   "devDependencies": {
     "eslint": "9.39.1",
