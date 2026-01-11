@@ -123,12 +123,18 @@ const expectPageLoads = async (page: import("@playwright/test").Page, path: stri
 	}
 
 	// Verify no error state displayed
+	// Check multiple error patterns:
+	// - h1 with "Error" text (generic error pages)
+	// - "Navigation Error" text (TanStack Router error boundary)
+	// - "404" text (not found pages)
 	const errorHeading = await page.locator('h1:has-text("Error")').count();
+	const navigationError = await page.locator('text="Navigation Error"').count();
 	const error404Count = await page.locator('text="404"').count();
 
 	// Allow 404 only for explicitly invalid routes
 	if (!path.includes("invalid") && !path.includes("999999")) {
 		expect(errorHeading, `Page ${path} should not show Error heading`).toBe(0);
+		expect(navigationError, `Page ${path} should not show Navigation Error`).toBe(0);
 		expect(error404Count, `Page ${path} should not show 404`).toBe(0);
 	}
 };
