@@ -8,6 +8,7 @@ import { logError, logger } from "@bibgraph/utils/logger";
 import { type CatalogueEntity,catalogueService } from "@bibgraph/utils/storage/catalogue-db";
 import {
   ActionIcon,
+  Badge,
   Button,
   Card,
   Divider,
@@ -36,6 +37,26 @@ import { useUserInteractions } from "@/hooks/use-user-interactions";
 
 /** Non-entity pages that shouldn't trigger display name fetches */
 const NON_ENTITY_URL_PATTERNS = ["/about", "/settings", "/history", "/bookmarks", "/catalogue"];
+
+/** Color mapping for entity type badges - consistent with BookmarkListItem */
+const ENTITY_TYPE_COLORS: Record<string, string> = {
+  works: "blue",
+  authors: "green",
+  sources: "orange",
+  institutions: "purple",
+  topics: "pink",
+  concepts: "cyan",
+  publishers: "grape",
+  funders: "yellow",
+  keywords: "teal",
+  domains: "indigo",
+  fields: "lime",
+  subfields: "violet",
+};
+
+const getEntityTypeColor = (entityType: string): string => {
+  return ENTITY_TYPE_COLORS[entityType] || "gray";
+};
 
 /**
  * Sub-component for rendering a single history entry with display name resolution
@@ -111,13 +132,22 @@ const HistoryEntryCard = ({ entry, onNavigate, onDelete, formatDate }: HistoryEn
     >
       <Group justify="space-between" align="flex-start">
         <Stack gap="xs" style={{ flex: 1 }}>
-          {isLoading && !titleFromNotes ? (
-            <Skeleton height={16} width="60%" />
-          ) : (
-            <Text size="sm" fw={500}>
-              {title}
-            </Text>
-          )}
+          <Group gap="xs" wrap="nowrap">
+            <Badge
+              size="xs"
+              color={getEntityTypeColor(entry.entityType)}
+              variant="light"
+            >
+              {formatEntityType(entry.entityType)}
+            </Badge>
+            {isLoading && !titleFromNotes ? (
+              <Skeleton height={16} width="60%" />
+            ) : (
+              <Text size="sm" fw={500} lineClamp={1}>
+                {title}
+              </Text>
+            )}
+          </Group>
           {entry.notes && (
             <Text size="xs" c="dimmed" lineClamp={2}>
               {entry.notes.split('\n').filter(line => !line.startsWith('URL:') && !line.startsWith('Title:')).join('\n')}
