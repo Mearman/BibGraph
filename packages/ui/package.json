@@ -43,7 +43,7 @@
     "@types/react-dom": "19.2.3",
     "@vanilla-extract/vite-plugin": "5.1.1",
     "eslint": "9.39.1",
-    "eslint-plugin-storybook": "10.1.0",
+    "eslint-plugin-storybook": "10.1.11",
     "react": "19.2.0",
     "storybook": "10.1.0",
     "typescript": "5.9.2",
