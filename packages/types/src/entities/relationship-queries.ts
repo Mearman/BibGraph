@@ -500,7 +500,7 @@ export const ENTITY_RELATIONSHIP_QUERIES: Record<EntityType, EntityRelationshipQ
       {
         source: 'embedded',
         type: 'topic_part_of_field',
-        targetType: 'topics',
+        targetType: 'fields',
         label: 'Field',
         extractEmbedded: (entityData) => {
           const field = entityData.field as Record<string, unknown> | undefined;
@@ -516,7 +516,7 @@ export const ENTITY_RELATIONSHIP_QUERIES: Record<EntityType, EntityRelationshipQ
       {
         source: 'embedded',
         type: 'field_part_of_domain',
-        targetType: 'topics',
+        targetType: 'domains',
         label: 'Domain',
         extractEmbedded: (entityData) => {
           const domain = entityData.domain as Record<string, unknown> | undefined;
@@ -532,7 +532,7 @@ export const ENTITY_RELATIONSHIP_QUERIES: Record<EntityType, EntityRelationshipQ
       {
         source: 'embedded',
         type: 'topic_part_of_subfield',
-        targetType: 'topics',
+        targetType: 'subfields',
         label: 'Subfield',
         extractEmbedded: (entityData) => {
           const subfield = entityData.subfield as Record<string, unknown> | undefined;
