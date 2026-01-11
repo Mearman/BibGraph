@@ -247,7 +247,8 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
             entityType: entityType as EntityType,
             entityId: entityId,
             url: currentUrl,
-            title: `${entityType}: ${entityId}`,
+            // Don't provide fallback title - let HistoryCard fetch display name from API
+            title: undefined,
           });
         } catch (error) {
           logger.error(
@@ -312,7 +313,8 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
           entityType: metadata.entityType as EntityType,
           entityId: metadata.entityId,
           url,
-          title: metadata.searchQuery ? `Search: ${metadata.searchQuery}` : `${metadata.entityType}: ${metadata.entityId}`,
+          // Only provide title for search queries - let HistoryCard fetch display name for entities
+          title: metadata.searchQuery ? `Search: ${metadata.searchQuery}` : undefined,
         });
 
         // Refresh data to update UI
