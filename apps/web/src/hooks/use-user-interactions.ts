@@ -105,21 +105,8 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
     displayName,
   } = options;
 
-  // Safely get router location (may not be available in test environments)
-  const location = (() => {
-    try {
-      return useLocation();
-    } catch {
-      // Return a fallback location object when router is not available
-      return {
-        pathname: '',
-        search: '',
-        hash: '',
-        state: null,
-        key: '',
-      };
-    }
-  })();
+  // Get router location - must be called unconditionally at top level (React hooks rules)
+  const location = useLocation();
 
   // State
   const [recentHistory, setRecentHistory] = useState<CatalogueEntity[]>([]);

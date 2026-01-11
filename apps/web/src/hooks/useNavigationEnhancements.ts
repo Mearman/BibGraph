@@ -98,65 +98,69 @@ export const useNavigationEnhancements = () => {
     router.navigate({ to: '/' });
   }, [router]);
 
-  // Keyboard navigation handling
-  const useKeyboardNavigation = useCallback(() => {
-    useEffect(() => {
-      const handleKeyDown = (event: KeyboardEvent) => {
-        // Only handle navigation keys when not focused on input fields
-        if (
-          event.target instanceof HTMLInputElement ||
-          event.target instanceof HTMLTextAreaElement ||
-          event.target instanceof HTMLSelectElement ||
-          (event.target as HTMLElement)?.contentEditable === 'true'
-        ) {
-          return;
-        }
+  // Keyboard navigation is now handled directly in the hook
+  // Components using this hook automatically get keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle navigation keys when not focused on input fields
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement ||
+        event.target instanceof HTMLSelectElement ||
+        (event.target as HTMLElement)?.contentEditable === 'true'
+      ) {
+        return;
+      }
 
-        // Alt + Arrow keys for navigation
-        if (event.altKey) {
-          switch (event.key) {
-            case 'ArrowLeft':
-              navigateWithKeyboard('left', event);
-              break;
-            case 'ArrowRight':
-              navigateWithKeyboard('right', event);
-              break;
-            case 'ArrowUp':
-              navigateWithKeyboard('up', event);
-              break;
-            case 'ArrowDown':
-              navigateWithKeyboard('down', event);
-              break;
-          }
+      // Alt + Arrow keys for navigation
+      if (event.altKey) {
+        switch (event.key) {
+          case 'ArrowLeft':
+            navigateWithKeyboard('left', event);
+            break;
+          case 'ArrowRight':
+            navigateWithKeyboard('right', event);
+            break;
+          case 'ArrowUp':
+            navigateWithKeyboard('up', event);
+            break;
+          case 'ArrowDown':
+            navigateWithKeyboard('down', event);
+            break;
         }
+      }
 
-        // Ctrl/Cmd + [ and ] for history navigation
-        if ((event.ctrlKey || event.metaKey)) {
-          switch (event.key) {
-            case '[':
-              navigateWithKeyboard('left', event);
-              break;
-            case ']':
-              navigateWithKeyboard('right', event);
-              break;
-            case 'k':
-            case 'K': {
-              // Focus search input
-              event.preventDefault();
-              const searchInput = document.querySelector('input[aria-label="Global search input"]');
-              if (searchInput) {
-                (searchInput as HTMLInputElement).focus();
-              }
-              break;
+      // Ctrl/Cmd + [ and ] for history navigation
+      if ((event.ctrlKey || event.metaKey)) {
+        switch (event.key) {
+          case '[':
+            navigateWithKeyboard('left', event);
+            break;
+          case ']':
+            navigateWithKeyboard('right', event);
+            break;
+          case 'k':
+          case 'K': {
+            // Focus search input
+            event.preventDefault();
+            const searchInput = document.querySelector('input[aria-label="Global search input"]');
+            if (searchInput) {
+              (searchInput as HTMLInputElement).focus();
             }
+            break;
           }
         }
-      };
+      }
+    };
 
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [navigateWithKeyboard]);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [navigateWithKeyboard]);
+
+  // Legacy function for backwards compatibility - now a no-op
+  const useKeyboardNavigation = useCallback(() => {
+    // Keyboard navigation is now automatically enabled when using this hook
+  }, []);
 
   // Get navigation context information
   const getNavigationContext = useCallback(() => {
