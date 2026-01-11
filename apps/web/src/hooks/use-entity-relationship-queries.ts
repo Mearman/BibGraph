@@ -368,6 +368,20 @@ export const useEntityRelationshipQueries = (entityId: string | undefined, entit
 };
 
 /**
+ * Parse a filter string like "key:value" into an object { key: value }
+ * Used to convert filter strings for API functions that expect filter objects
+ * @param filterString - Filter string in format "key:value"
+ * @returns Object with the key-value pair
+ */
+const parseFilterStringToObject = (filterString: string): Record<string, string> => {
+  const colonIndex = filterString.indexOf(':');
+  if (colonIndex === -1) return {};
+  const key = filterString.substring(0, colonIndex);
+  const value = filterString.substring(colonIndex + 1);
+  return { [key]: value };
+};
+
+/**
  * Execute a single relationship query using the OpenAlex API or embedded data extraction
  * @param entityId
  * @param entityType
@@ -382,6 +396,8 @@ const executeRelationshipQuery = async (entityId: string, entityType: EntityType
     const pageSize = customPageSize ?? config.pageSize ?? DEFAULT_PAGE_SIZE;
 
     // Choose the appropriate API function based on target type
+    // Note: Some API functions accept `filter` (string), others accept `filters` (object)
+    // For functions expecting `filters` object, we parse the filter string into an object
     let response;
     switch (config.targetType) {
       case 'works':
@@ -402,7 +418,7 @@ const executeRelationshipQuery = async (entityId: string, entityType: EntityType
         break;
       case 'sources':
         response = await getSources({
-          filters: { id: filter }, // getSources uses 'filters' object, not 'filter' string
+          filters: parseFilterStringToObject(filter),
           per_page: pageSize,
           page,
           ...(config.select && { select: config.select }),
@@ -410,7 +426,7 @@ const executeRelationshipQuery = async (entityId: string, entityType: EntityType
         break;
       case 'institutions':
         response = await getInstitutions({
-          filters: { id: filter }, // getInstitutions uses 'filters' object, not 'filter' string
+          filters: parseFilterStringToObject(filter),
           per_page: pageSize,
           page,
           ...(config.select && { select: config.select }),
@@ -418,7 +434,7 @@ const executeRelationshipQuery = async (entityId: string, entityType: EntityType
         break;
       case 'topics':
         response = await getTopics({
-          filters: { id: filter },
+          filters: parseFilterStringToObject(filter),
           per_page: pageSize,
           page,
           ...(config.select && { select: config.select }),
@@ -426,7 +442,7 @@ const executeRelationshipQuery = async (entityId: string, entityType: EntityType
         break;
       case 'publishers':
         response = await getPublishers({
-          filters: { id: filter },
+          filters: parseFilterStringToObject(filter),
           per_page: pageSize,
           page,
           ...(config.select && { select: config.select }),

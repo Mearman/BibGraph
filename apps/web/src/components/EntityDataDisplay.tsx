@@ -36,6 +36,7 @@ import { Link } from "@tanstack/react-router";
 
 import { ICON_SIZE } from "@/config/style-constants";
 import { useVersionComparison } from "@/hooks/use-version-comparison";
+import { humanizeFieldName } from "@/utils/field-labels";
 import { convertOpenAlexToInternalLink, isOpenAlexId } from "@/utils/openalex-link-conversion";
 
 /** Section priority for consistent ordering */
@@ -65,8 +66,9 @@ const SECTION_ICONS: Record<string, import("react").ReactNode> = {
 // ============================================================================
 
 const renderPrimitiveValue = (value: unknown): import("react").ReactNode => {
+  // Don't render null/undefined - these fields will be filtered out
   if (value === null || value === undefined) {
-    return <Text c="dimmed" fs="italic" size="sm">null</Text>;
+    return null;
   }
 
   if (typeof value === "boolean") {
@@ -161,6 +163,29 @@ interface SectionData {
   icon: import("react").ReactNode;
 }
 
+/**
+ * Check if a value should be displayed (not null, undefined, empty string, or empty array)
+ */
+const isDisplayableValue = (value: unknown): boolean => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string" && value.trim() === "") return false;
+  if (Array.isArray(value) && value.length === 0) return false;
+  return true;
+};
+
+/**
+ * Fields that should be hidden from display (internal API fields, URLs, etc.)
+ */
+const HIDDEN_FIELDS = new Set([
+  "works_api_url",
+  "cited_by_api_url",
+  "updated_date",
+  "created_date",
+  "ngrams_url",
+  "abstract_inverted_index",
+  "indexed_in",
+]);
+
 const groupFields = (data: Record<string, unknown>): SectionData[] => {
   const groups: Record<string, Record<string, unknown>> = {
     "Identifiers": {},
@@ -175,11 +200,16 @@ const groupFields = (data: Record<string, unknown>): SectionData[] => {
   const identifierKeys = ["id", "ids", "doi", "orcid", "issn", "ror", "mag", "openalex_id", "pmid", "pmcid"];
   const metricKeys = ["cited_by_count", "works_count", "h_index", "i10_index", "counts_by_year", "summary_stats", "fwci", "citation_normalized_percentile", "cited_by_percentile_year"];
   const relationshipKeys = ["authorships", "institutions", "concepts", "topics", "keywords", "grants", "sustainable_development_goals", "mesh", "affiliations", "last_known_institutions", "primary_location", "locations", "best_oa_location", "alternate_host_venues", "x_concepts"];
-  const dateKeys = ["created_date", "updated_date", "publication_date", "publication_year"];
+  const dateKeys = ["publication_date", "publication_year"];
   const geoKeys = ["country_code", "countries_distinct_count", "geo", "latitude", "longitude"];
   const basicKeys = ["display_name", "title", "type", "description", "homepage_url", "image_url", "thumbnail_url", "is_oa", "oa_status", "has_fulltext"];
 
   Object.entries(data).forEach(([key, value]) => {
+    // Skip hidden fields and non-displayable values
+    if (HIDDEN_FIELDS.has(key) || !isDisplayableValue(value)) {
+      return;
+    }
+
     const lowerKey = key.toLowerCase();
     if (identifierKeys.some(k => lowerKey.includes(k))) {
       groups["Identifiers"][key] = value;
@@ -220,10 +250,10 @@ const renderValueContent = (value: unknown): import("react").ReactNode => {
     return renderPrimitiveValue(value);
   }
 
-  // Arrays
+  // Arrays - don't render empty arrays
   if (Array.isArray(value)) {
     if (value.length === 0) {
-      return <Text c="dimmed" fs="italic" size="sm">[ ]</Text>;
+      return null;
     }
 
     // Primitive arrays - inline badges
@@ -336,7 +366,7 @@ export const EntityDataDisplay = ({ data, title }: EntityDataDisplayProps) => {
             {section.fields.map((field) => (
               <Box key={field.key}>
                 <Text size="sm" fw={600} c="blue.7" mb="xs">
-                  {field.key.replaceAll('_', ' ').replaceAll(/\b\w/g, l => l.toUpperCase())}
+                  {humanizeFieldName(field.key)}
                 </Text>
                 {renderValueContent(field.value)}
               </Box>

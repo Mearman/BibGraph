@@ -43,6 +43,25 @@ export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardProps) =>
     enabled: !isSpecialId && !titleFromNotes,
   });
 
+  // Format entity type for display (e.g., "works" -> "Work", "authors" -> "Author")
+  const formatEntityType = (entityType: string): string => {
+    const singular = entityType.endsWith("s") ? entityType.slice(0, -1) : entityType;
+    return singular.charAt(0).toUpperCase() + singular.slice(1);
+  };
+
+  // Format entity ID for display (shortened if it's a long ID)
+  const formatEntityId = (entityId: string): string => {
+    // Extract just the ID part (e.g., "W123456789" from URL or keep as-is)
+    const idMatch = entityId.match(/([A-Z]\d+)$/);
+    if (idMatch) {
+      const id = idMatch[1];
+      // Show first letter + first few digits for readability
+      return id.length > 8 ? `${id.substring(0, 8)}...` : id;
+    }
+    // For other IDs, truncate if too long
+    return entityId.length > 15 ? `${entityId.substring(0, 15)}...` : entityId;
+  };
+
   // Determine the title to display
   let title: string;
   if (titleFromNotes) {
@@ -54,7 +73,8 @@ export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardProps) =>
   } else if (isLoading) {
     title = "Loading...";
   } else {
-    title = `${entry.entityType}: ${entry.entityId}`;
+    // Improved fallback: "Work W1234567..." instead of "works: W123456789012345"
+    title = `${formatEntityType(entry.entityType)} ${formatEntityId(entry.entityId)}`;
   }
 
   // Compute link URL - for special IDs, try to extract from notes; otherwise use entity path
