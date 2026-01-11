@@ -5,10 +5,12 @@
  * @see specs/016-entity-relationship-viz/data-model.md
  */
 
-import { Anchor, Group, Stack, Text } from '@mantine/core';
+import { Anchor, Badge, Group, Stack, Text, Tooltip } from '@mantine/core';
+import { IconArrowDownLeft, IconArrowRight } from '@tabler/icons-react';
 import { useNavigate } from '@tanstack/react-router';
 import React from 'react';
 
+import { ICON_SIZE } from '@/config/style-constants';
 import type { RelationshipItem as RelationshipItemType } from '@/types/relationship';
 import { decodeHtmlEntities } from '@/utils/decode-html-entities';
 import { formatMetadata } from '@/utils/formatMetadata';
@@ -72,25 +74,61 @@ export const RelationshipItem: React.FC<RelationshipItemProps> = ({ item }) => {
     // Otherwise, let the browser handle it (opens in new tab, etc.)
   };
 
+  // Direction indicator configuration
+  const getDirectionBadge = () => {
+    const isOutbound = item.direction === 'outbound';
+
+    return (
+      <Tooltip
+        label={isOutbound ? 'This entity references the related entity' : 'The related entity references this one'}
+        position="top"
+      >
+        <Badge
+          size="xs"
+          variant="light"
+          color={isOutbound ? 'blue' : 'green'}
+          leftSection={
+            isOutbound ? (
+              <IconArrowRight size={ICON_SIZE.XS} />
+            ) : (
+              <IconArrowDownLeft size={ICON_SIZE.XS} />
+            )
+          }
+        >
+          {isOutbound ? 'Outgoing' : 'Incoming'}
+        </Badge>
+      </Tooltip>
+    );
+  };
+
   return (
     <Stack gap="xs" data-testid={`relationship-item-${item.id}`}>
-      <Group gap="xs">
-        <Anchor href={entityUrl} onClick={handleClick} size="sm">
-          {decodeHtmlEntities(item.displayName || cleanEntityId)}
-        </Anchor>
-        {item.isSelfReference && (
-          <Text size="xs" c="dimmed">
-            (self-reference)
-          </Text>
-        )}
+      <Group gap="sm" justify="space-between" align="start" wrap="nowrap">
+        <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
+          {getDirectionBadge()}
+          <Anchor
+            href={entityUrl}
+            onClick={handleClick}
+            size="sm"
+            fw={500}
+            style={{ wordBreak: 'break-word' }}
+          >
+            {decodeHtmlEntities(item.displayName || cleanEntityId)}
+          </Anchor>
+          {item.isSelfReference && (
+            <Badge size="xs" variant="outline" color="gray">
+              Self
+            </Badge>
+          )}
+        </Group>
       </Group>
       {item.subtitle && (
-        <Text size="xs" c="dimmed" data-testid="relationship-subtitle">
+        <Text size="xs" c="dimmed" data-testid="relationship-subtitle" ml={4}>
           {decodeHtmlEntities(item.subtitle)}
         </Text>
       )}
       {item.metadata && (
-        <Text size="xs" c="dimmed" data-testid="relationship-metadata">
+        <Text size="xs" c="dimmed" data-testid="relationship-metadata" ml={4}>
           {formatMetadata(item.metadata)}
         </Text>
       )}
