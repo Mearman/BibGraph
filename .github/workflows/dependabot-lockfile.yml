@@ -39,11 +39,11 @@ jobs:
           node-version: 20
           cache: pnpm
 
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
       - name: Format package.json files with syncpack
         run: pnpm syncpack format
-
-      - name: Regenerate lockfile
-        run: pnpm install --no-frozen-lockfile
 
       - name: Check for changes
         id: changes
