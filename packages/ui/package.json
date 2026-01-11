@@ -34,7 +34,7 @@
     "@mantine/core": "8.3.9",
     "@mantine/hooks": "8.3.9",
     "@mantine/notifications": "8.3.9",
-    "@storybook/addon-docs": "10.1.0",
+    "@storybook/addon-docs": "10.1.11",
     "@storybook/react-vite": "10.1.0",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.0",
