@@ -192,6 +192,36 @@ const formatEntityMetadata = (entity: CatalogueEntity): string => {
   return 'No metadata';
 };
 
+/**
+ * Provenance labels for graph list entries
+ * Maps technical provenance values to user-friendly descriptions
+ */
+const PROVENANCE_LABELS: Record<string, string> = {
+  user: "Added manually",
+  "collection-load": "Loaded from collection",
+  expansion: "Discovered via expansion",
+  "auto-population": "Auto-populated",
+};
+
+/**
+ * Formats notes field for user-friendly display
+ * Handles graph list serialized format: "provenance:TYPE|label:LABEL"
+ * @param notes - Raw notes string from entity
+ * @returns User-friendly display string
+ */
+const formatNotesForDisplay = (notes: string | undefined): string => {
+  if (!notes) return "No notes";
+
+  // Check for graph list serialized format: "provenance:TYPE|label:LABEL"
+  const provenanceMatch = notes.match(/^provenance:([^|]+)(?:\|label:.+)?$/);
+  if (provenanceMatch) {
+    const [, provenanceType] = provenanceMatch;
+    return PROVENANCE_LABELS[provenanceType] || provenanceType;
+  }
+
+  return notes;
+};
+
 const SortableEntityRow = ({
   entity,
   onNavigate,
@@ -289,7 +319,7 @@ const SortableEntityRow = ({
           ) : (
             <Group gap="sm">
               <Text size="sm" c="dimmed" style={{ flex: 1 }}>
-                {entity.notes || "No notes"}
+                {formatNotesForDisplay(entity.notes)}
               </Text>
               <ActionIcon
                 size="sm"
