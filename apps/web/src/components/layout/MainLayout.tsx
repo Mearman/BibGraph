@@ -456,10 +456,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             <KeyboardShortcutsButton
               onClick={() => setShortcutsHelpOpened(true)}
             />
-            <KeyboardShortcutsHelp
-              opened={shortcutsHelpOpened}
-              onClose={() => setShortcutsHelpOpened(false)}
-            />
           </Group>
         </Group>
       </AppShell.Header>

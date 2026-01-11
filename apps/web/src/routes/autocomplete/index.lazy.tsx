@@ -31,6 +31,7 @@ import { BaseTable } from "@/components/tables/BaseTable";
 import { type TableViewMode,TableViewModeToggle } from "@/components/TableViewModeToggle";
 import { API, BORDER_STYLE_GRAY_3, ICON_SIZE, TEXT, TIME_MS } from '@/config/style-constants';
 import { useThemeColors } from "@/hooks/use-theme-colors";
+import { decodeHtmlEntities } from "@/utils/decode-html-entities";
 import { transformAutocompleteResultToGridItem } from "@/utils/entity-mappers";
 
 /**
@@ -128,7 +129,7 @@ const AutocompleteGeneralRoute = () => {
         const routePath = routeMap[result.entity_type] || result.entity_type;
         return (
           <Anchor href={`#/${routePath}/${cleanId}`} fw={500}>
-            {info.getValue() as string}
+            {decodeHtmlEntities(info.getValue() as string)}
           </Anchor>
         );
       },

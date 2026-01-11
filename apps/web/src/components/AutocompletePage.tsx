@@ -29,6 +29,7 @@ import { IconInfoCircle, IconSearch } from "@tabler/icons-react";
 
 import { AutocompleteEntityFilter } from "@/components/AutocompleteEntityFilter";
 import { BORDER_STYLE_GRAY_3 } from "@/config/style-constants";
+import { decodeHtmlEntities } from "@/utils/decode-html-entities";
 
 export interface AutocompletePageProps {
   /** The entity type this page is for */
@@ -215,7 +216,7 @@ const AutocompleteResultCard = ({ result, entityType }: AutocompleteResultCardPr
       <Stack gap="xs">
         <Group justify="space-between" wrap="nowrap">
           <Anchor href={href} fw={500} size="md">
-            {result.display_name}
+            {decodeHtmlEntities(result.display_name ?? "")}
           </Anchor>
           <Badge size="sm" variant="light" color={metadata.color}>
             {metadata.displayName}
@@ -224,7 +225,7 @@ const AutocompleteResultCard = ({ result, entityType }: AutocompleteResultCardPr
 
         {result.hint && (
           <Text size="sm" c="dimmed" lineClamp={2}>
-            {result.hint}
+            {decodeHtmlEntities(result.hint)}
           </Text>
         )}
 

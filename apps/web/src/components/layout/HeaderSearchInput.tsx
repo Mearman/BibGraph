@@ -32,6 +32,7 @@ import { NOTIFICATION_DURATION } from "@/config/notification-constants";
 import { ICON_SIZE } from "@/config/style-constants";
 import { useNavigationEnhancements } from "@/hooks/useNavigationEnhancements";
 import { announceToScreenReader } from "@/utils/accessibility";
+import { decodeHtmlEntities } from "@/utils/decode-html-entities";
 
 // Type for OpenAlex autocomplete API response
 interface OpenAlexAutocompleteItem {
@@ -188,7 +189,7 @@ export const HeaderSearchInput = () => {
 
         const suggestion: SearchSuggestion = {
           id: item.id || `${item.entity_type}-${item.display_name}`,
-          displayName: item.display_name,
+          displayName: decodeHtmlEntities(item.display_name),
           entityType: mapEntityType(item.entity_type),
           description: item.entity_type,
           worksCount: item.works_count,
