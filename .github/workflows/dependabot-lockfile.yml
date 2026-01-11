@@ -11,9 +11,8 @@ permissions:
 
 jobs:
   lockfile:
-    # DISABLED: Dependabot groups now handle version alignment
-    # This workflow was causing conflicts by reverting Dependabot's version updates
-    if: false
+    # Only run for Dependabot PRs to update lockfiles after version changes
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     env:
       # Use environment variables for any github context to avoid injection risks
@@ -40,14 +39,6 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Align versions with syncpack
-        run: |
-          pnpm syncpack fix-mismatches
-          pnpm syncpack format
-
       - name: Regenerate lockfile
         run: pnpm install --no-frozen-lockfile
 
@@ -65,6 +56,6 @@ jobs:
         run: |
           git config user.name "dependabot[bot]"
           git config user.email "49699333+dependabot[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "chore(deps): align versions and update lockfile"
+          git add pnpm-lock.yaml
+          git commit -m "chore(deps): update lockfile"
           git push origin "$PR_HEAD_REF"
