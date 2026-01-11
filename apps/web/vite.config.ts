@@ -114,6 +114,11 @@ function createWebConfig(): UserConfig {
       githubPagesPlugin(),
     ],
 
+    // Esbuild options - keep function names for better error stack traces
+    esbuild: {
+      keepNames: true,
+    },
+
     // Build configuration
     build: {
       outDir: 'dist',
