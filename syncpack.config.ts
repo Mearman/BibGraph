@@ -61,161 +61,161 @@ const config: RcFile = {
       label: 'Nx packages',
       packages: ['**'],
       dependencies: ['nx', '@nx/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // Mantine packages must all use the same version
     {
       label: 'Mantine packages',
       packages: ['**'],
       dependencies: ['@mantine/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // TanStack packages must all use the same version
     {
       label: 'TanStack packages',
       packages: ['**'],
       dependencies: ['@tanstack/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // Testing Library packages must all use the same version
     {
       label: 'Testing Library packages',
       packages: ['**'],
       dependencies: ['@testing-library/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // TypeScript ESLint packages must all use the same version
     {
       label: 'TypeScript ESLint packages',
       packages: ['**'],
       dependencies: ['@typescript-eslint/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // Vitest packages must all use the same version
     {
       label: 'Vitest packages',
       packages: ['**'],
       dependencies: ['vitest', '@vitest/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // DnD Kit packages must all use the same version
     {
       label: 'DnD Kit packages',
       packages: ['**'],
       dependencies: ['@dnd-kit/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // Semantic Release packages must all use the same version
     {
       label: 'Semantic Release packages',
       packages: ['**'],
       dependencies: ['@semantic-release/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // Commitlint packages must all use the same version
     {
       label: 'Commitlint packages',
       packages: ['**'],
       dependencies: ['@commitlint/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // SWC packages must all use the same version
     {
       label: 'SWC packages',
       packages: ['**'],
       dependencies: ['@swc/*', '@swc-node/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // React Three Fiber packages must all use the same version
     {
       label: 'React Three Fiber packages',
       packages: ['**'],
       dependencies: ['@react-three/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // Playwright packages must all use the same version
     {
       label: 'Playwright packages',
       packages: ['**'],
       dependencies: ['@playwright/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // Axe-core packages must all use the same version
     {
       label: 'Axe-core packages',
       packages: ['**'],
       dependencies: ['@axe-core/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // ESLint core packages must all use the same version
     {
       label: 'ESLint core packages',
       packages: ['**'],
       dependencies: ['@eslint/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // Vanilla Extract packages must all use the same version
     {
       label: 'Vanilla Extract packages',
       packages: ['**'],
       dependencies: ['@vanilla-extract/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // Vite packages must all use the same version
     {
       label: 'Vite packages',
       packages: ['**'],
       dependencies: ['vite', '@vitejs/*', 'vite-*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // D3 type definitions must all use the same version
     {
       label: 'D3 types',
       packages: ['**'],
       dependencies: ['@types/d3', '@types/d3-*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // Three.js packages must all use the same version
     {
       label: 'Three.js packages',
       packages: ['**'],
       dependencies: ['three', '@types/three', 'three-*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // React Force Graph packages must all use the same version
     {
       label: 'React Force Graph packages',
       packages: ['**'],
       dependencies: ['react-force-graph-*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // XO ESLint config packages must all use the same version
     {
       label: 'XO ESLint config',
       packages: ['**'],
       dependencies: ['eslint-config-xo', 'eslint-config-xo-*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // React packages must all use the same version
     {
       label: 'React packages',
       packages: ['**'],
       dependencies: ['react', 'react-dom'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // React types must all use the same version
     {
       label: 'React types',
       packages: ['**'],
       dependencies: ['@types/react', '@types/react-dom'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // PostHog packages must all use the same version
     {
       label: 'PostHog packages',
       packages: ['**'],
       dependencies: ['posthog-js', '@posthog/*'],
-      policy: 'sameRange',
+      preferVersion: 'highestSemver',
     },
     // Everything else: use highest semver version found across all packages
     {
