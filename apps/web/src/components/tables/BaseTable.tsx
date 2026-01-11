@@ -48,29 +48,6 @@ interface BaseTableProps<T> {
   maxHeight?: number;
 }
 
-// Helper component for table wrapper with mobile scroll support
-const TableWrapper = ({ children }: { children: React.ReactNode }) => {
-  const { isMobile } = useResponsiveDesign();
-
-  if (isMobile()) {
-    return (
-      <ScrollArea
-        type="auto"
-        scrollbarSize={8}
-        className={sprinkles({ borderGray3: true, borderRadius: 'md' })}
-        styles={{
-          viewport: {
-            minHeight: '400px'
-          }
-        }}
-      >
-        {children}
-      </ScrollArea>
-    );
-  }
-  return <>{children}</>;
-};
-
 export const BaseTable = <T,>({
   data,
   columns,
@@ -408,23 +385,22 @@ export const BaseTable = <T,>({
 
   // Helper function to render regular table
   const renderRegularTable = () => {
-    return (
-      <TableWrapper>
-        <Table
-          striped={!isMobile()}
-          highlightOnHover
-          withTableBorder
-          withColumnBorders={isMobile()}
-          stickyHeader
-          style={{
-            minHeight: isLoading ? 400 : "auto",
-            width: isMobile() && compactView ? 'max-content' : '100%'
-          }}
-          className={sprinkles({
-            minHeight: '400px',
-            fontSize: isMobile() ? 'sm' : 'md'
-          })}
-        >
+    const tableContent = (
+      <Table
+        striped={!isMobile()}
+        highlightOnHover
+        withTableBorder
+        withColumnBorders={isMobile()}
+        stickyHeader
+        style={{
+          minHeight: isLoading ? 400 : "auto",
+          width: isMobile() && compactView ? 'max-content' : '100%'
+        }}
+        className={sprinkles({
+          minHeight: '400px',
+          fontSize: isMobile() ? 'sm' : 'md'
+        })}
+      >
           {renderTableHeader()}
 
           <Table.Tbody>
@@ -491,8 +467,27 @@ export const BaseTable = <T,>({
                   }))}
           </Table.Tbody>
         </Table>
-      </TableWrapper>
     );
+
+    // Wrap in ScrollArea for mobile devices
+    if (isMobile()) {
+      return (
+        <ScrollArea
+          type="auto"
+          scrollbarSize={8}
+          className={sprinkles({ borderGray3: true, borderRadius: 'md' })}
+          styles={{
+            viewport: {
+              minHeight: '400px'
+            }
+          }}
+        >
+          {tableContent}
+        </ScrollArea>
+      );
+    }
+
+    return tableContent;
   };
 
   // Helper function to render pagination info
