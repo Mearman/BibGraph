@@ -10,6 +10,7 @@ import { useNavigate } from '@tanstack/react-router';
 import React from 'react';
 
 import type { RelationshipItem as RelationshipItemType } from '@/types/relationship';
+import { decodeHtmlEntities } from '@/utils/decode-html-entities';
 import { formatMetadata } from '@/utils/formatMetadata';
 
 export interface RelationshipItemProps {
@@ -75,7 +76,7 @@ export const RelationshipItem: React.FC<RelationshipItemProps> = ({ item }) => {
     <Stack gap="xs" data-testid={`relationship-item-${item.id}`}>
       <Group gap="xs">
         <Anchor href={entityUrl} onClick={handleClick} size="sm">
-          {item.displayName || cleanEntityId}
+          {decodeHtmlEntities(item.displayName || cleanEntityId)}
         </Anchor>
         {item.isSelfReference && (
           <Text size="xs" c="dimmed">
@@ -85,7 +86,7 @@ export const RelationshipItem: React.FC<RelationshipItemProps> = ({ item }) => {
       </Group>
       {item.subtitle && (
         <Text size="xs" c="dimmed" data-testid="relationship-subtitle">
-          {item.subtitle}
+          {decodeHtmlEntities(item.subtitle)}
         </Text>
       )}
       {item.metadata && (

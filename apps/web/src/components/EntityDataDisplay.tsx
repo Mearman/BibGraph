@@ -36,26 +36,10 @@ import { Link } from "@tanstack/react-router";
 
 import { ICON_SIZE } from "@/config/style-constants";
 import { useVersionComparison } from "@/hooks/use-version-comparison";
+import { decodeHtmlEntities } from "@/utils/decode-html-entities";
 import { humanizeFieldName } from "@/utils/field-labels";
 import { formatNumber } from "@/utils/format-number";
 import { convertOpenAlexToInternalLink, isOpenAlexId } from "@/utils/openalex-link-conversion";
-
-/**
- * Decode HTML entities in text
- * Handles common entities like &amp;, &lt;, &gt;, &quot;, etc.
- */
-const decodeHtmlEntities = (text: string): string => {
-  const entities: Record<string, string> = {
-    "&amp;": "&",
-    "&lt;": "<",
-    "&gt;": ">",
-    "&quot;": '"',
-    "&#39;": "'",
-    "&apos;": "'",
-    "&nbsp;": " ",
-  };
-  return text.replaceAll(/&(?:amp|lt|gt|quot|apos|nbsp|#39);/g, (match) => entities[match] ?? match);
-};
 
 /** Section priority for consistent ordering */
 const SECTION_PRIORITY: Record<string, number> = {
