@@ -29,10 +29,10 @@
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/user-event": "14.6.1",
     "@types/node": "24.10.1",
-    "eslint": "9.39.1",
+    "eslint": "9.39.2",
     "msw": "2.12.3",
     "tsx": "4.21.0",
-    "typescript": "5.9.2",
+    "typescript": "5.9.3",
     "vitest": "4.0.14"
   },
   "author": "Joe Mearman",
