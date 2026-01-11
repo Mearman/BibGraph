@@ -1,8 +1,9 @@
 import type { EntityType } from "@bibgraph/types";
 import { EntityCard } from "@bibgraph/ui";
-import { Stack, Text } from "@mantine/core";
+import { Stack } from "@mantine/core";
 
 import { ContentSkeleton } from "./molecules/ContentSkeleton";
+import { EmptyState } from "./ui/EmptyState";
 
 export interface EntityListItem {
   id: string;
@@ -21,6 +22,12 @@ interface EntityListViewProps {
   emptyMessage?: string;
   loading?: boolean;
   loadingCount?: number;
+  /** Empty state variant */
+  emptyVariant?: "no-data" | "no-results";
+  /** Optional empty state actions */
+  emptyActions?: Array<{ label: string; onClick?: () => void }>;
+  /** Whether to show quick start guide in empty state */
+  showQuickStart?: boolean;
 }
 
 export const EntityListView = ({
@@ -30,6 +37,9 @@ export const EntityListView = ({
   emptyMessage = "No items to display",
   loading = false,
   loadingCount = 5,
+  emptyVariant = "no-data",
+  emptyActions,
+  showQuickStart = false,
 }: EntityListViewProps) => {
   if (loading) {
     return <ContentSkeleton variant="list" count={loadingCount} />;
@@ -37,11 +47,16 @@ export const EntityListView = ({
 
   if (items.length === 0) {
     return (
-      <Stack align="center" gap="md" p="xl">
-        <Text size="lg" c="dimmed">
-          {emptyMessage}
-        </Text>
-      </Stack>
+      <EmptyState
+        variant={emptyVariant}
+        title={emptyMessage}
+        actions={emptyActions}
+        quickStart={showQuickStart ? [
+          { step: "Search for entities", detail: "Browse the OpenAlex database" },
+          { step: "View details", detail: "Click any entity to learn more" },
+          { step: "Build collection", detail: "Bookmarks and history are saved automatically" },
+        ] : undefined}
+      />
     );
   }
 
