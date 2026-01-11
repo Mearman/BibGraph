@@ -6,6 +6,8 @@
 import { useLocation, useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { serializeSearch } from "@/utils/url-decoding";
+
 interface NavigationState {
   canGoBack: boolean;
   canGoForward: boolean;
@@ -20,7 +22,7 @@ export const useNavigationEnhancements = () => {
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
 
   // Track navigation history
-  const currentPath = location.pathname + location.search + location.hash;
+  const currentPath = location.pathname + serializeSearch(location.search) + location.hash;
 
   useEffect(() => {
     const lastPath = historyRef.current[historyRef.current.length - 1];
