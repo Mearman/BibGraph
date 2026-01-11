@@ -130,7 +130,9 @@ const renderPrimitiveValue = (value: unknown, fieldName?: string): import("react
       );
     }
 
-    if (value.startsWith("http://") || value.startsWith("https://")) {
+    // Case-insensitive URL detection and normalize display to lowercase
+    const lowerValue = value.toLowerCase();
+    if (lowerValue.startsWith("http://") || lowerValue.startsWith("https://")) {
       return (
         <Anchor
           href={value}
@@ -141,7 +143,7 @@ const renderPrimitiveValue = (value: unknown, fieldName?: string): import("react
         >
           <Group gap={4}>
             <IconExternalLink size={ICON_SIZE.SM} />
-            <Text size="sm" span>{value}</Text>
+            <Text size="sm" span>{lowerValue}</Text>
           </Group>
         </Anchor>
       );
@@ -304,9 +306,24 @@ const renderValueContent = (value: unknown, fieldName?: string): import("react")
     }
 
     // Object arrays - vertical list
+    // Deduplicate arrays of objects by 'id' field if present
+    let itemsToRender = value;
+    if (value.length > 0 && typeof value[0] === "object" && value[0] !== null) {
+      const firstItem = value[0] as Record<string, unknown>;
+      if ("id" in firstItem) {
+        const seenIds = new Set<unknown>();
+        itemsToRender = value.filter((item) => {
+          const itemObj = item as Record<string, unknown>;
+          if (seenIds.has(itemObj.id)) return false;
+          seenIds.add(itemObj.id);
+          return true;
+        });
+      }
+    }
+
     return (
       <Stack gap="xs">
-        {value.map((item, index) => (
+        {itemsToRender.map((item, index) => (
           <Paper key={index} withBorder p="sm" radius="sm">
             <Group gap="sm" align="flex-start">
               <Badge circle size="sm" color="blue" variant="light">

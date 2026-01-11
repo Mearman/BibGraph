@@ -29,19 +29,31 @@ interface HistoryCardProps {
   formatDate: (date: Date) => string;
 }
 
+/** Non-entity pages that shouldn't trigger display name fetches */
+const NON_ENTITY_URL_PATTERNS = ["/about", "/settings", "/history", "/bookmarks", "/catalogue"];
+
+/** Pattern for corrupted URLs */
+const CORRUPTED_URL_PATTERNS = ["[object Object]", "[object%20Object]", "%5Bobject"];
+
 export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardProps) => {
   // Check if this is a special ID (search or list)
   const isSpecialId = entry.entityId.startsWith("search-") || entry.entityId.startsWith("list-");
 
-  // Try to extract title from notes first
+  // Try to extract URL and title from notes
+  const urlFromNotes = entry.notes?.match(/URL: ([^\n]+)/)?.[1];
   const titleFromNotes = entry.notes?.match(/Title: ([^\n]+)/)?.[1];
 
-  // Always try to fetch display name from API for non-special IDs
-  // This ensures fresh titles even if stale ones were stored in notes
+  // Check if URL points to a non-entity page
+  const isNonEntityUrl = urlFromNotes && NON_ENTITY_URL_PATTERNS.some(pattern => urlFromNotes.includes(pattern));
+
+  // Check if URL is corrupted
+  const isCorruptedUrl = urlFromNotes && CORRUPTED_URL_PATTERNS.some(pattern => urlFromNotes.includes(pattern));
+
+  // Only fetch display name for valid entity URLs
   const { displayName, isLoading } = useEntityDisplayName({
     entityId: entry.entityId,
     entityType: entry.entityType as EntityType,
-    enabled: !isSpecialId,
+    enabled: !isSpecialId && !isNonEntityUrl && !isCorruptedUrl,
   });
 
   // Format entity type for display (e.g., "works" -> "Work", "authors" -> "Author")
@@ -64,13 +76,16 @@ export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardProps) =>
   };
 
   // Determine the title to display
-  // Priority: fetched displayName > stored titleFromNotes > fallback
-  // This ensures fresh titles even if stale ones were stored
+  // Priority varies based on URL type
   let title: string;
   if (isSpecialId) {
     title = entry.entityId.startsWith("search-") ? `Search: ${entry.entityId.replace("search-", "").split("-")[0]}` : `List: ${entry.entityId.replace("list-", "")}`;
+  } else if (isNonEntityUrl && urlFromNotes) {
+    // For non-entity pages, show the page name (e.g., "About", "Settings")
+    const pageName = urlFromNotes.replace(/.*[#/]/, "").split("/")[0];
+    title = pageName.charAt(0).toUpperCase() + pageName.slice(1);
   } else if (displayName) {
-    // Prefer freshly fetched display name
+    // Prefer freshly fetched display name for entity pages
     title = displayName;
   } else if (titleFromNotes) {
     // Fall back to stored title from notes
@@ -88,6 +103,10 @@ export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardProps) =>
     const urlMatch = entry.notes?.match(/URL: ([^\n]+)/);
     if (urlMatch) {
       const url = urlMatch[1];
+      // Skip corrupted URLs - fall back to entity path
+      if (CORRUPTED_URL_PATTERNS.some(pattern => url.includes(pattern))) {
+        return `/${String(entry.entityType)}/${String(entry.entityId)}`;
+      }
       // Convert OpenAlex API URLs to internal paths
       if (url.startsWith("https://api.openalex.org")) {
         return url.replace("https://api.openalex.org", "");

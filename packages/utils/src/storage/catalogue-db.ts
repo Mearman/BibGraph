@@ -1075,18 +1075,24 @@ export class CatalogueService {
 
   /**
    * Get all history entries
-   * Filters out corrupted entries at runtime (entityId containing [object Object] or empty)
+   * Filters out corrupted entries at runtime (entityId or URL containing [object Object])
    */
   async getHistory(): Promise<CatalogueEntity[]> {
     await this.initializeSpecialLists();
     const entities = await this.getListEntities(SPECIAL_LIST_IDS.HISTORY);
 
     // Runtime cleanup: filter out corrupted entries that may have been created after migration
-    return entities.filter(
-      (entity) =>
-        entity.entityId.length > 0 &&
-        !entity.entityId.includes(CORRUPTED_ENTITY_ID_PATTERN)
-    );
+    // Check both entityId and notes (which contains URL) for corruption patterns
+    const urlEncodedPattern = "[object%20Object]";
+    return entities.filter((entity) => {
+      if (entity.entityId.length === 0) return false;
+      if (entity.entityId.includes(CORRUPTED_ENTITY_ID_PATTERN)) return false;
+      if (entity.entityId.includes(urlEncodedPattern)) return false;
+      // Also check notes for corrupted URLs
+      if (entity.notes?.includes(CORRUPTED_ENTITY_ID_PATTERN)) return false;
+      if (entity.notes?.includes(urlEncodedPattern)) return false;
+      return true;
+    });
   }
 
   /**

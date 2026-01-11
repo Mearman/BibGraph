@@ -19,7 +19,7 @@ const YEAR_FIELD_PATTERNS = ["year", "publication_year"] as const;
 /**
  * Field names that contain decimal scores/shares requiring precision
  */
-const DECIMAL_PRECISION_FIELD_PATTERNS = ["score", "share", "percentile", "fwci"] as const;
+const DECIMAL_PRECISION_FIELD_PATTERNS = ["score", "share", "percentile", "fwci", "value"] as const;
 
 /**
  * Maximum decimal places to show for score/share fields
