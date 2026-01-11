@@ -86,7 +86,7 @@
     "tsx": "4.21.0",
     "typescript": "5.9.2",
     "vite": "7.2.4",
-    "vite-plugin-pwa": "1.0.3",
+    "vite-plugin-pwa": "1.2.0",
     "vitest": "4.0.14",
     "vitest-axe": "0.1.0"
   },
