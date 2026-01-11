@@ -1150,7 +1150,7 @@ export class CatalogueService {
       }
     }
 
-    return Array.from(seen.values());
+    return [...seen.values()];
   }
 
   /**

@@ -62,14 +62,14 @@ export const decodeHtmlEntities = (text: string): string => {
 				}
 				// Handle hex numeric entities: &#x00EF; -> ï
 				if (match.startsWith("&#x") || match.startsWith("&#X")) {
-					const codePoint = parseInt(match.slice(3, -1), 16);
+					const codePoint = Number.parseInt(match.slice(3, -1), 16);
 					if (!isNaN(codePoint)) {
 						return String.fromCodePoint(codePoint);
 					}
 				}
 				// Handle decimal numeric entities: &#239; -> ï
 				if (match.startsWith("&#")) {
-					const codePoint = parseInt(match.slice(2, -1), 10);
+					const codePoint = Number.parseInt(match.slice(2, -1), 10);
 					if (!isNaN(codePoint)) {
 						return String.fromCodePoint(codePoint);
 					}

@@ -62,7 +62,7 @@ const getEntityTypeFromIdPrefix = (id: string): EntityType | null => {
 export const convertToRelativeUrl = (urlOrId: string): string => {
 	// Extract just the ID part if it's a full URL
 	// Handle both direct ID URLs (openalex.org/T10211) and path-based URLs (openalex.org/topics/T10211)
-	let id = urlOrId.replace(/^https?:\/\/(?:api\.)?openalex\.org\//, '');
+	const id = urlOrId.replace(/^https?:\/\/(?:api\.)?openalex\.org\//, '');
 
 	// If the ID already includes an entity type path (e.g., "topics/T10211", "keywords/machine-learning"),
 	// return it directly
