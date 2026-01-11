@@ -167,13 +167,18 @@ const HistoryEntryCard = ({ entry, onNavigate, onDelete, formatDate }: HistoryEn
               <IconExternalLink size={ICON_SIZE.MD} />
             </ActionIcon>
           </Tooltip>
-          {entry.id && (
+          {entry.id != null && (
             <Tooltip label="Delete history entry">
               <ActionIcon
                 variant="light"
                 color="red"
                 aria-label={`Delete ${title} from history`}
-                onClick={() => onDelete(entry.id!, title)}
+                onClick={() => {
+                  const entryId = entry.id;
+                  if (entryId != null) {
+                    onDelete(entryId, title);
+                  }
+                }}
               >
                 <IconTrash size={ICON_SIZE.MD} />
               </ActionIcon>
