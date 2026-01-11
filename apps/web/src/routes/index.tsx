@@ -3,14 +3,12 @@ import { lazy } from "react";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const IndexRoute = lazy(() =>
-  import("./index.lazy").then((m) => ({ default: m.default })),
-);
+const HomePage = lazy(() => import("./index.lazy"));
 
 export const Route = createFileRoute("/")({
   component: () => (
     <LazyRoute>
-      <IndexRoute />
+      <HomePage />
     </LazyRoute>
   ),
 });

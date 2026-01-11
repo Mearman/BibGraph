@@ -1,10 +1,29 @@
 import { Alert, Button,Container, Group, Stack, Text, Title } from "@mantine/core";
 import { IconHome, IconSearch } from "@tabler/icons-react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useLocation } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
 
 import { ICON_SIZE } from "@/config/style-constants";
 
+// Lazy load HomePage for when we need to render it as fallback for root path
+// This works around a TanStack Router bug where the index route isn't matched
+const HomePage = lazy(() => import("./index.lazy"));
+
 const NotFoundRoute = () => {
+  const location = useLocation();
+
+  // Workaround for TanStack Router bug: index route not matching root path
+  // See: https://github.com/TanStack/router/issues/5528
+  if (location.pathname === "/") {
+    console.log("[NOT FOUND ROUTE] Root path detected, rendering HomePage as workaround");
+    return (
+      <Suspense fallback={<div style={{ padding: "40px", textAlign: "center" }}>Loading...</div>}>
+        <HomePage />
+      </Suspense>
+    );
+  }
+
+  console.log("[NOT FOUND ROUTE] Rendering 404 component");
   return (
     <Container size="md" py="xl">
       <Stack gap="md" align="center">

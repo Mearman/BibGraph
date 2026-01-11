@@ -21,6 +21,15 @@
     <meta property="twitter:description" content="Explore academic research data from OpenAlex, visualize citation networks, and discover research relationships across works, authors, institutions, and more." />
 
     <script>
+      // Redirect to hash-based home route if no hash is present
+      // This ensures users landing on "/" get properly routed to "/#/"
+      (function() {
+        if (!window.location.hash || window.location.hash === '#') {
+          window.location.replace(window.location.pathname + '#/');
+        }
+      })();
+    </script>
+    <script>
       // Prevent flash of wrong theme by setting color scheme before React loads
       (function() {
         const storedScheme = localStorage.getItem('mantine-color-scheme-value');
