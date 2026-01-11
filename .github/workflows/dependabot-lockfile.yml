@@ -11,8 +11,9 @@ permissions:
 
 jobs:
   lockfile:
-    # Check if PR was created by Dependabot (works even when humans reopen the PR)
-    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    # DISABLED: Dependabot groups now handle version alignment
+    # This workflow was causing conflicts by reverting Dependabot's version updates
+    if: false
     runs-on: ubuntu-latest
     env:
       # Use environment variables for any github context to avoid injection risks
