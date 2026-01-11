@@ -54,6 +54,12 @@ const getEntityTypeLabel = (entityType: EntityType): string => entityType.charAt
 const TECHNICAL_NOTE_PREFIXES = ["URL:", "Title:", "Tags:"] as const;
 
 /**
+ * Pattern for provenance lines like "AUTHOR from OpenAlex Tags: ..."
+ * These are technical metadata about entity source, not user-entered notes
+ */
+const PROVENANCE_LINE_PATTERN = /^[A-Z]+\s+from\s+\S+/i;
+
+/**
  * Filter out technical metadata lines from notes for user-friendly display
  * @param notes - Raw notes string
  * @returns Cleaned notes without technical metadata
@@ -62,7 +68,18 @@ const filterNotesForDisplay = (notes: string | undefined): string | undefined =>
 	if (!notes) return undefined;
 	const filteredLines = notes
 		.split("\n")
-		.filter(line => !TECHNICAL_NOTE_PREFIXES.some(prefix => line.startsWith(prefix)))
+		.filter(line => {
+			const trimmed = line.trim();
+			// Filter standard metadata prefixes
+			if (TECHNICAL_NOTE_PREFIXES.some(prefix => trimmed.startsWith(prefix))) {
+				return false;
+			}
+			// Filter provenance lines: "TYPE from SOURCE" pattern
+			if (PROVENANCE_LINE_PATTERN.test(trimmed)) {
+				return false;
+			}
+			return true;
+		})
 		.map(line => line.trim())
 		.filter(Boolean);
 	return filteredLines.length > 0 ? filteredLines.join("\n") : undefined;

@@ -138,10 +138,22 @@ export const BookmarkCard = ({ bookmark, onClose, onDeleted }: BookmarkCardProps
     });
   };
 
-  // Filter out technical metadata (URL, Title, Tags) from notes for display
+  // Filter out technical metadata from notes for display
+  // This includes URL:, Title:, Tags: prefixes and provenance lines like "AUTHOR from OpenAlex Tags:"
   const notesDisplay = bookmark.notes
     ?.split('\n')
-    .filter(line => !line.startsWith('URL:') && !line.startsWith('Title:') && !line.startsWith('Tags:'))
+    .filter(line => {
+      const trimmed = line.trim();
+      // Filter standard metadata prefixes
+      if (trimmed.startsWith('URL:') || trimmed.startsWith('Title:') || trimmed.startsWith('Tags:')) {
+        return false;
+      }
+      // Filter provenance lines: "TYPE from SOURCE" pattern (e.g., "AUTHOR from OpenAlex Tags: ...")
+      if (/^[A-Z]+\s+from\s+\S+/i.test(trimmed)) {
+        return false;
+      }
+      return true;
+    })
     .map(line => line.trim())
     .filter(Boolean)
     .join('\n') || undefined;
