@@ -4,11 +4,14 @@
 
 // Announce messages to screen readers
 export const announceToScreenReader = (message: string, priority: 'polite' | 'assertive' = 'polite') => {
-  // Create element using DOMParser to avoid createElement deprecation
-  const htmlString = `<div aria-live="${priority}" aria-atomic="true" style="position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden;"></div>`;
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(htmlString, 'text/html');
-  const announcement = doc.body.firstChild as HTMLElement;
+  const announcement = document.createElement('div');
+  announcement.setAttribute('aria-live', priority);
+  announcement.setAttribute('aria-atomic', 'true');
+  announcement.style.position = 'absolute';
+  announcement.style.left = '-10000px';
+  announcement.style.width = '1px';
+  announcement.style.height = '1px';
+  announcement.style.overflow = 'hidden';
 
   document.body.append(announcement);
   announcement.textContent = message;
@@ -60,17 +63,16 @@ export const createSkipLinks = () => {
     { href: '#search', text: 'Skip to search' },
   ];
 
-  // Create container using DOMParser to avoid createElement deprecation
-  const containerHtml = '<div role="navigation" aria-label="Skip navigation links" class="skip-links"></div>';
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(containerHtml, 'text/html');
-  const skipLinksContainer = doc.body.firstChild as HTMLElement;
+  const skipLinksContainer = document.createElement('div');
+  skipLinksContainer.setAttribute('role', 'navigation');
+  skipLinksContainer.setAttribute('aria-label', 'Skip navigation links');
+  skipLinksContainer.className = 'skip-links';
 
   skipLinks.forEach((link) => {
-    // Create anchor elements using DOMParser
-    const anchorHtml = `<a href="${link.href}" class="skip-link">${link.text}</a>`;
-    const anchorDoc = parser.parseFromString(anchorHtml, 'text/html');
-    const anchor = anchorDoc.body.firstChild as HTMLElement;
+    const anchor = document.createElement('a');
+    anchor.href = link.href;
+    anchor.className = 'skip-link';
+    anchor.textContent = link.text;
     skipLinksContainer.append(anchor);
   });
 
@@ -281,11 +283,8 @@ export const injectAccessibilityStyles = () => {
     return; // Already injected
   }
 
-  // Create style element using DOMParser to avoid createElement deprecation
-  const styleHtml = `<style id="${styleId}"></style>`;
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(styleHtml, 'text/html');
-  const style = doc.body.firstChild as HTMLStyleElement;
+  const style = document.createElement('style');
+  style.id = styleId;
   style.textContent = `
     .skip-links {
       position: absolute;
