@@ -138,11 +138,13 @@ export const BookmarkCard = ({ bookmark, onClose, onDeleted }: BookmarkCardProps
     });
   };
 
-  // Filter out URL and Title from notes for display
+  // Filter out technical metadata (URL, Title, Tags) from notes for display
   const notesDisplay = bookmark.notes
     ?.split('\n')
-    .filter(line => !line.startsWith('URL:') && !line.startsWith('Title:'))
-    .join('\n');
+    .filter(line => !line.startsWith('URL:') && !line.startsWith('Title:') && !line.startsWith('Tags:'))
+    .map(line => line.trim())
+    .filter(Boolean)
+    .join('\n') || undefined;
 
   return (
     <Card

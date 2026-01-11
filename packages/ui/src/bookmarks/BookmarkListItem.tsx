@@ -48,6 +48,27 @@ export interface BookmarkListItemProps {
 const getEntityTypeLabel = (entityType: EntityType): string => entityType.charAt(0).toUpperCase() + entityType.slice(1);
 
 /**
+ * Technical prefixes that should be filtered from notes display
+ * These are used internally for storing navigation/metadata but aren't user-facing
+ */
+const TECHNICAL_NOTE_PREFIXES = ["URL:", "Title:", "Tags:"] as const;
+
+/**
+ * Filter out technical metadata lines from notes for user-friendly display
+ * @param notes - Raw notes string
+ * @returns Cleaned notes without technical metadata
+ */
+const filterNotesForDisplay = (notes: string | undefined): string | undefined => {
+	if (!notes) return undefined;
+	const filteredLines = notes
+		.split("\n")
+		.filter(line => !TECHNICAL_NOTE_PREFIXES.some(prefix => line.startsWith(prefix)))
+		.map(line => line.trim())
+		.filter(Boolean);
+	return filteredLines.length > 0 ? filteredLines.join("\n") : undefined;
+};
+
+/**
  * Get a color for entity type badges
  * @param entityType
  */
@@ -228,12 +249,13 @@ export const BookmarkListItem = ({
 	// Format timestamp
 	const timestampText = formatRelativeTime(bookmark.metadata.timestamp);
 
-	// Truncate notes if they exist and are too long
+	// Filter and truncate notes for display (remove technical metadata lines)
 	const maxNotesLength = 150;
+	const cleanedNotes = filterNotesForDisplay(bookmark.notes);
 	const truncatedNotes =
-		bookmark.notes && bookmark.notes.length > maxNotesLength
-			? `${bookmark.notes.slice(0, maxNotesLength)}...`
-			: bookmark.notes;
+		cleanedNotes && cleanedNotes.length > maxNotesLength
+			? `${cleanedNotes.slice(0, maxNotesLength)}...`
+			: cleanedNotes;
 
 	return (
 		<Card
