@@ -30,7 +30,7 @@
     "@testing-library/user-event": "14.6.1",
     "@types/node": "24.10.1",
     "eslint": "9.39.1",
-    "msw": "2.12.3",
+    "msw": "2.12.7",
     "tsx": "4.21.0",
     "typescript": "5.9.2",
     "vitest": "4.0.14"
