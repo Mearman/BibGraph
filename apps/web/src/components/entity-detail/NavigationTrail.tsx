@@ -26,15 +26,23 @@ export type NavigationTrailProps = {
   customBreadcrumbs?: BreadcrumbItem[];
 };
 
+/** Default empty array for custom breadcrumbs to avoid React infinite loop */
+const DEFAULT_BREADCRUMBS: BreadcrumbItem[] = [];
+
 /**
  * NavigationTrail provides breadcrumbs and optional back-to-search functionality
  * for entity detail pages, improving navigation context and UX.
+ * @param props - Component props
+ * @param props.entityType - Current entity type (e.g., 'authors', 'works')
+ * @param props.entityName - Current entity display name
+ * @param props.showBackToSearch - Show "back to search" button if user came from search
+ * @param props.customBreadcrumbs - Custom breadcrumbs to prepend before entity trail
  */
 export const NavigationTrail = ({
   entityType,
   entityName,
   showBackToSearch = false,
-  customBreadcrumbs = [],
+  customBreadcrumbs = DEFAULT_BREADCRUMBS,
 }: NavigationTrailProps) => {
   const navigate = useNavigate();
 

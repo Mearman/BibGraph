@@ -5,8 +5,6 @@ import { notifications } from "@mantine/notifications";
 import { IconBookmark, IconBookmarkFilled, IconBookmarkOff, IconCode, IconGraph, IconListCheck, IconMenu2, IconX } from "@tabler/icons-react";
 import React, { ReactNode, useState } from "react";
 
-import { NavigationTrail } from "./NavigationTrail";
-
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
 import { useQueryBookmarking } from "@/hooks/use-query-bookmarking";
 import { useResponsiveDesign } from "@/hooks/use-sprinkles";
@@ -18,6 +16,7 @@ import { AddToListModal } from "../catalogue/AddToListModal";
 import { EntityDataDisplay } from "../EntityDataDisplay";
 import type { EntityTypeConfig } from "./EntityTypeConfig";
 import { getMantineColor } from "./EntityTypeConfig";
+import { NavigationTrail } from "./NavigationTrail";
 
 export type DetailViewMode = "rich" | "raw";
 
