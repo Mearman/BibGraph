@@ -168,7 +168,7 @@ function createWebConfig(): UserConfig {
       alias: {
         '@': resolve(__dirname, 'src'),
       },
-      dedupe: ['react', 'react-dom', '@tanstack/react-virtual', 'react-force-graph-2d', 'react-force-graph-3d', 'three'],
+      dedupe: ['react', 'react-dom', '@tanstack/react-virtual', 'react-force-graph-2d', 'react-force-graph-3d', 'three', '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
     },
 
     // Development server configuration
