@@ -24,7 +24,7 @@ const HTML_ENTITIES: Record<string, string> = {
  * - Decimal numeric entities: &#123;
  * - Hex numeric entities: &#x00EF; &#xAB;
  */
-const ENTITY_PATTERN = /&(?:amp|lt|gt|quot|apos|nbsp|#39|#\d+|#x[0-9a-fA-F]+);/g;
+const ENTITY_PATTERN = /&(?:amp|lt|gt|quot|apos|nbsp|#\d+|#x[0-9a-fA-F]+);/g;
 
 /**
  * Maximum iterations to prevent infinite loops
@@ -63,14 +63,14 @@ export const decodeHtmlEntities = (text: string): string => {
 				// Handle hex numeric entities: &#x00EF; -> ï
 				if (match.startsWith("&#x") || match.startsWith("&#X")) {
 					const codePoint = Number.parseInt(match.slice(3, -1), 16);
-					if (!isNaN(codePoint)) {
+					if (!Number.isNaN(codePoint)) {
 						return String.fromCodePoint(codePoint);
 					}
 				}
 				// Handle decimal numeric entities: &#239; -> ï
 				if (match.startsWith("&#")) {
 					const codePoint = Number.parseInt(match.slice(2, -1), 10);
-					if (!isNaN(codePoint)) {
+					if (!Number.isNaN(codePoint)) {
 						return String.fromCodePoint(codePoint);
 					}
 				}
