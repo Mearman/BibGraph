@@ -1,9 +1,13 @@
 import { cachedOpenAlex } from "@bibgraph/client";
+import { InMemoryStorageProvider } from "@bibgraph/utils";
 import { MantineProvider } from "@mantine/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useParams, useSearch } from "@tanstack/react-router";
 import { cleanup,fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
+
+import { StorageProviderWrapper } from "@/contexts/storage-provider-context";
 
 // Mock cachedOpenAlex client
 vi.mock("@bibgraph/client", async (importOriginal) => {
@@ -45,14 +49,18 @@ const mockTopicData = {
 
 describe("TopicRoute Integration Tests", () => {
   let queryClient: QueryClient;
+  let storage: InMemoryStorageProvider;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false, staleTime: Infinity },
         mutations: { retry: false },
       },
     });
+
+    storage = new InMemoryStorageProvider();
+    await storage.initializeSpecialLists();
 
     // Mock useParams
     vi.mocked(useParams).mockReturnValue({ topicId: "T123" });
@@ -65,6 +73,16 @@ describe("TopicRoute Integration Tests", () => {
       mockTopicData as any,
     );
   });
+
+  const TestWrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <StorageProviderWrapper provider={storage}>
+        <MantineProvider>
+          {children}
+        </MantineProvider>
+      </StorageProviderWrapper>
+    </QueryClientProvider>
+  );
 
   afterEach(() => {
     cleanup();
@@ -79,11 +97,9 @@ describe("TopicRoute Integration Tests", () => {
     );
 
     render(
-      <QueryClientProvider client={queryClient}>
-        <MantineProvider>
-          <TopicRoute />
-        </MantineProvider>
-      </QueryClientProvider>,
+      <TestWrapper>
+        <TopicRoute />
+      </TestWrapper>,
     );
 
     expect(screen.getByText("Loading Topic...")).toBeInTheDocument();
@@ -97,11 +113,9 @@ describe("TopicRoute Integration Tests", () => {
     );
 
     render(
-      <QueryClientProvider client={queryClient}>
-        <MantineProvider>
-          <TopicRoute />
-        </MantineProvider>
-      </QueryClientProvider>,
+      <TestWrapper>
+        <TopicRoute />
+      </TestWrapper>,
     );
 
     await waitFor(() => {
@@ -115,11 +129,9 @@ describe("TopicRoute Integration Tests", () => {
 
   it("renders topic data in rich view by default", async () => {
     render(
-      <QueryClientProvider client={queryClient}>
-        <MantineProvider>
-          <TopicRoute />
-        </MantineProvider>
-      </QueryClientProvider>,
+      <TestWrapper>
+        <TopicRoute />
+      </TestWrapper>,
     );
 
     await waitFor(() => {
@@ -138,11 +150,9 @@ describe("TopicRoute Integration Tests", () => {
 
   it("toggles to raw view and renders JSON", async () => {
     render(
-      <QueryClientProvider client={queryClient}>
-        <MantineProvider>
-          <TopicRoute />
-        </MantineProvider>
-      </QueryClientProvider>,
+      <TestWrapper>
+        <TopicRoute />
+      </TestWrapper>,
     );
 
     // Wait for data to load
@@ -166,11 +176,9 @@ describe("TopicRoute Integration Tests", () => {
 
   it("toggles back to rich view from raw view", async () => {
     render(
-      <QueryClientProvider client={queryClient}>
-        <MantineProvider>
-          <TopicRoute />
-        </MantineProvider>
-      </QueryClientProvider>,
+      <TestWrapper>
+        <TopicRoute />
+      </TestWrapper>,
     );
 
     // Wait for data to load
@@ -200,11 +208,9 @@ describe("TopicRoute Integration Tests", () => {
     );
 
     render(
-      <QueryClientProvider client={queryClient}>
-        <MantineProvider>
-          <TopicRoute />
-        </MantineProvider>
-      </QueryClientProvider>,
+      <TestWrapper>
+        <TopicRoute />
+      </TestWrapper>,
     );
 
     await waitFor(() => {

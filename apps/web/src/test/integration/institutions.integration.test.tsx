@@ -1,9 +1,13 @@
 import { cachedOpenAlex } from "@bibgraph/client";
+import { InMemoryStorageProvider } from "@bibgraph/utils";
 import { MantineProvider } from "@mantine/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useParams, useSearch } from "@tanstack/react-router";
 import { cleanup,fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
+
+import { StorageProviderWrapper } from "@/contexts/storage-provider-context";
 
 // Mock cachedOpenAlex client
 vi.mock("@bibgraph/client", async (importOriginal) => {
@@ -48,14 +52,18 @@ const mockInstitutionData = {
 
 describe("InstitutionRoute Integration Tests", () => {
   let queryClient: QueryClient;
+  let storage: InMemoryStorageProvider;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false, staleTime: Infinity },
         mutations: { retry: false },
       },
     });
+
+    storage = new InMemoryStorageProvider();
+    await storage.initializeSpecialLists();
 
     // Mock useParams
     vi.mocked(useParams).mockReturnValue({ _splat: "I123" });
@@ -68,6 +76,16 @@ describe("InstitutionRoute Integration Tests", () => {
       mockInstitutionData as any,
     );
   });
+
+  const TestWrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <StorageProviderWrapper provider={storage}>
+        <MantineProvider>
+          {children}
+        </MantineProvider>
+      </StorageProviderWrapper>
+    </QueryClientProvider>
+  );
 
   afterEach(() => {
     cleanup();
@@ -82,11 +100,9 @@ describe("InstitutionRoute Integration Tests", () => {
     );
 
     render(
-      <QueryClientProvider client={queryClient}>
-        <MantineProvider>
-          <InstitutionRoute />
-        </MantineProvider>
-      </QueryClientProvider>,
+      <TestWrapper>
+        <InstitutionRoute />
+      </TestWrapper>,
     );
 
     expect(screen.getByText("Loading Institution...")).toBeInTheDocument();
@@ -100,11 +116,9 @@ describe("InstitutionRoute Integration Tests", () => {
     );
 
     render(
-      <QueryClientProvider client={queryClient}>
-        <MantineProvider>
-          <InstitutionRoute />
-        </MantineProvider>
-      </QueryClientProvider>,
+      <TestWrapper>
+        <InstitutionRoute />
+      </TestWrapper>,
     );
 
     await waitFor(() => {
@@ -117,11 +131,9 @@ describe("InstitutionRoute Integration Tests", () => {
 
   it("renders institution data in rich view by default", async () => {
     render(
-      <QueryClientProvider client={queryClient}>
-        <MantineProvider>
-          <InstitutionRoute />
-        </MantineProvider>
-      </QueryClientProvider>,
+      <TestWrapper>
+        <InstitutionRoute />
+      </TestWrapper>,
     );
 
     await waitFor(() => {
@@ -140,11 +152,9 @@ describe("InstitutionRoute Integration Tests", () => {
 
   it("toggles to raw view and renders JSON", async () => {
     render(
-      <QueryClientProvider client={queryClient}>
-        <MantineProvider>
-          <InstitutionRoute />
-        </MantineProvider>
-      </QueryClientProvider>,
+      <TestWrapper>
+        <InstitutionRoute />
+      </TestWrapper>,
     );
 
     // Wait for data to load
@@ -168,11 +178,9 @@ describe("InstitutionRoute Integration Tests", () => {
 
   it("toggles back to rich view from raw view", async () => {
     render(
-      <QueryClientProvider client={queryClient}>
-        <MantineProvider>
-          <InstitutionRoute />
-        </MantineProvider>
-      </QueryClientProvider>,
+      <TestWrapper>
+        <InstitutionRoute />
+      </TestWrapper>,
     );
 
     // Wait for data to load
@@ -202,11 +210,9 @@ describe("InstitutionRoute Integration Tests", () => {
     );
 
     render(
-      <QueryClientProvider client={queryClient}>
-        <MantineProvider>
-          <InstitutionRoute />
-        </MantineProvider>
-      </QueryClientProvider>,
+      <TestWrapper>
+        <InstitutionRoute />
+      </TestWrapper>,
     );
 
     await waitFor(() => {

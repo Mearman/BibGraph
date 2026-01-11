@@ -1,9 +1,13 @@
 import { cachedOpenAlex } from '@bibgraph/client';
+import { InMemoryStorageProvider } from '@bibgraph/utils';
 import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useParams, useSearch } from '@tanstack/react-router';
 import { cleanup,render, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach,beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { StorageProviderWrapper } from '@/contexts/storage-provider-context';
 
 // Mock cachedOpenAlex client
 vi.mock('@bibgraph/client', async (importOriginal) => {
@@ -103,14 +107,18 @@ const mockKeyword = {
 
 describe('Keywords Route - EntityDetailLayout Migration', () => {
   let queryClient: QueryClient;
+  let storage: InMemoryStorageProvider;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false, staleTime: Infinity },
         mutations: { retry: false },
       },
     });
+
+    storage = new InMemoryStorageProvider();
+    await storage.initializeSpecialLists();
 
     // Mock useParams
     vi.mocked(useParams).mockReturnValue({ keywordId: 'artificial-intelligence' });
@@ -124,6 +132,16 @@ describe('Keywords Route - EntityDetailLayout Migration', () => {
     );
   });
 
+  const TestWrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <StorageProviderWrapper provider={storage}>
+        <MantineProvider>
+          {children}
+        </MantineProvider>
+      </StorageProviderWrapper>
+    </QueryClientProvider>
+  );
+
   afterEach(() => {
     cleanup();
     queryClient.clear();
@@ -133,11 +151,9 @@ describe('Keywords Route - EntityDetailLayout Migration', () => {
   describe('T003: EntityDetailLayout Component', () => {
     it('should use EntityDetailLayout component', async () => {
       render(
-        <QueryClientProvider client={queryClient}>
-          <MantineProvider>
-            <KeywordRoute />
-          </MantineProvider>
-        </QueryClientProvider>
+        <TestWrapper>
+          <KeywordRoute />
+        </TestWrapper>
       );
 
       // Wait for data to load
@@ -157,11 +173,9 @@ describe('Keywords Route - EntityDetailLayout Migration', () => {
       );
 
       render(
-        <QueryClientProvider client={queryClient}>
-          <MantineProvider>
-            <KeywordRoute />
-          </MantineProvider>
-        </QueryClientProvider>
+        <TestWrapper>
+          <KeywordRoute />
+        </TestWrapper>
       );
 
       // Expect LoadingState component to be rendered
@@ -176,11 +190,9 @@ describe('Keywords Route - EntityDetailLayout Migration', () => {
       );
 
       render(
-        <QueryClientProvider client={queryClient}>
-          <MantineProvider>
-            <KeywordRoute />
-          </MantineProvider>
-        </QueryClientProvider>
+        <TestWrapper>
+          <KeywordRoute />
+        </TestWrapper>
       );
 
       // Wait for error to be handled
@@ -194,11 +206,9 @@ describe('Keywords Route - EntityDetailLayout Migration', () => {
 
     it('should render RelationshipCounts component', async () => {
       render(
-        <QueryClientProvider client={queryClient}>
-          <MantineProvider>
-            <KeywordRoute />
-          </MantineProvider>
-        </QueryClientProvider>
+        <TestWrapper>
+          <KeywordRoute />
+        </TestWrapper>
       );
 
       await waitFor(() => {
@@ -214,11 +224,9 @@ describe('Keywords Route - EntityDetailLayout Migration', () => {
 
     it('should render IncomingRelationships component', async () => {
       render(
-        <QueryClientProvider client={queryClient}>
-          <MantineProvider>
-            <KeywordRoute />
-          </MantineProvider>
-        </QueryClientProvider>
+        <TestWrapper>
+          <KeywordRoute />
+        </TestWrapper>
       );
 
       await waitFor(() => {
@@ -233,11 +241,9 @@ describe('Keywords Route - EntityDetailLayout Migration', () => {
 
     it('should render OutgoingRelationships component', async () => {
       render(
-        <QueryClientProvider client={queryClient}>
-          <MantineProvider>
-            <KeywordRoute />
-          </MantineProvider>
-        </QueryClientProvider>
+        <TestWrapper>
+          <KeywordRoute />
+        </TestWrapper>
       );
 
       await waitFor(() => {
