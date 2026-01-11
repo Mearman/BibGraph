@@ -23,7 +23,7 @@
     "@bibgraph/types": "workspace:*",
     "@bibgraph/utils": "workspace:*",
     "commander": "14.0.1",
-    "zod": "4.1.13"
+    "zod": "4.3.5"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "6.9.1",

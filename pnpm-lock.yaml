@@ -314,8 +314,8 @@ importers:
         specifier: 0.1.0
         version: 0.1.0(vitest@4.0.14)
       zod:
-        specifier: 4.1.13
-        version: 4.1.13
+        specifier: 4.3.5
+        version: 4.3.5
 
   apps/cli:
     dependencies:
@@ -332,8 +332,8 @@ importers:
         specifier: 14.0.1
         version: 14.0.1
       zod:
-        specifier: 4.1.13
-        version: 4.1.13
+        specifier: 4.3.5
+        version: 4.3.5
     devDependencies:
       '@testing-library/jest-dom':
         specifier: 6.9.1
@@ -477,8 +477,8 @@ importers:
         specifier: 5.1.0
         version: 5.1.0
       zod:
-        specifier: 4.1.13
-        version: 4.1.13
+        specifier: 4.3.5
+        version: 4.3.5
     devDependencies:
       '@axe-core/playwright':
         specifier: 4.11.0
@@ -604,8 +604,8 @@ importers:
   packages/types:
     dependencies:
       zod:
-        specifier: 4.1.13
-        version: 4.1.13
+        specifier: 4.3.5
+        version: 4.3.5
     devDependencies:
       eslint:
         specifier: 9.39.1
@@ -729,8 +729,8 @@ importers:
         specifier: 1.5.4
         version: 1.5.4
       zod:
-        specifier: 4.1.13
-        version: 4.1.13
+        specifier: 4.3.5
+        version: 4.3.5
     devDependencies:
       '@types/react':
         specifier: 19.2.7
@@ -10326,8 +10326,8 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
-  zod@4.1.13:
-    resolution: {integrity: sha512-AvvthqfqrAhNH9dnfmrfKzX5upOdjUVJYFqNSlkmGf64gRaTzlPwz99IHYnVs28qYAybvAlBV+H7pn0saFY4Ig==}
+  zod@4.3.5:
+    resolution: {integrity: sha512-k7Nwx6vuWx1IJ9Bjuf4Zt1PEllcwe7cls3VNzm4CQ1/hgtFUK2bRNG3rvnpPUhFjmqJKAKtjV576KnUkHocg/g==}
 
   zustand@4.5.7:
     resolution: {integrity: sha512-CHOUy7mu3lbD6o6LJLfllpjkzhHXSBlX8B9+qPddUsIfeF5S/UZ5q0kmCsnRqT1UHFQZchNFDDzMbQsuesHWlw==}
@@ -11603,7 +11603,7 @@ snapshots:
       eslint: 9.39.1(jiti@2.6.1)
       ts-pattern: 5.9.0
       typescript: 5.9.2
-      zod: 4.1.13
+      zod: 4.3.5
     transitivePeerDependencies:
       - supports-color
 
@@ -16382,8 +16382,8 @@ snapshots:
       '@babel/parser': 7.28.5
       eslint: 9.39.1(jiti@2.6.1)
       hermes-parser: 0.25.1
-      zod: 4.1.13
-      zod-validation-error: 4.0.2(zod@4.1.13)
+      zod: 4.3.5
+      zod-validation-error: 4.0.2(zod@4.3.5)
     transitivePeerDependencies:
       - supports-color
 
@@ -17845,7 +17845,7 @@ snapshots:
       smol-toml: 1.5.2
       strip-json-comments: 5.0.3
       typescript: 5.9.2
-      zod: 4.1.13
+      zod: 4.3.5
 
   koa-compose@4.1.0: {}
 
@@ -21454,13 +21454,13 @@ snapshots:
 
   yoctocolors@2.1.2: {}
 
-  zod-validation-error@4.0.2(zod@4.1.13):
+  zod-validation-error@4.0.2(zod@4.3.5):
     dependencies:
-      zod: 4.1.13
+      zod: 4.3.5
 
   zod@3.25.76: {}
 
-  zod@4.1.13: {}
+  zod@4.3.5: {}
 
   zustand@4.5.7(@types/react@19.2.7)(immer@11.0.0)(react@19.2.0):
     dependencies:
