@@ -376,8 +376,8 @@ export const useEntityRelationshipQueries = (entityId: string | undefined, entit
 const parseFilterStringToObject = (filterString: string): Record<string, string> => {
   const colonIndex = filterString.indexOf(':');
   if (colonIndex === -1) return {};
-  const key = filterString.substring(0, colonIndex);
-  const value = filterString.substring(colonIndex + 1);
+  const key = filterString.slice(0, colonIndex);
+  const value = filterString.slice(colonIndex + 1);
   return { [key]: value };
 };
 

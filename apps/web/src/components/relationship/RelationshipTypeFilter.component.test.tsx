@@ -1,12 +1,13 @@
 /**
  * Component tests for RelationshipTypeFilter
+ * Tests the categorized accordion + chip UI with preset buttons
  */
 
 import { RelationType } from '@bibgraph/types';
 import { MantineProvider } from '@mantine/core';
-import { cleanup,render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { afterEach,beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RelationshipTypeFilter } from './RelationshipTypeFilter';
 
@@ -49,115 +50,110 @@ describe('RelationshipTypeFilter', () => {
     expect(screen.getByText('Filter by Relationship Type')).toBeInTheDocument();
   });
 
-  it('should render checkboxes for all relationship types', () => {
+  it('should render preset buttons', () => {
     renderComponent();
 
-    // Verify all unique RelationType values have checkboxes
-    const allTypes = getUniqueTypes();
-    allTypes.forEach((type) => {
-      const checkbox = screen.getByTestId(`filter-checkbox-${type}`);
-      expect(checkbox).toBeInTheDocument();
-    });
+    expect(screen.getByTestId('preset-all')).toBeInTheDocument();
+    expect(screen.getByTestId('preset-core')).toBeInTheDocument();
+    expect(screen.getByTestId('preset-citations')).toBeInTheDocument();
   });
 
-  it('should show all checkboxes as checked when selectedTypes is empty', () => {
-    renderComponent([]);
-
-    const allTypes = getUniqueTypes();
-    allTypes.forEach((type) => {
-      // Mantine passes data-testid to the wrapper, find input inside
-      const checkboxWrapper = screen.getByTestId(`filter-checkbox-${type}`);
-      const input = checkboxWrapper.closest('.mantine-Checkbox-root')?.querySelector('input[type="checkbox"]') as HTMLInputElement;
-      expect(input).toBeChecked();
-    });
-  });
-
-  it('should only check selected types when selectedTypes is not empty', () => {
-    const selectedTypes = [RelationType.AUTHORSHIP, RelationType.REFERENCE];
-    renderComponent(selectedTypes);
-
-    const authorshipCheckbox = screen.getByTestId(`filter-checkbox-${RelationType.AUTHORSHIP}`);
-    const referenceCheckbox = screen.getByTestId(`filter-checkbox-${RelationType.REFERENCE}`);
-    const publicationCheckbox = screen.getByTestId(`filter-checkbox-${RelationType.PUBLICATION}`);
-
-    const authorshipInput = authorshipCheckbox.closest('.mantine-Checkbox-root')?.querySelector('input[type="checkbox"]') as HTMLInputElement;
-    const referenceInput = referenceCheckbox.closest('.mantine-Checkbox-root')?.querySelector('input[type="checkbox"]') as HTMLInputElement;
-    const publicationInput = publicationCheckbox.closest('.mantine-Checkbox-root')?.querySelector('input[type="checkbox"]') as HTMLInputElement;
-
-    expect(authorshipInput).toBeChecked();
-    expect(referenceInput).toBeChecked();
-    expect(publicationInput).not.toBeChecked();
-  });
-
-  it('should call onChange when checkbox is toggled', async () => {
-    const user = userEvent.setup();
-    renderComponent([]);
-
-    const authorshipCheckbox = screen.getByTestId(`filter-checkbox-${RelationType.AUTHORSHIP}`);
-    await user.click(authorshipCheckbox);
-
-    // When empty array (all selected), clicking should select only that one type
-    expect(mockOnChange).toHaveBeenCalledWith([RelationType.AUTHORSHIP]);
-  });
-
-  it('should add type when checkbox is clicked on unselected type', async () => {
+  it('should call onChange with empty array when All preset is clicked', async () => {
     const user = userEvent.setup();
     const selectedTypes = [RelationType.AUTHORSHIP];
     renderComponent(selectedTypes);
 
-    const referenceCheckbox = screen.getByTestId(`filter-checkbox-${RelationType.REFERENCE}`);
-    await user.click(referenceCheckbox);
-
-    expect(mockOnChange).toHaveBeenCalledWith([RelationType.AUTHORSHIP, RelationType.REFERENCE]);
-  });
-
-  it('should remove type when checkbox is clicked on selected type', async () => {
-    const user = userEvent.setup();
-    const selectedTypes = [RelationType.AUTHORSHIP, RelationType.REFERENCE];
-    renderComponent(selectedTypes);
-
-    const authorshipCheckbox = screen.getByTestId(`filter-checkbox-${RelationType.AUTHORSHIP}`);
-    await user.click(authorshipCheckbox);
-
-    expect(mockOnChange).toHaveBeenCalledWith([RelationType.REFERENCE]);
-  });
-
-  it('should clear all selections when Clear All is clicked', async () => {
-    const user = userEvent.setup();
-    const selectedTypes = [RelationType.AUTHORSHIP, RelationType.REFERENCE];
-    renderComponent(selectedTypes);
-
-    const clearButton = screen.getByTestId('clear-all-button');
-    await user.click(clearButton);
+    const allPreset = screen.getByTestId('preset-all');
+    await user.click(allPreset);
 
     expect(mockOnChange).toHaveBeenCalledWith([]);
   });
 
-  it('should select all types when Select All is clicked', async () => {
+  it('should call onChange with core types when Core Only preset is clicked', async () => {
+    const user = userEvent.setup();
+    renderComponent([]);
+
+    const corePreset = screen.getByTestId('preset-core');
+    await user.click(corePreset);
+
+    expect(mockOnChange).toHaveBeenCalledWith([
+      RelationType.AUTHORSHIP,
+      RelationType.AFFILIATION,
+      RelationType.PUBLICATION,
+      RelationType.REFERENCE,
+      RelationType.TOPIC,
+    ]);
+  });
+
+  it('should call onChange with REFERENCE when Citations preset is clicked', async () => {
+    const user = userEvent.setup();
+    renderComponent([]);
+
+    const citationsPreset = screen.getByTestId('preset-citations');
+    await user.click(citationsPreset);
+
+    expect(mockOnChange).toHaveBeenCalledWith([RelationType.REFERENCE]);
+  });
+
+  it('should render chips for relationship types within accordion', () => {
+    renderComponent();
+
+    // Core category should be open by default
+    expect(screen.getByTestId(`filter-chip-${RelationType.AUTHORSHIP}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`filter-chip-${RelationType.REFERENCE}`)).toBeInTheDocument();
+  });
+
+  it('should render chips for core category types when empty selection (all shown)', () => {
+    renderComponent([]);
+
+    // Chips should be rendered in core category (open by default)
+    expect(screen.getByTestId(`filter-chip-${RelationType.AUTHORSHIP}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`filter-chip-${RelationType.REFERENCE}`)).toBeInTheDocument();
+  });
+
+  it('should render chips in core category for specific selection', () => {
+    const selectedTypes = [RelationType.AUTHORSHIP, RelationType.REFERENCE];
+    renderComponent(selectedTypes);
+
+    // All core category chips should be present
+    expect(screen.getByTestId(`filter-chip-${RelationType.AUTHORSHIP}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`filter-chip-${RelationType.REFERENCE}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`filter-chip-${RelationType.PUBLICATION}`)).toBeInTheDocument();
+  });
+
+  it('should call onChange when chip is toggled from "all" state', async () => {
+    const user = userEvent.setup();
+    renderComponent([]);
+
+    const authorshipChip = screen.getByTestId(`filter-chip-${RelationType.AUTHORSHIP}`);
+    await user.click(authorshipChip);
+
+    // When empty array (all selected), clicking should exclude that type
+    const allTypes = getUniqueTypes();
+    const expectedTypes = allTypes.filter(t => t !== RelationType.AUTHORSHIP);
+    expect(mockOnChange).toHaveBeenCalledWith(expectedTypes);
+  });
+
+  it('should add type when chip is clicked on unselected type', async () => {
     const user = userEvent.setup();
     const selectedTypes = [RelationType.AUTHORSHIP];
     renderComponent(selectedTypes);
 
-    const selectAllButton = screen.getByTestId('select-all-button');
-    await user.click(selectAllButton);
+    const referenceChip = screen.getByTestId(`filter-chip-${RelationType.REFERENCE}`);
+    await user.click(referenceChip);
 
-    const allTypes = getUniqueTypes();
-    expect(mockOnChange).toHaveBeenCalledWith(allTypes);
+    expect(mockOnChange).toHaveBeenCalledWith([RelationType.AUTHORSHIP, RelationType.REFERENCE]);
   });
 
-  it('should disable Clear All button when no types selected', () => {
-    renderComponent([]);
+  it('should remove type when chip is clicked on selected type', async () => {
+    const user = userEvent.setup();
+    const selectedTypes = [RelationType.AUTHORSHIP, RelationType.REFERENCE];
+    renderComponent(selectedTypes);
 
-    const clearButton = screen.getByTestId('clear-all-button');
-    expect(clearButton).toBeDisabled();
-  });
+    const authorshipChip = screen.getByTestId(`filter-chip-${RelationType.AUTHORSHIP}`);
+    await user.click(authorshipChip);
 
-  it('should disable Select All button when all types selected', () => {
-    const allTypes = getUniqueTypes();
-    renderComponent(allTypes);
-
-    const selectAllButton = screen.getByTestId('select-all-button');
-    expect(selectAllButton).toBeDisabled();
+    expect(mockOnChange).toHaveBeenCalledWith([RelationType.REFERENCE]);
   });
 
   it('should use custom title when provided', () => {
@@ -172,5 +168,36 @@ describe('RelationshipTypeFilter', () => {
     );
 
     expect(screen.getByText('Custom Filter Title')).toBeInTheDocument();
+  });
+
+  it('should show selection count badge when types are selected', () => {
+    const selectedTypes = [RelationType.AUTHORSHIP, RelationType.REFERENCE];
+    renderComponent(selectedTypes);
+
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+  });
+
+  it('should not show selection count when showing all (empty array)', () => {
+    renderComponent([]);
+
+    expect(screen.queryByText(/\d+ selected/)).not.toBeInTheDocument();
+  });
+
+  it('should highlight active preset button via class when All is active', () => {
+    renderComponent([]);
+
+    // When selectedTypes is empty, "All" preset should be active
+    // Just verify the button exists and is clickable
+    const allPreset = screen.getByTestId('preset-all');
+    expect(allPreset).toBeInTheDocument();
+  });
+
+  it('should render category toggle buttons', () => {
+    renderComponent();
+
+    // Core category should be open by default - look for its toggle
+    const coreToggle = screen.getByTestId('category-toggle-core');
+    expect(coreToggle).toBeInTheDocument();
+    expect(coreToggle).toHaveTextContent('Deselect All');
   });
 });

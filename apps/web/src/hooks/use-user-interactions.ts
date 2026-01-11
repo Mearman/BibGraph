@@ -26,6 +26,8 @@ export interface UseUserInteractionsOptions {
   url?: string;
   autoTrackVisits?: boolean;
   sessionId?: string;
+  /** Display name for the entity (used for history title) */
+  displayName?: string;
 }
 
 export interface UseUserInteractionsReturn {
@@ -100,6 +102,7 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
     url,
     autoTrackVisits = true,
     sessionId,
+    displayName,
   } = options;
 
   // Safely get router location (may not be available in test environments)
@@ -135,6 +138,10 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
 
   // Track component mount status to prevent state updates after unmount
   const isMountedRef = useRef(true);
+
+  // Debounce history entries to prevent duplicates on rapid navigation
+  const lastHistoryRef = useRef<{ entityId: string; time: number } | null>(null);
+  const HISTORY_DEBOUNCE_MS = 1000;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -241,15 +248,27 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
     if (autoTrackVisits && entityId && entityType) {
       const trackPageVisit = async () => {
         try {
+          // Debounce: skip if same entity was recorded recently
+          const now = Date.now();
+          if (
+            lastHistoryRef.current?.entityId === entityId &&
+            now - lastHistoryRef.current.time < HISTORY_DEBOUNCE_MS
+          ) {
+            return;
+          }
+
           const currentUrl = location.pathname + serializeSearch(location.search);
 
           await catalogueService.addToHistory({
             entityType: entityType as EntityType,
             entityId: entityId,
             url: currentUrl,
-            // Don't provide fallback title - let HistoryCard fetch display name from API
-            title: undefined,
+            // Pass display name for proper history titles
+            title: displayName,
           });
+
+          // Record for debounce
+          lastHistoryRef.current = { entityId, time: now };
         } catch (error) {
           logger.error(
             USER_INTERACTIONS_LOGGER_CONTEXT,
@@ -270,6 +289,7 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
     entityType,
     autoTrackVisits,
     sessionId,
+    displayName,
     location.pathname,
     location.search,
   ]);

@@ -56,10 +56,10 @@ export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardProps) =>
     if (idMatch) {
       const id = idMatch[1];
       // Show first letter + first few digits for readability
-      return id.length > 8 ? `${id.substring(0, 8)}...` : id;
+      return id.length > 8 ? `${id.slice(0, 8)}...` : id;
     }
     // For other IDs, truncate if too long
-    return entityId.length > 15 ? `${entityId.substring(0, 15)}...` : entityId;
+    return entityId.length > 15 ? `${entityId.slice(0, 15)}...` : entityId;
   };
 
   // Determine the title to display

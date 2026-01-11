@@ -131,7 +131,7 @@ const FIELD_LABELS: Record<string, string> = {
  * @param key - The API field name (e.g., "2yr_mean_citedness", "cited_by_count")
  * @returns Human-readable label (e.g., "2-Year Mean Citedness", "Times Cited")
  */
-export function humanizeFieldName(key: string): string {
+export const humanizeFieldName = (key: string): string => {
   // Check for exact match (case-insensitive)
   const lowerKey = key.toLowerCase();
   if (lowerKey in FIELD_LABELS) {
@@ -145,16 +145,16 @@ export function humanizeFieldName(key: string): string {
     // Replace underscores with spaces
     .replaceAll("_", " ")
     // Capitalize first letter of each word
-    .replace(/\b\w/g, (l) => l.toUpperCase())
+    .replaceAll(/\b\w/g, (l) => l.toUpperCase())
     // Handle common abbreviations that should stay uppercase
-    .replace(/\bId\b/g, "ID")
-    .replace(/\bDoi\b/g, "DOI")
-    .replace(/\bOrcid\b/g, "ORCID")
-    .replace(/\bRor\b/g, "ROR")
-    .replace(/\bOa\b/g, "OA")
-    .replace(/\bApi\b/g, "API")
-    .replace(/\bUrl\b/g, "URL");
-}
+    .replaceAll(/\bId\b/g, "ID")
+    .replaceAll(/\bDoi\b/g, "DOI")
+    .replaceAll(/\bOrcid\b/g, "ORCID")
+    .replaceAll(/\bRor\b/g, "ROR")
+    .replaceAll(/\bOa\b/g, "OA")
+    .replaceAll(/\bApi\b/g, "API")
+    .replaceAll(/\bUrl\b/g, "URL");
+};
 
 /**
  * Get label for a field, with optional custom overrides.
@@ -163,13 +163,13 @@ export function humanizeFieldName(key: string): string {
  * @param customLabels - Optional custom label overrides
  * @returns Human-readable label
  */
-export function getFieldLabel(
+export const getFieldLabel = (
   key: string,
   customLabels?: Record<string, string>
-): string {
+): string => {
   // Check custom labels first
   if (customLabels && key in customLabels) {
     return customLabels[key];
   }
   return humanizeFieldName(key);
-}
+};

@@ -53,6 +53,7 @@ export const EntityDetailLayout = ({
     entityId,
     entityType,
     autoTrackVisits: true,
+    displayName,
   });
 
   // Initialize query bookmarking hook for query-specific bookmarking

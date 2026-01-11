@@ -351,3 +351,119 @@ export const RELATIONSHIP_TYPE_LABELS: Record<RelationType, string> = {
   // General catch-all
   [RelationType.RELATED_TO]: 'Related Entities',
 };
+
+/**
+ * Category definition for grouping relationship types
+ */
+export interface RelationshipTypeCategory {
+  /** Category identifier */
+  id: string;
+  /** Display label */
+  label: string;
+  /** Relationship types in this category */
+  types: RelationType[];
+}
+
+/**
+ * Relationship type categories for organized filter UI
+ * Groups 22 relationship types into 6 logical categories
+ */
+export const RELATIONSHIP_TYPE_CATEGORIES: RelationshipTypeCategory[] = [
+  {
+    id: 'core',
+    label: 'Core Academic',
+    types: [
+      RelationType.AUTHORSHIP,
+      RelationType.AFFILIATION,
+      RelationType.PUBLICATION,
+      RelationType.REFERENCE,
+      RelationType.TOPIC,
+    ],
+  },
+  {
+    id: 'institutional',
+    label: 'Institutional',
+    types: [
+      RelationType.LINEAGE,
+      RelationType.INSTITUTION_ASSOCIATED,
+      RelationType.INSTITUTION_HAS_REPOSITORY,
+      RelationType.INSTITUTION_LOCATED_IN,
+    ],
+  },
+  {
+    id: 'publishing',
+    label: 'Publishing',
+    types: [
+      RelationType.HOST_ORGANIZATION,
+      RelationType.PUBLISHER_CHILD_OF,
+    ],
+  },
+  {
+    id: 'research',
+    label: 'Research Topics',
+    types: [
+      RelationType.AUTHOR_RESEARCHES,
+      RelationType.TOPIC_PART_OF_FIELD,
+      RelationType.TOPIC_PART_OF_SUBFIELD,
+      RelationType.TOPIC_SIBLING,
+      RelationType.FIELD_PART_OF_DOMAIN,
+    ],
+  },
+  {
+    id: 'content',
+    label: 'Content',
+    types: [
+      RelationType.WORK_HAS_KEYWORD,
+      RelationType.CONCEPT,
+    ],
+  },
+  {
+    id: 'other',
+    label: 'Other',
+    types: [
+      RelationType.FUNDED_BY,
+      RelationType.FUNDER_LOCATED_IN,
+      RelationType.HAS_ROLE,
+      RelationType.RELATED_TO,
+    ],
+  },
+];
+
+/**
+ * Filter preset definition
+ */
+export interface FilterPreset {
+  /** Preset identifier */
+  id: string;
+  /** Display label */
+  label: string;
+  /** Relationship types included in preset (empty = all) */
+  types: RelationType[];
+}
+
+/**
+ * Quick filter presets for common use cases
+ */
+export const FILTER_PRESETS: FilterPreset[] = [
+  {
+    id: 'all',
+    label: 'All',
+    types: [],
+  },
+  {
+    id: 'core',
+    label: 'Core Only',
+    types: [
+      RelationType.AUTHORSHIP,
+      RelationType.AFFILIATION,
+      RelationType.PUBLICATION,
+      RelationType.REFERENCE,
+      RelationType.TOPIC,
+    ],
+  },
+  {
+    id: 'citations',
+    label: 'Citations',
+    types: [RelationType.REFERENCE],
+  },
+];

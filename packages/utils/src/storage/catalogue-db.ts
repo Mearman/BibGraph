@@ -52,7 +52,6 @@ export const catalogueEventEmitter = new CatalogueEventEmitter();
 // Constants
 const LOG_CATEGORY = "catalogue";
 const DB_NAME = "bibgraph-catalogue";
-const DB_VERSION = 2;
 
 // Pattern for corrupted history entries (from location.search object concatenation bug)
 const CORRUPTED_ENTITY_ID_PATTERN = "[object Object]";
@@ -1076,10 +1075,18 @@ export class CatalogueService {
 
   /**
    * Get all history entries
+   * Filters out corrupted entries at runtime (entityId containing [object Object] or empty)
    */
   async getHistory(): Promise<CatalogueEntity[]> {
     await this.initializeSpecialLists();
-    return await this.getListEntities(SPECIAL_LIST_IDS.HISTORY);
+    const entities = await this.getListEntities(SPECIAL_LIST_IDS.HISTORY);
+
+    // Runtime cleanup: filter out corrupted entries that may have been created after migration
+    return entities.filter(
+      (entity) =>
+        entity.entityId.length > 0 &&
+        !entity.entityId.includes(CORRUPTED_ENTITY_ID_PATTERN)
+    );
   }
 
   /**

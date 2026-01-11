@@ -37,6 +37,7 @@ import { Link } from "@tanstack/react-router";
 import { ICON_SIZE } from "@/config/style-constants";
 import { useVersionComparison } from "@/hooks/use-version-comparison";
 import { humanizeFieldName } from "@/utils/field-labels";
+import { formatNumber } from "@/utils/format-number";
 import { convertOpenAlexToInternalLink, isOpenAlexId } from "@/utils/openalex-link-conversion";
 
 /** Section priority for consistent ordering */
@@ -65,7 +66,7 @@ const SECTION_ICONS: Record<string, import("react").ReactNode> = {
 // Value Rendering
 // ============================================================================
 
-const renderPrimitiveValue = (value: unknown): import("react").ReactNode => {
+const renderPrimitiveValue = (value: unknown, fieldName?: string): import("react").ReactNode => {
   // Don't render null/undefined - these fields will be filtered out
   if (value === null || value === undefined) {
     return null;
@@ -87,7 +88,7 @@ const renderPrimitiveValue = (value: unknown): import("react").ReactNode => {
   if (typeof value === "number") {
     return (
       <Code variant="light" color="blue" ff="monospace" fw={600}>
-        {value.toLocaleString()}
+        {formatNumber(value, fieldName)}
       </Code>
     );
   }
@@ -174,16 +175,31 @@ const isDisplayableValue = (value: unknown): boolean => {
 };
 
 /**
- * Fields that should be hidden from display (internal API fields, URLs, etc.)
+ * Fields that should be hidden from display (internal API fields, URLs, debug fields, etc.)
  */
 const HIDDEN_FIELDS = new Set([
+  // API URLs (not useful for display)
   "works_api_url",
   "cited_by_api_url",
+  "ngrams_url",
+  "sources_api_url",
+  // Internal dates (use publication_date instead)
   "updated_date",
   "created_date",
-  "ngrams_url",
+  // Technical data structures
   "abstract_inverted_index",
   "indexed_in",
+  // Internal processing fields (from OpenAlex API)
+  "block_key",
+  "parsed_longest_name",
+  "suffix",
+  "nickname",
+  "given_name",
+  "family_name",
+  "middle_name",
+  // Other internal fields
+  "relevance_score",
+  "filter_key",
 ]);
 
 const groupFields = (data: Record<string, unknown>): SectionData[] => {
@@ -243,11 +259,11 @@ const groupFields = (data: Record<string, unknown>): SectionData[] => {
 // Value Content Renderer
 // ============================================================================
 
-const renderValueContent = (value: unknown): import("react").ReactNode => {
+const renderValueContent = (value: unknown, fieldName?: string): import("react").ReactNode => {
   // Primitives
   if (value === null || value === undefined || typeof value === "boolean" ||
       typeof value === "number" || typeof value === "string") {
-    return renderPrimitiveValue(value);
+    return renderPrimitiveValue(value, fieldName);
   }
 
   // Arrays - don't render empty arrays
@@ -279,7 +295,7 @@ const renderValueContent = (value: unknown): import("react").ReactNode => {
                 {index + 1}
               </Badge>
               <Box style={{ flex: 1, minWidth: 0 }}>
-                {renderValueContent(item)}
+                {renderValueContent(item, fieldName)}
               </Box>
             </Group>
           </Paper>
@@ -300,10 +316,10 @@ const renderValueContent = (value: unknown): import("react").ReactNode => {
         {entries.map(([key, val]) => (
           <Box key={key}>
             <Text size="xs" fw={600} c="dimmed" mb="xs">
-              {key}
+              {humanizeFieldName(key)}
             </Text>
             <Box ml="sm">
-              {renderValueContent(val)}
+              {renderValueContent(val, key)}
             </Box>
           </Box>
         ))}
