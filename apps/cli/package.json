@@ -22,18 +22,18 @@
     "@bibgraph/client": "workspace:*",
     "@bibgraph/types": "workspace:*",
     "@bibgraph/utils": "workspace:*",
-    "commander": "14.0.1",
-    "zod": "4.1.13"
+    "commander": "14.0.2",
+    "zod": "4.3.5"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/user-event": "14.6.1",
-    "@types/node": "24.10.1",
-    "eslint": "9.39.1",
-    "msw": "2.12.3",
+    "@types/node": "25.0.6",
+    "eslint": "9.39.2",
+    "msw": "2.12.7",
     "tsx": "4.21.0",
-    "typescript": "5.9.2",
-    "vitest": "4.0.14"
+    "typescript": "5.9.3",
+    "vitest": "4.0.16"
   },
   "author": "Joe Mearman",
   "bin": {
