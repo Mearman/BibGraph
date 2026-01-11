@@ -79,9 +79,9 @@ export const HeaderSearchInput = () => {
   // Enable keyboard navigation shortcuts
   useKeyboardNavigation();
 
-  // Initialize from URL params if on autocomplete page
+  // Initialize from URL params if on search page
   const [query, setQuery] = useState(() => {
-    if (location.pathname === "/autocomplete" && searchParams.q) {
+    if (location.pathname === "/search" && searchParams.q) {
       return String(searchParams.q);
     }
     return "";
@@ -97,9 +97,9 @@ export const HeaderSearchInput = () => {
 
   // Update local state when URL changes
   useEffect(() => {
-    if (location.pathname === "/autocomplete" && searchParams.q) {
+    if (location.pathname === "/search" && searchParams.q) {
       setQuery(String(searchParams.q));
-    } else if (location.pathname !== "/autocomplete") {
+    } else if (location.pathname !== "/search") {
       setQuery("");
     }
   }, [location.pathname, searchParams.q]);
@@ -257,7 +257,7 @@ export const HeaderSearchInput = () => {
 
     // Navigate to search
     navigate({
-      to: "/autocomplete",
+      to: "/search",
       search: { q: trimmedQuery, filter: undefined, search: undefined },
     });
 

@@ -34,17 +34,17 @@ const HomePage = () => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
 
-    // Navigate to autocomplete page with search query
+    // Navigate to search page with search query
     navigate({
-      to: "/autocomplete",
+      to: "/search",
       search: { q: searchQuery.trim(), filter: undefined, search: undefined },
     });
   };
 
   const handleExampleSearch = (query: string) => {
-    // Navigate to autocomplete page with example query
+    // Navigate to search page with example query
     navigate({
-      to: "/autocomplete",
+      to: "/search",
       search: { q: query, filter: undefined, search: undefined },
     });
   };
