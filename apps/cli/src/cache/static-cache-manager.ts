@@ -3,7 +3,7 @@
  * Handles environment-aware static data cache operations
  */
 
-import { access, mkdir, readdir, readFile, rmdir, stat, writeFile } from "node:fs/promises"
+import { access, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -337,7 +337,7 @@ export class StaticCacheManager {
 		for (const entityType of typesToClear) {
 			try {
 				const entityDir = join(this.config.basePath, entityType)
-				await rmdir(entityDir, { recursive: true })
+				await rm(entityDir, { recursive: true, force: true })
 				logger.debug(LOG_CONTEXT, `Cleared cache for ${entityType}`)
 			} catch (error) {
 				if (error instanceof Error && "code" in error && error.code === "ENOENT") {
