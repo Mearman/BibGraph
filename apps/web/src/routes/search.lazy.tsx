@@ -11,6 +11,7 @@ import {
   Container,
   Group,
   Stack,
+  Table,
   Text,
   Title,
 } from "@mantine/core";
@@ -21,16 +22,13 @@ import {
 } from "@tabler/icons-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute,useSearch  } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
 import { useEffect, useMemo, useState } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE, SEARCH, TIME_MS } from '@/config/style-constants';
 import { useUserInteractions } from "@/hooks/use-user-interactions";
 
 import { SearchInterface } from "../components/search/SearchInterface";
-import { SearchResultPreview, useSearchResultHover } from "../components/search/SearchResultPreview";
 import { SearchResultsSkeleton } from "../components/search/SearchResultsSkeleton";
-import { BaseTable } from "../components/tables/BaseTable";
 import { pageDescription, pageTitle } from "../styles/layout.css";
 
 interface SearchFilters {
@@ -133,113 +131,6 @@ const getEntityTypeColor = (entityType: AutocompleteResult["entity_type"]) => {
   return "gray";
 };
 
-/**
- * Name cell component - extracted to use hooks properly
- * React hooks must be called at the top level of a component, not in render functions
- */
-const SearchResultNameCell = ({ result }: { result: AutocompleteResult }) => {
-  const entityUrl = convertToRelativeUrl(result.id);
-  const hover = useSearchResultHover(result);
-
-  return (
-    <>
-      <div {...hover.props}>
-        {entityUrl ? (
-          <Anchor
-            href={entityUrl}
-            size="sm"
-            fw={500}
-            style={{ textDecoration: "none" }}
-            aria-label={`View ${result.entity_type} ${result.display_name}`}
-          >
-            {result.display_name}
-          </Anchor>
-        ) : (
-          <Text fw={500} size="sm">
-            {result.display_name}
-          </Text>
-        )}
-        {result.hint && (
-          <Text size="xs" c="dimmed" lineClamp={1}>
-            {result.hint}
-          </Text>
-        )}
-        {result.external_id && (
-          <Text size="xs" c="dimmed">
-            {result.external_id}
-          </Text>
-        )}
-      </div>
-
-      {/* Hover preview card */}
-      <SearchResultPreview
-        entity={result}
-        opened={hover.opened}
-        onToggle={hover.toggle}
-        targetElement={hover.targetElement}
-      />
-    </>
-  );
-};
-
-// Extract column definitions to reduce complexity
-const createSearchColumns = (): ColumnDef<AutocompleteResult>[] => [
-  {
-    accessorKey: "entity_type",
-    header: "Type",
-    size: 100,
-    cell: ({ row }) => {
-      const result = row.original;
-      return (
-        <Badge
-          size="sm"
-          color={getEntityTypeColor(result.entity_type)}
-          variant="light"
-        >
-          {result.entity_type}
-        </Badge>
-      );
-    },
-  },
-  {
-    accessorKey: "display_name",
-    header: "Name",
-    cell: ({ row }) => <SearchResultNameCell result={row.original} />,
-  },
-  {
-    accessorKey: "cited_by_count",
-    header: "Citations",
-    size: 120,
-    cell: ({ row }) => {
-      const count = row.original.cited_by_count;
-      return count ? (
-        <Text size="sm" fw={500}>
-          {formatLargeNumber(count)}
-        </Text>
-      ) : (
-        <Text size="sm" c="dimmed">
-          —
-        </Text>
-      );
-    },
-  },
-  {
-    accessorKey: "works_count",
-    header: "Works",
-    size: 100,
-    cell: ({ row }) => {
-      const count = row.original.works_count;
-      return count ? (
-        <Text size="sm">{formatLargeNumber(count)}</Text>
-      ) : (
-        <Text size="sm" c="dimmed">
-          —
-        </Text>
-      );
-    },
-  },
-];
-
 const SearchPage = () => {
   const searchParams = useSearch({ from: "/search" });
   const queryClient = useQueryClient();
@@ -292,8 +183,6 @@ const SearchPage = () => {
     retry: SEARCH.MAX_RETRY_ATTEMPTS,
     staleTime: TIME_MS.SEARCH_STALE_TIME,
   });
-
-  const columns = createSearchColumns();
 
   const handleSearch = async (filters: SearchFilters) => {
     setSearchFilters(filters);
@@ -451,24 +340,64 @@ const SearchPage = () => {
           )}
         </Group>
 
-        <BaseTable
-          data={searchResults}
-          columns={columns}
-          searchable={false} // Search is handled by the SearchInterface
-          onRowClick={(result) => {
-            logger.debug(
-              "ui",
-              "Search result clicked",
-              {
-                id: result.id,
-                name: result.display_name,
-                type: result.entity_type,
-              },
-              "SearchPage",
-            );
-            // Navigation is handled by the entity links in the table
-          }}
-        />
+        {/* Using Mantine Table directly due to TanStack Table hook compatibility
+            issues with lazy-loaded routes. BaseTable's useReactTable/useVirtualizer
+            hooks cause "Invalid hook call" errors in this lazy route context. */}
+        <Table striped highlightOnHover withTableBorder>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th w={100}>Type</Table.Th>
+              <Table.Th>Name</Table.Th>
+              <Table.Th w={100}>Citations</Table.Th>
+              <Table.Th w={100}>Works</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {searchResults.map((result) => {
+              const entityUrl = convertToRelativeUrl(result.id);
+              return (
+                <Table.Tr key={result.id}>
+                  <Table.Td>
+                    <Badge size="sm" color={getEntityTypeColor(result.entity_type)} variant="light">
+                      {result.entity_type}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    <Stack gap={2}>
+                      {entityUrl ? (
+                        <Anchor
+                          href={entityUrl}
+                          size="sm"
+                          fw={500}
+                          style={{ textDecoration: "none" }}
+                        >
+                          {result.display_name}
+                        </Anchor>
+                      ) : (
+                        <Text size="sm" fw={500}>{result.display_name}</Text>
+                      )}
+                      {result.hint && (
+                        <Text size="xs" c="dimmed" lineClamp={1}>
+                          {result.hint}
+                        </Text>
+                      )}
+                    </Stack>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm" fw={500}>
+                      {result.cited_by_count ? formatLargeNumber(result.cited_by_count) : '—'}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">
+                      {result.works_count ? formatLargeNumber(result.works_count) : '—'}
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              );
+            })}
+          </Table.Tbody>
+        </Table>
       </Stack>
     );
   };
