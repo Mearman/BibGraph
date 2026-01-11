@@ -171,6 +171,7 @@ interface SectionData {
 
 /**
  * Check if a value should be displayed (not null, undefined, empty string, or empty array)
+ * @param value
  */
 const isDisplayableValue = (value: unknown): boolean => {
   if (value === null || value === undefined) return false;

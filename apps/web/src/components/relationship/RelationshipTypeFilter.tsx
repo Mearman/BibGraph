@@ -41,6 +41,10 @@ export interface RelationshipTypeFilterProps {
 /**
  * Component for filtering relationships by type
  * Displays preset buttons and categorized chip toggles in collapsible sections
+ * @param root0
+ * @param root0.selectedTypes
+ * @param root0.onChange
+ * @param root0.title
  */
 export const RelationshipTypeFilter = ({
   selectedTypes,
