@@ -1075,7 +1075,7 @@ export class CatalogueService {
 
   /**
    * Get all history entries
-   * Filters out corrupted entries at runtime (entityId or URL containing [object Object])
+   * Filters out corrupted entries and deduplicates to show only most recent visit per entity
    */
   async getHistory(): Promise<CatalogueEntity[]> {
     await this.initializeSpecialLists();
@@ -1100,7 +1100,7 @@ export class CatalogueService {
     // Non-entity pages that shouldn't be validated against entity patterns
     const nonEntityPatterns = ["/about", "/settings", "/history", "/bookmarks", "/catalogue", "/search"];
 
-    return entities.filter((entity) => {
+    const validEntities = entities.filter((entity) => {
       if (entity.entityId.length === 0) return false;
       if (entity.entityId.includes(CORRUPTED_ENTITY_ID_PATTERN)) return false;
       if (entity.entityId.includes(urlEncodedPattern)) return false;
@@ -1136,6 +1136,21 @@ export class CatalogueService {
 
       return true;
     });
+
+    // Deduplicate: keep only the most recent entry per unique entityType+entityId
+    // This handles cases where the compound index didn't prevent duplicates
+    // (e.g., race conditions, slightly different entityType values)
+    const seen = new Map<string, CatalogueEntity>();
+    for (const entity of validEntities) {
+      const key = `${entity.entityType}:${entity.entityId}`;
+      const existing = seen.get(key);
+      // Keep the entry with the most recent addedAt timestamp
+      if (!existing || entity.addedAt > existing.addedAt) {
+        seen.set(key, entity);
+      }
+    }
+
+    return Array.from(seen.values());
   }
 
   /**
