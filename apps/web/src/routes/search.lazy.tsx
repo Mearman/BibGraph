@@ -1,7 +1,7 @@
 import { cachedOpenAlex } from "@bibgraph/client";
 import type { AutocompleteResult } from "@bibgraph/types";
 import { ENTITY_METADATA, toEntityType } from "@bibgraph/types";
-import { convertToRelativeUrl, ErrorRecovery,SearchEmptyState } from "@bibgraph/ui";
+import { convertToRelativeUrl, ErrorRecovery, SearchEmptyState } from "@bibgraph/ui";
 import { formatLargeNumber, logger } from "@bibgraph/utils";
 import {
   Anchor,
@@ -10,18 +10,25 @@ import {
   Card,
   Container,
   Group,
+  Paper,
+  SegmentedControl,
+  SimpleGrid,
   Stack,
   Table,
   Text,
   Title,
+  Tooltip,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
   IconBookmark,
   IconBookmarkOff,
+  IconLayoutGrid,
+  IconList,
+  IconTable,
 } from "@tabler/icons-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createLazyFileRoute,useSearch  } from "@tanstack/react-router";
+import { createLazyFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE, SEARCH, TIME_MS } from '@/config/style-constants';
@@ -34,6 +41,20 @@ import { pageDescription, pageTitle } from "../styles/layout.css";
 interface SearchFilters {
   query: string;
 }
+
+type ViewMode = "table" | "card" | "list";
+
+// Calculate entity type breakdown from results
+const getEntityTypeBreakdown = (results: AutocompleteResult[]) => {
+  const breakdown = results.reduce((acc, result) => {
+    acc[result.entity_type] = (acc[result.entity_type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  return Object.entries(breakdown)
+    .map(([type, count]) => ({ type, count }))
+    .sort((a, b) => b.count - a.count);
+};
 
 // Real OpenAlex API autocomplete function - searches across all entity types
 const searchAllEntities = async (
@@ -135,6 +156,16 @@ const SearchPage = () => {
   const searchParams = useSearch({ from: "/search" });
   const queryClient = useQueryClient();
 
+  // View mode state
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
+
+  // Entity type filter state
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+
+  // Search duration tracking
+  const [searchStartTime, setSearchStartTime] = useState<number>(0);
+  const [searchDuration, setSearchDuration] = useState<number>(0);
+
   // Derive initial search filters from URL parameters using useMemo
   const initialSearchFilters = useMemo<SearchFilters>(() => {
     const qParam = searchParams.q;
@@ -185,6 +216,7 @@ const SearchPage = () => {
   });
 
   const handleSearch = async (filters: SearchFilters) => {
+    setSearchStartTime(Date.now());
     setSearchFilters(filters);
     // Auto-tracking in useUserInteractions will handle page visit recording
   };
@@ -250,10 +282,25 @@ const SearchPage = () => {
     if (searchResults && searchResults.length > 0 && retryCount > 0) {
       setRetryCount(0);
     }
-  }, [searchResults, retryCount]);
+    if (searchResults && searchStartTime > 0) {
+      setSearchDuration(Date.now() - searchStartTime);
+    }
+  }, [searchResults, retryCount, searchStartTime]);
 
   const hasResults = searchResults && searchResults.length > 0;
   const hasQuery = Boolean(searchFilters.query.trim());
+
+  // Filter results by selected entity types
+  const filteredResults = useMemo(() => {
+    if (!searchResults) return [];
+    if (selectedTypes.length === 0) return searchResults;
+    return searchResults.filter(result => selectedTypes.includes(result.entity_type));
+  }, [searchResults, selectedTypes]);
+
+  // Calculate entity type breakdown
+  const entityTypeBreakdown = useMemo(() => {
+    return searchResults ? getEntityTypeBreakdown(searchResults) : [];
+  }, [searchResults]);
 
   const renderSearchResults = () => {
     if (isLoading) return renderLoadingState();
@@ -267,15 +314,105 @@ const SearchPage = () => {
     );
     if (!hasResults) return renderNoResultsState(searchFilters.query, handleQuickSearch);
 
+    const displayResults = selectedTypes.length > 0 ? filteredResults : searchResults;
+
     return (
       <Stack>
-        <Group justify="space-between" align="center">
-          <Text size="sm" c="dimmed">
-            Found {searchResults.length} results for &quot;
-            {searchFilters.query}&quot;
-          </Text>
+        {/* Enhanced Results Header */}
+        <Stack gap="md">
+          {/* Primary stats row */}
+          <Group justify="space-between" align="center" wrap="nowrap">
+            <Group gap="md" align="center">
+              <Text size="sm" fw={500}>
+                {displayResults.length} {displayResults.length === 1 ? 'result' : 'results'}
+                {selectedTypes.length > 0 && ` (filtered from ${searchResults.length})`}
+              </Text>
+              {searchDuration > 0 && (
+                <Tooltip label={`${searchDuration}ms from OpenAlex API`}>
+                  <Text size="xs" c="dimmed" style={{ cursor: 'help' }}>
+                    {(searchDuration / 1000).toFixed(2)}s
+                  </Text>
+                </Tooltip>
+              )}
+            </Group>
 
-          {hasQuery && (
+            {/* View mode toggle */}
+            <SegmentedControl
+              value={viewMode}
+              onChange={(value) => setViewMode(value as ViewMode)}
+              data={[
+                {
+                  value: 'table',
+                  label: (
+                    <Tooltip label="Table view"><IconTable size={ICON_SIZE.SM} /></Tooltip>
+                  )
+                },
+                {
+                  value: 'card',
+                  label: (
+                    <Tooltip label="Card view"><IconLayoutGrid size={ICON_SIZE.SM} /></Tooltip>
+                  )
+                },
+                {
+                  value: 'list',
+                  label: (
+                    <Tooltip label="List view"><IconList size={ICON_SIZE.SM} /></Tooltip>
+                  )
+                },
+              ]}
+              size="xs"
+            />
+          </Group>
+
+          {/* Entity type breakdown and filter chips */}
+          {entityTypeBreakdown.length > 0 && (
+            <Stack gap="xs">
+              <Group gap="xs" wrap="wrap">
+                <Text size="xs" c="dimmed">Filter by type:</Text>
+                {entityTypeBreakdown.map(({ type, count }) => {
+                  const isSelected = selectedTypes.includes(type);
+                  // Get color safely using toEntityType helper, defaulting to gray for unknown types
+                  const pluralForm = toEntityType(type);
+                  const color = pluralForm && pluralForm in ENTITY_METADATA
+                    ? ENTITY_METADATA[pluralForm].color
+                    : "gray";
+                  return (
+                    <Badge
+                      key={type}
+                      size="sm"
+                      color={color}
+                      variant={isSelected ? "filled" : "light"}
+                      leftSection={isSelected ? "✓ " : undefined}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => {
+                        setSelectedTypes(prev =>
+                          prev.includes(type)
+                            ? prev.filter(t => t !== type)
+                            : [...prev, type]
+                        );
+                      }}
+                    >
+                      {type} ({count})
+                    </Badge>
+                  );
+                })}
+                {selectedTypes.length > 0 && (
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    onClick={() => setSelectedTypes([])}
+                  >
+                    Clear filters
+                  </Button>
+                )}
+              </Group>
+            </Stack>
+          )}
+        </Stack>
+
+        {/* Bookmark button */}
+        {hasQuery && (
+          <Group justify="end">
             <Button
               variant="light"
               color={userInteractions.isBookmarked ? "yellow" : "gray"}
@@ -337,23 +474,22 @@ const SearchPage = () => {
             >
               {userInteractions.isBookmarked ? "Bookmarked" : "Bookmark Search"}
             </Button>
-          )}
-        </Group>
+          </Group>
+        )}
 
-        {/* Using Mantine Table directly due to TanStack Table hook compatibility
-            issues with lazy-loaded routes. BaseTable's useReactTable/useVirtualizer
-            hooks cause "Invalid hook call" errors in this lazy route context. */}
-        <Table striped highlightOnHover withTableBorder>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th w={100}>Type</Table.Th>
-              <Table.Th>Name</Table.Th>
-              <Table.Th w={100}>Citations</Table.Th>
-              <Table.Th w={100}>Works</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {searchResults.map((result) => {
+        {/* Results display based on view mode */}
+        {viewMode === "table" && (
+          <Table striped highlightOnHover withTableBorder>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th w={100}>Type</Table.Th>
+                <Table.Th>Name</Table.Th>
+                <Table.Th w={100}>Citations</Table.Th>
+                <Table.Th w={100}>Works</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {displayResults.map((result) => {
               const entityUrl = convertToRelativeUrl(result.id);
               return (
                 <Table.Tr key={result.id}>
@@ -398,6 +534,94 @@ const SearchPage = () => {
             })}
           </Table.Tbody>
         </Table>
+        )}
+
+        {viewMode === "card" && (
+          <SimpleGrid cols={{ base: 1, xs: 2, sm: 2, md: 3, lg: 4 }} spacing="md">
+            {displayResults.map((result) => {
+              const entityUrl = convertToRelativeUrl(result.id);
+              return (
+                <Card
+                  key={result.id}
+                  shadow="sm"
+                  p="md"
+                  withBorder
+                  style={{ cursor: 'pointer' }}
+                  component={entityUrl ? "a" : "div"}
+                  href={entityUrl}
+                >
+                  <Stack gap="xs">
+                    <Group justify="space-between" align="start">
+                      <Badge size="sm" color={getEntityTypeColor(result.entity_type)} variant="light">
+                        {result.entity_type}
+                      </Badge>
+                      <Text size="xs" c="dimmed">
+                        {result.cited_by_count ? `${formatLargeNumber(result.cited_by_count)} citations` : '—'}
+                      </Text>
+                    </Group>
+                    <Text size="sm" fw={500} lineClamp={2}>
+                      {result.display_name}
+                    </Text>
+                    {result.hint && (
+                      <Text size="xs" c="dimmed" lineClamp={1}>
+                        {result.hint}
+                      </Text>
+                    )}
+                  </Stack>
+                </Card>
+              );
+            })}
+          </SimpleGrid>
+        )}
+
+        {viewMode === "list" && (
+          <Stack gap="xs">
+            {displayResults.map((result) => {
+              const entityUrl = convertToRelativeUrl(result.id);
+              return (
+                <Paper
+                  key={result.id}
+                  withBorder
+                  p="sm"
+                  radius="md"
+                  style={{ cursor: 'pointer' }}
+                  component={entityUrl ? "a" : "div"}
+                  href={entityUrl}
+                >
+                  <Group justify="space-between" align="center">
+                    <Group gap="sm" align="start" style={{ flex: 1 }}>
+                      <Badge size="xs" color={getEntityTypeColor(result.entity_type)} variant="light">
+                        {result.entity_type}
+                      </Badge>
+                      <Stack gap={0} style={{ flex: 1 }}>
+                        <Text size="sm" fw={500}>
+                          {result.display_name}
+                        </Text>
+                        {result.hint && (
+                          <Text size="xs" c="dimmed" lineClamp={1}>
+                            {result.hint}
+                          </Text>
+                        )}
+                      </Stack>
+                    </Group>
+                    <Group gap="md">
+                      {result.cited_by_count && (
+                        <Text size="xs" c="dimmed" ta="right">
+                          {formatLargeNumber(result.cited_by_count)} citations
+                        </Text>
+                      )}
+                      {result.works_count && (
+                        <Text size="xs" c="dimmed" ta="right">
+                          {formatLargeNumber(result.works_count)} works
+                        </Text>
+                      )}
+                    </Group>
+                  </Group>
+                </Paper>
+              );
+            })}
+          </Stack>
+        )}
       </Stack>
     );
   };
