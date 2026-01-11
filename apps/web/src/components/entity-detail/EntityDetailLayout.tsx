@@ -394,7 +394,7 @@ export const EntityDetailLayout = ({
                     <Text size="sm" c="dimmed" flex={1}>
                       {selectParam && typeof selectParam === 'string'
                         ? selectParam
-                        : `default (${selectFields.length} fields)`}
+                        : `default (all fields)`}
                     </Text>
                   </Group>
                 </Stack>
