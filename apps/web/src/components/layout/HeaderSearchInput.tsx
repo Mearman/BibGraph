@@ -126,7 +126,7 @@ export const HeaderSearchInput = () => {
 
       // OpenAlex API for autocomplete suggestions
       const response = await fetch(
-        `https://api.openalex.org/autocomplete?=${encodeURIComponent(searchQuery)}`,
+        `https://api.openalex.org/autocomplete?q=${encodeURIComponent(searchQuery)}`,
         {
           signal: abortController.signal,
           headers: {
