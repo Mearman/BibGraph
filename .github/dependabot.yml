@@ -50,6 +50,20 @@ updates:
         patterns:
           - "nx"
           - "@nx/*"
+      storybook:
+        patterns:
+          - "storybook"
+          - "@storybook/*"
+      commitlint:
+        patterns:
+          - "@commitlint/*"
+      swc:
+        patterns:
+          - "@swc/*"
+          - "@swc-node/*"
+      vanilla-extract:
+        patterns:
+          - "@vanilla-extract/*"
 
   # Apps - Web
   - package-ecosystem: npm
