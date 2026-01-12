@@ -7,6 +7,7 @@ import { NavigationTracker } from "@/components/NavigationTracker";
 import { UrlFixer } from "@/components/UrlFixer";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ActivityProvider } from "@/contexts/ActivityContext";
+import { SyncStatusProvider } from "@/contexts/SyncStatusContext";
 import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
 import { GraphVisualizationProvider } from "@/contexts/GraphVisualizationContext";
 
@@ -25,21 +26,23 @@ const RootLayout = () => {
       <NavigationTracker />
       <NotificationProvider>
         <ActivityProvider>
-          <UndoRedoProvider>
-            {/* Conditionally wrap MainLayout and Outlet with GraphVisualizationProvider on graph page */}
-            {/* This allows the sidebar (in MainLayout) to access the context */}
-            {isGraphPage ? (
-              <GraphVisualizationProvider>
+          <SyncStatusProvider>
+            <UndoRedoProvider>
+              {/* Conditionally wrap MainLayout and Outlet with GraphVisualizationProvider on graph page */}
+              {/* This allows the sidebar (in MainLayout) to access the context */}
+              {isGraphPage ? (
+                <GraphVisualizationProvider>
+                  <MainLayout>
+                    <Outlet />
+                  </MainLayout>
+                </GraphVisualizationProvider>
+              ) : (
                 <MainLayout>
                   <Outlet />
                 </MainLayout>
-              </GraphVisualizationProvider>
-            ) : (
-              <MainLayout>
-                <Outlet />
-              </MainLayout>
-            )}
-          </UndoRedoProvider>
+              )}
+            </UndoRedoProvider>
+          </SyncStatusProvider>
         </ActivityProvider>
       </NotificationProvider>
     </div>
