@@ -37,32 +37,22 @@ export const ExportModal = ({ listId, listTitle, onClose }: ExportModalProps) =>
     setIsExporting(true);
     setExportSuccess(false);
     try {
-      // Call the appropriate export method based on format
-      if (selectedFormat === "json" || selectedFormat === "compressed") {
-        await exportListAsFile(listId, selectedFormat);
+      await exportListAsFile(listId, selectedFormat);
 
-        logger.debug("catalogue-ui", "List exported successfully", {
-          listId,
-          listTitle,
-          format: selectedFormat,
-        });
+      logger.debug("catalogue-ui", "List exported successfully", {
+        listId,
+        listTitle,
+        format: selectedFormat,
+      });
 
-        setExportSuccess(true);
+      setExportSuccess(true);
 
-        notifications.show({
-          title: "Export Successful",
-          message: `List exported as ${selectedFormat.toUpperCase()} format`,
-          color: "green",
-          icon: <IconCheck size={ICON_SIZE.MD} />,
-        });
-      } else {
-        // CSV and BibTeX not yet implemented
-        notifications.show({
-          title: "Not Implemented",
-          message: `${selectedFormat.toUpperCase()} export is not yet implemented`,
-          color: "yellow",
-        });
-      }
+      notifications.show({
+        title: "Export Successful",
+        message: `List exported as ${selectedFormat.toUpperCase()} format`,
+        color: "green",
+        icon: <IconCheck size={ICON_SIZE.MD} />,
+      });
     } catch (error) {
       logger.error("catalogue-ui", "Failed to export list", {
         listId,
@@ -72,7 +62,7 @@ export const ExportModal = ({ listId, listTitle, onClose }: ExportModalProps) =>
 
       notifications.show({
         title: "Export Failed",
-        message: "Failed to export list. Please try again.",
+        message: error instanceof Error ? error.message : "Failed to export list. Please try again.",
         color: "red",
       });
     } finally {
@@ -111,14 +101,12 @@ export const ExportModal = ({ listId, listTitle, onClose }: ExportModalProps) =>
             value="csv"
             label="CSV"
             description="Spreadsheet-compatible format"
-            disabled
             aria-describedby="csv-description"
           />
           <Radio
             value="bibtex"
             label="BibTeX"
             description="Bibliography format (works only)"
-            disabled
             aria-describedby="bibtex-description"
           />
         </Stack>
@@ -137,12 +125,6 @@ export const ExportModal = ({ listId, listTitle, onClose }: ExportModalProps) =>
         </Alert>
       )}
 
-      {(selectedFormat === "csv" || selectedFormat === "bibtex") && (
-        <Alert icon={<IconAlertCircle size={ICON_SIZE.MD} />} color="yellow">
-          This export format is not yet implemented. Please use JSON or Compressed Data format.
-        </Alert>
-      )}
-
       <Group justify="flex-end" gap="xs">
         <Button variant="subtle" onClick={onClose} disabled={isExporting}>
           {exportSuccess ? "Done" : "Cancel"}
@@ -150,7 +132,6 @@ export const ExportModal = ({ listId, listTitle, onClose }: ExportModalProps) =>
         <Button
           onClick={handleExport}
           loading={isExporting}
-          disabled={selectedFormat === "csv" || selectedFormat === "bibtex"}
           leftSection={<IconDownload size={ICON_SIZE.MD} />}
           data-testid="export-list-button"
         >

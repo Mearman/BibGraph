@@ -150,7 +150,9 @@ export interface UseCatalogueReturn {
   // File Export
   exportList: (listId: string) => Promise<ExportFormat>;
   exportListCompressed: (listId: string) => Promise<string>;
-  exportListAsFile: (listId: string, format: "json" | "compressed") => Promise<void>;
+  exportListAsFile: (listId: string, format: "json" | "compressed" | "csv" | "bibtex") => Promise<void>;
+  exportListAsCSV: (listId: string) => Promise<void>;
+  exportListAsBibTeX: (listId: string) => Promise<void>;
 
   // Import Methods
   importList: (data: ExportFormat) => Promise<string>;
@@ -843,9 +845,179 @@ export const useCatalogue = (options: UseCatalogueOptions = {}): UseCatalogueRet
     }
   }, [exportList, storage]);
 
-  // Export list as downloadable file
-  const exportListAsFile = useCallback(async (listId: string, format: "json" | "compressed"): Promise<void> => {
+  // Helper function to escape CSV values
+  const escapeCSVValue = useCallback((value: string): string => {
+    // Wrap in quotes if it contains comma, quote, or newline
+    if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+      return `"${value.replaceAll(/"/g, '""')}"`;
+    }
+    return value;
+  }, []);
+
+  // Export list as CSV
+  const exportListAsCSV = useCallback(async (listId: string): Promise<void> => {
     try {
+      const list = await storage.getList(listId);
+      if (!list) {
+        throw new Error("List not found");
+      }
+
+      const listEntities = await storage.getListEntities(listId);
+
+      // Create CSV header
+      const headers = ["Entity ID", "Entity Type", "Notes", "Position", "Added At"];
+      let csv = headers.map(escapeCSVValue).join(",") + "\n";
+
+      // Add data rows
+      for (const entity of listEntities) {
+        const row = [
+          entity.entityId,
+          entity.entityType,
+          entity.notes || "",
+          entity.position?.toString() || "",
+          entity.addedAt instanceof Date ? entity.addedAt.toISOString() : entity.addedAt || "",
+        ];
+        csv += row.map(escapeCSVValue).join(",") + "\n";
+      }
+
+      // Create filename
+      const date = new Date().toISOString().split('T')[0];
+      const sanitizedTitle = list.title
+        .replaceAll(/[^0-9a-z]/gi, '-')
+        .replaceAll(/-+/g, '-')
+        .replaceAll(/^-/g, '')
+        .replaceAll(/-$/g, '')
+        .toLowerCase();
+      const filename = `catalogue-${sanitizedTitle}-${date}.csv`;
+
+      // Create blob and trigger download
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.style.display = "none";
+
+      document.body.append(link);
+      link.click();
+
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      logger.debug(CATALOGUE_LOGGER_CONTEXT, "CSV export completed", {
+        listId,
+        entityCount: listEntities.length,
+        filename,
+      });
+    } catch (error) {
+      logger.error(CATALOGUE_LOGGER_CONTEXT, "Failed to export list as CSV", { listId, error });
+      throw error;
+    }
+  }, [storage, escapeCSVValue]);
+
+  // Helper function to convert entity to BibTeX format
+  const convertToBibTeX = useCallback((entity: CatalogueEntity): string | null => {
+    // Only works can be exported to BibTeX
+    if (entity.entityType !== "works") {
+      return null;
+    }
+
+    const citationKey = entity.entityId.replace(/^W/, ''); // Remove W prefix for key
+    const bibTeXType = "misc"; // Default to misc since we have limited data
+
+    // Basic BibTeX entry with the data we have
+    let bibtex = `@${bibTeXType}{${citationKey},\n`;
+    bibtex += `  openalex = {${entity.entityId}},\n`;
+
+    if (entity.notes) {
+      bibtex += `  note = {${entity.notes.replaceAll(/"/g, "{").replaceAll(/}/g, "}")}},\n`;
+    }
+
+    bibtex += `}`;
+
+    return bibtex;
+  }, []);
+
+  // Export list as BibTeX (works only)
+  const exportListAsBibTeX = useCallback(async (listId: string): Promise<void> => {
+    try {
+      const list = await storage.getList(listId);
+      if (!list) {
+        throw new Error("List not found");
+      }
+
+      const listEntities = await storage.getListEntities(listId);
+
+      // Filter only works
+      const works = listEntities.filter(e => e.entityType === "works");
+
+      if (works.length === 0) {
+        throw new Error("No works found in this list. BibTeX export is only available for works.");
+      }
+
+      let bibtex = "";
+      const skippedEntities: { entityId: string; type: string }[] = [];
+
+      for (const entity of listEntities) {
+        const entry = convertToBibTeX(entity);
+        if (entry) {
+          bibtex += entry + "\n\n";
+        } else {
+          skippedEntities.push({ entityId: entity.entityId, type: entity.entityType });
+        }
+      }
+
+      // Create filename
+      const date = new Date().toISOString().split('T')[0];
+      const sanitizedTitle = list.title
+        .replaceAll(/[^0-9a-z]/gi, '-')
+        .replaceAll(/-+/g, '-')
+        .replaceAll(/^-/g, '')
+        .replaceAll(/-$/g, '')
+        .toLowerCase();
+      const filename = `bibliography-${sanitizedTitle}-${date}.bib`;
+
+      // Create blob and trigger download
+      const blob = new Blob([bibtex], { type: "text/plain;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.style.display = "none";
+
+      document.body.append(link);
+      link.click();
+
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      logger.debug(CATALOGUE_LOGGER_CONTEXT, "BibTeX export completed", {
+        listId,
+        worksExported: works.length,
+        skippedCount: skippedEntities.length,
+        skippedTypes: skippedEntities.map(s => s.type),
+        filename,
+      });
+    } catch (error) {
+      logger.error(CATALOGUE_LOGGER_CONTEXT, "Failed to export list as BibTeX", { listId, error });
+      throw error;
+    }
+  }, [storage, convertToBibTeX]);
+
+  // Export list as downloadable file
+  const exportListAsFile = useCallback(async (listId: string, format: "json" | "compressed" | "csv" | "bibtex"): Promise<void> => {
+    try {
+      if (format === "csv") {
+        await exportListAsCSV(listId);
+        return;
+      }
+      if (format === "bibtex") {
+        await exportListAsBibTeX(listId);
+        return;
+      }
+
       const list = await storage.getList(listId);
       if (!list) {
         throw new Error("List not found");
@@ -906,7 +1078,7 @@ export const useCatalogue = (options: UseCatalogueOptions = {}): UseCatalogueRet
       logger.error(CATALOGUE_LOGGER_CONTEXT, "Failed to export list as file", { listId, format, error });
       throw error;
     }
-  }, [storage, exportList, exportListCompressed]);
+  }, [storage, exportList, exportListCompressed, exportListAsCSV, exportListAsBibTeX]);
 
   // Import list from ExportFormat data
   const importList = useCallback(async (data: ExportFormat): Promise<string> => {
@@ -1211,6 +1383,8 @@ export const useCatalogue = (options: UseCatalogueOptions = {}): UseCatalogueRet
     exportList,
     exportListCompressed,
     exportListAsFile,
+    exportListAsCSV,
+    exportListAsBibTeX,
 
     // Import Methods
     importList,
