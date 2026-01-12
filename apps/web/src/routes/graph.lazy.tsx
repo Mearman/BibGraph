@@ -61,6 +61,7 @@ import {
   NodeContextMenu,
 } from '@/components/graph/NodeContextMenu';
 import { OptimizedForceGraphVisualization } from '@/components/graph/OptimizedForceGraphVisualization';
+import { PathHighlightingPresets } from '@/components/graph/path-presets';
 import { GraphSnapshots } from '@/components/graph/snapshots';
 import type { DisplayMode } from '@/components/graph/types';
 import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
@@ -70,6 +71,7 @@ import { type GraphMethods, useFitToView } from '@/hooks/useFitToView';
 import { useGraphAnnotations } from '@/hooks/useGraphAnnotations';
 import { type GraphLayoutType,useGraphLayout } from '@/hooks/useGraphLayout';
 import { useNodeExpansion } from '@/lib/graph-index';
+import type { PathPreset } from '@/lib/path-presets';
 import { downloadGraphSVG } from '@/utils/exportUtils';
 
 /**
@@ -131,6 +133,8 @@ const EntityGraphPage = () => {
     clearHighlights,
     setPathSource,
     setPathTarget,
+    highlightNodes,
+    highlightPath,
   } = visualization;
 
   // Graph methods ref for external control (zoomToFit, etc.)
@@ -148,6 +152,9 @@ const EntityGraphPage = () => {
 
   // Mini-map state
   const [cameraPosition, setCameraPosition] = useState({ zoom: 1, panX: 0, panY: 0 });
+
+  // Path highlighting preset state
+  const [pathPreset, setPathPreset] = useState<PathPreset>('shortest');
 
   // Fit-to-view operations (shared logic for 2D/3D)
   const { fitToViewAll, fitToViewSelected } = useFitToView({
@@ -264,6 +271,11 @@ const EntityGraphPage = () => {
 
     // TODO: Update nodes, edges, layout, and annotations in context
     // This requires extending the GraphVisualizationContext to support full state replacement
+  }, []);
+
+  // Handle path preset change
+  const handlePresetChange = useCallback((preset: PathPreset) => {
+    setPathPreset(preset);
   }, []);
 
   // Convert expandingNodeIds array to Set for visualization components
@@ -543,6 +555,18 @@ const EntityGraphPage = () => {
                       { label: 'Highlight', value: 'highlight' },
                       { label: 'Filter', value: 'filter' },
                     ]}
+                  />
+
+                  <PathHighlightingPresets
+                    preset={pathPreset}
+                    onPresetChange={handlePresetChange}
+                    pathSource={pathSource}
+                    pathTarget={pathTarget}
+                    nodes={nodes}
+                    edges={edges}
+                    onHighlightNodes={highlightNodes}
+                    onHighlightPath={highlightPath}
+                    onClearHighlights={clearHighlights}
                   />
 
                   <LayoutSelector
