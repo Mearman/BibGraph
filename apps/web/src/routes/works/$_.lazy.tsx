@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute,useParams, useSearch  } from "@tanstack/react-router";
 import { useEffect,useState } from "react";
 
-import { type DetailViewMode, EntityDetailLayout, ErrorState, LoadingState, RelatedEntitiesSection } from "@/components/entity-detail";
+import { type DetailViewMode, EntityDetailLayout, ErrorState, LoadingState, RelatedEntitiesSection, CitationContextPreview } from "@/components/entity-detail";
 import { ENTITY_TYPE_CONFIGS } from "@/components/entity-detail/EntityTypeConfig";
 import { PdfViewer } from "@/components/pdf";
 import { IncomingRelationships } from "@/components/relationship/IncomingRelationships";
@@ -243,6 +243,11 @@ const WorkRoute = () => {
         />
       )}
       <RelationshipCounts incomingCount={incomingCount} outgoingCount={outgoingCount} />
+      <CitationContextPreview
+        incomingSections={incomingSections}
+        outgoingSections={outgoingSections}
+        workId={normalizedWorkId}
+      />
       <RelatedEntitiesSection
         incomingSections={incomingSections}
         outgoingSections={outgoingSections}
