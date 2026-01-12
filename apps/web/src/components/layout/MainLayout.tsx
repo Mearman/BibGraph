@@ -47,6 +47,7 @@ import { HeaderSearchInput } from "./HeaderSearchInput";
 import { HistorySidebar } from "./HistorySidebar";
 import { LeftRibbon } from "./LeftRibbon";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { UndoRedoControls } from "@/components/undo-redo/UndoRedoControls";
 import { RightRibbon } from "./RightRibbon";
 import { RightSidebarContent } from "./RightSidebarContent";
 // import { ThemeDropdown } from "./ThemeDropdown";
@@ -309,6 +310,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
             {/* Sidebar controls - simplified on mobile */}
             <Group gap="xs" visibleFrom="sm">
+              <UndoRedoControls />
               <NotificationCenter />
               <ActionIcon
                 onClick={toggleLeftSidebar}

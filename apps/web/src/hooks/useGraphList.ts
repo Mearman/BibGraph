@@ -3,6 +3,7 @@
  * Provides reactive graph list state and CRUD operations for the persistent working set
  *
  * T029: Graph List hook with storage integration
+ * T045: Undo/redo integration for destructive actions
  */
 
 import type { AddToGraphListParams, GraphListNode, PruneGraphListResult } from "@bibgraph/types";
@@ -13,6 +14,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 
 import { useStorageProvider } from "@/contexts/storage-provider-context";
+import { useUndoRedoContext } from "@/contexts/UndoRedoContext";
 
 const GRAPH_LIST_LOGGER_CONTEXT = "graph-list-hook";
 
@@ -81,6 +83,7 @@ export interface UseGraphListResult {
  */
 export const useGraphList = (): UseGraphListResult => {
   const storage = useStorageProvider();
+  const { addAction } = useUndoRedoContext();
 
   // State
   const [nodes, setNodes] = useState<GraphListNode[]>([]);
@@ -268,10 +271,33 @@ export const useGraphList = (): UseGraphListResult => {
 
     // T030: Optimistic update - remove from UI immediately
     const previousNodes = nodes;
+    const removedNode = nodes.find(n => n.entityId === entityId);
     setNodes(prevNodes => prevNodes.filter(n => n.entityId !== entityId));
 
     try {
       await storage.removeFromGraphList(entityId);
+
+      // T045: Add undo/redo action for destructive operation
+      if (removedNode) {
+        addAction({
+          id: crypto.randomUUID(),
+          timestamp: new Date(),
+          description: `Remove ${removedNode.label || removedNode.entityId} from graph`,
+          undo: async () => {
+            // Restore node to graph list
+            await storage.addToGraphList({
+              entityId: removedNode.entityId,
+              entityType: removedNode.entityType,
+              label: removedNode.label,
+              provenance: removedNode.provenance,
+            });
+          },
+          redo: async () => {
+            // Remove node from graph list again
+            await storage.removeFromGraphList(entityId);
+          },
+        });
+      }
 
       logger.debug(GRAPH_LIST_LOGGER_CONTEXT, "Node removed from graph list", {
         entityId
@@ -291,7 +317,7 @@ export const useGraphList = (): UseGraphListResult => {
       });
       throw errorObj;
     }
-  }, [storage, nodes]);
+  }, [storage, nodes, addAction]);
 
   // Clear graph list
   const clearGraphList = useCallback(async (): Promise<void> => {
@@ -303,6 +329,29 @@ export const useGraphList = (): UseGraphListResult => {
 
     try {
       await storage.clearGraphList();
+
+      // T045: Add undo/redo action for destructive operation
+      addAction({
+        id: crypto.randomUUID(),
+        timestamp: new Date(),
+        description: `Clear graph list (${previousNodes.length} nodes)`,
+        undo: async () => {
+          // Restore all nodes to graph list
+          const restorePromises = previousNodes.map(node =>
+            storage.addToGraphList({
+              entityId: node.entityId,
+              entityType: node.entityType,
+              label: node.label,
+              provenance: node.provenance,
+            })
+          );
+          await Promise.all(restorePromises);
+        },
+        redo: async () => {
+          // Clear graph list again
+          await storage.clearGraphList();
+        },
+      });
 
       logger.debug(GRAPH_LIST_LOGGER_CONTEXT, "Graph list cleared");
 
@@ -319,7 +368,7 @@ export const useGraphList = (): UseGraphListResult => {
       });
       throw errorObj;
     }
-  }, [storage, nodes]);
+  }, [storage, nodes, addAction]);
 
   // Check if entity is in graph list
   const isInGraphList = useCallback(async (entityId: string): Promise<boolean> => {

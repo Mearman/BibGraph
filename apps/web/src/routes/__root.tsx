@@ -6,6 +6,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { NavigationTracker } from "@/components/NavigationTracker";
 import { UrlFixer } from "@/components/UrlFixer";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
 import { GraphVisualizationProvider } from "@/contexts/GraphVisualizationContext";
 
 import { shadcnLightTheme } from "../styles/shadcn-theme.css";
@@ -22,19 +23,21 @@ const RootLayout = () => {
       <UrlFixer />
       <NavigationTracker />
       <NotificationProvider>
-        {/* Conditionally wrap MainLayout and Outlet with GraphVisualizationProvider on graph page */}
-        {/* This allows the sidebar (in MainLayout) to access the context */}
-        {isGraphPage ? (
-          <GraphVisualizationProvider>
+        <UndoRedoProvider>
+          {/* Conditionally wrap MainLayout and Outlet with GraphVisualizationProvider on graph page */}
+          {/* This allows the sidebar (in MainLayout) to access the context */}
+          {isGraphPage ? (
+            <GraphVisualizationProvider>
+              <MainLayout>
+                <Outlet />
+              </MainLayout>
+            </GraphVisualizationProvider>
+          ) : (
             <MainLayout>
               <Outlet />
             </MainLayout>
-          </GraphVisualizationProvider>
-        ) : (
-          <MainLayout>
-            <Outlet />
-          </MainLayout>
-        )}
+          )}
+        </UndoRedoProvider>
       </NotificationProvider>
     </div>
   );
