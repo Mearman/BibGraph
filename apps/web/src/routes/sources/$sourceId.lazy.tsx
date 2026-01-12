@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute,useParams, useSearch  } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { type DetailViewMode, EntityDetailLayout, ErrorState, LoadingState, RelatedEntitiesSection } from "@/components/entity-detail";
+import { type DetailViewMode, EntityDetailLayout, ErrorState, LoadingState, PublicationTimeline, RelatedEntitiesSection } from "@/components/entity-detail";
 import { ENTITY_TYPE_CONFIGS } from "@/components/entity-detail/EntityTypeConfig";
 import { IncomingRelationships } from "@/components/relationship/IncomingRelationships";
 import { OutgoingRelationships } from "@/components/relationship/OutgoingRelationships";
@@ -75,6 +75,14 @@ const SourceRoute = () => {
       onViewModeChange={setViewMode}
       data={source as Record<string, unknown>}>
       <RelationshipCounts incomingCount={incomingCount} outgoingCount={outgoingCount} />
+      <PublicationTimeline
+        yearData={(source.counts_by_year ?? []).map((year) => ({
+          year: year.year,
+          count: year.works_count ?? 0,
+          citations: year.cited_by_count,
+        }))}
+        entityType="sources"
+      />
       <RelatedEntitiesSection
         incomingSections={incomingSections}
         outgoingSections={outgoingSections}
