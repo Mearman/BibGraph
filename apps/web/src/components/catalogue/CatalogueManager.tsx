@@ -27,6 +27,7 @@ import { useHotkeys } from "@mantine/hooks";
 import {
   IconBook,
   IconBulb,
+  IconChartBar,
   IconChevronDown,
   IconDatabase,
   IconDownload,
@@ -47,6 +48,7 @@ import { CatalogueListComponent } from "@/components/catalogue/CatalogueList";
 import { CreateListModal } from "@/components/catalogue/CreateListModal";
 import { ExportModal } from "@/components/catalogue/ExportModal";
 import { ImportModal } from "@/components/catalogue/ImportModal";
+import { ListAnalytics } from "@/components/catalogue/ListAnalytics";
 import { ListMerge } from "@/components/catalogue/ListMerge";
 import type { ListTemplate } from "@/components/catalogue/ListTemplates";
 import { ListTemplates } from "@/components/catalogue/ListTemplates";
@@ -76,6 +78,7 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
     importFromShareUrl,
     getListStats,
     mergeLists,
+    entities,
   } = useCatalogueContext();
 
   const navigate = useNavigate();
@@ -89,6 +92,7 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
   const [showImportModal, setShowImportModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [shareUrl, setShareUrl] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSystemCatalogues, setShowSystemCatalogues] = useState(false);
@@ -506,6 +510,16 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
                 <Button
                   variant="light"
                   size="sm"
+                  onClick={() => setShowAnalyticsModal(true)}
+                  leftSection={<IconChartBar size={ICON_SIZE.MD} />}
+                  data-testid="analytics-list-button"
+                  aria-label="View list analytics"
+                >
+                  Analytics
+                </Button>
+                <Button
+                  variant="light"
+                  size="sm"
                   onClick={handleShare}
                   leftSection={<IconShare size={ICON_SIZE.MD} />}
                   data-testid="share-list-button"
@@ -670,6 +684,23 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
               listId={selectedList.id}
               listTitle={selectedList.title}
               onClose={() => setShowExportModal(false)}
+            />
+          )}
+        </Modal>
+
+        <Modal
+          opened={showAnalyticsModal}
+          onClose={() => setShowAnalyticsModal(false)}
+          title="List Analytics"
+          size="xl"
+          trapFocus
+          returnFocus
+        >
+          {selectedList && (
+            <ListAnalytics
+              list={selectedList}
+              entities={entities}
+              onClose={() => setShowAnalyticsModal(false)}
             />
           )}
         </Modal>
