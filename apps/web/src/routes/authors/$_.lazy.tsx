@@ -90,7 +90,6 @@ const AuthorRoute = () => {
       entityId={decodedAuthorId}
       displayName={author.display_name || "Author"}
       selectParam={(selectParam as string) || ''}
-      selectFields={selectFields || []}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       data={author as Record<string, unknown>}>

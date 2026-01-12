@@ -77,7 +77,6 @@ const TopicRoute = () => {
       entityId={topicId || ''}
       displayName={topic.display_name || "Topic"}
       selectParam={typeof selectParam === 'string' ? selectParam : undefined}
-      selectFields={selectFields || []}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       data={topic}>

@@ -80,7 +80,6 @@ const SubfieldRoute = () => {
       entityId={fullSubfieldId}
       displayName={subfield.display_name || "Subfield"}
       selectParam={typeof selectParam === 'string' ? selectParam : undefined}
-      selectFields={selectFields || []}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       data={subfield}>

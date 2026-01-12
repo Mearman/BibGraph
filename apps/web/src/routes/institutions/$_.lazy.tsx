@@ -90,7 +90,6 @@ const InstitutionRoute = () => {
       entityId={decodedInstitutionId}
       displayName={institution.display_name || "Institution"}
       selectParam={(selectParam as string) || ''}
-      selectFields={selectFields || []}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       data={institution as Record<string, unknown>}>

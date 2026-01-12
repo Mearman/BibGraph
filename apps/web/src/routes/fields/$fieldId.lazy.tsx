@@ -80,7 +80,6 @@ const FieldRoute = () => {
       entityId={fullFieldId}
       displayName={field.display_name || "Field"}
       selectParam={typeof selectParam === 'string' ? selectParam : undefined}
-      selectFields={selectFields || []}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       data={field}>

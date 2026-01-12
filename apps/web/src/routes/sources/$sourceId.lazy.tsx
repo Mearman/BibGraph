@@ -71,7 +71,6 @@ const SourceRoute = () => {
       entityId={sourceId}
       displayName={source.display_name || "Source"}
       selectParam={(selectParam as string) || ''}
-      selectFields={selectFields || []}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       data={source as Record<string, unknown>}>

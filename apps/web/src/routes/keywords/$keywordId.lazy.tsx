@@ -73,7 +73,6 @@ const KeywordRoute = () => {
       entityId={keywordId || ''}
       displayName={keyword.display_name || "Keyword"}
       selectParam={typeof selectParam === 'string' ? selectParam : undefined}
-      selectFields={selectFields || []}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       data={keyword}>

@@ -73,7 +73,6 @@ const PublisherRoute = () => {
       entityId={publisherId}
       displayName={publisher.display_name || "Publisher"}
       selectParam={(selectParam as string) || ''}
-      selectFields={selectFields || []}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       data={publisher as Record<string, unknown>}

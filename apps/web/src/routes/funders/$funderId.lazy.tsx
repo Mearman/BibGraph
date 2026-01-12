@@ -73,7 +73,6 @@ const FunderRoute = () => {
       entityId={funderId}
       displayName={funder.display_name || "Funder"}
       selectParam={(selectParam as string) || ''}
-      selectFields={selectFields || []}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       data={funder as Record<string, unknown>}

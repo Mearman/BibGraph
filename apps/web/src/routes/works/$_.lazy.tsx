@@ -227,7 +227,6 @@ const WorkRoute = () => {
       entityId={normalizedWorkId}
       displayName={work.display_name || work.title || "Work"}
       selectParam={(selectParam as string) || ''}
-      selectFields={selectFields || []}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       data={work as Record<string, unknown>}

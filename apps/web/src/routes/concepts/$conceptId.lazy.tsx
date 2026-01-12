@@ -76,7 +76,6 @@ const ConceptRoute = () => {
       entityId={conceptId || ''}
       displayName={concept.display_name || "Concept"}
       selectParam={typeof selectParam === 'string' ? selectParam : undefined}
-      selectFields={selectFields || []}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       data={concept}>

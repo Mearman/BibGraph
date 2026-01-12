@@ -80,7 +80,6 @@ const DomainRoute = () => {
       entityId={fullDomainId}
       displayName={domain.display_name || "Domain"}
       selectParam={typeof selectParam === 'string' ? selectParam : undefined}
-      selectFields={selectFields || []}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       data={domain}>
