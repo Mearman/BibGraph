@@ -31,6 +31,10 @@ interface CreateListModalProps {
     tags?: string[];
     isPublic?: boolean;
   }) => Promise<void>;
+  initialTitle?: string;
+  initialDescription?: string;
+  initialType?: ListType;
+  initialTags?: string[];
 }
 
 // Validation constants
@@ -38,11 +42,18 @@ const MAX_TITLE_LENGTH = 100;
 const MAX_DESCRIPTION_LENGTH = 500;
 const MAX_TAGS_COUNT = 10;
 
-export const CreateListModal = ({ onClose, onSubmit }: CreateListModalProps) => {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [type, setType] = useState<ListType>("list");
-  const [tags, setTags] = useState<string[]>([]);
+export const CreateListModal = ({
+  onClose,
+  onSubmit,
+  initialTitle,
+  initialDescription,
+  initialType,
+  initialTags
+}: CreateListModalProps) => {
+  const [title, setTitle] = useState(initialTitle || "");
+  const [description, setDescription] = useState(initialDescription || "");
+  const [type, setType] = useState<ListType>(initialType || "list");
+  const [tags, setTags] = useState<string[]>(initialTags || []);
   const [isPublic, setIsPublic] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);

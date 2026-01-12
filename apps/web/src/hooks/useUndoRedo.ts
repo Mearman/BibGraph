@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export interface UndoableAction<T = unknown> {
+export interface UndoableAction<_T = unknown> {
   id: string;
   timestamp: Date;
   description: string;

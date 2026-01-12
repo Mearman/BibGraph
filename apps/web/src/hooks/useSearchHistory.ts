@@ -1,148 +1,106 @@
 /**
  * Search History Hook
  *
- * Manages search query history with IndexedDB persistence.
+ * Manages search query history with IndexedDB persistence via catalogue service.
  * Stores up to 50 search queries with FIFO eviction.
  */
 
-import { logger } from '@bibgraph/utils';
-import { openDB } from 'idb';
+import { catalogueService } from '@bibgraph/utils/storage/catalogue-db';
 import { useCallback, useEffect, useState } from 'react';
 
-const SEARCH_HISTORY_DB_NAME = 'bibgraph-search-history';
-const SEARCH_HISTORY_STORE_NAME = 'queries';
-const SEARCH_HISTORY_VERSION = 1;
-const MAX_SEARCH_HISTORY = 50;
-
 interface SearchHistoryEntry {
-  id: string;
+  id?: string;
   query: string;
   timestamp: Date;
 }
 
-interface SearchHistoryDB {
-  [SEARCH_HISTORY_STORE_NAME]: {
-    key: string;
-    value: SearchHistoryEntry;
-  };
-}
+const MAX_SEARCH_HISTORY = 50;
 
-const initializeDB = async () => {
-  return openDB<SearchHistoryDB>(SEARCH_HISTORY_DB_NAME, SEARCH_HISTORY_VERSION, {
-    upgrade: (db) => {
-      if (!db.objectStoreNames.contains(SEARCH_HISTORY_STORE_NAME)) {
-        const store = db.createObjectStore(SEARCH_HISTORY_STORE_NAME, {
-          keyPath: 'id',
-        });
-        store.createIndex('timestamp', 'timestamp');
-      }
-    },
-  });
-};
-
+/**
+ * Hook for managing search history
+ * @returns Search history state and operations
+ */
 export const useSearchHistory = () => {
   const [searchHistory, setSearchHistory] = useState<SearchHistoryEntry[]>([]);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize IndexedDB and load history
+  // Load search history on mount
   useEffect(() => {
-    const init = async () => {
+    let mounted = true;
+
+    const loadHistory = async () => {
       try {
-        const db = await initializeDB();
-        const allEntries = await db.getAll(SEARCH_HISTORY_STORE_NAME);
-        // Sort by timestamp (newest first)
-        const sortedByTime = [...allEntries].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-        const sortedEntries = sortedByTime.slice(0, MAX_SEARCH_HISTORY);
-        setSearchHistory(sortedEntries);
-        setIsInitialized(true);
+        const history = await catalogueService.getSearchHistory();
+        if (mounted) {
+          setSearchHistory(history);
+          setIsLoading(false);
+        }
       } catch (error) {
-        logger.error('search-history', 'Failed to initialize search history', { error });
-        setIsInitialized(true);
+        console.error('Failed to load search history:', error);
+        if (mounted) {
+          setSearchHistory([]);
+          setIsLoading(false);
+        }
       }
     };
 
-    void init();
+    void loadHistory();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const addSearchQuery = useCallback(
-    async (query: string) => {
-      if (!query.trim()) return;
+  /**
+   * Add a search query to history
+   * @param query Search query to add
+   */
+  const addSearchQuery = useCallback(async (query: string) => {
+    if (!query.trim()) return;
 
-      try {
-        const db = await initializeDB();
+    try {
+      await catalogueService.addSearchQuery(query, MAX_SEARCH_HISTORY);
 
-        // Create new entry
-        const entry: SearchHistoryEntry = {
-          id: crypto.randomUUID(),
-          query: query.trim(),
-          timestamp: new Date(),
-        };
+      // Reload history after adding
+      const updatedHistory = await catalogueService.getSearchHistory();
+      setSearchHistory(updatedHistory);
+    } catch (error) {
+      console.error('Failed to add search query:', error);
+    }
+  }, []);
 
-        // Add to database
-        await db.put(SEARCH_HISTORY_STORE_NAME, entry);
-
-        // Get all entries and enforce FIFO eviction
-        const allEntries = await db.getAll(SEARCH_HISTORY_STORE_NAME);
-        if (allEntries.length > MAX_SEARCH_HISTORY) {
-          // Sort by timestamp (oldest first)
-          const sortedEntries = [...allEntries].sort(
-            (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
-          );
-
-          // Remove oldest entries
-          const entriesToRemove = sortedEntries.slice(0, allEntries.length - MAX_SEARCH_HISTORY);
-          for (const entry of entriesToRemove) {
-            await db.delete(SEARCH_HISTORY_STORE_NAME, entry.id);
-          }
-        }
-
-        // Update state
-        const updatedHistory = await db.getAll(SEARCH_HISTORY_STORE_NAME);
-        // Sort by timestamp (newest first)
-        const sortedByTimeNewest = [...updatedHistory].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-        const sortedHistory = sortedByTimeNewest.slice(0, MAX_SEARCH_HISTORY);
-        setSearchHistory(sortedHistory);
-
-        logger.debug('search-history', 'Added search query to history', { query });
-      } catch (error) {
-        logger.error('search-history', 'Failed to add search query to history', { error, query });
-      }
-    },
-    [],
-  );
-
+  /**
+   * Remove a search query from history
+   * @param id ID of the query to remove
+   */
   const removeSearchQuery = useCallback(async (id: string) => {
     try {
-      const db = await initializeDB();
-      await db.delete(SEARCH_HISTORY_STORE_NAME, id);
+      await catalogueService.removeSearchQuery(id);
 
-      // Update state
-      const updatedHistory = searchHistory.filter((entry) => entry.id !== id);
-      setSearchHistory(updatedHistory);
-
-      logger.debug('search-history', 'Removed search query from history', { id });
+      // Update local state
+      setSearchHistory(prev => prev.filter(entry => entry.id !== id));
     } catch (error) {
-      logger.error('search-history', 'Failed to remove search query from history', { error, id });
+      console.error('Failed to remove search query:', error);
     }
-  }, [searchHistory]);
+  }, []);
 
+  /**
+   * Clear all search history
+   */
   const clearSearchHistory = useCallback(async () => {
     try {
-      const db = await initializeDB();
-      await db.clear(SEARCH_HISTORY_STORE_NAME);
+      await catalogueService.clearSearchHistory();
       setSearchHistory([]);
-
-      logger.debug('search-history', 'Cleared search history');
     } catch (error) {
-      logger.error('search-history', 'Failed to clear search history', { error });
+      console.error('Failed to clear search history:', error);
     }
   }, []);
 
   return {
-    searchHistory: isInitialized ? searchHistory : [],
+    searchHistory,
+    isLoading,
     addSearchQuery,
     removeSearchQuery,
     clearSearchHistory,
-    isInitialized,
   };
 };

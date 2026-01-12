@@ -3,6 +3,7 @@
  * Handles lists, bibliographies, and entity management
  */
 
+import type { ListType } from "@bibgraph/utils";
 import { logger } from "@bibgraph/utils";
 import { SPECIAL_LIST_IDS } from "@bibgraph/utils/storage/catalogue-db";
 import {
@@ -11,6 +12,7 @@ import {
   Card,
   Container,
   Group,
+  Menu,
   Modal,
   Paper,
   SimpleGrid,
@@ -24,6 +26,7 @@ import {
 import { useHotkeys } from "@mantine/hooks";
 import {
   IconBook,
+  IconChevronDown,
   IconDatabase,
   IconDownload,
   IconEdit,
@@ -42,6 +45,8 @@ import { CatalogueListComponent } from "@/components/catalogue/CatalogueList";
 import { CreateListModal } from "@/components/catalogue/CreateListModal";
 import { ExportModal } from "@/components/catalogue/ExportModal";
 import { ImportModal } from "@/components/catalogue/ImportModal";
+import type { ListTemplate } from "@/components/catalogue/ListTemplates";
+import { ListTemplates } from "@/components/catalogue/ListTemplates";
 import { ShareModal } from "@/components/catalogue/ShareModal";
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from '@/config/style-constants';
 import { useCatalogueContext } from "@/contexts/catalogue-context";
@@ -71,6 +76,8 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
 
   const [activeTab, setActiveTab] = useState<string | null>("lists");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<ListTemplate | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -197,6 +204,43 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
     }
   };
 
+  // Handle template selection
+  const handleUseTemplate = (template: ListTemplate) => {
+    setSelectedTemplate(template);
+    setShowTemplatesModal(false);
+    setShowCreateModal(true);
+  };
+
+  // Handle create list from template or custom
+  const handleCreateList = async (params: {
+    title: string;
+    description?: string;
+    type: ListType;
+    tags?: string[];
+    isPublic?: boolean;
+  }) => {
+    // Merge template tags with user-provided tags (avoiding duplicates)
+    const mergedTags = selectedTemplate
+      ? [...new Set([...selectedTemplate.tags, ...(params.tags || [])])]
+      : params.tags;
+
+    const listId = await createList({
+      ...params,
+      tags: mergedTags,
+    });
+    // Switch to the appropriate tab based on list type
+    setActiveTab(params.type === "bibliography" ? "bibliographies" : "lists");
+    selectList(listId);
+    setSelectedTemplate(null);
+    setShowCreateModal(false);
+  };
+
+  // Reset template when closing create modal
+  const handleCloseCreateModal = () => {
+    setSelectedTemplate(null);
+    setShowCreateModal(false);
+  };
+
   return (
     <Container size="xl" py="md" data-testid="catalogue-manager">
       <Stack gap="lg">
@@ -232,13 +276,36 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
               Share
             </Button>
 
-            <Button
-              leftSection={<IconPlus size={ICON_SIZE.MD} />}
-              onClick={() => setShowCreateModal(true)}
-              aria-label="Open modal to create a new catalogue list"
+            <Menu
+              shadow="md"
+              width={200}
+              position="bottom-end"
             >
-              Create New List
-            </Button>
+              <Menu.Target>
+                <Button
+                  leftSection={<IconPlus size={ICON_SIZE.MD} />}
+                  rightSection={<IconChevronDown size={16} />}
+                  aria-label="Create new list or use templates"
+                >
+                  Create New List
+                </Button>
+              </Menu.Target>
+
+              <Menu.Dropdown>
+                <Menu.Item
+                  leftSection={<IconBook size={14} />}
+                  onClick={() => setShowTemplatesModal(true)}
+                >
+                  Use Templates
+                </Menu.Item>
+                <Menu.Item
+                  leftSection={<IconPlus size={14} />}
+                  onClick={() => setShowCreateModal(true)}
+                >
+                  Create Custom List
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
           </Group>
         </Group>
 
@@ -428,21 +495,33 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
         {/* Modals */}
         <Modal
           opened={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          title="Create New List"
+          onClose={handleCloseCreateModal}
+          title={selectedTemplate ? `Create from Template: ${selectedTemplate.name}` : "Create New List"}
           size="md"
           trapFocus
           returnFocus
         >
           <CreateListModal
-            onClose={() => setShowCreateModal(false)}
-            onSubmit={async (params) => {
-              const listId = await createList(params);
-              // Switch to the appropriate tab based on list type
-              setActiveTab(params.type === "bibliography" ? "bibliographies" : "lists");
-              selectList(listId);
-              setShowCreateModal(false);
-            }}
+            onClose={handleCloseCreateModal}
+            onSubmit={handleCreateList}
+            initialTitle={selectedTemplate?.name}
+            initialDescription={selectedTemplate?.description}
+            initialType={selectedTemplate?.type}
+            initialTags={selectedTemplate?.tags}
+          />
+        </Modal>
+
+        <Modal
+          opened={showTemplatesModal}
+          onClose={() => setShowTemplatesModal(false)}
+          title="Choose a Template"
+          size="xl"
+          trapFocus
+          returnFocus
+        >
+          <ListTemplates
+            onUseTemplate={handleUseTemplate}
+            onClose={() => setShowTemplatesModal(false)}
           />
         </Modal>
 
