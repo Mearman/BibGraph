@@ -849,7 +849,7 @@ export const useCatalogue = (options: UseCatalogueOptions = {}): UseCatalogueRet
   const escapeCSVValue = useCallback((value: string): string => {
     // Wrap in quotes if it contains comma, quote, or newline
     if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-      return `"${value.replaceAll(/"/g, '""')}"`;
+      return `"${value.replaceAll('"', '""')}"`;
     }
     return value;
   }, []);
@@ -931,7 +931,7 @@ export const useCatalogue = (options: UseCatalogueOptions = {}): UseCatalogueRet
     bibtex += `  openalex = {${entity.entityId}},\n`;
 
     if (entity.notes) {
-      bibtex += `  note = {${entity.notes.replaceAll(/"/g, "{").replaceAll(/}/g, "}")}},\n`;
+      bibtex += `  note = {${entity.notes.replaceAll('"', "{").replaceAll('}', "}")}},\n`;
     }
 
     bibtex += `}`;

@@ -1,16 +1,16 @@
 import { logger } from "@bibgraph/utils/logger";
 import { createRootRoute, Outlet, useLocation } from "@tanstack/react-router";
 
-import { RouterErrorComponent } from "@/components/error/RouterErrorComponent";
 import { ErrorBoundary } from "@/components/error/ErrorBoundary";
+import { RouterErrorComponent } from "@/components/error/RouterErrorComponent";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { NavigationTracker } from "@/components/NavigationTracker";
 import { UrlFixer } from "@/components/UrlFixer";
-import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ActivityProvider } from "@/contexts/ActivityContext";
+import { GraphVisualizationProvider } from "@/contexts/GraphVisualizationContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import { SyncStatusProvider } from "@/contexts/SyncStatusContext";
 import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
-import { GraphVisualizationProvider } from "@/contexts/GraphVisualizationContext";
 
 import { shadcnLightTheme } from "../styles/shadcn-theme.css";
 

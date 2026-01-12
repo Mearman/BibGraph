@@ -4,13 +4,12 @@
  * Provides export functionality for search results to CSV and BibTeX formats.
  */
 
+import type { AutocompleteResult } from '@bibgraph/types';
 import { ActionIcon, Group, Menu, Stack, Text, Tooltip } from '@mantine/core';
 import { IconDownload, IconFileExport, IconFileTypography, IconTable } from '@tabler/icons-react';
 
 import { ICON_SIZE } from '@/config/style-constants';
 import { exportToBibTeX, exportToCSV, getExportFilename } from '@/utils/exportUtils';
-
-import type { AutocompleteResult } from '@bibgraph/types';
 
 interface ExportButtonProps {
   results: AutocompleteResult[];

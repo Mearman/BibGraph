@@ -30,6 +30,7 @@ import {
   Title,
   Tooltip,
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import {
   IconAlertTriangle,
   IconDownload,
@@ -42,7 +43,6 @@ import {
   IconRefresh,
 } from '@tabler/icons-react';
 import { createLazyFileRoute } from '@tanstack/react-router';
-import { notifications } from '@mantine/notifications';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { type ForceGraphMethods } from 'react-force-graph-2d';
 

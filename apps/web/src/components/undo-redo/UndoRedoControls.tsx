@@ -5,8 +5,6 @@
  * Integrates with global UndoRedoContext.
  */
 
-import { useUndoRedoContext } from '@/contexts/UndoRedoContext';
-import { ICON_SIZE } from '@/config/style-constants';
 import {
   ActionIcon,
   Box,
@@ -16,8 +14,11 @@ import {
   Text,
   Tooltip,
 } from '@mantine/core';
-import { IconHistory, IconRefresh, IconTrash, IconArrowBackUp, IconArrowForwardUp } from '@tabler/icons-react';
+import { IconArrowBackUp, IconArrowForwardUp,IconHistory, IconRefresh, IconTrash } from '@tabler/icons-react';
 import { memo } from 'react';
+
+import { ICON_SIZE } from '@/config/style-constants';
+import { useUndoRedoContext } from '@/contexts/UndoRedoContext';
 
 export const UndoRedoControls = memo(() => {
   const { canUndo, canRedo, undo, redo, clearHistory, historySize } = useUndoRedoContext();

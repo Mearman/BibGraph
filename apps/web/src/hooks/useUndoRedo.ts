@@ -34,10 +34,9 @@ const DEFAULT_MAX_HISTORY = 10; // User decision: 10 actions
 
 /**
  * Hook for managing undo/redo state with keyboard shortcuts
+ * @param options
  */
-export function useUndoRedo<T = unknown>(
-  options: UseUndoRedoOptions = {}
-): UseUndoRedoReturn<T> {
+export const useUndoRedo = <T = unknown>(options: UseUndoRedoOptions = {}): UseUndoRedoReturn<T> => {
   const {
     maxHistory = DEFAULT_MAX_HISTORY,
     enableKeyboardShortcuts = true,
@@ -144,7 +143,7 @@ export function useUndoRedo<T = unknown>(
     clearHistory,
     historySize: past.length + future.length,
   };
-}
+};
 
 /**
  * Hook for integrating undo/redo with specific state operations

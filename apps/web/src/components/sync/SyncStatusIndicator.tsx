@@ -5,8 +5,6 @@
  * Shows current state (idle, syncing, success, error, offline) with tooltips.
  */
 
-import { useSyncStatus } from '@/contexts/SyncStatusContext';
-import { ICON_SIZE } from '@/config/style-constants';
 import { Badge, Box, Group, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import {
   IconAlertTriangle,
@@ -16,6 +14,9 @@ import {
   IconX,
 } from '@tabler/icons-react';
 import { memo, useMemo } from 'react';
+
+import { ICON_SIZE } from '@/config/style-constants';
+import { useSyncStatus } from '@/contexts/SyncStatusContext';
 
 const STATUS_CONFIG = {
   idle: {

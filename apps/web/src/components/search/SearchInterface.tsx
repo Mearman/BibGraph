@@ -9,8 +9,8 @@ import { useSearchHotkeys } from "@/hooks/use-hotkeys";
 import { useSearchHistory } from "@/hooks/useSearchHistory";
 import { announceToScreenReader } from "@/utils/accessibility";
 
-import { SearchHistoryDropdown } from "./SearchHistoryDropdown";
 import { AdvancedSearchFilters,SearchFilters } from "./SearchFilters";
+import { SearchHistoryDropdown } from "./SearchHistoryDropdown";
 
 interface SearchFilters {
   query: string;

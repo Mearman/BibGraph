@@ -5,7 +5,8 @@
  * Integrates with useUndoRedo hook and manages action history across all hooks.
  */
 
-import React, { createContext, useContext } from 'react';
+import React, { createContext, use } from 'react';
+
 import useUndoRedo, { type UndoableAction } from '@/hooks/useUndoRedo';
 
 export interface UndoRedoContextValue {
@@ -22,6 +23,8 @@ const UndoRedoContext = createContext<UndoRedoContextValue | null>(null);
 
 /**
  * Provider component that wraps the application with undo/redo functionality
+ * @param root0
+ * @param root0.children
  */
 export const UndoRedoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const undoRedo = useUndoRedo({
@@ -30,9 +33,9 @@ export const UndoRedoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
 
   return (
-    <UndoRedoContext.Provider value={undoRedo}>
+    <UndoRedoContext value={undoRedo}>
       {children}
-    </UndoRedoContext.Provider>
+    </UndoRedoContext>
   );
 };
 
@@ -40,7 +43,7 @@ export const UndoRedoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
  * Hook to access the global undo/redo context
  */
 export const useUndoRedoContext = (): UndoRedoContextValue => {
-  const context = useContext(UndoRedoContext);
+  const context = use(UndoRedoContext);
   if (!context) {
     throw new Error('useUndoRedoContext must be used within UndoRedoProvider');
   }

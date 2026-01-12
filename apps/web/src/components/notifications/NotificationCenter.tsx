@@ -5,8 +5,6 @@
  * Shows toast-style notifications with mark as read and dismiss functionality.
  */
 
-import { useNotifications } from '@/contexts/NotificationContext';
-
 import {
   ActionIcon,
   Box,
@@ -24,14 +22,15 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import {
   IconBell,
+  IconBellOff,
   IconBellRinging,
   IconCheck,
-  IconBellOff,
   IconX,
 } from '@tabler/icons-react';
 import { memo } from 'react';
 
 import { ICON_SIZE } from '@/config/style-constants';
+import { useNotifications } from '@/contexts/NotificationContext';
 
 interface NotificationBellProps {
   onClick: () => void;

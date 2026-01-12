@@ -6,7 +6,7 @@
  */
 
 import { type NotificationData, notifications } from '@mantine/notifications';
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, use, useCallback, useState } from 'react';
 
 export type NotificationCategory = 'success' | 'error' | 'info' | 'warning';
 
@@ -106,14 +106,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   return (
-    <NotificationContext.Provider value={value}>
+    <NotificationContext value={value}>
       {children}
-    </NotificationContext.Provider>
+    </NotificationContext>
   );
 };
 
 export const useNotifications = (): NotificationContextValue => {
-  const context = useContext(NotificationContext);
+  const context = use(NotificationContext);
   if (!context) {
     throw new Error('useNotifications must be used within NotificationProvider');
   }

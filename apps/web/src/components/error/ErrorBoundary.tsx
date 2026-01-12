@@ -6,8 +6,6 @@
  */
 
 import { logger } from '@bibgraph/utils/logger';
-import type { ClassValue } from 'clsx';
-import { clsx } from 'clsx';
 import {
   Alert,
   Button,
@@ -23,6 +21,8 @@ import {
   IconHome,
   IconRefresh,
 } from '@tabler/icons-react';
+import type { ClassValue } from 'clsx';
+import { clsx } from 'clsx';
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 import { ICON_SIZE } from '@/config/style-constants';
@@ -222,6 +222,8 @@ export class ErrorBoundary extends Component<
 
 /**
  * Functional wrapper for easier usage
+ * @param Component
+ * @param errorBoundaryProps
  */
 export const withErrorBoundary = <P extends object>(
   Component: React.ComponentType<P>,

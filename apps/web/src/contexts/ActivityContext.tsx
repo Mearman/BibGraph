@@ -5,7 +5,8 @@
  * Tracks user actions like create, update, delete, navigate, search, export, import.
  */
 
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, use, useCallback, useState } from 'react';
+
 import type { Activity, ActivityCategory, ActivityFilter } from '@/types/activity';
 
 interface ActivityContextValue {
@@ -87,14 +88,14 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   return (
-    <ActivityContext.Provider value={value}>
+    <ActivityContext value={value}>
       {children}
-    </ActivityContext.Provider>
+    </ActivityContext>
   );
 };
 
 export const useActivity = (): ActivityContextValue => {
-  const context = useContext(ActivityContext);
+  const context = use(ActivityContext);
   if (!context) {
     throw new Error('useActivity must be used within ActivityProvider');
   }

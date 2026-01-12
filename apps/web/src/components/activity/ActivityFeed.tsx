@@ -5,9 +5,6 @@
  * Integrates with ActivityContext for real-time updates.
  */
 
-import { useActivity } from '@/contexts/ActivityContext';
-import { ICON_SIZE } from '@/config/style-constants';
-import type { ActivityCategory } from '@/types/activity';
 import {
   Avatar,
   Box,
@@ -20,8 +17,8 @@ import {
 } from '@mantine/core';
 import {
   IconArrowRight,
-  IconDatabaseImport,
   IconDatabaseExport,
+  IconDatabaseImport,
   IconEdit,
   IconList,
   IconPlus,
@@ -29,8 +26,12 @@ import {
   IconTrash,
   IconX,
 } from '@tabler/icons-react';
-import { memo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
+import { memo } from 'react';
+
+import { ICON_SIZE } from '@/config/style-constants';
+import { useActivity } from '@/contexts/ActivityContext';
+import type { ActivityCategory } from '@/types/activity';
 
 const CATEGORY_ICONS: Record<ActivityCategory, React.ReactNode> = {
   create: <IconPlus size={ICON_SIZE.SM} />,

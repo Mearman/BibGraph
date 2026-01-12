@@ -5,7 +5,8 @@
  * Tracks active operations and shows visual indicators for sync state.
  */
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, use, useCallback, useEffect, useState } from 'react';
+
 import type { SyncOperation, SyncStatus, SyncStatusType } from '@/types/sync';
 
 interface SyncStatusContextValue {
@@ -132,14 +133,14 @@ export const SyncStatusProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   return (
-    <SyncStatusContext.Provider value={value}>
+    <SyncStatusContext value={value}>
       {children}
-    </SyncStatusContext.Provider>
+    </SyncStatusContext>
   );
 };
 
 export const useSyncStatus = (): SyncStatusContextValue => {
-  const context = useContext(SyncStatusContext);
+  const context = use(SyncStatusContext);
   if (!context) {
     throw new Error('useSyncStatus must be used within SyncStatusProvider');
   }
