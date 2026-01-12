@@ -20,7 +20,8 @@
           { "type": "chore", "release": "patch" },
           { "breaking": true, "release": "major" },
           { "revert": true, "release": "patch" }
-        ]
+        ],
+        "defaultRelease": "patch"
       }
     ],
     [
