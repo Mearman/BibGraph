@@ -93,6 +93,59 @@ export interface CatalogueList {
   shareToken?: string;
 }
 
+export interface SearchHistoryEntry {
+  id?: string;
+  /** Search query text */
+  query: string;
+  /** When the search was performed */
+  timestamp: Date;
+}
+
+/**
+ * Graph annotation storage interface
+ * Annotations are visual markup on graphs (text labels, shapes, drawings)
+ */
+export interface GraphAnnotationStorage {
+  id?: string;
+  /** Annotation type discriminator */
+  type: 'text' | 'rectangle' | 'circle' | 'drawing';
+  /** Creation timestamp */
+  createdAt: Date;
+  /** Last modified timestamp */
+  updatedAt: Date;
+  /** Whether annotation is visible */
+  visible: boolean;
+  /** Optional color */
+  color?: string;
+
+  // Text annotation fields
+  content?: string;
+  x?: number;
+  y?: number;
+  fontSize?: number;
+  backgroundColor?: string;
+  /** Linked node ID (optional) */
+  nodeId?: string;
+
+  // Rectangle annotation fields
+  width?: number;
+  height?: number;
+  borderColor?: string;
+  fillColor?: string;
+  borderWidth?: number;
+
+  // Circle annotation fields
+  radius?: number;
+
+  // Drawing annotation fields
+  points?: Array<{ x: number; y: number }>;
+  strokeColor?: string;
+  strokeWidth?: number;
+  closed?: boolean;
+
+  /** Optional graph/snapshot ID for sharing annotations via URL */
+  graphId?: string;
+}
 export interface CatalogueEntity {
   id?: string;
   /** List this entity belongs to */
@@ -130,6 +183,8 @@ class CatalogueDB extends Dexie {
   catalogueLists!: Dexie.Table<CatalogueList, string>;
   catalogueEntities!: Dexie.Table<CatalogueEntity, string>;
   catalogueShares!: Dexie.Table<CatalogueShareRecord, string>;
+  searchHistory!: Dexie.Table<SearchHistoryEntry, string>;
+  annotations!: Dexie.Table<GraphAnnotationStorage, string>;
 
   constructor() {
     super(DB_NAME);
@@ -173,6 +228,37 @@ class CatalogueDB extends Dexie {
             `[catalogue-db] Migration v2: Cleaned up ${corruptedIds.length} corrupted history entries`
           );
         }
+      });
+
+    // Migration v3: Add search history table
+    this.version(3)
+      .stores({
+        // Same schema as v2
+        catalogueLists: "id, title, type, createdAt, updatedAt, isPublic, shareToken, *tags",
+        catalogueEntities: "id, listId, entityType, entityId, addedAt, position, [listId+position], [listId+entityType+entityId]",
+        catalogueShares: "id, listId, shareToken, createdAt, expiresAt",
+        // New search history table
+        searchHistory: "id, query, timestamp",
+      })
+      .upgrade(async () => {
+        // No data migration needed - this is a new table
+        console.log('[catalogue-db] Migration v3: Added search history table');
+      });
+
+    // Migration v4: Add graph annotations table
+    this.version(4)
+      .stores({
+        // Same schema as v3
+        catalogueLists: "id, title, type, createdAt, updatedAt, isPublic, shareToken, *tags",
+        catalogueEntities: "id, listId, entityType, entityId, addedAt, position, [listId+position], [listId+entityType+entityId]",
+        catalogueShares: "id, listId, shareToken, createdAt, expiresAt",
+        searchHistory: "id, query, timestamp",
+        // New annotations table with indexes for querying by graph and type
+        annotations: "id, type, createdAt, updatedAt, visible, graphId, nodeId",
+      })
+      .upgrade(async () => {
+        // No data migration needed - this is a new table
+        console.log('[catalogue-db] Migration v4: Added graph annotations table');
       });
   }
 }
@@ -1380,6 +1466,226 @@ export class CatalogueService {
       }
     }
     return addedIds;
+  }
+
+  /**
+   * Add search query to history with FIFO eviction
+   * @param query Search query text
+   * @param maxHistory Maximum entries to keep (default: 50)
+   */
+  async addSearchQuery(query: string, maxHistory = 50): Promise<void> {
+    try {
+      if (!query.trim()) return;
+
+      const id = crypto.randomUUID();
+      const entry: SearchHistoryEntry = {
+        id,
+        query: query.trim(),
+        timestamp: new Date(),
+      };
+
+      await this.db.searchHistory.add(entry);
+
+      // Enforce FIFO eviction by removing oldest entries if exceeding max
+      const allEntries = await this.db.searchHistory.orderBy('timestamp').toArray();
+      if (allEntries.length > maxHistory) {
+        const entriesToRemove = allEntries.slice(0, allEntries.length - maxHistory);
+        const idsToRemove = entriesToRemove
+          .map((e) => e.id)
+          .filter((id): id is string => id !== undefined);
+        await this.db.searchHistory.bulkDelete(idsToRemove);
+      }
+
+      this.logger?.debug(LOG_CATEGORY, 'Added search query to history', { query });
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to add search query to history', { error, query });
+      throw error;
+    }
+  }
+
+  /**
+   * Get all search history entries ordered by timestamp (newest first)
+   */
+  async getSearchHistory(): Promise<SearchHistoryEntry[]> {
+    try {
+      return await this.db.searchHistory.orderBy('timestamp').reverse().toArray();
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to get search history', { error });
+      return [];
+    }
+  }
+
+  /**
+   * Remove search query from history
+   * @param id Entry ID to remove
+   */
+  async removeSearchQuery(id: string): Promise<void> {
+    try {
+      await this.db.searchHistory.delete(id);
+      this.logger?.debug(LOG_CATEGORY, 'Removed search query from history', { id });
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to remove search query from history', { error, id });
+      throw error;
+    }
+  }
+
+  /**
+   * Clear all search history
+   */
+  async clearSearchHistory(): Promise<void> {
+    try {
+      await this.db.searchHistory.clear();
+      this.logger?.debug(LOG_CATEGORY, 'Cleared search history');
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to clear search history', { error });
+      throw error;
+    }
+  }
+
+  // ========== Graph Annotation Operations ==========
+
+  /**
+   * Add a graph annotation
+   * @param annotation Annotation data (id will be generated if not provided)
+   */
+  async addAnnotation(annotation: Omit<GraphAnnotationStorage, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    try {
+      const id = crypto.randomUUID();
+      const now = new Date();
+      const entry: GraphAnnotationStorage = {
+        id,
+        type: annotation.type,
+        createdAt: now,
+        updatedAt: now,
+        visible: annotation.visible ?? true,
+        color: annotation.color,
+        // Text annotation fields
+        content: annotation.content,
+        x: annotation.x,
+        y: annotation.y,
+        fontSize: annotation.fontSize,
+        backgroundColor: annotation.backgroundColor,
+        nodeId: annotation.nodeId,
+        // Rectangle annotation fields
+        width: annotation.width,
+        height: annotation.height,
+        borderColor: annotation.borderColor,
+        fillColor: annotation.fillColor,
+        borderWidth: annotation.borderWidth,
+        // Circle annotation fields
+        radius: annotation.radius,
+        // Drawing annotation fields
+        points: annotation.points,
+        strokeColor: annotation.strokeColor,
+        strokeWidth: annotation.strokeWidth,
+        closed: annotation.closed,
+        // Graph association for sharing
+        graphId: annotation.graphId,
+      };
+
+      await this.db.annotations.add(entry);
+      this.logger?.debug(LOG_CATEGORY, 'Added graph annotation', { id, type: annotation.type });
+      return id;
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to add graph annotation', { error, annotation });
+      throw error;
+    }
+  }
+
+  /**
+   * Get all annotations for a specific graph (or all annotations if no graphId provided)
+   * @param graphId Optional graph ID to filter annotations
+   */
+  async getAnnotations(graphId?: string): Promise<GraphAnnotationStorage[]> {
+    try {
+      if (graphId) {
+        return await this.db.annotations.where('graphId').equals(graphId).toArray();
+      }
+      return await this.db.annotations.toArray();
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to get graph annotations', { error, graphId });
+      return [];
+    }
+  }
+
+  /**
+   * Get a single annotation by ID
+   * @param id Annotation ID
+   */
+  async getAnnotation(id: string): Promise<GraphAnnotationStorage | null> {
+    try {
+      const result = await this.db.annotations.get(id);
+      return result ?? null;
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to get graph annotation', { id, error });
+      return null;
+    }
+  }
+
+  /**
+   * Update an existing annotation
+   * @param id Annotation ID
+   * @param updates Fields to update
+   */
+  async updateAnnotation(id: string, updates: Partial<Omit<GraphAnnotationStorage, 'id' | 'createdAt' | 'updatedAt'>>): Promise<void> {
+    try {
+      const updateData = {
+        ...updates,
+        updatedAt: new Date(),
+      };
+
+      await this.db.annotations.update(id, updateData);
+      this.logger?.debug(LOG_CATEGORY, 'Updated graph annotation', { id, updates });
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to update graph annotation', { id, updates, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Delete an annotation
+   * @param id Annotation ID
+   */
+  async deleteAnnotation(id: string): Promise<void> {
+    try {
+      await this.db.annotations.delete(id);
+      this.logger?.debug(LOG_CATEGORY, 'Deleted graph annotation', { id });
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to delete graph annotation', { id, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Delete all annotations for a specific graph
+   * @param graphId Graph ID
+   */
+  async deleteAnnotationsByGraph(graphId: string): Promise<void> {
+    try {
+      await this.db.annotations.where('graphId').equals(graphId).delete();
+      this.logger?.debug(LOG_CATEGORY, 'Deleted annotations for graph', { graphId });
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to delete annotations for graph', { graphId, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Toggle annotation visibility
+   * @param id Annotation ID
+   * @param visible New visibility state
+   */
+  async toggleAnnotationVisibility(id: string, visible: boolean): Promise<void> {
+    try {
+      await this.db.annotations.update(id, {
+        visible,
+        updatedAt: new Date(),
+      });
+      this.logger?.debug(LOG_CATEGORY, 'Toggled annotation visibility', { id, visible });
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to toggle annotation visibility', { id, visible, error });
+      throw error;
+    }
   }
 
   /**

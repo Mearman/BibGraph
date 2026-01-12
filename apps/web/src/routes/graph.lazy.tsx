@@ -40,6 +40,7 @@ import {
   IconGraph,
   IconInfoCircle,
   IconLoader,
+  IconPencil,
   IconRefresh,
 } from '@tabler/icons-react';
 import { createLazyFileRoute } from '@tanstack/react-router';
@@ -49,6 +50,7 @@ import { type ForceGraphMethods } from 'react-force-graph-2d';
 import { ForceGraph3DVisualization } from '@/components/graph/3d/ForceGraph3DVisualization';
 import { GraphEmptyState } from '@/components/graph/GraphEmptyState';
 import { GraphSourcePanel } from '@/components/graph/GraphSourcePanel';
+import { GraphAnnotations } from '@/components/graph/annotations';
 import { LayoutSelector } from '@/components/graph/LayoutSelector';
 import {
   type ContextMenuState,
@@ -62,6 +64,7 @@ import { ICON_SIZE, LAYOUT } from '@/config/style-constants';
 import { useGraphVisualizationContext } from '@/contexts/GraphVisualizationContext';
 import { type GraphMethods, useFitToView } from '@/hooks/useFitToView';
 import { type GraphLayoutType,useGraphLayout } from '@/hooks/useGraphLayout';
+import { useGraphAnnotations } from '@/hooks/useGraphAnnotations';
 import { useNodeExpansion } from '@/lib/graph-index';
 
 /**
@@ -133,6 +136,10 @@ const EntityGraphPage = () => {
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(INITIAL_CONTEXT_MENU_STATE);
+
+  // Annotations state
+  const [showAnnotations, setShowAnnotations] = useState(false);
+  const annotations = useGraphAnnotations(); // No graphId - annotations are local for now
 
   // Fit-to-view operations (shared logic for 2D/3D)
   const { fitToViewAll, fitToViewSelected } = useFitToView({
@@ -467,6 +474,16 @@ const EntityGraphPage = () => {
                     </ActionIcon>
                   </Tooltip>
 
+                  {/* Annotations toggle */}
+                  <Tooltip label={showAnnotations ? 'Hide annotations' : 'Show annotations'}>
+                    <ActionIcon
+                      variant={showAnnotations ? 'filled' : 'light'}
+                      onClick={() => setShowAnnotations(!showAnnotations)}
+                    >
+                      <IconPencil size={ICON_SIZE.MD} />
+                    </ActionIcon>
+                  </Tooltip>
+
                   {/* Clear highlights */}
                   {highlightedNodes.size > 0 && (
                     <Button variant="subtle" size="xs" onClick={clearHighlights}>
@@ -551,6 +568,21 @@ const EntityGraphPage = () => {
                   pathSource={pathSource}
                   pathTarget={pathTarget}
                 />
+
+                {/* Annotations overlay (2D only) */}
+                {showAnnotations && viewMode === '2D' && (
+                  <GraphAnnotations
+                    width={graphContainerRef.current?.clientWidth ?? 800}
+                    height={typeof window !== 'undefined' ? window.innerHeight * 0.55 : 500}
+                    annotations={annotations.annotations}
+                    onAddAnnotation={async (annotation) => {
+                      await annotations.addAnnotation(annotation);
+                    }}
+                    onClearAnnotations={async () => {
+                      await annotations.clearAnnotations();
+                    }}
+                  />
+                )}
               </Box>
             </Stack>
           </Card>
