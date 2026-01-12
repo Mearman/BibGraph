@@ -36,6 +36,7 @@ import { createLazyFileRoute, useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE, SEARCH, TIME_MS } from '@/config/style-constants';
+import { useActivity } from '@/contexts/ActivityContext';
 import { useUserInteractions } from "@/hooks/use-user-interactions";
 import { useGraphList } from "@/hooks/useGraphList";
 
@@ -200,6 +201,7 @@ const getEntityTypeColor = (entityType: AutocompleteResult["entity_type"]) => {
 const SearchPage = () => {
   const searchParams = useSearch({ from: "/search" });
   const queryClient = useQueryClient();
+  const { addActivity } = useActivity();
 
   // View mode state
   const [viewMode, setViewMode] = useState<ViewMode>("table");
@@ -433,8 +435,16 @@ const SearchPage = () => {
     }
     if (searchResults && searchStartTime > 0) {
       setSearchDuration(Date.now() - searchStartTime);
+
+      // T006: Add search activity to feed
+      addActivity({
+        category: 'search',
+        description: `Searched for "${searchFilters.query}"`,
+        query: searchFilters.query,
+        resultCount: searchResults.length,
+      });
     }
-  }, [searchResults, retryCount, searchStartTime]);
+  }, [searchResults, retryCount, searchStartTime, searchFilters.query, addActivity]);
 
   const hasResults = searchResults && searchResults.length > 0;
   const hasQuery = Boolean(searchFilters.query.trim());
