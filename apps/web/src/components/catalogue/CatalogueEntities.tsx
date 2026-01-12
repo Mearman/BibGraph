@@ -5,7 +5,7 @@
 
 import type { EntityType } from "@bibgraph/types";
 import { ENTITY_METADATA } from "@bibgraph/types";
-import { type CatalogueEntity } from "@bibgraph/utils"
+import { calculateDuplicateStats, type CatalogueEntity, type DuplicateStats, suggestDuplicateRemovals } from "@bibgraph/utils"
 import { logger } from "@bibgraph/utils";
 import {
   closestCenter,
@@ -44,6 +44,7 @@ import {
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
+  IconAlertTriangle,
   IconDots,
   IconEdit,
   IconExternalLink,
@@ -449,6 +450,8 @@ export const CatalogueEntities = ({ onNavigate }: CatalogueEntitiesProps) => {
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
   const [showBulkMoveModal, setShowBulkMoveModal] = useState(false);
   const [targetListId, setTargetListId] = useState<string | null>(null);
+  const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
+  const [duplicateStats, setDuplicateStats] = useState<DuplicateStats | null>(null);
 
   // T075: Virtual scrolling ref for large lists
   const parentRef = useRef<HTMLDivElement>(null);
@@ -691,6 +694,23 @@ export const CatalogueEntities = ({ onNavigate }: CatalogueEntitiesProps) => {
     }
   };
 
+  // Calculate duplicate statistics when entities change
+  React.useEffect(() => {
+    if (entities.length > 0) {
+      const stats = calculateDuplicateStats(entities);
+      setDuplicateStats(stats);
+      logger.debug("catalogue-entities", "Duplicate stats calculated", {
+        total: stats.totalEntities,
+        unique: stats.uniqueEntities,
+        duplicates: stats.duplicateCount,
+        removable: stats.removableCount,
+        percentage: stats.duplicatePercentage.toFixed(1),
+      });
+    } else {
+      setDuplicateStats(null);
+    }
+  }, [entities]);
+
   // Get unique entity types for filter dropdown
   const entityTypes = [...new Set(entities.map((e) => e.entityType))];
 
@@ -738,14 +758,50 @@ export const CatalogueEntities = ({ onNavigate }: CatalogueEntitiesProps) => {
   return (
     <Card style={{ border: BORDER_STYLE_GRAY_3 }} padding="md">
       <Stack gap="md">
+        {/* Duplicate Warning Banner */}
+        {duplicateStats && duplicateStats.removableCount > 0 && (
+          <Alert
+            variant="light"
+            color="yellow"
+            icon={<IconAlertTriangle size={ICON_SIZE.MD} />}
+            title="Duplicates Found"
+          >
+            <Group justify="space-between">
+              <Text size="sm">
+                {duplicateStats.removableCount} duplicate {duplicateStats.removableCount === 1 ? 'entity' : 'entities'} found ({duplicateStats.duplicatePercentage.toFixed(1)}% of list)
+              </Text>
+              <Button
+                size="xs"
+                variant="light"
+                onClick={() => setShowDuplicatesModal(true)}
+              >
+                View & Remove Duplicates
+              </Button>
+            </Group>
+          </Alert>
+        )}
+
         {/* Header */}
         <Group justify="space-between">
           <Text size="lg" fw={500}>
             {entities.length} {entities.length === 1 ? "entity" : "entities"} in "{selectedList.title}"
           </Text>
-          <Badge size="sm" color="blue">
-            {selectedList.type === "bibliography" ? "Bibliography" : "List"}
-          </Badge>
+          <Group gap="xs">
+            {duplicateStats && duplicateStats.removableCount > 0 && (
+              <Button
+                size="xs"
+                variant="light"
+                color="yellow"
+                leftSection={<IconAlertTriangle size={14} />}
+                onClick={() => setShowDuplicatesModal(true)}
+              >
+                {duplicateStats.removableCount} Duplicates
+              </Button>
+            )}
+            <Badge size="sm" color="blue">
+              {selectedList.type === "bibliography" ? "Bibliography" : "List"}
+            </Badge>
+          </Group>
         </Group>
 
         {/* Filters */}
@@ -990,6 +1046,75 @@ export const CatalogueEntities = ({ onNavigate }: CatalogueEntitiesProps) => {
             </Button>
           </Group>
         </Stack>
+      </Modal>
+
+      {/* Duplicates Modal */}
+      <Modal
+        opened={showDuplicatesModal}
+        onClose={() => setShowDuplicatesModal(false)}
+        title="Duplicate Entities"
+        size="lg"
+      >
+        {duplicateStats && duplicateStats.removableCount > 0 ? (
+          <Stack gap="md">
+            <Text size="sm">
+              Found <Text fw={700}>{duplicateStats.removableCount}</Text> duplicate {duplicateStats.removableCount === 1 ? 'entity' : 'entities'} in this list.
+              Removing duplicates will free up <Text fw={700}>{duplicateStats.duplicatePercentage.toFixed(1)}%</Text> of the list.
+            </Text>
+
+            <Alert variant="light" color="blue">
+              <Text size="sm">
+                Duplicates are detected when the same entity (same type and ID) appears multiple times in the list.
+                Only the most recently added duplicate will be kept; earlier duplicates will be removed.
+              </Text>
+            </Alert>
+
+            <Group justify="flex-end" gap="xs">
+              <Button
+                variant="subtle"
+                onClick={() => setShowDuplicatesModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="red"
+                onClick={async () => {
+                  if (!selectedList.id) return;
+
+                  try {
+                    const toRemove = suggestDuplicateRemovals(entities);
+                    await bulkRemoveEntities(selectedList.id, toRemove);
+                    setShowDuplicatesModal(false);
+                    logger.info("catalogue-entities", "Duplicates removed", {
+                      removedCount: toRemove.length,
+                    });
+                    notifications.show({
+                      title: "Duplicates Removed",
+                      message: `Removed ${toRemove.length} duplicate entities`,
+                      color: "green",
+                    });
+                  } catch (error) {
+                    logger.error("catalogue-entities", "Failed to remove duplicates", {
+                      error,
+                    });
+                    notifications.show({
+                      title: "Error",
+                      message: "Failed to remove duplicates",
+                      color: "red",
+                    });
+                  }
+                }}
+              >
+                Remove All Duplicates
+              </Button>
+            </Group>
+          </Stack>
+        ) : (
+          <Stack gap="md">
+            <Text size="sm">No duplicates found in this list.</Text>
+            <Button onClick={() => setShowDuplicatesModal(false)}>Close</Button>
+          </Stack>
+        )}
       </Modal>
     </Card>
   );

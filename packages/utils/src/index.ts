@@ -27,6 +27,7 @@ export * from "./bookmark-filters";
 export * from "./bookmark-migration";
 export * from "./build-info";
 export * from "./data-evaluation";
+export * from "./duplicate-detection";
 export * from "./field-summary";
 export * from "./metadata-improvements";
 
