@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute,useParams, useSearch  } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { type DetailViewMode, EntityDetailLayout, ErrorState, LoadingState, RelatedEntitiesSection } from "@/components/entity-detail";
+import { CollaborationNetwork,type DetailViewMode, EntityDetailLayout, ErrorState, LoadingState, RelatedEntitiesSection } from "@/components/entity-detail";
 import { ENTITY_TYPE_CONFIGS } from "@/components/entity-detail/EntityTypeConfig";
 import { IncomingRelationships } from "@/components/relationship/IncomingRelationships";
 import { OutgoingRelationships } from "@/components/relationship/OutgoingRelationships";
@@ -94,6 +94,10 @@ const AuthorRoute = () => {
       onViewModeChange={setViewMode}
       data={author as Record<string, unknown>}>
       <RelationshipCounts incomingCount={incomingCount} outgoingCount={outgoingCount} />
+      <CollaborationNetwork
+        authorId={decodedAuthorId}
+        author={author}
+      />
       <RelatedEntitiesSection
         incomingSections={incomingSections}
         outgoingSections={outgoingSections}
