@@ -12,8 +12,8 @@ import {
   Container,
   Group,
   Paper,
-  Select,
   SegmentedControl,
+  Select,
   SimpleGrid,
   Stack,
   Table,
@@ -29,15 +29,17 @@ import {
   IconLayoutGrid,
   IconList,
   IconTable,
+  IconToggleLeft,
 } from "@tabler/icons-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute, useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE, SEARCH, TIME_MS } from '@/config/style-constants';
-import { useGraphList } from "@/hooks/useGraphList";
 import { useUserInteractions } from "@/hooks/use-user-interactions";
+import { useGraphList } from "@/hooks/useGraphList";
 
+import { AdvancedQueryBuilder, type QueryStructure } from "../components/search/AdvancedQueryBuilder";
 import { SearchInterface } from "../components/search/SearchInterface";
 import { SearchResultsSkeleton } from "../components/search/SearchResultsSkeleton";
 import { pageDescription, pageTitle } from "../styles/layout.css";
@@ -229,6 +231,9 @@ const SearchPage = () => {
   const [isRetrying, setIsRetrying] = useState(false);
   const maxRetries = 3;
 
+  // Advanced query builder state
+  const [showAdvancedQuery, setShowAdvancedQuery] = useState(false);
+
   // Update searchFilters when URL parameters change
   useEffect(() => {
     setSearchFilters(initialSearchFilters);
@@ -353,6 +358,23 @@ const SearchPage = () => {
     // Auto-tracking in useUserInteractions will handle page visit recording
   };
 
+  // Handle advanced query builder search
+  const handleAdvancedQuerySearch = useCallback((queryStructure: QueryStructure) => {
+    // Convert QueryStructure to search string
+    const queryString = queryStructure.terms
+      .filter((term) => term.text.trim().length > 0)
+      .map((term, index) => {
+        const prefix = index > 0 ? ` ${term.operator || 'AND'} ` : '';
+        return `${prefix}"${term.text.trim()}"`;
+      })
+      .join('');
+
+    if (queryString.trim()) {
+      handleSearch({ query: queryString.trim() });
+      setShowAdvancedQuery(false); // Hide advanced builder after search
+    }
+  }, [handleSearch]);
+
   // Retry handlers
   const handleRetry = async () => {
     if (retryCount >= maxRetries) return;
@@ -425,7 +447,7 @@ const SearchPage = () => {
 
   // Sort and filter results by selected sort option
   const sortedResults = useMemo(() => {
-    let results = filteredResults;
+    const results = filteredResults;
 
     switch (sortBy) {
       case "citations":
@@ -826,6 +848,28 @@ const SearchPage = () => {
       <Stack gap="xl">
         {renderSearchHeader()}
 
+        {/* Advanced Search Toggle */}
+        <Group justify="flex-end">
+          <Button
+            variant={showAdvancedQuery ? "filled" : "light"}
+            leftSection={<IconToggleLeft size={ICON_SIZE.SM} />}
+            onClick={() => setShowAdvancedQuery(!showAdvancedQuery)}
+            size="sm"
+          >
+            {showAdvancedQuery ? "Hide" : "Show"} Advanced Query Builder
+          </Button>
+        </Group>
+
+        {/* Advanced Query Builder */}
+        {showAdvancedQuery && (
+          <AdvancedQueryBuilder
+            onSearch={handleAdvancedQuerySearch}
+            placeholder="Enter search term..."
+            maxTerms={10}
+          />
+        )}
+
+        {/* Standard Search Interface */}
         <SearchInterface
           onSearch={handleSearch}
           isLoading={isLoading}
