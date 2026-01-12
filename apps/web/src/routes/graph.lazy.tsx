@@ -32,6 +32,7 @@ import {
 } from '@mantine/core';
 import {
   IconAlertTriangle,
+  IconDownload,
   IconEye,
   IconFocus2,
   IconFocusCentered,
@@ -41,6 +42,7 @@ import {
   IconRefresh,
 } from '@tabler/icons-react';
 import { createLazyFileRoute } from '@tanstack/react-router';
+import { notifications } from '@mantine/notifications';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { type ForceGraphMethods } from 'react-force-graph-2d';
 
@@ -124,6 +126,9 @@ const EntityGraphPage = () => {
   // Graph methods ref for external control (zoomToFit, etc.)
   const graphMethodsRef = useRef<GraphMethods | null>(null);
 
+  // Ref for the graph container to access canvas for export
+  const graphContainerRef = useRef<HTMLDivElement>(null);
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(INITIAL_CONTEXT_MENU_STATE);
 
@@ -193,6 +198,65 @@ const EntityGraphPage = () => {
 
   // Count enabled sources with entities
   const enabledSourceCount = sources.filter(s => enabledSourceIds.has(s.source.id)).length;
+
+  // Export state
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Handle graph export as PNG
+  const handleExportPNG = useCallback(() => {
+    if (!graphContainerRef.current) {
+      notifications.show({
+        title: 'Export Failed',
+        message: 'Graph container is not ready for export.',
+        color: 'red',
+      });
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+
+      // Find the canvas element within the graph container
+      const canvas = graphContainerRef.current.querySelector('canvas');
+      if (!canvas) {
+        throw new Error('Could not find graph canvas element');
+      }
+
+      // Convert canvas to data URL
+      const dataUrl = canvas.toDataURL('image/png');
+
+      // Create filename with timestamp
+      const date = new Date().toISOString().split('T')[0];
+      const time = new Date().toISOString().split('T')[1].split('.')[0].replaceAll(':', '-');
+      const filename = `graph-${date}-${time}.png`;
+
+      // Create download link
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = filename;
+      link.style.display = 'none';
+
+      document.body.append(link);
+      link.click();
+
+      // Cleanup
+      link.remove();
+      setIsExporting(false);
+
+      notifications.show({
+        title: 'Export Successful',
+        message: `Graph exported as ${filename}`,
+        color: 'green',
+      });
+    } catch (error) {
+      setIsExporting(false);
+      notifications.show({
+        title: 'Export Failed',
+        message: error instanceof Error ? error.message : 'Failed to export graph',
+        color: 'red',
+      });
+    }
+  }, []);
 
   // Loading state
   if (loading && sources.length === 0) {
@@ -301,7 +365,17 @@ const EntityGraphPage = () => {
                 </Text>
               </Stack>
             </Group>
-            <Group>
+            <Group gap="xs">
+              <Tooltip label="Export graph as PNG">
+                <ActionIcon
+                  variant="light"
+                  onClick={handleExportPNG}
+                  loading={isExporting}
+                  aria-label="Export graph as PNG"
+                >
+                  <IconDownload size={ICON_SIZE.MD} />
+                </ActionIcon>
+              </Tooltip>
               <Tooltip label="Refresh data">
                 <ActionIcon variant="light" onClick={refresh} loading={loading}>
                   <IconRefresh size={ICON_SIZE.MD} />
@@ -386,6 +460,7 @@ const EntityGraphPage = () => {
 
               {/* Graph Container */}
               <Box
+                ref={graphContainerRef}
                 h={LAYOUT.GRAPH_VIEWPORT_HEIGHT}
                 mih={350}
                 style={{
