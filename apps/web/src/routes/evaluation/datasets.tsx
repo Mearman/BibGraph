@@ -316,7 +316,7 @@ const DatasetsManagement = () => {
                   <Text size="sm" c="dimmed" ta="center">
                     Supported formats: CSV, JSON, Excel (.xlsx)
                   </Text>
-                  <Text size="sm" c="blue" ta="center" td="underline">
+                  <Text size="sm" c="blue" ta="center" style={{ textDecoration: "underline" }}>
                     Click to select file
                   </Text>
                 </Stack>

@@ -125,10 +125,9 @@ export const UnifiedSearch = ({ defaultTab = "basic" }: UnifiedSearchProps) => {
                       <Text
                         key={index}
                         size="sm"
-                        style={{ cursor: "pointer", padding: "4px 8px" }}
+                        style={{ cursor: "pointer", padding: "4px 8px", textDecoration: "underline" }}
                         onClick={() => handleHistoryClick(query)}
                         c="blue"
-                        td="underline"
                       >
                         {query}
                       </Text>
