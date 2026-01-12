@@ -26,6 +26,7 @@ import {
 import { useHotkeys } from "@mantine/hooks";
 import {
   IconBook,
+  IconBulb,
   IconChevronDown,
   IconDatabase,
   IconDownload,
@@ -48,6 +49,8 @@ import { ImportModal } from "@/components/catalogue/ImportModal";
 import type { ListTemplate } from "@/components/catalogue/ListTemplates";
 import { ListTemplates } from "@/components/catalogue/ListTemplates";
 import { ShareModal } from "@/components/catalogue/ShareModal";
+import type { SmartListCriteria } from "@/components/catalogue/SmartLists";
+import { SmartLists } from "@/components/catalogue/SmartLists";
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from '@/config/style-constants';
 import { useCatalogueContext } from "@/contexts/catalogue-context";
 import { settingsActions } from "@/stores/settings-store";
@@ -77,6 +80,7 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
   const [activeTab, setActiveTab] = useState<string | null>("lists");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  const [showSmartListsModal, setShowSmartListsModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<ListTemplate | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -211,6 +215,31 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
     setShowCreateModal(true);
   };
 
+  // Handle smart list creation
+  const handleCreateSmartList = async (criteria: SmartListCriteria) => {
+    // Create a new list from smart list criteria
+    // In a full implementation, this would:
+    // 1. Create the list with criteria metadata
+    // 2. Run the query to populate it
+    // 3. Store criteria for auto-refresh
+    const listId = await createList({
+      title: criteria.name,
+      description: `${criteria.description} (Auto-populated)`,
+      type: 'list',
+      tags: ['smart-list', criteria.type],
+    });
+
+    setActiveTab('lists');
+    selectList(listId);
+    setShowSmartListsModal(false);
+
+    logger.info("catalogue-ui", "Smart list created", {
+      listId,
+      criteriaId: criteria.id,
+      criteriaType: criteria.type,
+    });
+  };
+
   // Handle create list from template or custom
   const handleCreateList = async (params: {
     title: string;
@@ -297,6 +326,12 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
                   onClick={() => setShowTemplatesModal(true)}
                 >
                   Use Templates
+                </Menu.Item>
+                <Menu.Item
+                  leftSection={<IconBulb size={14} />}
+                  onClick={() => setShowSmartListsModal(true)}
+                >
+                  Smart Lists
                 </Menu.Item>
                 <Menu.Item
                   leftSection={<IconPlus size={14} />}
@@ -522,6 +557,20 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
           <ListTemplates
             onUseTemplate={handleUseTemplate}
             onClose={() => setShowTemplatesModal(false)}
+          />
+        </Modal>
+
+        <Modal
+          opened={showSmartListsModal}
+          onClose={() => setShowSmartListsModal(false)}
+          title="Smart Lists"
+          size="xl"
+          trapFocus
+          returnFocus
+        >
+          <SmartLists
+            onCreateSmartList={handleCreateSmartList}
+            onClose={() => setShowSmartListsModal(false)}
           />
         </Modal>
 
