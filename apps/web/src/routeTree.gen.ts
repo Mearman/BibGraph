@@ -8,6 +8,8 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
+import { createFileRoute } from '@tanstack/react-router'
+
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SearchRouteImport } from './routes/search'
@@ -71,6 +73,15 @@ import { Route as OpenalexOrgSplatRouteImport } from './routes/openalex.org/$'
 import { Route as InstitutionsRorRorRouteImport } from './routes/institutions/ror.$ror'
 import { Route as AuthorsOrcidOrcidRouteImport } from './routes/authors/orcid.$orcid'
 
+const GraphComparisonLazyRouteImport = createFileRoute('/graph-comparison')()
+
+const GraphComparisonLazyRoute = GraphComparisonLazyRouteImport.update({
+  id: '/graph-comparison',
+  path: '/graph-comparison',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/graph-comparison.lazy').then((d) => d.Route),
+)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -443,6 +454,7 @@ export interface FileRoutesByFullPath {
   '/history': typeof HistoryRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
+  '/graph-comparison': typeof GraphComparisonLazyRoute
   '/api-openalex-org/$': typeof ApiOpenalexOrgSplatRoute
   '/authors/$': typeof AuthorsSplatRoute
   '/concepts/$conceptId': typeof ConceptsConceptIdRoute
@@ -505,6 +517,7 @@ export interface FileRoutesByTo {
   '/history': typeof HistoryRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
+  '/graph-comparison': typeof GraphComparisonLazyRoute
   '/api-openalex-org/$': typeof ApiOpenalexOrgSplatRoute
   '/authors/$': typeof AuthorsSplatRoute
   '/concepts/$conceptId': typeof ConceptsConceptIdRoute
@@ -569,6 +582,7 @@ export interface FileRoutesById {
   '/history': typeof HistoryRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
+  '/graph-comparison': typeof GraphComparisonLazyRoute
   '/api-openalex-org/$': typeof ApiOpenalexOrgSplatRoute
   '/authors/$_': typeof AuthorsSplatRoute
   '/concepts/$conceptId': typeof ConceptsConceptIdRoute
@@ -633,6 +647,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/search'
     | '/settings'
+    | '/graph-comparison'
     | '/api-openalex-org/$'
     | '/authors/$'
     | '/concepts/$conceptId'
@@ -695,6 +710,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/search'
     | '/settings'
+    | '/graph-comparison'
     | '/api-openalex-org/$'
     | '/authors/$'
     | '/concepts/$conceptId'
@@ -758,6 +774,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/search'
     | '/settings'
+    | '/graph-comparison'
     | '/api-openalex-org/$'
     | '/authors/$_'
     | '/concepts/$conceptId'
@@ -822,6 +839,7 @@ export interface RootRouteChildren {
   HistoryRoute: typeof HistoryRoute
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRoute
+  GraphComparisonLazyRoute: typeof GraphComparisonLazyRoute
   ApiOpenalexOrgSplatRoute: typeof ApiOpenalexOrgSplatRoute
   AuthorsSplatRoute: typeof AuthorsSplatRoute
   ConceptsConceptIdRoute: typeof ConceptsConceptIdRoute
@@ -867,6 +885,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/graph-comparison': {
+      id: '/graph-comparison'
+      path: '/graph-comparison'
+      fullPath: '/graph-comparison'
+      preLoaderRoute: typeof GraphComparisonLazyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -1340,6 +1365,7 @@ const rootRouteChildren: RootRouteChildren = {
   HistoryRoute: HistoryRoute,
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRoute,
+  GraphComparisonLazyRoute: GraphComparisonLazyRoute,
   ApiOpenalexOrgSplatRoute: ApiOpenalexOrgSplatRoute,
   AuthorsSplatRoute: AuthorsSplatRoute,
   ConceptsConceptIdRoute: ConceptsConceptIdRoute,
