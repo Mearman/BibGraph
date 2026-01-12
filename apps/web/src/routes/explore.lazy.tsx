@@ -1,15 +1,40 @@
-import { Container, Stack,Text, Title } from "@mantine/core";
-import { createLazyFileRoute } from "@tanstack/react-router";
+import { Container, Paper, Stack, Text, Title } from '@mantine/core';
+import { createLazyFileRoute } from '@tanstack/react-router';
 
-const GraphExplorer = () => <Container size="xl" py="md">
-      <Stack align="center" justify="center" h="50vh" gap="md">
-        <Title order={2}>Explore</Title>
-        <Text c="dimmed">Graph exploration interface - Navigate to view content</Text>
-      </Stack>
-    </Container>;
+import { FeaturedCollections } from '@/components/explore/FeaturedCollections';
+import { RandomExplorer } from '@/components/explore/RandomExplorer';
+import { TrendingTopics } from '@/components/explore/TrendingTopics';
+import { pageDescription, pageTitle } from '@/styles/layout.css';
 
-export const Route = createLazyFileRoute("/explore")({
-  component: GraphExplorer,
+const ExplorePage = () => (
+  <Container size="xl" py="md">
+    <Stack gap="xl">
+      {/* Page Header */}
+      <div>
+        <Title className={pageTitle}>Explore</Title>
+        <Text className={pageDescription}>
+          Discover academic literature through featured collections, trending topics, and serendipitous exploration
+        </Text>
+      </div>
+
+      {/* Trending Topics Bar */}
+      <TrendingTopics />
+
+      {/* Featured Collections */}
+      <Paper shadow="xs" p="md" withBorder>
+        <FeaturedCollections />
+      </Paper>
+
+      {/* Random Explorer */}
+      <Paper shadow="xs" p="md" withBorder>
+        <RandomExplorer />
+      </Paper>
+    </Stack>
+  </Container>
+);
+
+export const Route = createLazyFileRoute('/explore')({
+  component: ExplorePage,
 });
 
-export default GraphExplorer;
+export default ExplorePage;
