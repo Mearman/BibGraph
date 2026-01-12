@@ -123,6 +123,7 @@ export interface UseCatalogueReturn {
   updateEntityNotes: (entityRecordId: string, notes: string) => Promise<void>;
   bulkRemoveEntities: (listId: string, entityIds: string[]) => Promise<void>;
   bulkMoveEntities: (sourceListId: string, targetListId: string, entityIds: string[]) => Promise<void>;
+  mergeLists: (sourceListIds: string[], mergeStrategy: 'union' | 'intersection' | 'combine', newListName: string, deduplicate: boolean) => Promise<string>;
 
   // Search and Filter
   searchLists: (query: string) => Promise<CatalogueList[]>;
@@ -480,6 +481,113 @@ export const useCatalogue = (options: UseCatalogueOptions = {}): UseCatalogueRet
       throw error;
     }
   }, [storage, refreshEntities]);
+
+  // Merge lists
+  const mergeLists = useCallback(async (
+    sourceListIds: string[],
+    mergeStrategy: 'union' | 'intersection' | 'combine',
+    newListName: string,
+    deduplicate: boolean
+  ): Promise<string> => {
+    try {
+      // Fetch entities from all source lists
+      const allEntities: Array<{
+        listId: string;
+        entity: CatalogueEntity;
+      }> = [];
+
+      for (const listId of sourceListIds) {
+        const entities = await storage.getListEntities(listId);
+        for (const entity of entities) {
+          allEntities.push({ listId, entity });
+        }
+      }
+
+      // Apply merge strategy
+      let entitiesToMerge: Array<typeof allEntities[0]>;
+      const entityKey = (e: CatalogueEntity) => `${e.entityType}:${e.entityId}`;
+
+      if (mergeStrategy === 'intersection') {
+        // Only entities that appear in ALL source lists
+        const entityCounts = new Map<string, number>();
+        for (const { entity } of allEntities) {
+          const key = entityKey(entity);
+          entityCounts.set(key, (entityCounts.get(key) || 0) + 1);
+        }
+        const requiredCount = sourceListIds.length;
+        entitiesToMerge = allEntities.filter(({ entity }) =>
+          (entityCounts.get(entityKey(entity)) || 0) >= requiredCount
+        );
+      } else if (mergeStrategy === 'union') {
+        // All unique entities
+        const seen = new Set<string>();
+        entitiesToMerge = [];
+        for (const item of allEntities) {
+          const key = entityKey(item.entity);
+          if (!seen.has(key)) {
+            seen.add(key);
+            entitiesToMerge.push(item);
+          }
+        }
+      } else {
+        // Combine: keep all entities including duplicates
+        entitiesToMerge = allEntities;
+      }
+
+      // Additional deduplication if requested (and not intersection)
+      if (deduplicate && mergeStrategy !== 'intersection') {
+        const seen = new Set<string>();
+        entitiesToMerge = entitiesToMerge.filter(({ entity }) => {
+          const key = entityKey(entity);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+
+      // Create new list
+      const newListId = await storage.createList({
+        title: newListName,
+        type: 'list',
+        tags: ['merged'],
+      });
+
+      // Add entities to new list
+      for (const { entity } of entitiesToMerge) {
+        await storage.addEntityToList({
+          listId: newListId,
+          entityType: entity.entityType,
+          entityId: entity.entityId,
+          notes: entity.notes,
+        });
+      }
+
+      // Refresh lists to show the new merged list
+      await refreshLists();
+
+      // Select the new list
+      selectList(newListId);
+
+      logger.info(CATALOGUE_LOGGER_CONTEXT, "Lists merged successfully", {
+        sourceListIds,
+        mergeStrategy,
+        newListId,
+        newListName,
+        deduplicate,
+        entityCount: entitiesToMerge.length,
+      });
+
+      return newListId;
+    } catch (error) {
+      logger.error(CATALOGUE_LOGGER_CONTEXT, "Failed to merge lists", {
+        sourceListIds,
+        mergeStrategy,
+        newListName,
+        error,
+      });
+      throw error;
+    }
+  }, [storage, refreshLists, selectList]);
 
   // Search lists
   const searchLists = useCallback(async (query: string): Promise<CatalogueList[]> => {
@@ -1358,6 +1466,7 @@ export const useCatalogue = (options: UseCatalogueOptions = {}): UseCatalogueRet
     updateEntityNotes,
     bulkRemoveEntities,
     bulkMoveEntities,
+    mergeLists,
 
     // Search and Filter
     searchLists,

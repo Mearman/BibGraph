@@ -31,6 +31,7 @@ import {
   IconDatabase,
   IconDownload,
   IconEdit,
+  IconGitMerge,
   IconList,
   IconPlus,
   IconSearch,
@@ -46,6 +47,7 @@ import { CatalogueListComponent } from "@/components/catalogue/CatalogueList";
 import { CreateListModal } from "@/components/catalogue/CreateListModal";
 import { ExportModal } from "@/components/catalogue/ExportModal";
 import { ImportModal } from "@/components/catalogue/ImportModal";
+import { ListMerge } from "@/components/catalogue/ListMerge";
 import type { ListTemplate } from "@/components/catalogue/ListTemplates";
 import { ListTemplates } from "@/components/catalogue/ListTemplates";
 import { ShareModal } from "@/components/catalogue/ShareModal";
@@ -73,6 +75,7 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
     generateShareUrl,
     importFromShareUrl,
     getListStats,
+    mergeLists,
   } = useCatalogueContext();
 
   const navigate = useNavigate();
@@ -85,6 +88,7 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
   const [showShareModal, setShowShareModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showMergeModal, setShowMergeModal] = useState(false);
   const [shareUrl, setShareUrl] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSystemCatalogues, setShowSystemCatalogues] = useState(false);
@@ -240,6 +244,34 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
     });
   };
 
+  // Handle merge lists
+  const handleMergeLists = async (
+    sourceListIds: string[],
+    mergeStrategy: 'union' | 'intersection' | 'combine',
+    newListName: string,
+    deduplicate: boolean
+  ) => {
+    const mergedListId = await mergeLists(
+      sourceListIds,
+      mergeStrategy,
+      newListName,
+      deduplicate
+    );
+
+    setActiveTab('lists');
+    setShowMergeModal(false);
+
+    logger.info("catalogue-ui", "Lists merged successfully", {
+      sourceListIds,
+      mergeStrategy,
+      mergedListId,
+      newListName,
+      deduplicate,
+    });
+
+    return mergedListId;
+  };
+
   // Handle create list from template or custom
   const handleCreateList = async (params: {
     title: string;
@@ -332,6 +364,12 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
                   onClick={() => setShowSmartListsModal(true)}
                 >
                   Smart Lists
+                </Menu.Item>
+                <Menu.Item
+                  leftSection={<IconGitMerge size={14} />}
+                  onClick={() => setShowMergeModal(true)}
+                >
+                  Merge Lists
                 </Menu.Item>
                 <Menu.Item
                   leftSection={<IconPlus size={14} />}
@@ -571,6 +609,21 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
           <SmartLists
             onCreateSmartList={handleCreateSmartList}
             onClose={() => setShowSmartListsModal(false)}
+          />
+        </Modal>
+
+        <Modal
+          opened={showMergeModal}
+          onClose={() => setShowMergeModal(false)}
+          title="Merge Lists"
+          size="lg"
+          trapFocus
+          returnFocus
+        >
+          <ListMerge
+            lists={lists}
+            onMerge={handleMergeLists}
+            onClose={() => setShowMergeModal(false)}
           />
         </Modal>
 

@@ -113,19 +113,14 @@ const buildTreeStructure = (
     let parent: string;
     let child: string;
 
-    if (edge.type === 'AUTHORSHIP') {
-      // Target (work) is child of source (author)
-      // or Target (author) is child of source (institution)
+    if (edge.type === 'AUTHORSHIP' || edge.type === 'AFFILIATION') {
+      // Target (work/author) is child of source (author/institution)
       parent = source;
       child = target;
     } else if (edge.type === 'REFERENCE') {
       // Source references target, so target is parent (earlier work)
       parent = target;
       child = source;
-    } else if (edge.type === 'AFFILIATION') {
-      // Target (author) is child of source (institution)
-      parent = source;
-      child = target;
     } else {
       return;
     }
