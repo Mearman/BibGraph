@@ -40,6 +40,7 @@ import { useUserInteractions } from "@/hooks/use-user-interactions";
 import { useGraphList } from "@/hooks/useGraphList";
 
 import { AdvancedQueryBuilder, type QueryStructure } from "../components/search/AdvancedQueryBuilder";
+import { ExportButton } from "../components/export/ExportButton";
 import { SearchInterface } from "../components/search/SearchInterface";
 import { SearchResultsSkeleton } from "../components/search/SearchResultsSkeleton";
 import { pageDescription, pageTitle } from "../styles/layout.css";
@@ -542,6 +543,10 @@ const SearchPage = () => {
                   },
                 ]}
                 size="xs"
+              />
+              <ExportButton
+                results={sortedResults}
+                query={searchFilters.query}
               />
             </Group>
           </Group>
