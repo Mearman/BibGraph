@@ -4,6 +4,7 @@ import { ENTITY_METADATA, toEntityType } from "@bibgraph/types";
 import { convertToRelativeUrl, ErrorRecovery, SearchEmptyState } from "@bibgraph/ui";
 import { formatLargeNumber, logger } from "@bibgraph/utils";
 import {
+  ActionIcon,
   Anchor,
   Badge,
   Button,
@@ -23,6 +24,7 @@ import { notifications } from "@mantine/notifications";
 import {
   IconBookmark,
   IconBookmarkOff,
+  IconGraph,
   IconLayoutGrid,
   IconList,
   IconTable,
@@ -32,6 +34,7 @@ import { createLazyFileRoute, useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE, SEARCH, TIME_MS } from '@/config/style-constants';
+import { useGraphList } from "@/hooks/useGraphList";
 import { useUserInteractions } from "@/hooks/use-user-interactions";
 
 import { SearchInterface } from "../components/search/SearchInterface";
@@ -240,6 +243,57 @@ const SearchPage = () => {
     filters: memoizedFilters,
     autoTrackVisits: Boolean(searchFilters.query),
   });
+
+  // Graph list hook for adding entities to graph
+  const graphList = useGraphList();
+
+  // Helper function to check if entity is in graph
+  const isInGraph = useCallback((entityId: string): boolean => {
+    return graphList.nodes.some(node => node.entityId === entityId);
+  }, [graphList.nodes]);
+
+  // Handle add/remove from graph
+  const handleToggleGraph = useCallback(async (result: AutocompleteResult, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+
+    const entityType = toEntityType(result.entity_type);
+    if (!entityType) return;
+
+    try {
+      if (isInGraph(result.id)) {
+        await graphList.removeNode(result.id);
+        notifications.show({
+          title: "Removed from Graph",
+          message: `${result.display_name} removed from graph`,
+          color: "gray",
+          autoClose: TIME_MS.BOOKMARK_FEEDBACK_DURATION,
+        });
+      } else {
+        await graphList.addNode({
+          entityId: result.id,
+          entityType,
+          label: result.display_name,
+          provenance: "user",
+        });
+        notifications.show({
+          title: "Added to Graph",
+          message: `${result.display_name} added to graph for analysis`,
+          color: "green",
+          autoClose: TIME_MS.BOOKMARK_FEEDBACK_DURATION,
+        });
+      }
+    } catch (error) {
+      logger.error("ui", "Failed to toggle graph list", { error, entityId: result.id });
+      notifications.show({
+        title: "Error",
+        message: isInGraph(result.id) ? "Failed to remove from graph" : "Failed to add to graph",
+        color: "red",
+      });
+    }
+  }, [graphList, isInGraph]);
 
   const {
     data: searchResults,
@@ -542,11 +596,13 @@ const SearchPage = () => {
                 <Table.Th>Name</Table.Th>
                 <Table.Th w={100}>Citations</Table.Th>
                 <Table.Th w={100}>Works</Table.Th>
+                <Table.Th w={50}>Graph</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {displayResults.map((result) => {
               const entityUrl = convertToRelativeUrl(result.id);
+              const inGraph = isInGraph(result.id);
               return (
                 <Table.Tr key={result.id}>
                   <Table.Td>
@@ -585,6 +641,20 @@ const SearchPage = () => {
                       {result.works_count ? formatLargeNumber(result.works_count) : '—'}
                     </Text>
                   </Table.Td>
+                  <Table.Td>
+                    <Tooltip label={inGraph ? "Remove from graph" : "Add to graph"} position="bottom">
+                      <ActionIcon
+                        size="sm"
+                        variant={inGraph ? "filled" : "light"}
+                        color="grape"
+                        onClick={(e) => void handleToggleGraph(result, e)}
+                        loading={graphList.loading}
+                        aria-label={inGraph ? "Remove from graph" : "Add to graph"}
+                      >
+                        <IconGraph size={ICON_SIZE.XS} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Table.Td>
                 </Table.Tr>
               );
             })}
@@ -596,13 +666,14 @@ const SearchPage = () => {
           <SimpleGrid cols={{ base: 1, xs: 2, sm: 2, md: 3, lg: 4 }} spacing="md">
             {displayResults.map((result) => {
               const entityUrl = convertToRelativeUrl(result.id);
+              const inGraph = isInGraph(result.id);
               return (
                 <Card
                   key={result.id}
                   shadow="sm"
                   p="md"
                   withBorder
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: 'pointer', position: 'relative' }}
                   component={entityUrl ? "a" : "div"}
                   href={entityUrl}
                 >
@@ -611,9 +682,23 @@ const SearchPage = () => {
                       <Badge size="sm" color={getEntityTypeColor(result.entity_type)} variant="light">
                         {result.entity_type}
                       </Badge>
-                      <Text size="xs" c="dimmed">
-                        {result.cited_by_count ? `${formatLargeNumber(result.cited_by_count)} citations` : '—'}
-                      </Text>
+                      <Group gap="xs">
+                        <Text size="xs" c="dimmed">
+                          {result.cited_by_count ? `${formatLargeNumber(result.cited_by_count)} citations` : '—'}
+                        </Text>
+                        <Tooltip label={inGraph ? "Remove from graph" : "Add to graph"} position="bottom">
+                          <ActionIcon
+                            size="sm"
+                            variant={inGraph ? "filled" : "light"}
+                            color="grape"
+                            onClick={(e) => void handleToggleGraph(result, e)}
+                            loading={graphList.loading}
+                            aria-label={inGraph ? "Remove from graph" : "Add to graph"}
+                          >
+                            <IconGraph size={ICON_SIZE.XS} />
+                          </ActionIcon>
+                        </Tooltip>
+                      </Group>
                     </Group>
                     <Text size="sm" fw={500} lineClamp={2}>
                       {result.display_name}
@@ -634,6 +719,7 @@ const SearchPage = () => {
           <Stack gap="xs">
             {displayResults.map((result) => {
               const entityUrl = convertToRelativeUrl(result.id);
+              const inGraph = isInGraph(result.id);
               return (
                 <Paper
                   key={result.id}
@@ -671,6 +757,18 @@ const SearchPage = () => {
                           {formatLargeNumber(result.works_count)} works
                         </Text>
                       )}
+                      <Tooltip label={inGraph ? "Remove from graph" : "Add to graph"} position="bottom">
+                        <ActionIcon
+                          size="sm"
+                          variant={inGraph ? "filled" : "light"}
+                          color="grape"
+                          onClick={(e) => void handleToggleGraph(result, e)}
+                          loading={graphList.loading}
+                          aria-label={inGraph ? "Remove from graph" : "Add to graph"}
+                        >
+                          <IconGraph size={ICON_SIZE.XS} />
+                        </ActionIcon>
+                      </Tooltip>
                     </Group>
                   </Group>
                 </Paper>
