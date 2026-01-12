@@ -32,6 +32,9 @@ export * from "./graph/graph";
 // Hierarchical algorithms
 export * from "./hierarchical/clustering";
 
+// Layout algorithms
+export * from "./layout/hierarchical-layout";
+
 // Partitioning algorithms
 export * from "./partitioning/spectral";
 

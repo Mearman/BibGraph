@@ -117,6 +117,8 @@ export interface OptimizedForceGraphVisualizationProps {
   onBackgroundClick?: () => void;
   /** Enable/disable force simulation */
   enableSimulation?: boolean;
+  /** Fixed node positions for static layouts (nodeId -> {x, y}) */
+  nodePositions?: Map<string, { x: number; y: number }>;
   /** Seed for deterministic initial positions (defaults to 42 for reproducibility) */
   seed?: number;
   /** Callback when graph methods become available (for external control like zoomToFit) */
@@ -160,6 +162,7 @@ export const OptimizedForceGraphVisualization = ({
   onNodeHover,
   onBackgroundClick,
   enableSimulation = true,
+  nodePositions,
   seed,
   onGraphReady,
   enableOptimizations = true,
@@ -302,15 +305,21 @@ export const OptimizedForceGraphVisualization = ({
     });
 
     // Transform nodes for force graph
-    const transformedNodes: ForceGraphNode[] = deduplicatedNodes.map(node => ({
-      id: node.id,
-      entityType: node.entityType,
-      label: node.label || node.id,
-      entityId: node.id,
-      x: node.x ?? (random() - 0.5) * 200,
-      y: node.y ?? (random() - 0.5) * 200,
-      originalNode: node,
-    }));
+    const transformedNodes: ForceGraphNode[] = deduplicatedNodes.map(node => {
+      const fixedPosition = nodePositions?.get(node.id);
+      return {
+        id: node.id,
+        entityType: node.entityType,
+        label: node.label || node.id,
+        entityId: node.id,
+        x: node.x ?? (random() - 0.5) * 200,
+        y: node.y ?? (random() - 0.5) * 200,
+        // Use fixed positions if provided (for static layouts)
+        fx: fixedPosition?.x,
+        fy: fixedPosition?.y,
+        originalNode: node,
+      };
+    });
 
     // Transform edges, only include edges where both endpoints are visible
     const visibleNodeIds = new Set(transformedNodes.map(n => n.id));
@@ -329,7 +338,7 @@ export const OptimizedForceGraphVisualization = ({
       }));
 
     return { nodes: transformedNodes, links: transformedEdges };
-  }, [renderNodes, edges, seed]);
+  }, [renderNodes, edges, seed, nodePositions]);
 
   // Node highlighting logic
   const isNodeHighlighted = useCallback((nodeId: string): boolean => {

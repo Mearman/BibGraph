@@ -49,6 +49,7 @@ import { type ForceGraphMethods } from 'react-force-graph-2d';
 import { ForceGraph3DVisualization } from '@/components/graph/3d/ForceGraph3DVisualization';
 import { GraphEmptyState } from '@/components/graph/GraphEmptyState';
 import { GraphSourcePanel } from '@/components/graph/GraphSourcePanel';
+import { LayoutSelector } from '@/components/graph/LayoutSelector';
 import {
   type ContextMenuState,
   INITIAL_CONTEXT_MENU_STATE,
@@ -57,9 +58,10 @@ import {
 import { OptimizedForceGraphVisualization } from '@/components/graph/OptimizedForceGraphVisualization';
 import type { DisplayMode } from '@/components/graph/types';
 import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
-import { ICON_SIZE,LAYOUT  } from '@/config/style-constants';
+import { ICON_SIZE, LAYOUT } from '@/config/style-constants';
 import { useGraphVisualizationContext } from '@/contexts/GraphVisualizationContext';
-import { type GraphMethods,useFitToView } from '@/hooks/useFitToView';
+import { type GraphMethods, useFitToView } from '@/hooks/useFitToView';
+import { type GraphLayoutType,useGraphLayout } from '@/hooks/useGraphLayout';
 import { useNodeExpansion } from '@/lib/graph-index';
 
 /**
@@ -192,6 +194,27 @@ const EntityGraphPage = () => {
     });
     return counts;
   }, [nodes]);
+
+  // Layout state
+  const [currentLayout, setCurrentLayout] = useState<GraphLayoutType>('force');
+  const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const layout = useGraphLayout(nodes, edges, currentLayout);
+
+  // Handle layout change
+  const handleLayoutChange = useCallback((layoutType: GraphLayoutType) => {
+    setCurrentLayout(layoutType);
+
+    if (layoutType === 'force') {
+      // Clear manual positions, let force simulation handle it
+      setNodePositions(new Map());
+      setEnableSimulation(true);
+    } else {
+      // Apply the selected layout
+      const positions = layout.applyLayout(layoutType);
+      setNodePositions(positions);
+      setEnableSimulation(false);
+    }
+  }, [layout, setEnableSimulation]);
 
   // Convert expandingNodeIds array to Set for visualization components
   const expandingNodeIdsSet = useMemo(() => new Set(expandingNodeIds), [expandingNodeIds]);
@@ -401,6 +424,13 @@ const EntityGraphPage = () => {
                       { label: 'Filter', value: 'filter' },
                     ]}
                   />
+
+                  <LayoutSelector
+                    value={currentLayout}
+                    onChange={handleLayoutChange}
+                    nodes={nodes}
+                    edges={edges}
+                  />
                 </Group>
 
                 <Group gap="xs">
@@ -479,6 +509,7 @@ const EntityGraphPage = () => {
                     expandingNodeIds={expandingNodeIdsSet}
                     _displayMode={displayMode}
                     enableSimulation={enableSimulation}
+                    nodePositions={nodePositions}
                     onNodeClick={handleNodeClick}
                     onNodeRightClick={handleNodeRightClick}
                     onBackgroundClick={handleBackgroundClick}
