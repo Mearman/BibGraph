@@ -5,8 +5,8 @@
  */
 
 import type { AutocompleteResult } from '@bibgraph/types';
-import { ActionIcon, Group, Menu, Stack, Text, Tooltip } from '@mantine/core';
-import { IconDownload, IconFileExport, IconFileTypography, IconTable } from '@tabler/icons-react';
+import { ActionIcon, Menu, Stack, Text, Tooltip } from '@mantine/core';
+import { IconFileExport, IconFileTypography, IconTable } from '@tabler/icons-react';
 
 import { ICON_SIZE } from '@/config/style-constants';
 import { exportToBibTeX, exportToCSV, getExportFilename } from '@/utils/exportUtils';

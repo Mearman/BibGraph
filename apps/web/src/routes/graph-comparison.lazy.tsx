@@ -17,27 +17,23 @@ import {
   Button,
   Card,
   Container,
-  Flex,
   Group,
   Stack,
   Text,
   Title,
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
-import { notifications } from '@mantine/notifications';
 import {
   IconAlertTriangle,
   IconArrowLeft,
   IconGraph,
   IconLoader,
 } from '@tabler/icons-react';
-import { createLazyFileRoute } from '@tanstack/react-router';
+import { createLazyFileRoute , Link } from '@tanstack/react-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { ICON_SIZE } from '@/config/style-constants';
 import { GraphComparison } from '@/components/graph/comparison';
+import { ICON_SIZE } from '@/config/style-constants';
 import { useGraphSnapshots } from '@/hooks/useGraphSnapshots';
-import { Link } from '@tanstack/react-router';
 
 interface GraphComparisonSearchParams {
   left?: string;
@@ -73,9 +69,6 @@ const GraphComparisonPage = () => {
     name: string;
   } | null>(null);
 
-  const [isLoadingLeft, setIsLoadingLeft] = useState(false);
-  const [isLoadingRight, setIsLoadingRight] = useState(false);
-
   const [error, setError] = useState<string | null>(null);
 
   // Load snapshots from URL params
@@ -98,7 +91,6 @@ const GraphComparisonPage = () => {
     }
 
     const loadLeft = async () => {
-      setIsLoadingLeft(true);
       setError(null);
 
       try {
@@ -119,8 +111,6 @@ const GraphComparisonPage = () => {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load left snapshot';
         setError(errorMessage);
         setLeftSnapshot(null);
-      } finally {
-        setIsLoadingLeft(false);
       }
     };
 
@@ -135,7 +125,6 @@ const GraphComparisonPage = () => {
     }
 
     const loadRight = async () => {
-      setIsLoadingRight(true);
       setError(null);
 
       try {
@@ -156,8 +145,6 @@ const GraphComparisonPage = () => {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load right snapshot';
         setError(errorMessage);
         setRightSnapshot(null);
-      } finally {
-        setIsLoadingRight(false);
       }
     };
 

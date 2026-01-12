@@ -7,7 +7,7 @@
 
 import React, { createContext, use } from 'react';
 
-import useUndoRedo, { type UndoableAction } from '@/hooks/useUndoRedo';
+import { useUndoRedo, type UndoableAction } from '@/hooks/useUndoRedo';
 
 export interface UndoRedoContextValue {
   canUndo: boolean;
@@ -50,4 +50,3 @@ export const useUndoRedoContext = (): UndoRedoContextValue => {
   return context;
 };
 
-export default UndoRedoContext;

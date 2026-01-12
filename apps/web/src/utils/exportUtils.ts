@@ -5,8 +5,9 @@
  * and graph visualizations to SVG format.
  */
 
-import { ENTITY_TYPE_COLORS as HASH_BASED_ENTITY_COLORS } from '@/styles/hash-colors';
 import type { AutocompleteResult, GraphEdge, GraphNode } from '@bibgraph/types';
+
+import { ENTITY_TYPE_COLORS as HASH_BASED_ENTITY_COLORS } from '@/styles/hash-colors';
 
 /**
  * Convert search results to CSV format

@@ -11,8 +11,8 @@ import {
   Stack,
   Text,
 } from "@mantine/core";
+import { IconCheck, IconDownload } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
-import { IconAlertCircle, IconCheck, IconDownload } from "@tabler/icons-react";
 import React, { useState } from "react";
 
 import { ICON_SIZE } from '@/config/style-constants';

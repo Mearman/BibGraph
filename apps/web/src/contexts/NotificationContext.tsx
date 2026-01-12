@@ -6,7 +6,7 @@
  */
 
 import { type NotificationData, notifications } from '@mantine/notifications';
-import React, { createContext, use, useCallback, useState } from 'react';
+import React, { createContext, use, useCallback, useMemo,useState } from 'react';
 
 export type NotificationCategory = 'success' | 'error' | 'info' | 'warning';
 
@@ -95,7 +95,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const unreadCount = appNotifications.filter((n) => !n.read).length;
 
-  const value: NotificationContextValue = {
+  const value: NotificationContextValue = useMemo(() => ({
     notifications: appNotifications,
     unreadCount,
     showNotification,
@@ -103,7 +103,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     markAllAsRead,
     dismissNotification,
     clearAll,
-  };
+  }), [appNotifications, unreadCount, showNotification, markAsRead, markAllAsRead, dismissNotification, clearAll]);
 
   return (
     <NotificationContext value={value}>

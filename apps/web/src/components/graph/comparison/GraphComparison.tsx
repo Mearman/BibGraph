@@ -13,7 +13,6 @@ import {
   ActionIcon,
   Badge,
   Box,
-  Button,
   Card,
   Container,
   Flex,
@@ -24,21 +23,17 @@ import {
   Tooltip,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { notifications } from '@mantine/notifications';
 import {
-  IconArrowLeft,
   IconArrowsLeftRight,
   IconMinus,
   IconPlus,
-  IconRefresh,
   IconX,
 } from '@tabler/icons-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 
+import { OptimizedForceGraphVisualization } from '@/components/graph/OptimizedForceGraphVisualization';
 import { ICON_SIZE } from '@/config/style-constants';
 import { type GraphLayoutType, useGraphLayout } from '@/hooks/useGraphLayout';
-import { OptimizedForceGraphVisualization } from '@/components/graph/OptimizedForceGraphVisualization';
-import type { DisplayMode } from '@/components/graph/types';
 
 interface GraphComparisonProps {
   /** Left graph nodes */

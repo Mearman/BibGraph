@@ -46,6 +46,19 @@ export const useUndoRedo = <T = unknown>(options: UseUndoRedoOptions = {}): UseU
   const [future, setFuture] = useState<UndoableAction<T>[]>([]);
   const isOperatingRef = useRef(false);
 
+  const performOperation = async (
+    operation: () => Promise<void>,
+    cleanup: () => void
+  ): Promise<void> => {
+    isOperatingRef.current = true;
+    try {
+      await operation();
+    } finally {
+      cleanup();
+      isOperatingRef.current = false;
+    }
+  };
+
   const canUndo = past.length > 0;
   const canRedo = future.length > 0;
 
@@ -55,17 +68,15 @@ export const useUndoRedo = <T = unknown>(options: UseUndoRedoOptions = {}): UseU
   const undo = useCallback(async () => {
     if (!canUndo || isOperatingRef.current) return;
 
-    isOperatingRef.current = true;
-
-    try {
-      const action = past[past.length - 1];
-      await action.undo();
-
-      setPast((prev) => prev.slice(0, -1));
-      setFuture((prev) => [action, ...prev]);
-    } finally {
-      isOperatingRef.current = false;
-    }
+    const action = past[past.length - 1];
+    await performOperation(
+      async () => {
+        await action.undo();
+        setPast((prev) => prev.slice(0, -1));
+        setFuture((prev) => [action, ...prev]);
+      },
+      () => {}
+    );
   }, [past, canUndo]);
 
   /**
@@ -74,17 +85,15 @@ export const useUndoRedo = <T = unknown>(options: UseUndoRedoOptions = {}): UseU
   const redo = useCallback(async () => {
     if (!canRedo || isOperatingRef.current) return;
 
-    isOperatingRef.current = true;
-
-    try {
-      const action = future[0];
-      await action.redo();
-
-      setFuture((prev) => prev.slice(1));
-      setPast((prev) => [...prev, action]);
-    } finally {
-      isOperatingRef.current = false;
-    }
+    const action = future[0];
+    await performOperation(
+      async () => {
+        await action.redo();
+        setFuture((prev) => prev.slice(1));
+        setPast((prev) => [...prev, action]);
+      },
+      () => {}
+    );
   }, [future, canRedo]);
 
   /**
@@ -121,10 +130,7 @@ export const useUndoRedo = <T = unknown>(options: UseUndoRedoOptions = {}): UseU
       if (cmdOrCtrl && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         undo();
-      } else if (cmdOrCtrl && e.key === 'z' && e.shiftKey) {
-        e.preventDefault();
-        redo();
-      } else if (cmdOrCtrl && e.key === 'y') {
+      } else if (cmdOrCtrl && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
         e.preventDefault();
         redo();
       }
@@ -171,4 +177,3 @@ export const useUndoRedo = <T = unknown>(options: UseUndoRedoOptions = {}): UseU
  * };
  * ```
  */
-export default useUndoRedo;

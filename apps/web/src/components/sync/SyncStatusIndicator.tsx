@@ -7,7 +7,6 @@
 
 import { Badge, Box, Group, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import {
-  IconAlertTriangle,
   IconCheck,
   IconCloudOff,
   IconLoader,
@@ -145,4 +144,3 @@ export const SyncStatusIndicator = memo(() => {
 
 SyncStatusIndicator.displayName = 'SyncStatusIndicator';
 
-export default SyncStatusIndicator;

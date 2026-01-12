@@ -5,7 +5,7 @@
  * Tracks active operations and shows visual indicators for sync state.
  */
 
-import React, { createContext, use, useCallback, useEffect, useState } from 'react';
+import React, { createContext, use, useCallback, useEffect, useMemo,useState } from 'react';
 
 import type { SyncOperation, SyncStatus, SyncStatusType } from '@/types/sync';
 
@@ -93,44 +93,49 @@ export const SyncStatusProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   // Auto-remove successful operations after 5 seconds
+  const shouldKeepOp = useCallback((op: SyncOperation, now: Date) => {
+    if (!op.endTime) return true;
+    const age = now.getTime() - op.endTime.getTime();
+    return age < 5000 || op.status === 'error';
+  }, []);
+
+  const filterActiveOps = useCallback((ops: SyncOperation[]) => {
+    return ops.filter((op) => op.status === 'syncing');
+  }, []);
+
+  const filterAndTrimCompletedOps = useCallback((ops: SyncOperation[], now: Date) => {
+    const completed = ops.filter((op) => op.status !== 'syncing');
+    const recentCompleted = completed.filter((op) => shouldKeepOp(op, now));
+    return recentCompleted.slice(0, MAX_HISTORY);
+  }, [shouldKeepOp]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
       setOperations((prev) => {
-        const active = prev.filter((op) => op.status === 'syncing');
-        const completed = prev.filter((op) => op.status !== 'syncing');
-
-        // Remove successful ops older than 5 seconds
-        const recentCompleted = completed.filter((op) => {
-          if (!op.endTime) return true;
-          const age = now.getTime() - op.endTime.getTime();
-          return age < 5000 || op.status === 'error';
-        });
-
-        // Keep only last MAX_HISTORY completed operations
-        const trimmedCompleted = recentCompleted.slice(0, MAX_HISTORY);
-
+        const active = filterActiveOps(prev);
+        const trimmedCompleted = filterAndTrimCompletedOps(prev, now);
         return [...active, ...trimmedCompleted];
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [filterActiveOps, filterAndTrimCompletedOps]);
 
-  const syncStatus: SyncStatus = {
+  const syncStatus: SyncStatus = useMemo(() => ({
     overall,
     operations,
     lastSyncTime: operations.find((op) => op.status === 'success')?.endTime,
     isOnline,
-  };
+  }), [overall, operations, isOnline]);
 
-  const value: SyncStatusContextValue = {
+  const value: SyncStatusContextValue = useMemo(() => ({
     syncStatus,
     startOperation,
     updateOperation,
     completeOperation,
     clearCompleted,
-  };
+  }), [syncStatus, startOperation, updateOperation, completeOperation, clearCompleted]);
 
   return (
     <SyncStatusContext value={value}>
@@ -147,4 +152,3 @@ export const useSyncStatus = (): SyncStatusContextValue => {
   return context;
 };
 
-export default SyncStatusContext;

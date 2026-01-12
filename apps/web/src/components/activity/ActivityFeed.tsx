@@ -109,8 +109,9 @@ export const ActivityFeed = memo(({ maxItems = 20, filter }: ActivityFeedProps) 
   const { activities, clearActivities, getActivityCount } = useActivity();
 
   // Filter activities if filter provided
-  const filteredActivities = filter?.categories && filter.categories.length > 0
-    ? activities.filter(a => filter.categories!.includes(a.category))
+  const filterCategories = filter?.categories;
+  const filteredActivities = filterCategories && filterCategories.length > 0
+    ? activities.filter(a => filterCategories.includes(a.category))
     : activities;
 
   // Limit to maxItems
@@ -171,4 +172,3 @@ export const ActivityFeed = memo(({ maxItems = 20, filter }: ActivityFeedProps) 
 
 ActivityFeed.displayName = 'ActivityFeed';
 
-export default ActivityFeed;

@@ -5,10 +5,10 @@
  * Shows recent searches with ability to re-run or remove them.
  */
 
-import { ActionIcon, Box, Group, Menu, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core';
+import { ActionIcon, Group, Menu, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import { IconClock, IconHistory, IconTrash, IconX } from '@tabler/icons-react';
 
-import { BORDER_STYLE_GRAY_3, ICON_SIZE } from '@/config/style-constants';
+import { ICON_SIZE } from '@/config/style-constants';
 import { useSearchHistory } from '@/hooks/useSearchHistory';
 
 interface SearchHistoryDropdownProps {
@@ -112,7 +112,7 @@ export const SearchHistoryDropdown: React.FC<SearchHistoryDropdownProps> = ({
                       variant="transparent"
                       color="gray"
                       size="xs"
-                      onClick={(e) => void handleRemoveQuery(entry.id, e)}
+                      onClick={(e) => entry.id && void handleRemoveQuery(entry.id, e)}
                     >
                       <IconX size={ICON_SIZE.XS} />
                     </ActionIcon>

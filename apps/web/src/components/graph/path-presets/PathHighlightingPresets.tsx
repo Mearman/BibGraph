@@ -11,10 +11,9 @@
  */
 
 import type { GraphEdge, GraphNode } from '@bibgraph/types';
-import { Group, SegmentedControl, Stack, Text, Tooltip } from '@mantine/core';
-import { useCallback, useMemo } from 'react';
+import { Group, SegmentedControl, Text, Tooltip } from '@mantine/core';
+import { useMemo } from 'react';
 
-import { ICON_SIZE } from '@/config/style-constants';
 import { findReachableNodes, type PathPreset } from '@/lib/path-presets';
 
 interface PathHighlightingPresetsProps {
@@ -66,9 +65,9 @@ export const PathHighlightingPresets: React.FC<PathHighlightingPresetsProps> = (
   pathTarget,
   nodes,
   edges,
-  onHighlightNodes,
-  onHighlightPath,
-  onClearHighlights,
+  onHighlightNodes: _onHighlightNodes,
+  onHighlightPath: _onHighlightPath,
+  onClearHighlights: _onClearHighlights,
 }) => {
   // Build graph adjacency map for pathfinding
   const graph = useMemo(() => {
@@ -91,57 +90,6 @@ export const PathHighlightingPresets: React.FC<PathHighlightingPresetsProps> = (
 
     return adjacency;
   }, [nodes, edges]);
-
-  // Find and highlight paths based on preset
-  const applyPreset = useCallback(() => {
-    if (!pathSource && preset !== 'shortest' && preset !== 'all-paths') {
-      // For incoming/outgoing paths, we need at least source or target
-      return;
-    }
-
-    if (preset === 'shortest') {
-      // Use existing shortest path logic (handled by pathSource/pathTarget)
-      if (pathSource && pathTarget) {
-        const path = findReachableNodes(graph, pathSource, pathTarget, 1);
-        if (path.length > 0) {
-          onHighlightPath(path);
-        }
-      }
-    } else if (preset === 'outgoing-paths') {
-      // Find all nodes reachable from source
-      if (pathSource) {
-        const reachableNodes = findReachableNodes(graph, pathSource);
-        onHighlightNodes(reachableNodes);
-      }
-    } else if (preset === 'incoming-paths') {
-      // Find all nodes that can reach target
-      // This requires reversing the graph
-      if (pathTarget) {
-        const reversedGraph = new Map<string, Set<string>>();
-
-        // Build reversed adjacency list
-        graph.forEach((neighbors, nodeId) => {
-          reversedGraph.set(nodeId, new Set());
-        });
-
-        graph.forEach((neighbors, fromNode) => {
-          neighbors.forEach((toNode) => {
-            if (reversedGraph.has(toNode)) {
-              reversedGraph.get(toNode)?.add(fromNode);
-            }
-          });
-        });
-
-        const incomingNodes = findReachableNodes(reversedGraph, pathTarget);
-        onHighlightNodes(incomingNodes);
-      }
-    } else if (preset === 'all-paths' && pathSource && pathTarget) {
-      // Find all nodes on all paths between source and target
-      // This is a complex problem - for now, highlight nodes within 2 hops of shortest path
-      const pathNodes = findReachableNodes(graph, pathSource, pathTarget, 3);
-      onHighlightNodes(pathNodes);
-    }
-  }, [preset, pathSource, pathTarget, graph, onHighlightNodes, onHighlightPath]);
 
   // Calculate path count
   const pathCount = useMemo(() => {

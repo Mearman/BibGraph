@@ -169,7 +169,7 @@ NotificationItem.displayName = 'NotificationItem';
 
 export const NotificationCenter = memo(() => {
   const { notifications: allNotifications, unreadCount, markAsRead, markAllAsRead, dismissNotification, clearAll } = useNotifications();
-  const [opened, { toggle, close }] = useDisclosure(false);
+  const [opened, { toggle }] = useDisclosure(false);
 
   return (
     <Menu

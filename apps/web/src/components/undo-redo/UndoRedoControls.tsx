@@ -7,14 +7,18 @@
 
 import {
   ActionIcon,
-  Box,
   Group,
   Menu,
   Stack,
   Text,
   Tooltip,
 } from '@mantine/core';
-import { IconArrowBackUp, IconArrowForwardUp,IconHistory, IconRefresh, IconTrash } from '@tabler/icons-react';
+import {
+  IconArrowBackUp,
+  IconArrowForwardUp,
+  IconHistory,
+  IconTrash,
+} from '@tabler/icons-react';
 import { memo } from 'react';
 
 import { ICON_SIZE } from '@/config/style-constants';
@@ -86,4 +90,3 @@ export const UndoRedoControls = memo(() => {
 
 UndoRedoControls.displayName = 'UndoRedoControls';
 
-export default UndoRedoControls;

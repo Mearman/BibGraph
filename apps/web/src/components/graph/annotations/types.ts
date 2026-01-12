@@ -118,19 +118,17 @@ export type SerializableAnnotation = Omit<AnyAnnotation, 'createdAt' | 'updatedA
  * Convert annotation to serializable format
  * @param annotation
  */
-export function serializeAnnotation(annotation: AnyAnnotation): SerializableAnnotation {
-  return {
+export const serializeAnnotation = (annotation: AnyAnnotation): SerializableAnnotation => ({
     ...annotation,
     createdAt: annotation.createdAt.toISOString(),
     updatedAt: annotation.updatedAt.toISOString(),
-  };
-}
+  });
 
 /**
  * Convert serializable annotation back to annotation
  * @param serializable
  */
-export function deserializeAnnotation(serializable: SerializableAnnotation): AnyAnnotation {
+export const deserializeAnnotation = (serializable: SerializableAnnotation): AnyAnnotation => {
   const base = {
     ...serializable,
     createdAt: new Date(serializable.createdAt),
@@ -148,4 +146,4 @@ export function deserializeAnnotation(serializable: SerializableAnnotation): Any
     case 'drawing':
       return base as DrawingAnnotation;
   }
-}
+};

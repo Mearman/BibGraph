@@ -5,7 +5,7 @@
  * Tracks user actions like create, update, delete, navigate, search, export, import.
  */
 
-import React, { createContext, use, useCallback, useState } from 'react';
+import React, { createContext, use, useCallback, useMemo,useState } from 'react';
 
 import type { Activity, ActivityCategory, ActivityFilter } from '@/types/activity';
 
@@ -46,17 +46,19 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     let filtered = [...activities];
 
     // Filter by category
-    if (filter.categories && filter.categories.length > 0) {
-      filtered = filtered.filter((a) => filter.categories!.includes(a.category));
+    const categories = filter.categories;
+    if (categories && categories.length > 0) {
+      filtered = filtered.filter((a) => categories.includes(a.category));
     }
 
     // Filter by date range
-    if (filter.dateRange) {
+    const dateRange = filter.dateRange;
+    if (dateRange) {
       filtered = filtered.filter((a) => {
         const timestamp = a.timestamp.getTime();
         return (
-          timestamp >= filter.dateRange!.start.getTime() &&
-          timestamp <= filter.dateRange!.end.getTime()
+          timestamp >= dateRange.start.getTime() &&
+          timestamp <= dateRange.end.getTime()
         );
       });
     }
@@ -79,13 +81,13 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return activities.length;
   }, [activities]);
 
-  const value: ActivityContextValue = {
+  const value: ActivityContextValue = useMemo(() => ({
     activities,
     addActivity,
     clearActivities,
     filteredActivities,
     getActivityCount,
-  };
+  }), [activities, addActivity, clearActivities, filteredActivities, getActivityCount]);
 
   return (
     <ActivityContext value={value}>
@@ -102,4 +104,3 @@ export const useActivity = (): ActivityContextValue => {
   return context;
 };
 
-export default ActivityContext;
