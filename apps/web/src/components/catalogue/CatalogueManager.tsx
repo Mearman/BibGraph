@@ -32,6 +32,7 @@ import {
   IconDatabase,
   IconDownload,
   IconEdit,
+  IconFileText,
   IconGitMerge,
   IconList,
   IconPlus,
@@ -45,6 +46,7 @@ import React, { useEffect,useState } from "react";
 import { CacheTierLists } from "@/components/catalogue/CacheTierLists";
 import { CatalogueEntities } from "@/components/catalogue/CatalogueEntities";
 import { CatalogueListComponent } from "@/components/catalogue/CatalogueList";
+import { CitationStylePreview } from "@/components/catalogue/CitationStylePreview";
 import { CreateListModal } from "@/components/catalogue/CreateListModal";
 import { ExportModal } from "@/components/catalogue/ExportModal";
 import { ImportModal } from "@/components/catalogue/ImportModal";
@@ -94,6 +96,7 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
   const [showExportModal, setShowExportModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
+  const [showCitationModal, setShowCitationModal] = useState(false);
   const [shareUrl, setShareUrl] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
@@ -553,6 +556,16 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
                 <Button
                   variant="light"
                   size="sm"
+                  onClick={() => setShowCitationModal(true)}
+                  leftSection={<IconFileText size={ICON_SIZE.MD} />}
+                  data-testid="citation-list-button"
+                  aria-label="Preview citations in different styles"
+                >
+                  Citations
+                </Button>
+                <Button
+                  variant="light"
+                  size="sm"
                   onClick={handleShare}
                   leftSection={<IconShare size={ICON_SIZE.MD} />}
                   data-testid="share-list-button"
@@ -734,6 +747,23 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
               list={selectedList}
               entities={entities}
               onClose={() => setShowAnalyticsModal(false)}
+            />
+          )}
+        </Modal>
+
+        <Modal
+          opened={showCitationModal}
+          onClose={() => setShowCitationModal(false)}
+          title="Citation Style Preview"
+          size="xl"
+          trapFocus
+          returnFocus
+        >
+          {selectedList && (
+            <CitationStylePreview
+              entities={entities}
+              listTitle={selectedList.title}
+              onClose={() => setShowCitationModal(false)}
             />
           )}
         </Modal>
