@@ -123,6 +123,10 @@ export interface OptimizedForceGraphVisualizationProps {
   seed?: number;
   /** Callback when graph methods become available (for external control like zoomToFit) */
   onGraphReady?: (methods: ForceGraphMethods) => void;
+  /** Callback when zoom level changes */
+  onZoom?: (zoom: number) => void;
+  /** Callback when pan position changes */
+  onPan?: (x: number, y: number) => void;
   /** Enable performance optimizations */
   enableOptimizations?: boolean;
   /** Progressive loading configuration */
@@ -165,6 +169,8 @@ export const OptimizedForceGraphVisualization = ({
   nodePositions,
   seed,
   onGraphReady,
+  onZoom,
+  onPan,
   enableOptimizations = true,
   progressiveLoading = DEFAULT_PROGRESSIVE_LOADING,
 }: OptimizedForceGraphVisualizationProps) => {
@@ -503,6 +509,9 @@ export const OptimizedForceGraphVisualization = ({
         // Use zoom method if available, otherwise use default
         const zoom = typeof graphRef.current.zoom === 'function' ? graphRef.current.zoom() : 1;
 
+        // Notify parent component of zoom change
+        onZoom?.(zoom);
+
         // For camera position, use defaults if method not available
         const x = 0;
         const y = 0;
@@ -520,12 +529,51 @@ export const OptimizedForceGraphVisualization = ({
         // Camera might not be ready
       }
     }
-  }, [enableOptimizations, containerWidth, height]);
+  }, [enableOptimizations, containerWidth, height, onZoom]);
 
   // Performance monitoring toggle
   const handlePerformanceToggle = useCallback(() => {
     setShowPerformanceStats(prev => !prev);
   }, []);
+
+  // Track camera pan position for mini-map
+  useEffect(() => {
+    if (!onPan || !containerRef.current) return;
+
+    // Poll for camera position changes
+    const interval = setInterval(() => {
+      try {
+        // Access canvas through container
+        const canvas = containerRef.current?.querySelector('canvas') as HTMLCanvasElement;
+        if (!canvas) return;
+
+        // Get transformation matrix from canvas
+        const transform = canvas.style.transform;
+        if (!transform) return;
+
+        // Parse transform: "translate(x, y) scale(z)"
+        // Split by parentheses to extract translate values
+        const translateStart = transform.indexOf('translate(');
+        if (translateStart === -1) return;
+
+        const translateEnd = transform.indexOf(')', translateStart);
+        if (translateEnd === -1) return;
+
+        const valuesStr = transform.slice(translateStart + 10, translateEnd);
+        const values = valuesStr.split(',').map(v => v.trim());
+
+        if (values.length >= 2) {
+          const panX = Number.parseFloat(values[0]) || 0;
+          const panY = Number.parseFloat(values[1]) || 0;
+          onPan(panX, panY);
+        }
+      } catch {
+        // Canvas might not be ready or transform not available
+      }
+    }, 100); // Poll every 100ms
+
+    return () => clearInterval(interval);
+  }, [onPan]);
 
   return (
     <Box ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%' }}>

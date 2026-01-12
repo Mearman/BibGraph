@@ -48,9 +48,10 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { type ForceGraphMethods } from 'react-force-graph-2d';
 
 import { ForceGraph3DVisualization } from '@/components/graph/3d/ForceGraph3DVisualization';
-import { GraphEmptyState } from '@/components/graph/GraphEmptyState';
-import { GraphSourcePanel } from '@/components/graph/GraphSourcePanel';
 import { GraphAnnotations } from '@/components/graph/annotations';
+import { GraphEmptyState } from '@/components/graph/GraphEmptyState';
+import { GraphMiniMap } from '@/components/graph/GraphMiniMap';
+import { GraphSourcePanel } from '@/components/graph/GraphSourcePanel';
 import { LayoutSelector } from '@/components/graph/LayoutSelector';
 import {
   type ContextMenuState,
@@ -63,8 +64,8 @@ import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 import { ICON_SIZE, LAYOUT } from '@/config/style-constants';
 import { useGraphVisualizationContext } from '@/contexts/GraphVisualizationContext';
 import { type GraphMethods, useFitToView } from '@/hooks/useFitToView';
-import { type GraphLayoutType,useGraphLayout } from '@/hooks/useGraphLayout';
 import { useGraphAnnotations } from '@/hooks/useGraphAnnotations';
+import { type GraphLayoutType,useGraphLayout } from '@/hooks/useGraphLayout';
 import { useNodeExpansion } from '@/lib/graph-index';
 
 /**
@@ -140,6 +141,9 @@ const EntityGraphPage = () => {
   // Annotations state
   const [showAnnotations, setShowAnnotations] = useState(false);
   const annotations = useGraphAnnotations(); // No graphId - annotations are local for now
+
+  // Mini-map state
+  const [cameraPosition, setCameraPosition] = useState({ zoom: 1, panX: 0, panY: 0 });
 
   // Fit-to-view operations (shared logic for 2D/3D)
   const { fitToViewAll, fitToViewSelected } = useFitToView({
@@ -222,6 +226,23 @@ const EntityGraphPage = () => {
       setEnableSimulation(false);
     }
   }, [layout, setEnableSimulation]);
+
+  // Handle camera position changes for mini-map
+  const handleZoomChange = useCallback((zoom: number) => {
+    setCameraPosition(prev => ({ ...prev, zoom }));
+  }, []);
+
+  const handlePanChange = useCallback((panX: number, panY: number) => {
+    setCameraPosition(prev => ({ ...prev, panX, panY }));
+  }, []);
+
+  // Handle mini-map pan click
+  const handleMiniMapPan = useCallback((x: number, y: number) => {
+    // Use the force graph methods to pan to the clicked position
+    if (graphMethodsRef.current && typeof graphMethodsRef.current.centerAt === 'function') {
+      graphMethodsRef.current.centerAt(x, y, 500); // 500ms transition
+    }
+  }, []);
 
   // Convert expandingNodeIds array to Set for visualization components
   const expandingNodeIdsSet = useMemo(() => new Set(expandingNodeIds), [expandingNodeIds]);
@@ -531,6 +552,8 @@ const EntityGraphPage = () => {
                     onNodeRightClick={handleNodeRightClick}
                     onBackgroundClick={handleBackgroundClick}
                     onGraphReady={handleGraphReady}
+                    onZoom={handleZoomChange}
+                    onPan={handlePanChange}
                     enableOptimizations={true}
                     progressiveLoading={{
                       enabled: true,
@@ -581,6 +604,19 @@ const EntityGraphPage = () => {
                     onClearAnnotations={async () => {
                       await annotations.clearAnnotations();
                     }}
+                  />
+                )}
+
+                {/* Mini-map (2D only, shows when graph has 100+ nodes) */}
+                {viewMode === '2D' && (
+                  <GraphMiniMap
+                    nodes={nodes}
+                    containerWidth={graphContainerRef.current?.clientWidth ?? 800}
+                    containerHeight={typeof window !== 'undefined' ? window.innerHeight * 0.55 : 500}
+                    zoom={cameraPosition.zoom}
+                    panX={cameraPosition.panX}
+                    panY={cameraPosition.panY}
+                    onPan={handleMiniMapPan}
                   />
                 )}
               </Box>
