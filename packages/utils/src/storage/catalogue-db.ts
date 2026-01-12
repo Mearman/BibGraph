@@ -61,6 +61,7 @@ export const SPECIAL_LIST_IDS = {
   BOOKMARKS: "bookmarks-list",
   HISTORY: "history-list",
   GRAPH: "graph-list",
+  SEARCH_HISTORY: "search-history",
 } as const;
 
 export const SPECIAL_LIST_TYPES = {

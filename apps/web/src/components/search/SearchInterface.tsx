@@ -6,8 +6,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
 import { useSearchHotkeys } from "@/hooks/use-hotkeys";
+import { useSearchHistory } from "@/hooks/useSearchHistory";
 import { announceToScreenReader } from "@/utils/accessibility";
 
+import { SearchHistoryDropdown } from "./SearchHistoryDropdown";
 import { AdvancedSearchFilters,SearchFilters } from "./SearchFilters";
 
 interface SearchFilters {
@@ -35,6 +37,7 @@ export const SearchInterface = ({
   const [searchTip, setSearchTip] = useState("");
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedSearchFilters>({});
   const [showFilters, setShowFilters] = useState(false);
+  const { addSearchQuery } = useSearchHistory();
 
   // Set up keyboard shortcuts for search
   useSearchHotkeys(
@@ -48,13 +51,14 @@ export const SearchInterface = ({
       advanced: showFilters && Object.keys(advancedFilters).length > 0 ? advancedFilters : undefined,
     };
 
-    // Announce search to screen readers
+    // Add to search history
     if (filters.query) {
+      void addSearchQuery(filters.query);
       announceToScreenReader(`Searching for: ${filters.query}`);
     }
 
     onSearch(filters);
-  }, [query, advancedFilters, showFilters, onSearch]);
+  }, [query, advancedFilters, showFilters, onSearch, addSearchQuery]);
 
   const handleQueryChange = useCallback((value: string) => {
     setQuery(value);
@@ -65,10 +69,20 @@ export const SearchInterface = ({
           query: normalizeSearchQuery(value),
           advanced: showFilters && Object.keys(advancedFilters).length > 0 ? advancedFilters : undefined,
         };
+        // Add to search history for debounced searches too
+        void addSearchQuery(filters.query);
         onSearch(filters);
       }, value);
     }
-  }, [onSearch, advancedFilters, showFilters]);
+  }, [onSearch, advancedFilters, showFilters, addSearchQuery]);
+
+  const handleHistoryQuerySelect = useCallback((selectedQuery: string) => {
+    setQuery(selectedQuery);
+    handleQueryChange(selectedQuery);
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [handleQueryChange]);
 
   const handleFiltersChange = useCallback((filters: AdvancedSearchFilters) => {
     setAdvancedFilters(filters);
@@ -251,6 +265,7 @@ export const SearchInterface = ({
           >
             Search
           </Button>
+          <SearchHistoryDropdown onSearchQuerySelect={handleHistoryQuerySelect} />
         </Group>
 
         {/* Search Status */}
