@@ -26,7 +26,6 @@ export const useFieldFetch = ({
 
   const fetchField = useCallback(
     async (fieldName: string) => {
-      console.log('[useFieldFetch] fetchField called', { fieldName, entityId, entityType });
       setIsFetching(true);
       setError(null);
 
@@ -46,7 +45,6 @@ export const useFieldFetch = ({
           },
         });
 
-        console.log('[useFieldFetch] API call successful', { fieldName, result });
         logger.debug("api", "Successfully fetched field", {
           entityId,
           entityType,
@@ -55,14 +53,12 @@ export const useFieldFetch = ({
         });
 
         if (result && onSuccess) {
-          console.log('[useFieldFetch] Calling onSuccess callback', { result });
           onSuccess(result);
         }
 
         return result;
       } catch (err) {
         const error = err instanceof Error ? err : new Error("Failed to fetch field");
-        console.error('[useFieldFetch] API call failed', { fieldName, error });
         logger.error("api", "Failed to fetch field", {
           entityId,
           entityType,

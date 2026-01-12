@@ -5,6 +5,7 @@
  * using localStorage for cross-session persistence.
  */
 
+import { logger } from "@bibgraph/utils";
 import { useCallback, useEffect, useRef,useState } from 'react';
 
 export interface CameraState {
@@ -139,7 +140,7 @@ export const useCameraPersistence = (options: UseCameraPersistenceOptions = {}):
         latestStateRef.current = parsed;
       }
     } catch (error) {
-      console.warn('Failed to load camera state:', error);
+      logger.warn("camera", "Failed to load camera state", { error });
     }
     setIsLoaded(true);
   }, [storageKey, enabled]);
@@ -151,7 +152,7 @@ export const useCameraPersistence = (options: UseCameraPersistenceOptions = {}):
     try {
       localStorage.setItem(storageKey, JSON.stringify(state));
     } catch (error) {
-      console.warn('Failed to save camera state:', error);
+      logger.warn("camera", "Failed to save camera state", { error });
     }
   }, [storageKey, enabled]);
 

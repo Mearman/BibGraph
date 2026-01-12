@@ -167,10 +167,10 @@ export const NetworkProvider = ({
   const [showOfflineModal, setShowOfflineModal] = useState<boolean>(false);
 
   // Refs for performance tracking
-  const responseTimes = useRef<number[]>([]);
-  const totalRequests = useRef<number>(0);
-  const successfulRequests = useRef<number>(0);
-  const retryTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const responseTimesRef = useRef<number[]>([]);
+  const totalRequestsRef = useRef<number>(0);
+  const successfulRequestsRef = useRef<number>(0);
+  const retryTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Network monitoring
   const checkNetworkStatus = useCallback(async () => {
@@ -185,12 +185,12 @@ export const NetworkProvider = ({
       const responseTime = endTime - startTime;
 
       if (response.ok) {
-        responseTimes.current.push(responseTime);
-        if (responseTimes.current.length > 10) {
-          responseTimes.current = responseTimes.current.slice(-10);
+        responseTimesRef.current.push(responseTime);
+        if (responseTimesRef.current.length > 10) {
+          responseTimesRef.current = responseTimesRef.current.slice(-10);
         }
 
-        const avgTime = responseTimes.current.reduce((a, b) => a + b, 0) / responseTimes.current.length;
+        const avgTime = responseTimesRef.current.reduce((a, b) => a + b, 0) / responseTimesRef.current.length;
         setAverageResponseTime(avgTime);
 
         // Update status based on connection speed
@@ -224,16 +224,16 @@ export const NetworkProvider = ({
       setQueue(prev => prev.slice(1));
 
       // Clear retry timeout
-      const timeout = retryTimeouts.current.get(request.id);
+      const timeout = retryTimeoutsRef.current.get(request.id);
       if (timeout) {
         clearTimeout(timeout);
-        retryTimeouts.current.delete(request.id);
+        retryTimeoutsRef.current.delete(request.id);
       }
 
       // Update stats
       setConsecutiveFailures(0);
       setLastSuccessfulRequest(Date.now());
-      successfulRequests.current++;
+      successfulRequestsRef.current++;
 
       // Resolve request
       request.resolve(response);
@@ -249,7 +249,7 @@ export const NetworkProvider = ({
           processQueue();
         }, delay);
 
-        retryTimeouts.current.set(request.id, timeout);
+        retryTimeoutsRef.current.set(request.id, timeout);
 
         // Move to end of queue
         setQueue(prev => [...prev.slice(1), request]);
@@ -258,10 +258,10 @@ export const NetworkProvider = ({
         setQueue(prev => prev.slice(1));
         setFailedRequests(prev => prev + 1);
 
-        const timeout = retryTimeouts.current.get(request.id);
+        const timeout = retryTimeoutsRef.current.get(request.id);
         if (timeout) {
           clearTimeout(timeout);
-          retryTimeouts.current.delete(request.id);
+          retryTimeoutsRef.current.delete(request.id);
         }
 
         request.reject(error as Error);
@@ -303,14 +303,14 @@ export const NetworkProvider = ({
   // Clear all queued requests
   const clearQueue = useCallback(() => {
     queue.forEach(request => {
-      const timeout = retryTimeouts.current.get(request.id);
+      const timeout = retryTimeoutsRef.current.get(request.id);
       if (timeout) {
         clearTimeout(timeout);
       }
       request.reject(new Error('Queue cleared'));
     });
 
-    retryTimeouts.current.clear();
+    retryTimeoutsRef.current.clear();
     setQueue([]);
   }, [queue]);
 
@@ -329,8 +329,8 @@ export const NetworkProvider = ({
 
   // Get network statistics
   const getNetworkStats = useCallback(() => ({
-    totalRequests: totalRequests.current,
-    successfulRequests: successfulRequests.current,
+    totalRequests: totalRequestsRef.current,
+    successfulRequests: successfulRequestsRef.current,
     failedRequests: failedRequests,
     averageResponseTime
   }), [failedRequests, averageResponseTime]);
