@@ -12,6 +12,7 @@ import {
   Container,
   Group,
   Paper,
+  Select,
   SegmentedControl,
   SimpleGrid,
   Stack,
@@ -46,6 +47,16 @@ interface SearchFilters {
 }
 
 type ViewMode = "table" | "card" | "list";
+
+type SortOption = "relevance" | "citations" | "works" | "name" | "type";
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: "relevance", label: "Relevance" },
+  { value: "citations", label: "Most Cited" },
+  { value: "works", label: "Most Works" },
+  { value: "name", label: "Name (A-Z)" },
+  { value: "type", label: "Entity Type" },
+];
 
 // Calculate entity type breakdown from results
 const getEntityTypeBreakdown = (results: AutocompleteResult[]) => {
@@ -189,6 +200,9 @@ const SearchPage = () => {
 
   // View mode state
   const [viewMode, setViewMode] = useState<ViewMode>("table");
+
+  // Sort state
+  const [sortBy, setSortBy] = useState<SortOption>("relevance");
 
   // Entity type filter state
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -409,6 +423,25 @@ const SearchPage = () => {
     return searchResults.filter(result => selectedTypes.includes(result.entity_type));
   }, [searchResults, selectedTypes]);
 
+  // Sort and filter results by selected sort option
+  const sortedResults = useMemo(() => {
+    let results = filteredResults;
+
+    switch (sortBy) {
+      case "citations":
+        return [...results].sort((a, b) => (b.cited_by_count || 0) - (a.cited_by_count || 0));
+      case "works":
+        return [...results].sort((a, b) => (b.works_count || 0) - (a.works_count || 0));
+      case "name":
+        return [...results].sort((a, b) => a.display_name.localeCompare(b.display_name));
+      case "type":
+        return [...results].sort((a, b) => a.entity_type.localeCompare(b.entity_type));
+      case "relevance":
+      default:
+        return results; // Keep original order from API (relevance-sorted)
+    }
+  }, [filteredResults, sortBy]);
+
   // Calculate entity type breakdown
   const entityTypeBreakdown = useMemo(() => {
     return searchResults ? getEntityTypeBreakdown(searchResults) : [];
@@ -433,8 +466,6 @@ const SearchPage = () => {
     );
     if (!hasResults) return renderNoResultsState(searchFilters.query, handleQuickSearch);
 
-    const displayResults = selectedTypes.length > 0 ? filteredResults : searchResults;
-
     return (
       <Stack>
         {/* Enhanced Results Header */}
@@ -443,7 +474,7 @@ const SearchPage = () => {
           <Group justify="space-between" align="center" wrap="nowrap">
             <Group gap="md" align="center">
               <Text size="sm" fw={500}>
-                {displayResults.length} {displayResults.length === 1 ? 'result' : 'results'}
+                {sortedResults.length} {sortedResults.length === 1 ? 'result' : 'results'}
                 {selectedTypes.length > 0 && ` (filtered from ${searchResults.length})`}
               </Text>
               {searchDuration > 0 && (
@@ -455,32 +486,42 @@ const SearchPage = () => {
               )}
             </Group>
 
-            {/* View mode toggle */}
-            <SegmentedControl
-              value={viewMode}
-              onChange={(value) => setViewMode(value as ViewMode)}
-              data={[
-                {
-                  value: 'table',
-                  label: (
-                    <Tooltip label="Table view"><IconTable size={ICON_SIZE.SM} /></Tooltip>
-                  )
-                },
-                {
-                  value: 'card',
-                  label: (
-                    <Tooltip label="Card view"><IconLayoutGrid size={ICON_SIZE.SM} /></Tooltip>
-                  )
-                },
-                {
-                  value: 'list',
-                  label: (
-                    <Tooltip label="List view"><IconList size={ICON_SIZE.SM} /></Tooltip>
-                  )
-                },
-              ]}
-              size="xs"
-            />
+            {/* View mode toggle and sort selector */}
+            <Group gap="sm">
+              <Select
+                size="xs"
+                value={sortBy}
+                onChange={(value) => setSortBy(value as SortOption)}
+                data={SORT_OPTIONS}
+                style={{ width: 140 }}
+                allowDeselect={false}
+              />
+              <SegmentedControl
+                value={viewMode}
+                onChange={(value) => setViewMode(value as ViewMode)}
+                data={[
+                  {
+                    value: 'table',
+                    label: (
+                      <Tooltip label="Table view"><IconTable size={ICON_SIZE.SM} /></Tooltip>
+                    )
+                  },
+                  {
+                    value: 'card',
+                    label: (
+                      <Tooltip label="Card view"><IconLayoutGrid size={ICON_SIZE.SM} /></Tooltip>
+                    )
+                  },
+                  {
+                    value: 'list',
+                    label: (
+                      <Tooltip label="List view"><IconList size={ICON_SIZE.SM} /></Tooltip>
+                    )
+                  },
+                ]}
+                size="xs"
+              />
+            </Group>
           </Group>
 
           {/* Entity type breakdown and filter chips */}
@@ -600,7 +641,7 @@ const SearchPage = () => {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {displayResults.map((result) => {
+              {sortedResults.map((result) => {
               const entityUrl = convertToRelativeUrl(result.id);
               const inGraph = isInGraph(result.id);
               return (
@@ -664,7 +705,7 @@ const SearchPage = () => {
 
         {viewMode === "card" && (
           <SimpleGrid cols={{ base: 1, xs: 2, sm: 2, md: 3, lg: 4 }} spacing="md">
-            {displayResults.map((result) => {
+            {sortedResults.map((result) => {
               const entityUrl = convertToRelativeUrl(result.id);
               const inGraph = isInGraph(result.id);
               return (
@@ -717,7 +758,7 @@ const SearchPage = () => {
 
         {viewMode === "list" && (
           <Stack gap="xs">
-            {displayResults.map((result) => {
+            {sortedResults.map((result) => {
               const entityUrl = convertToRelativeUrl(result.id);
               const inGraph = isInGraph(result.id);
               return (
