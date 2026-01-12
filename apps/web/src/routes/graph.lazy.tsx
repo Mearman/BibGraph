@@ -13,6 +13,7 @@
  * @module routes/graph
  */
 
+import type { GraphNode } from '@bibgraph/types';
 import {
   ActionIcon,
   Alert,
@@ -50,8 +51,8 @@ import { type ForceGraphMethods } from 'react-force-graph-2d';
 import { ForceGraph3DVisualization } from '@/components/graph/3d/ForceGraph3DVisualization';
 import { GraphAnnotations } from '@/components/graph/annotations';
 import { GraphEmptyState } from '@/components/graph/GraphEmptyState';
+import { GraphLegend } from '@/components/graph/GraphLegend';
 import { GraphMiniMap } from '@/components/graph/GraphMiniMap';
-import { GraphSnapshots } from '@/components/graph/snapshots';
 import { GraphSourcePanel } from '@/components/graph/GraphSourcePanel';
 import { LayoutSelector } from '@/components/graph/LayoutSelector';
 import {
@@ -60,14 +61,13 @@ import {
   NodeContextMenu,
 } from '@/components/graph/NodeContextMenu';
 import { OptimizedForceGraphVisualization } from '@/components/graph/OptimizedForceGraphVisualization';
+import { GraphSnapshots } from '@/components/graph/snapshots';
 import type { DisplayMode } from '@/components/graph/types';
 import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 import { ICON_SIZE, LAYOUT } from '@/config/style-constants';
-import type { GraphNode } from '@bibgraph/types';
 import { useGraphVisualizationContext } from '@/contexts/GraphVisualizationContext';
 import { type GraphMethods, useFitToView } from '@/hooks/useFitToView';
 import { useGraphAnnotations } from '@/hooks/useGraphAnnotations';
-import { useGraphSnapshots } from '@/hooks/useGraphSnapshots';
 import { type GraphLayoutType,useGraphLayout } from '@/hooks/useGraphLayout';
 import { useNodeExpansion } from '@/lib/graph-index';
 
@@ -147,11 +147,6 @@ const EntityGraphPage = () => {
 
   // Mini-map state
   const [cameraPosition, setCameraPosition] = useState({ zoom: 1, panX: 0, panY: 0 });
-
-  // Snapshots state (for loading snapshots)
-  const [snapshotEdges, setSnapshotEdges] = useState<string>(JSON.stringify(edges));
-  const [snapshotLayout, setSnapshotLayout] = useState<GraphLayoutType>('force');
-  const [snapshotNodePositions, setSnapshotNodePositions] = useState<Map<string, { x: number; y: number }>>(new Map());
 
   // Fit-to-view operations (shared logic for 2D/3D)
   const { fitToViewAll, fitToViewSelected } = useFitToView({
@@ -263,13 +258,10 @@ const EntityGraphPage = () => {
     nodePositions?: Map<string, { x: number; y: number }>;
     annotations?: unknown[];
   }) => {
-    // Update state with snapshot data
-    setSnapshotEdges(snapshot.edges);
-    setSnapshotLayout(snapshot.layoutType);
-    setSnapshotNodePositions(snapshot.nodePositions ?? new Map());
+    // Update camera position from snapshot
     setCameraPosition({ zoom: snapshot.zoom, panX: snapshot.panX, panY: snapshot.panY });
 
-    // TODO: Update nodes and annotations in context
+    // TODO: Update nodes, edges, layout, and annotations in context
     // This requires extending the GraphVisualizationContext to support full state replacement
   }, []);
 
@@ -659,6 +651,13 @@ const EntityGraphPage = () => {
                     onPan={handleMiniMapPan}
                   />
                 )}
+
+                {/* Graph legend */}
+                <GraphLegend
+                  entityTypes={nodes.map(n => n.entityType)}
+                  showEdgeTypes={true}
+                  position="top-right"
+                />
               </Box>
             </Stack>
           </Card>
