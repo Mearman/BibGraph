@@ -5,10 +5,9 @@
  * Stores up to 50 search queries with FIFO eviction.
  */
 
+import { logger } from '@bibgraph/utils';
 import { openDB } from 'idb';
 import { useCallback, useEffect, useState } from 'react';
-
-import { logger } from '@bibgraph/utils';
 
 const SEARCH_HISTORY_DB_NAME = 'bibgraph-search-history';
 const SEARCH_HISTORY_STORE_NAME = 'queries';
@@ -30,7 +29,7 @@ interface SearchHistoryDB {
 
 const initializeDB = async () => {
   return openDB<SearchHistoryDB>(SEARCH_HISTORY_DB_NAME, SEARCH_HISTORY_VERSION, {
-    upgrade(db) {
+    upgrade: (db) => {
       if (!db.objectStoreNames.contains(SEARCH_HISTORY_STORE_NAME)) {
         const store = db.createObjectStore(SEARCH_HISTORY_STORE_NAME, {
           keyPath: 'id',
@@ -51,9 +50,9 @@ export const useSearchHistory = () => {
       try {
         const db = await initializeDB();
         const allEntries = await db.getAll(SEARCH_HISTORY_STORE_NAME);
-        const sortedEntries = allEntries
-          .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-          .slice(0, MAX_SEARCH_HISTORY);
+        // Sort by timestamp (newest first)
+        const sortedByTime = [...allEntries].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        const sortedEntries = sortedByTime.slice(0, MAX_SEARCH_HISTORY);
         setSearchHistory(sortedEntries);
         setIsInitialized(true);
       } catch (error) {
@@ -99,9 +98,9 @@ export const useSearchHistory = () => {
 
         // Update state
         const updatedHistory = await db.getAll(SEARCH_HISTORY_STORE_NAME);
-        const sortedHistory = updatedHistory
-          .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-          .slice(0, MAX_SEARCH_HISTORY);
+        // Sort by timestamp (newest first)
+        const sortedByTimeNewest = [...updatedHistory].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        const sortedHistory = sortedByTimeNewest.slice(0, MAX_SEARCH_HISTORY);
         setSearchHistory(sortedHistory);
 
         logger.debug('search-history', 'Added search query to history', { query });
