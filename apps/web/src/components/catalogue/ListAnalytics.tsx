@@ -28,6 +28,7 @@ import {
 } from "@tabler/icons-react";
 import { useState } from "react";
 
+import { CitationImpactChart } from "@/components/charts/CitationImpactChart";
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from '@/config/style-constants';
 
 interface ListAnalyticsProps {
@@ -49,8 +50,10 @@ interface YearStats {
 
 /**
  * Calculate entity type distribution
+ * @param entities - The entities to analyze
+ * @returns Array of entity statistics with type, count, and percentage
  */
-function calculateEntityTypeDistribution(entities: CatalogueEntity[]): EntityStats[] {
+const calculateEntityTypeDistribution = (entities: CatalogueEntity[]): EntityStats[] => {
   const typeCounts = new Map<string, number>();
 
   for (const entity of entities) {
@@ -69,13 +72,15 @@ function calculateEntityTypeDistribution(entities: CatalogueEntity[]): EntitySta
   }
 
   return stats.sort((a, b) => b.count - a.count);
-}
+};
 
 /**
  * Group entities by year (extracted from entityId if available)
  * Note: This is a simplified version - in production, you'd fetch actual publication years
+ * @param entities - The entities to analyze
+ * @returns Array of year statistics with year and count
  */
-function calculateYearDistribution(entities: CatalogueEntity[]): YearStats[] {
+const calculateYearDistribution = (entities: CatalogueEntity[]): YearStats[] => {
   const yearCounts = new Map<number, number>();
 
   for (const entity of entities) {
@@ -92,15 +97,18 @@ function calculateYearDistribution(entities: CatalogueEntity[]): YearStats[] {
   }
 
   return stats.sort((a, b) => a.year - b.year);
-}
+};
 
 /**
  * Generate CSV export of analytics data
+ * @param entityTypeStats - Entity type distribution statistics
+ * @param yearStats - Year distribution statistics
+ * @returns CSV string formatted for export
  */
-function generateAnalyticsCSV(
+const generateAnalyticsCSV = (
   entityTypeStats: EntityStats[],
   yearStats: YearStats[]
-): string {
+): string => {
   const lines: string[] = [];
 
   // Entity type distribution
@@ -119,7 +127,7 @@ function generateAnalyticsCSV(
   }
 
   return lines.join('\n');
-}
+};
 
 export const ListAnalytics = ({ list, entities, onClose }: ListAnalyticsProps) => {
   const [activeTab, setActiveTab] = useState<string | null>('overview');
@@ -142,12 +150,12 @@ export const ListAnalytics = ({ list, entities, onClose }: ListAnalyticsProps) =
       const url = URL.createObjectURL(blob);
 
       link.setAttribute('href', url);
-      link.setAttribute('download', `${list.title.replace(/[^a-z0-9]/gi, '_')}_analytics.csv`);
+      link.setAttribute('download', `${list.title.replaceAll(/[^a-z0-9]/gi, '_')}_analytics.csv`);
       link.style.visibility = 'hidden';
 
-      document.body.appendChild(link);
+      document.body.append(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
 
       URL.revokeObjectURL(url);
 
@@ -201,6 +209,9 @@ export const ListAnalytics = ({ list, entities, onClose }: ListAnalyticsProps) =
           </Tabs.Tab>
           <Tabs.Tab value="timeline" leftSection={<IconChartBar size={ICON_SIZE.MD} />}>
             Timeline
+          </Tabs.Tab>
+          <Tabs.Tab value="citation-impact" leftSection={<IconChartBar size={ICON_SIZE.MD} />}>
+            Citation Impact
           </Tabs.Tab>
         </Tabs.List>
 
@@ -339,6 +350,11 @@ export const ListAnalytics = ({ list, entities, onClose }: ListAnalyticsProps) =
               )}
             </Stack>
           </ScrollArea.Autosize>
+        </Tabs.Panel>
+
+        {/* Citation Impact Tab */}
+        <Tabs.Panel value="citation-impact" pt="md">
+          <CitationImpactChart entities={entities} />
         </Tabs.Panel>
       </Tabs>
 
