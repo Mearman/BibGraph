@@ -69,7 +69,7 @@ const DEFAULT_OPTIONS: Required<HierarchicalLayoutOptions> = {
  * For affiliation: affiliation (author affiliated with institution)
  * @param edge
  */
-function isParentChildEdge(edge: GraphEdge): boolean {
+const isParentChildEdge = (edge: GraphEdge): boolean => {
   // Reference relationship: earlier works are "parents" of later works
   if (edge.type === 'REFERENCE') {
     return true;
@@ -86,7 +86,7 @@ function isParentChildEdge(edge: GraphEdge): boolean {
   }
 
   return false;
-}
+};
 
 /**
  * Build adjacency lists for parent-child relationships
@@ -94,11 +94,11 @@ function isParentChildEdge(edge: GraphEdge): boolean {
  * @param edges
  * @param rootNodeId
  */
-function buildTreeStructure(
+const buildTreeStructure = (
   nodes: GraphNode[],
   edges: GraphEdge[],
   rootNodeId: string | null
-): { rootNodeId: string; children: Map<string, string[]>; parents: Map<string, string> } {
+): { rootNodeId: string; children: Map<string, string[]>; parents: Map<string, string> } => {
   const children = new Map<string, string[]>();
   const parents = new Map<string, string>();
 
@@ -115,6 +115,7 @@ function buildTreeStructure(
 
     if (edge.type === 'AUTHORSHIP') {
       // Target (work) is child of source (author)
+      // or Target (author) is child of source (institution)
       parent = source;
       child = target;
     } else if (edge.type === 'REFERENCE') {
@@ -133,7 +134,10 @@ function buildTreeStructure(
     if (!children.has(parent)) {
       children.set(parent, []);
     }
-    children.get(parent)!.push(child);
+    const parentChildren = children.get(parent);
+    if (parentChildren) {
+      parentChildren.push(child);
+    }
     parents.set(child, parent);
   });
 
@@ -156,7 +160,7 @@ function buildTreeStructure(
   }
 
   return { rootNodeId: root, children, parents };
-}
+};
 
 /**
  * Calculate subtree width for each node
@@ -164,11 +168,11 @@ function buildTreeStructure(
  * @param children
  * @param nodeSpacing
  */
-function calculateSubtreeWidth(
+const calculateSubtreeWidth = (
   nodeId: string,
   children: Map<string, string[]>,
   nodeSpacing: number
-): number {
+): number => {
   const nodeChildren = children.get(nodeId);
   if (!nodeChildren || nodeChildren.length === 0) {
     return nodeSpacing;
@@ -180,7 +184,7 @@ function calculateSubtreeWidth(
   });
 
   return totalWidth;
-}
+};
 
 /**
  * Assign Y positions to children recursively
@@ -189,12 +193,12 @@ function calculateSubtreeWidth(
  * @param nodeSpacing
  * @param startY
  */
-function assignChildPositions(
+const assignChildPositions = (
   nodeId: string,
   children: Map<string, string[]>,
   nodeSpacing: number,
   startY: number
-): Map<string, number> {
+): Map<string, number> => {
   const positions = new Map<string, number>();
   const nodeChildren = children.get(nodeId);
 
@@ -219,7 +223,7 @@ function assignChildPositions(
   });
 
   return positions;
-}
+};
 
 /**
  * Apply hierarchical layout to graph
@@ -228,11 +232,11 @@ function assignChildPositions(
  * @param options Layout configuration
  * @returns Positioned nodes with layout coordinates
  */
-export function hierarchicalLayout(
+export const hierarchicalLayout = (
   nodes: GraphNode[],
   edges: GraphEdge[],
   options: HierarchicalLayoutOptions = {}
-): HierarchicalLayoutResult {
+): HierarchicalLayoutResult => {
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
   if (nodes.length === 0) {
@@ -240,7 +244,7 @@ export function hierarchicalLayout(
   }
 
   // Build tree structure
-  const { rootNodeId, children, parents } = buildTreeStructure(nodes, edges, opts.rootNodeId);
+  const { rootNodeId, children } = buildTreeStructure(nodes, edges, opts.rootNodeId);
 
   // BFS to assign levels
   const levels = new Map<string, number>();
@@ -249,7 +253,9 @@ export function hierarchicalLayout(
   let maxDepth = 0;
 
   while (queue.length > 0) {
-    const { nodeId, level } = queue.shift()!;
+    const shifted = queue.shift();
+    if (!shifted) break;
+    const { nodeId, level } = shifted;
     levels.set(nodeId, level);
     maxDepth = Math.max(maxDepth, level);
 
@@ -294,15 +300,15 @@ export function hierarchicalLayout(
     maxDepth,
     rootNodeId,
   };
-}
+};
 
 /**
  * Convert positioned nodes to a node position map for react-force-graph
  * @param layoutResult
  */
-export function toNodePositionMap(
+export const toNodePositionMap = (
   layoutResult: HierarchicalLayoutResult
-): Map<string, { x: number; y: number }> {
+): Map<string, { x: number; y: number }> => {
   const positionMap = new Map<string, { x: number; y: number }>();
 
   layoutResult.nodes.forEach(({ node, x, y }) => {
@@ -310,4 +316,4 @@ export function toNodePositionMap(
   });
 
   return positionMap;
-}
+};
