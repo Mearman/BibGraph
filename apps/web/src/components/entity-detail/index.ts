@@ -8,6 +8,7 @@ export type { EntityTypeConfig } from './EntityTypeConfig';
 export { ENTITY_TYPE_CONFIGS, getMantineColor } from './EntityTypeConfig';
 export { CitationContextPreview } from './CitationContextPreview';
 export { CollaborationNetwork } from './CollaborationNetwork';
+export { EntityComparison } from './EntityComparison';
 export { ErrorState } from './ErrorState';
 export { LoadingState } from './LoadingState';
 export { NavigationTrail } from './NavigationTrail';
