@@ -70,6 +70,7 @@ import { type GraphMethods, useFitToView } from '@/hooks/useFitToView';
 import { useGraphAnnotations } from '@/hooks/useGraphAnnotations';
 import { type GraphLayoutType,useGraphLayout } from '@/hooks/useGraphLayout';
 import { useNodeExpansion } from '@/lib/graph-index';
+import { downloadGraphSVG } from '@/utils/exportUtils';
 
 /**
  * Entity Graph Page Component
@@ -273,6 +274,7 @@ const EntityGraphPage = () => {
 
   // Export state
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingSVG, setIsExportingSVG] = useState(false);
 
   // Handle graph export as PNG
   const handleExportPNG = useCallback(() => {
@@ -329,6 +331,54 @@ const EntityGraphPage = () => {
       });
     }
   }, []);
+
+  // Handle graph export as SVG
+  const handleExportSVG = useCallback(() => {
+    if (nodes.length === 0) {
+      notifications.show({
+        title: 'Export Failed',
+        message: 'Graph has no nodes to export.',
+        color: 'red',
+      });
+      return;
+    }
+
+    try {
+      setIsExportingSVG(true);
+
+      const width = graphContainerRef.current?.clientWidth ?? 1200;
+      const height = typeof window !== 'undefined' ? window.innerHeight * 0.55 : 600;
+
+      // Create filename with timestamp
+      const date = new Date().toISOString().split('T')[0];
+      const time = new Date().toISOString().split('T')[1].split('.')[0].replaceAll(':', '-');
+      const filename = `graph-${date}-${time}`;
+
+      // Download SVG
+      downloadGraphSVG(nodes, edges, {
+        width,
+        height,
+        padding: 50,
+        includeLegend: true,
+        nodePositions,
+      }, filename);
+
+      setIsExportingSVG(false);
+
+      notifications.show({
+        title: 'Export Successful',
+        message: `Graph exported as ${filename}.svg`,
+        color: 'green',
+      });
+    } catch (error) {
+      setIsExportingSVG(false);
+      notifications.show({
+        title: 'Export Failed',
+        message: error instanceof Error ? error.message : 'Failed to export graph',
+        color: 'red',
+      });
+    }
+  }, [nodes, edges, nodePositions]);
 
   // Loading state
   if (loading && sources.length === 0) {
@@ -455,6 +505,16 @@ const EntityGraphPage = () => {
                   onClick={handleExportPNG}
                   loading={isExporting}
                   aria-label="Export graph as PNG"
+                >
+                  <IconDownload size={ICON_SIZE.MD} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Export graph as SVG">
+                <ActionIcon
+                  variant="light"
+                  onClick={handleExportSVG}
+                  loading={isExportingSVG}
+                  aria-label="Export graph as SVG"
                 >
                   <IconDownload size={ICON_SIZE.MD} />
                 </ActionIcon>
