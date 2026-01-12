@@ -2,6 +2,7 @@ import { logger } from "@bibgraph/utils/logger";
 import { createRootRoute, Outlet, useLocation } from "@tanstack/react-router";
 
 import { RouterErrorComponent } from "@/components/error/RouterErrorComponent";
+import { ErrorBoundary } from "@/components/error/ErrorBoundary";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { NavigationTracker } from "@/components/NavigationTracker";
 import { UrlFixer } from "@/components/UrlFixer";
@@ -28,19 +29,21 @@ const RootLayout = () => {
         <ActivityProvider>
           <SyncStatusProvider>
             <UndoRedoProvider>
-              {/* Conditionally wrap MainLayout and Outlet with GraphVisualizationProvider on graph page */}
-              {/* This allows the sidebar (in MainLayout) to access the context */}
-              {isGraphPage ? (
-                <GraphVisualizationProvider>
+              <ErrorBoundary>
+                {/* Conditionally wrap MainLayout and Outlet with GraphVisualizationProvider on graph page */}
+                {/* This allows the sidebar (in MainLayout) to access the context */}
+                {isGraphPage ? (
+                  <GraphVisualizationProvider>
+                    <MainLayout>
+                      <Outlet />
+                    </MainLayout>
+                  </GraphVisualizationProvider>
+                ) : (
                   <MainLayout>
                     <Outlet />
                   </MainLayout>
-                </GraphVisualizationProvider>
-              ) : (
-                <MainLayout>
-                  <Outlet />
-                </MainLayout>
-              )}
+                )}
+              </ErrorBoundary>
             </UndoRedoProvider>
           </SyncStatusProvider>
         </ActivityProvider>
