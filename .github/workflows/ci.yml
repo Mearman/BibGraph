@@ -114,7 +114,7 @@ jobs:
   determine-version:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     outputs:
       next-version: ${{ steps.version.outputs.next-version }}
       should-release: ${{ steps.version.outputs.should-release }}
