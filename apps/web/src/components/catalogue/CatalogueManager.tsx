@@ -55,6 +55,7 @@ import { ListTemplates } from "@/components/catalogue/ListTemplates";
 import { ShareModal } from "@/components/catalogue/ShareModal";
 import type { SmartListCriteria } from "@/components/catalogue/SmartLists";
 import { SmartLists } from "@/components/catalogue/SmartLists";
+import { TagCloud } from "@/components/catalogue/TagCloud";
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from '@/config/style-constants';
 import { useCatalogueContext } from "@/contexts/catalogue-context";
 import { settingsActions } from "@/stores/settings-store";
@@ -95,6 +96,7 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [shareUrl, setShareUrl] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [showSystemCatalogues, setShowSystemCatalogues] = useState(false);
   const [listStats, setListStats] = useState<{
     totalEntities: number;
@@ -160,14 +162,37 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
     void settingsActions.setShowSystemCatalogues(checked);
   };
 
-  // Filter lists based on search (conditionally exclude special system lists)
+  // Handle tag toggling
+  const handleToggleTag = (tag: string) => {
+    setSelectedTags(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(tag)) {
+        newSet.delete(tag);
+      } else {
+        newSet.add(tag);
+      }
+      return newSet;
+    });
+  };
+
+  const handleClearTags = () => {
+    setSelectedTags(new Set());
+  };
+
+  // Filter lists based on search and tags (conditionally exclude special system lists)
   const specialListIdValues: string[] = Object.values(SPECIAL_LIST_IDS);
-  const filteredLists = searchQuery
+  const filteredLists = (searchQuery || selectedTags.size > 0)
     ? lists.filter(list =>
-        list.id && (showSystemCatalogues || !specialListIdValues.includes(list.id)) && (
+        list.id && (showSystemCatalogues || !specialListIdValues.includes(list.id)) &&
+        // Search query filter
+        (!searchQuery ||
           list.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           list.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           list.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+        ) &&
+        // Tag filter (list must have ALL selected tags)
+        (selectedTags.size === 0 ||
+          (list.tags && list.tags.length > 0 && [...selectedTags].every(tag => list.tags?.includes(tag) ?? false))
         )
       )
     : lists.filter(list => list.id && (showSystemCatalogues || !specialListIdValues.includes(list.id)));
@@ -412,6 +437,14 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
             data-testid="show-system-catalogues-toggle"
           />
         </Group>
+
+        {/* Tag Cloud for filtering */}
+        <TagCloud
+          lists={lists}
+          selectedTags={selectedTags}
+          onToggleTag={handleToggleTag}
+          onClearTags={handleClearTags}
+        />
 
         {/* Main Content */}
         <Tabs value={activeTab} onChange={setActiveTab}>
