@@ -318,7 +318,7 @@ jobs:
       - name: Determine deployment
         id: deploy
         run: |
-          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+          if { [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; } && [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "should-deploy=true" >> "${GITHUB_OUTPUT}"
           else
             echo "should-deploy=false" >> "${GITHUB_OUTPUT}"
