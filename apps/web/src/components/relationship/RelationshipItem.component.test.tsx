@@ -94,7 +94,8 @@ describe('RelationshipItem', () => {
       </TestWrapper>
     );
 
-    expect(screen.getByText('(self-reference)')).toBeInTheDocument();
+    // Self-reference is now shown as a Badge component with "Self" text
+    expect(screen.getByText('Self')).toBeInTheDocument();
   });
 
   it('should display metadata when provided', () => {

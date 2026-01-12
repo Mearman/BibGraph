@@ -29,7 +29,7 @@ import {
 } from "@tabler/icons-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute, useSearch } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE, SEARCH, TIME_MS } from '@/config/style-constants';
 import { useUserInteractions } from "@/hooks/use-user-interactions";
@@ -141,6 +141,34 @@ const renderNoResultsState = (query: string, onQuickSearch?: (query: string) => 
     query={query}
     onQuickSearch={onQuickSearch}
   />
+);
+
+// EntityTypeFilterBadge component to reduce nesting depth in search results
+interface EntityTypeFilterBadgeProps {
+  type: string;
+  count: number;
+  isSelected: boolean;
+  color: string;
+  onToggle: (type: string) => void;
+}
+
+const EntityTypeFilterBadge = ({
+  type,
+  count,
+  isSelected,
+  color,
+  onToggle,
+}: EntityTypeFilterBadgeProps) => (
+  <Badge
+    size="sm"
+    color={color}
+    variant={isSelected ? "filled" : "light"}
+    leftSection={isSelected ? "✓ " : undefined}
+    style={{ cursor: 'pointer', userSelect: 'none' }}
+    onClick={() => onToggle(type)}
+  >
+    {type} ({count})
+  </Badge>
 );
 
 // Get entity type color for badges using centralized metadata
@@ -332,6 +360,13 @@ const SearchPage = () => {
     return searchResults ? getEntityTypeBreakdown(searchResults) : [];
   }, [searchResults]);
 
+  // Handle entity type filter toggle (extracted to reduce nesting depth)
+  const handleTypeFilterToggle = useCallback((type: string) => {
+    setSelectedTypes(prev =>
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
+  }, []);
+
   const renderSearchResults = () => {
     if (isLoading) return renderLoadingState();
     if (error) return renderErrorState(
@@ -407,23 +442,14 @@ const SearchPage = () => {
                     ? ENTITY_METADATA[pluralForm].color
                     : "gray";
                   return (
-                    <Badge
+                    <EntityTypeFilterBadge
                       key={type}
-                      size="sm"
+                      type={type}
+                      count={count}
+                      isSelected={isSelected}
                       color={color}
-                      variant={isSelected ? "filled" : "light"}
-                      leftSection={isSelected ? "✓ " : undefined}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                      onClick={() => {
-                        setSelectedTypes(prev =>
-                          prev.includes(type)
-                            ? prev.filter(t => t !== type)
-                            : [...prev, type]
-                        );
-                      }}
-                    >
-                      {type} ({count})
-                    </Badge>
+                      onToggle={handleTypeFilterToggle}
+                    />
                   );
                 })}
                 {selectedTypes.length > 0 && (
