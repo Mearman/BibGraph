@@ -308,10 +308,19 @@ export const GraphAlgorithmsPanel = ({
 
   if (nodes.length === 0) {
     return (
-      <Card style={{ border: BORDER_STYLE_GRAY_3 }} p="md">
-        <Alert icon={<IconAlertCircle size={ICON_SIZE.MD} />} title="No Graph Data" color="gray">
-          Add nodes and edges to the graph to run algorithms.
-        </Alert>
+      <Card style={{ border: BORDER_STYLE_GRAY_3 }} p="lg">
+        <Stack align="center" gap="md" mih="200px" justify="center">
+          <IconGraph size={ICON_SIZE.XL} color="var(--mantine-color-gray-4)" style={{ opacity: 0.5 }} />
+          <Stack gap="xs" ta="center">
+            <Title order={4} c="dimmed">Build Your Graph</Title>
+            <Text size="sm" c="dimmed">
+              Add entities from search results or entity detail pages to start analyzing connections.
+            </Text>
+            <Text size="xs" c="dimmed" mt="sm">
+              Use the graph icon button on any entity to add it here.
+            </Text>
+          </Stack>
+        </Stack>
       </Card>
     );
   }

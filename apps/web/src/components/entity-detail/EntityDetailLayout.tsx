@@ -403,12 +403,12 @@ export const EntityDetailLayout = ({
                   </Group>
                   <Group align="flex-start" gap="sm" wrap="nowrap">
                     <Text size="sm" fw={600} c="dimmed" miw={isMobile() ? "80px" : "100px"}>
-                      Select fields:
+                      Fields shown:
                     </Text>
                     <Text size="sm" c="dimmed" flex={1}>
                       {selectParam && typeof selectParam === 'string'
                         ? selectParam
-                        : `default (all fields)`}
+                        : `All fields`}
                     </Text>
                   </Group>
                 </Stack>

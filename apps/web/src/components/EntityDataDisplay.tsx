@@ -11,17 +11,21 @@ import {
   Badge,
   Box,
   Code,
+  Collapse,
   Divider,
   Group,
   Paper,
   Stack,
   Text,
   Title,
+  UnstyledButton,
 } from "@mantine/core";
 import {
   IconCalendar,
   IconChartBar,
   IconCheck,
+  IconChevronDown,
+  IconChevronUp,
   IconClipboard,
   IconExternalLink,
   IconFile,
@@ -33,6 +37,7 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 
 import { ICON_SIZE } from "@/config/style-constants";
 import { useVersionComparison } from "@/hooks/use-version-comparison";
@@ -442,6 +447,30 @@ export const EntityDataDisplay = ({ data, title }: EntityDataDisplayProps) => {
   // Group and prepare data
   const sections = groupFields(data);
 
+  // Track collapsed state for each section
+  // Basic Information and Identifiers are expanded by default, others collapsed
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    sections.forEach(section => {
+      if (section.name !== "Basic Information" && section.name !== "Identifiers") {
+        initial.add(section.name);
+      }
+    });
+    return initial;
+  });
+
+  const toggleSection = (sectionName: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(sectionName)) {
+        next.delete(sectionName);
+      } else {
+        next.add(sectionName);
+      }
+      return next;
+    });
+  };
+
   // Version comparison for Works
   const workId = typeof data.id === 'string' && data.id.startsWith('W') ? data.id : undefined;
   const shouldShowComparison = Boolean(workId && isDataVersionSelectorVisible());
@@ -463,32 +492,50 @@ export const EntityDataDisplay = ({ data, title }: EntityDataDisplayProps) => {
       )}
 
       {/* Render sections */}
-      {sections.map((section) => (
-        <Paper key={section.name} withBorder p="md" radius="md">
-          {/* Section header */}
-          <Group gap="sm" mb="md">
-            {section.icon}
-            <Text size="lg" fw={600}>{section.name}</Text>
-            <Badge variant="light" color="gray" size="sm">
-              {section.fields.length} {section.fields.length === 1 ? "field" : "fields"}
-            </Badge>
-          </Group>
+      {sections.map((section) => {
+        const isCollapsed = collapsedSections.has(section.name);
+        return (
+          <Paper key={section.name} withBorder p="md" radius="md">
+            {/* Clickable section header */}
+            <UnstyledButton
+              onClick={() => toggleSection(section.name)}
+              style={{ width: '100%' }}
+              mb="sm"
+            >
+              <Group gap="sm" justify="space-between" pr="xs">
+                <Group gap="sm">
+                  {section.icon}
+                  <Text size="lg" fw={600}>{section.name}</Text>
+                  <Badge variant="light" color="gray" size="sm">
+                    {section.fields.length} {section.fields.length === 1 ? "field" : "fields"}
+                  </Badge>
+                </Group>
+                {isCollapsed ? (
+                  <IconChevronDown size={ICON_SIZE.MD} color="var(--mantine-color-dimmed)" />
+                ) : (
+                  <IconChevronUp size={ICON_SIZE.MD} color="var(--mantine-color-dimmed)" />
+                )}
+              </Group>
+            </UnstyledButton>
 
-          <Divider mb="md" />
+            <Collapse in={!isCollapsed}>
+              <Divider mb="md" />
 
-          {/* Section fields */}
-          <Stack gap="md">
-            {section.fields.map((field) => (
-              <Box key={field.key}>
-                <Text size="sm" fw={600} c="blue.7" mb="xs">
-                  {humanizeFieldName(field.key)}
-                </Text>
-                {renderValueContent(field.value)}
-              </Box>
-            ))}
-          </Stack>
-        </Paper>
-      ))}
+              {/* Section fields */}
+              <Stack gap="md">
+                {section.fields.map((field) => (
+                  <Box key={field.key}>
+                    <Text size="sm" fw={600} c="blue.7" mb="xs">
+                      {humanizeFieldName(field.key)}
+                    </Text>
+                    {renderValueContent(field.value)}
+                  </Box>
+                ))}
+              </Stack>
+            </Collapse>
+          </Paper>
+        );
+      })}
     </Stack>
   );
 };
