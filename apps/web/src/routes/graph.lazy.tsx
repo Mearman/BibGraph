@@ -51,6 +51,7 @@ import { ForceGraph3DVisualization } from '@/components/graph/3d/ForceGraph3DVis
 import { GraphAnnotations } from '@/components/graph/annotations';
 import { GraphEmptyState } from '@/components/graph/GraphEmptyState';
 import { GraphMiniMap } from '@/components/graph/GraphMiniMap';
+import { GraphSnapshots } from '@/components/graph/snapshots';
 import { GraphSourcePanel } from '@/components/graph/GraphSourcePanel';
 import { LayoutSelector } from '@/components/graph/LayoutSelector';
 import {
@@ -62,9 +63,11 @@ import { OptimizedForceGraphVisualization } from '@/components/graph/OptimizedFo
 import type { DisplayMode } from '@/components/graph/types';
 import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 import { ICON_SIZE, LAYOUT } from '@/config/style-constants';
+import type { GraphNode } from '@bibgraph/types';
 import { useGraphVisualizationContext } from '@/contexts/GraphVisualizationContext';
 import { type GraphMethods, useFitToView } from '@/hooks/useFitToView';
 import { useGraphAnnotations } from '@/hooks/useGraphAnnotations';
+import { useGraphSnapshots } from '@/hooks/useGraphSnapshots';
 import { type GraphLayoutType,useGraphLayout } from '@/hooks/useGraphLayout';
 import { useNodeExpansion } from '@/lib/graph-index';
 
@@ -144,6 +147,11 @@ const EntityGraphPage = () => {
 
   // Mini-map state
   const [cameraPosition, setCameraPosition] = useState({ zoom: 1, panX: 0, panY: 0 });
+
+  // Snapshots state (for loading snapshots)
+  const [snapshotEdges, setSnapshotEdges] = useState<string>(JSON.stringify(edges));
+  const [snapshotLayout, setSnapshotLayout] = useState<GraphLayoutType>('force');
+  const [snapshotNodePositions, setSnapshotNodePositions] = useState<Map<string, { x: number; y: number }>>(new Map());
 
   // Fit-to-view operations (shared logic for 2D/3D)
   const { fitToViewAll, fitToViewSelected } = useFitToView({
@@ -242,6 +250,27 @@ const EntityGraphPage = () => {
     if (graphMethodsRef.current && typeof graphMethodsRef.current.centerAt === 'function') {
       graphMethodsRef.current.centerAt(x, y, 500); // 500ms transition
     }
+  }, []);
+
+  // Handle load snapshot
+  const handleLoadSnapshot = useCallback((snapshot: {
+    nodes: GraphNode[];
+    edges: string;
+    zoom: number;
+    panX: number;
+    panY: number;
+    layoutType: GraphLayoutType;
+    nodePositions?: Map<string, { x: number; y: number }>;
+    annotations?: unknown[];
+  }) => {
+    // Update state with snapshot data
+    setSnapshotEdges(snapshot.edges);
+    setSnapshotLayout(snapshot.layoutType);
+    setSnapshotNodePositions(snapshot.nodePositions ?? new Map());
+    setCameraPosition({ zoom: snapshot.zoom, panX: snapshot.panX, panY: snapshot.panY });
+
+    // TODO: Update nodes and annotations in context
+    // This requires extending the GraphVisualizationContext to support full state replacement
   }, []);
 
   // Convert expandingNodeIds array to Set for visualization components
@@ -417,6 +446,17 @@ const EntityGraphPage = () => {
               </Stack>
             </Group>
             <Group gap="xs">
+              <GraphSnapshots
+                nodes={nodes}
+                edges={JSON.stringify(edges)}
+                zoom={cameraPosition.zoom}
+                panX={cameraPosition.panX}
+                panY={cameraPosition.panY}
+                layoutType={currentLayout}
+                nodePositions={nodePositions}
+                annotations={annotations.annotations}
+                onLoadSnapshot={handleLoadSnapshot}
+              />
               <Tooltip label="Export graph as PNG">
                 <ActionIcon
                   variant="light"

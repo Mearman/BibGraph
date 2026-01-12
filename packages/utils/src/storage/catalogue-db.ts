@@ -146,6 +146,41 @@ export interface GraphAnnotationStorage {
   /** Optional graph/snapshot ID for sharing annotations via URL */
   graphId?: string;
 }
+
+/**
+ * Graph snapshot storage
+ * Captures complete graph state for later restoration or sharing
+ */
+export interface GraphSnapshotStorage {
+  id?: string;
+  /** Snapshot name for display */
+  name: string;
+  /** Creation timestamp */
+  createdAt: Date;
+  /** Last modified timestamp */
+  updatedAt: Date;
+  /** Whether this is an auto-saved snapshot */
+  isAutoSave: boolean;
+  /** Graph nodes (serialized) */
+  nodes: string;
+  /** Graph edges (serialized) */
+  edges: string;
+  /** Camera zoom level */
+  zoom: number;
+  /** Camera pan X position */
+  panX: number;
+  /** Camera pan Y position */
+  panY: number;
+  /** Layout type */
+  layoutType: string;
+  /** Node positions (for static layouts) */
+  nodePositions?: string;
+  /** Annotations associated with this snapshot */
+  annotations?: string;
+  /** Optional share token for URL sharing */
+  shareToken?: string;
+}
+
 export interface CatalogueEntity {
   id?: string;
   /** List this entity belongs to */
@@ -185,6 +220,7 @@ class CatalogueDB extends Dexie {
   catalogueShares!: Dexie.Table<CatalogueShareRecord, string>;
   searchHistory!: Dexie.Table<SearchHistoryEntry, string>;
   annotations!: Dexie.Table<GraphAnnotationStorage, string>;
+  snapshots!: Dexie.Table<GraphSnapshotStorage, string>;
 
   constructor() {
     super(DB_NAME);
@@ -259,6 +295,23 @@ class CatalogueDB extends Dexie {
       .upgrade(async () => {
         // No data migration needed - this is a new table
         console.log('[catalogue-db] Migration v4: Added graph annotations table');
+      });
+
+    // Migration v5: Add graph snapshots table
+    this.version(5)
+      .stores({
+        // Same schema as v4
+        catalogueLists: "id, title, type, createdAt, updatedAt, isPublic, shareToken, *tags",
+        catalogueEntities: "id, listId, entityType, entityId, addedAt, position, [listId+position], [listId+entityType+entityId]",
+        catalogueShares: "id, listId, shareToken, createdAt, expiresAt",
+        searchHistory: "id, query, timestamp",
+        annotations: "id, type, createdAt, updatedAt, visible, graphId, nodeId",
+        // New snapshots table with indexes for querying and auto-save management
+        snapshots: "id, name, createdAt, updatedAt, isAutoSave, shareToken",
+      })
+      .upgrade(async () => {
+        // No data migration needed - this is a new table
+        console.log('[catalogue-db] Migration v5: Added graph snapshots table');
       });
   }
 }
@@ -1685,6 +1738,131 @@ export class CatalogueService {
     } catch (error) {
       this.logger?.error(LOG_CATEGORY, 'Failed to toggle annotation visibility', { id, visible, error });
       throw error;
+    }
+  }
+
+  /**
+   * Create a new graph snapshot
+   * @param snapshot Snapshot data (without id, timestamps)
+   * @returns Snapshot ID
+   */
+  async addSnapshot(snapshot: Omit<GraphSnapshotStorage, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    try {
+      const id = crypto.randomUUID();
+      const now = new Date();
+
+      await this.db.snapshots.add({
+        ...snapshot,
+        id,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      this.logger?.debug(LOG_CATEGORY, 'Created graph snapshot', { id, name: snapshot.name });
+      return id;
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to create graph snapshot', { snapshot, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get all snapshots
+   * @returns All snapshots
+   */
+  async getSnapshots(): Promise<GraphSnapshotStorage[]> {
+    try {
+      const snapshots = await this.db.snapshots.orderBy('createdAt').reverse().toArray();
+      return snapshots;
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to get snapshots', { error });
+      return [];
+    }
+  }
+
+  /**
+   * Get a specific snapshot by ID
+   * @param id Snapshot ID
+   * @returns Snapshot or null if not found
+   */
+  async getSnapshot(id: string): Promise<GraphSnapshotStorage | null> {
+    try {
+      const result = await this.db.snapshots.get(id);
+      return result ?? null;
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to get snapshot', { id, error });
+      return null;
+    }
+  }
+
+  /**
+   * Update an existing snapshot
+   * @param id Snapshot ID
+   * @param updates Fields to update
+   */
+  async updateSnapshot(id: string, updates: Partial<Omit<GraphSnapshotStorage, 'id' | 'createdAt' | 'updatedAt'>>): Promise<void> {
+    try {
+      const updateData = {
+        ...updates,
+        updatedAt: new Date(),
+      };
+
+      await this.db.snapshots.update(id, updateData);
+      this.logger?.debug(LOG_CATEGORY, 'Updated graph snapshot', { id, updates });
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to update graph snapshot', { id, updates, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a snapshot
+   * @param id Snapshot ID
+   */
+  async deleteSnapshot(id: string): Promise<void> {
+    try {
+      await this.db.snapshots.delete(id);
+      this.logger?.debug(LOG_CATEGORY, 'Deleted graph snapshot', { id });
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to delete graph snapshot', { id, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Delete old auto-saved snapshots, keeping only the most recent N
+   * @param keep Number of auto-saved snapshots to keep (default: 5)
+   */
+  async pruneAutoSaveSnapshots(keep = 5): Promise<void> {
+    try {
+      // Get all snapshots and filter for auto-saves
+      const allSnapshots = await this.db.snapshots.orderBy('createdAt').reverse().toArray();
+      const autoSnapshots = allSnapshots.filter(s => s.isAutoSave);
+
+      if (autoSnapshots.length > keep) {
+        const toDelete = autoSnapshots.slice(keep);
+        const idsToDelete = toDelete.map(s => s.id).filter((id): id is string => id !== undefined);
+        await this.db.snapshots.bulkDelete(idsToDelete);
+        this.logger?.debug(LOG_CATEGORY, 'Pruned auto-save snapshots', { count: idsToDelete.length, keep });
+      }
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to prune auto-save snapshots', { keep, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get snapshot by share token
+   * @param shareToken Share token
+   * @returns Snapshot or null if not found
+   */
+  async getSnapshotByShareToken(shareToken: string): Promise<GraphSnapshotStorage | null> {
+    try {
+      const result = await this.db.snapshots.where('shareToken').equals(shareToken).first();
+      return result ?? null;
+    } catch (error) {
+      this.logger?.error(LOG_CATEGORY, 'Failed to get snapshot by share token', { shareToken, error });
+      return null;
     }
   }
 
