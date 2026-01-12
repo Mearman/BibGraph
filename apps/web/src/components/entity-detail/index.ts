@@ -13,5 +13,6 @@ export { ErrorState } from './ErrorState';
 export { LoadingState } from './LoadingState';
 export { NavigationTrail } from './NavigationTrail';
 export { PublicationTimeline } from './PublicationTimeline';
+export { QuickActionBar } from './QuickActionBar';
 export { RelatedEntitiesSection } from './RelatedEntitiesSection';
 // Types can be imported directly from './NavigationTrail' if needed
