@@ -83,13 +83,13 @@ export const MotifDetectionItem = ({
               size="xs"
               onClick={() => {
                 const uniqueNodes = new Set<string>();
-                triangles.triangles.slice(0, MOTIF_DETECTION.TRIANGLE_HIGHLIGHT_LIMIT).forEach(t => {
+                triangles.triangles.forEach(t => {
                   t.nodes.forEach(n => uniqueNodes.add(n));
                 });
                 onHighlightNodes?.([...uniqueNodes]);
               }}
             >
-              Highlight First {MOTIF_DETECTION.TRIANGLE_HIGHLIGHT_LIMIT} Triangles
+              Highlight All Triangles
             </Button>
           )}
         </Stack>
@@ -128,7 +128,7 @@ export const MotifDetectionItem = ({
                 Found {starPatterns.count} hub nodes with {starMinDegree}+ connections
               </Text>
               <List spacing="xs" size="sm">
-                {starPatterns.patterns.slice(0, MOTIF_DETECTION.PREVIEW_LIMIT).map((pattern) => (
+                {starPatterns.patterns.map((pattern) => (
                   <List.Item
                     key={pattern.hubId}
                     icon={
@@ -144,11 +144,6 @@ export const MotifDetectionItem = ({
                     </Text>
                   </List.Item>
                 ))}
-                {starPatterns.patterns.length > MOTIF_DETECTION.PREVIEW_LIMIT && (
-                  <Text size="xs" c="dimmed">
-                    +{starPatterns.patterns.length - MOTIF_DETECTION.PREVIEW_LIMIT} more hubs
-                  </Text>
-                )}
               </List>
             </>
           )}
@@ -181,7 +176,7 @@ export const MotifDetectionItem = ({
                 Found {coCitations.pairs.length} co-citation pairs
               </Text>
               <List spacing="xs" size="sm">
-                {coCitations.pairs.slice(0, MOTIF_DETECTION.PREVIEW_LIMIT).map((pair) => (
+                {coCitations.pairs.map((pair) => (
                   <List.Item
                     key={`${pair.paper1Id}-${pair.paper2Id}`}
                     icon={
@@ -197,11 +192,6 @@ export const MotifDetectionItem = ({
                     </Text>
                   </List.Item>
                 ))}
-                {coCitations.pairs.length > MOTIF_DETECTION.PREVIEW_LIMIT && (
-                  <Text size="xs" c="dimmed">
-                    +{coCitations.pairs.length - MOTIF_DETECTION.PREVIEW_LIMIT} more pairs
-                  </Text>
-                )}
               </List>
             </>
           )}
@@ -234,7 +224,7 @@ export const MotifDetectionItem = ({
                 Found {bibCoupling.pairs.length} coupled paper pairs
               </Text>
               <List spacing="xs" size="sm">
-                {bibCoupling.pairs.slice(0, MOTIF_DETECTION.PREVIEW_LIMIT).map((pair) => (
+                {bibCoupling.pairs.map((pair) => (
                   <List.Item
                     key={`${pair.paper1Id}-${pair.paper2Id}`}
                     icon={
@@ -250,11 +240,6 @@ export const MotifDetectionItem = ({
                     </Text>
                   </List.Item>
                 ))}
-                {bibCoupling.pairs.length > MOTIF_DETECTION.PREVIEW_LIMIT && (
-                  <Text size="xs" c="dimmed">
-                    +{bibCoupling.pairs.length - MOTIF_DETECTION.PREVIEW_LIMIT} more pairs
-                  </Text>
-                )}
               </List>
             </>
           )}
