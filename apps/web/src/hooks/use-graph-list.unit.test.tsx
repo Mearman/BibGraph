@@ -16,6 +16,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach,describe, expect, it, vi } from 'vitest';
 
+import { NotificationProvider } from '@/contexts/NotificationContext';
 import { StorageProviderWrapper } from '@/contexts/storage-provider-context';
 
 import { useGraphList } from './use-graph-list';
@@ -31,7 +32,9 @@ describe('Graph List Management Hook (T042-T044)', () => {
 
 	const wrapper = ({ children }: { children: ReactNode }) => (
 		<StorageProviderWrapper provider={storage}>
-			{children}
+			<NotificationProvider>
+				{children}
+			</NotificationProvider>
 		</StorageProviderWrapper>
 	);
 

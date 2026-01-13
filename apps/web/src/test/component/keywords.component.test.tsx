@@ -7,7 +7,9 @@ import { cleanup,render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach,beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { NotificationProvider } from '@/contexts/NotificationContext';
 import { StorageProviderWrapper } from '@/contexts/storage-provider-context';
+import { UndoRedoProvider } from '@/contexts/UndoRedoContext';
 
 // Mock cachedOpenAlex client
 vi.mock('@bibgraph/client', async (importOriginal) => {
@@ -135,9 +137,13 @@ describe('Keywords Route - EntityDetailLayout Migration', () => {
   const TestWrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
       <StorageProviderWrapper provider={storage}>
-        <MantineProvider>
-          {children}
-        </MantineProvider>
+        <NotificationProvider>
+          <UndoRedoProvider>
+            <MantineProvider>
+              {children}
+            </MantineProvider>
+          </UndoRedoProvider>
+        </NotificationProvider>
       </StorageProviderWrapper>
     </QueryClientProvider>
   );
