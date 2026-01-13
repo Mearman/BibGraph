@@ -1,3 +1,7 @@
+## 24.8.0 (2026-01-13)
+
+* feat(algorithms): add hub penalty options to mutual information computation ([58f8e1a](https://github.com/Mearman/BibGraph/commit/58f8e1a)), closes [hi#degree](https://github.com/hi/issues/degree)
+
 ## 24.7.0 (2026-01-13)
 
 * fix(algorithms): remove non-null assertions violating constitution ([e1daea0](https://github.com/Mearman/BibGraph/commit/e1daea0))
