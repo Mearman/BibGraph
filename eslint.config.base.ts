@@ -34,6 +34,7 @@ export default tseslint.config([
             "node_modules/**/*",
             ".nx/**/*",
             "coverage/**/*",
+            "**/coverage/**/*",
             "**/*.d.ts",
             "**/routeTree.gen.ts",
             "**/*.generated.ts",
