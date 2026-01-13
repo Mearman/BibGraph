@@ -393,15 +393,15 @@ describe('Information-Theoretic Path Ranking', () => {
       directedGraph.addEdge({ id: 'E1', source: 'A', target: 'B', type: 'test-edge' });
       directedGraph.addEdge({ id: 'E2', source: 'B', target: 'C', type: 'test-edge' });
 
-      // Path A -> C should exist
-      const resultAC = rankPaths(directedGraph, 'A', 'C');
+      // Path A -> C should exist with directed traversal
+      const resultAC = rankPaths(directedGraph, 'A', 'C', { traversalMode: 'directed' });
       expect(resultAC.ok).toBe(true);
       if (resultAC.ok) {
         expect(resultAC.value.some).toBe(true);
       }
 
-      // Path C -> A should NOT exist (wrong direction)
-      const resultCA = rankPaths(directedGraph, 'C', 'A');
+      // Path C -> A should NOT exist with directed traversal (wrong direction)
+      const resultCA = rankPaths(directedGraph, 'C', 'A', { traversalMode: 'directed' });
       expect(resultCA.ok).toBe(true);
       if (resultCA.ok) {
         expect(resultCA.value.some).toBe(false);
