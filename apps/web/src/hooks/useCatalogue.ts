@@ -19,6 +19,7 @@ import { logger } from "@bibgraph/utils/logger";
 import QRCode from "qrcode";
 import { useCallback, useEffect, useState } from "react";
 
+import { useNotifications } from "@/contexts/NotificationContext";
 import { useStorageProvider } from "@/contexts/storage-provider-context";
 import type { ExportFormat } from "@/types/catalogue";
 import { validateExportFormat } from "@/utils/catalogue-validation";
@@ -91,6 +92,12 @@ export interface UseCatalogueReturn {
   // Entities
   entities: CatalogueEntity[];
   isLoadingEntities: boolean;
+
+  // Mutation loading states
+  isAddingEntity: boolean;
+  isRemovingEntity: boolean;
+  isUpdatingList: boolean;
+  isDeletingList: boolean;
 
   // CRUD Operations
   createList: (params: {
@@ -175,12 +182,21 @@ export const useCatalogue = (options: UseCatalogueOptions = {}): UseCatalogueRet
   // Get storage provider from context
   const storage = useStorageProvider();
 
+  // Get notifications for success/error feedback
+  const { showNotification } = useNotifications();
+
   // State
   const [lists, setLists] = useState<CatalogueList[]>([]);
   const [selectedListId, setSelectedListId] = useState<string | null>(focusedListId || null);
   const [entities, setEntities] = useState<CatalogueEntity[]>([]);
   const [isLoadingLists, setIsLoadingLists] = useState(false);
   const [isLoadingEntities, setIsLoadingEntities] = useState(false);
+
+  // Mutation loading states
+  const [isAddingEntity, setIsAddingEntity] = useState(false);
+  const [isRemovingEntity, setIsRemovingEntity] = useState(false);
+  const [isUpdatingList, setIsUpdatingList] = useState(false);
+  const [isDeletingList, setIsDeletingList] = useState(false);
 
   // Get selected list object
   const selectedList = lists.find(list => list.id === selectedListId) || null;
@@ -252,7 +268,7 @@ export const useCatalogue = (options: UseCatalogueOptions = {}): UseCatalogueRet
     return unsubscribe;
   }, [autoRefresh, refreshLists, refreshEntities, selectedListId]);
 
-  // Create list
+  // Create list (optimistic update)
   const createList = useCallback(async (params: {
     title: string;
     description?: string;
@@ -260,70 +276,222 @@ export const useCatalogue = (options: UseCatalogueOptions = {}): UseCatalogueRet
     tags?: string[];
     isPublic?: boolean;
   }): Promise<string> => {
+    // Create temporary optimistic list
+    const optimisticListId = `temp-${crypto.randomUUID()}`;
+    const optimisticList: CatalogueList = {
+      id: optimisticListId,
+      title: params.title,
+      description: params.description,
+      type: params.type,
+      tags: params.tags || [],
+      isPublic: params.isPublic || false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Optimistically add to lists
+    setLists((prev) => [...prev, optimisticList]);
+
     try {
       const listId = await storage.createList(params);
+
+      // Replace optimistic list with real one
+      setLists((prev) =>
+        prev.map((l) =>
+          l.id === optimisticListId ? { ...optimisticList, id: listId } : l
+        )
+      );
 
       // Auto-select the new list
       setSelectedListId(listId);
 
+      showNotification({
+        title: "Success",
+        message: `Created "${params.title}"`,
+        category: "success",
+      });
+
       return listId;
     } catch (error) {
+      // Rollback: remove optimistic list
+      setLists((prev) => prev.filter((l) => l.id !== optimisticListId));
+
       logger.error(CATALOGUE_LOGGER_CONTEXT, "Failed to create catalogue list", { params, error });
-      // T079: Throw user-friendly error message
+
+      showNotification({
+        title: "Error",
+        message: getUserFriendlyErrorMessage(error),
+        category: "error",
+      });
+
       throw new Error(getUserFriendlyErrorMessage(error));
     }
-  }, [storage]);
+  }, [showNotification]);
 
-  // Update list
+  // Update list (optimistic update)
   const updateList = useCallback(async (
     listId: string,
     updates: Partial<Pick<CatalogueList, "title" | "description" | "tags" | "isPublic">>
   ): Promise<void> => {
+    setIsUpdatingList(true);
+
+    // Store previous state for rollback
+    const previousLists = [...lists];
+    const listToUpdate = lists.find((l) => l.id === listId);
+
+    if (!listToUpdate) {
+      showNotification({
+        title: "Error",
+        message: "List not found",
+        category: "error",
+      });
+      setIsUpdatingList(false);
+      return;
+    }
+
+    // Optimistically update list
+    setLists((prev) =>
+      prev.map((l) =>
+        l.id === listId ? { ...l, ...updates, updatedAt: new Date() } : l
+      )
+    );
+
     try {
       await storage.updateList(listId, updates);
-    } catch (error) {
-      logger.error(CATALOGUE_LOGGER_CONTEXT, "Failed to update catalogue list", { listId, updates, error });
-      // T079: Throw user-friendly error message
-      throw new Error(getUserFriendlyErrorMessage(error));
-    }
-  }, [storage]);
 
-  // Delete list
+      showNotification({
+        title: "Success",
+        message: "List updated",
+        category: "success",
+      });
+    } catch (error) {
+      // Rollback: restore previous state
+      setLists(previousLists);
+
+      logger.error(CATALOGUE_LOGGER_CONTEXT, "Failed to update catalogue list", { listId, updates, error });
+
+      showNotification({
+        title: "Error",
+        message: getUserFriendlyErrorMessage(error),
+        category: "error",
+      });
+
+      throw new Error(getUserFriendlyErrorMessage(error));
+    } finally {
+      setIsUpdatingList(false);
+    }
+  }, [lists, showNotification]);
+
+  // Delete list (optimistic update)
   const deleteList = useCallback(async (listId: string): Promise<void> => {
+    setIsDeletingList(true);
+
+    // Store previous state for rollback
+    const previousLists = [...lists];
+    const listToDelete = lists.find((l) => l.id === listId);
+    const wasSelected = selectedListId === listId;
+
+    // Optimistically remove list
+    setLists((prev) => prev.filter((l) => l.id !== listId));
+
+    // Clear selection if deleted list was selected
+    if (wasSelected) {
+      setSelectedListId(null);
+    }
+
     try {
       await storage.deleteList(listId);
 
-      // Clear selection if deleted list was selected
-      if (selectedListId === listId) {
-        setSelectedListId(null);
-      }
+      showNotification({
+        title: "Success",
+        message: `Deleted "${listToDelete?.title || "list"}"`,
+        category: "success",
+      });
     } catch (error) {
+      // Rollback: restore list and selection
+      setLists(previousLists);
+      if (wasSelected) {
+        setSelectedListId(listId);
+      }
+
       logger.error(CATALOGUE_LOGGER_CONTEXT, "Failed to delete catalogue list", { listId, error });
-      // T079: Throw user-friendly error message
+
+      showNotification({
+        title: "Error",
+        message: getUserFriendlyErrorMessage(error),
+        category: "error",
+      });
+
       throw new Error(getUserFriendlyErrorMessage(error));
+    } finally {
+      setIsDeletingList(false);
     }
-  }, [selectedListId, storage]);
+  }, [lists, selectedListId, showNotification]);
 
   // Select list
   const selectList = useCallback((listId: string | null) => {
     setSelectedListId(listId);
   }, []);
 
-  // Add entity to list
+  // Add entity to list (optimistic update)
   const addEntityToList = useCallback(async (params: {
     listId: string;
     entityType: EntityType;
     entityId: string;
     notes?: string;
   }): Promise<string> => {
+    setIsAddingEntity(true);
+
+    // Create temporary optimistic entity for immediate UI feedback
+    const optimisticEntity: CatalogueEntity = {
+      id: `temp-${crypto.randomUUID()}`,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      notes: params.notes,
+      listId: params.listId,
+      position: entities.length,
+      addedAt: new Date(),
+    };
+
+    // Optimistically add to local state
+    setEntities((prev) => [...prev, optimisticEntity]);
+
     try {
-      return await storage.addEntityToList(params);
+      const recordId = await storage.addEntityToList(params);
+
+      // Success: replace optimistic entity with real one
+      setEntities((prev) =>
+        prev.map((e) =>
+          e.id === optimisticEntity.id
+            ? { ...optimisticEntity, id: recordId }
+            : e
+        )
+      );
+
+      showNotification({
+        title: "Success",
+        message: `Added ${params.entityType} to list`,
+        category: "success",
+      });
+
+      return recordId;
     } catch (error) {
+      // Error: rollback optimistic update
+      setEntities((prev) => prev.filter((e) => e.id !== optimisticEntity.id));
+
       logger.error(CATALOGUE_LOGGER_CONTEXT, "Failed to add entity to catalogue list", { params, error });
-      // T079: Throw user-friendly error message
+
+      showNotification({
+        title: "Error",
+        message: getUserFriendlyErrorMessage(error),
+        category: "error",
+      });
+
       throw new Error(getUserFriendlyErrorMessage(error));
+    } finally {
+      setIsAddingEntity(false);
     }
-  }, [storage]);
+  }, [storage, entities, showNotification]);
 
   // Add multiple entities to list
   const addEntitiesToList = useCallback(async (
@@ -346,25 +514,55 @@ export const useCatalogue = (options: UseCatalogueOptions = {}): UseCatalogueRet
     }
   }, []);
 
-  // Remove entity from list
+  // Remove entity from list (optimistic update)
   const removeEntityFromList = useCallback(async (listId: string, entityRecordId: string): Promise<void> => {
+    setIsRemovingEntity(true);
+
+    // Find and store the entity for potential rollback
+    const entityToRemove = entities.find((e) => e.id === entityRecordId);
+
+    // Optimistically remove from local state
+    setEntities((prev) => prev.filter((e) => e.id !== entityRecordId));
+
     try {
       await storage.removeEntityFromList(listId, entityRecordId);
-      // T085: Refresh entities after removal to update UI
+
+      // Refresh to ensure consistency with storage
       await refreshEntities(listId);
+
+      showNotification({
+        title: "Success",
+        message: "Removed from list",
+        category: "success",
+      });
+
       logger.debug(CATALOGUE_LOGGER_CONTEXT, "Entity removed and list refreshed", {
         listId,
         entityRecordId
       });
     } catch (error) {
+      // Error: rollback by restoring the removed entity
+      if (entityToRemove) {
+        setEntities((prev) => [...prev, entityToRemove]);
+      }
+
       logger.error(CATALOGUE_LOGGER_CONTEXT, "Failed to remove entity from catalogue list", {
         listId,
         entityRecordId,
         error
       });
-      throw error;
+
+      showNotification({
+        title: "Error",
+        message: getUserFriendlyErrorMessage(error),
+        category: "error",
+      });
+
+      throw new Error(getUserFriendlyErrorMessage(error));
+    } finally {
+      setIsRemovingEntity(false);
     }
-  }, [storage, refreshEntities]);
+  }, [entities, storage, refreshEntities, showNotification]);
 
   // Reorder entities in list
   const reorderEntities = useCallback(async (listId: string, orderedEntityIds: string[]): Promise<void> => {
@@ -1451,6 +1649,12 @@ export const useCatalogue = (options: UseCatalogueOptions = {}): UseCatalogueRet
     // Entities
     entities,
     isLoadingEntities,
+
+    // Mutation loading states
+    isAddingEntity,
+    isRemovingEntity,
+    isUpdatingList,
+    isDeletingList,
 
     // CRUD Operations
     createList,

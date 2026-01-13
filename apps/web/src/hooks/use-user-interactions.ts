@@ -14,6 +14,7 @@ import {
 import { useLocation } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useNotifications } from "@/contexts/NotificationContext";
 import { serializeSearch } from "@/utils/url-decoding";
 
 const USER_INTERACTIONS_LOGGER_CONTEXT = "user-interactions";
@@ -107,6 +108,9 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
 
   // Get router location - must be called unconditionally at top level (React hooks rules)
   const location = useLocation();
+
+  // Get notifications for user feedback
+  const { showNotification } = useNotifications();
 
   // State
   const [recentHistory, setRecentHistory] = useState<CatalogueEntity[]>([]);
@@ -381,6 +385,10 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
         throw new Error("Entity ID and type are required to bookmark");
       }
 
+      // Optimistic update
+      const wasBookmarked = isBookmarked;
+      setIsBookmarked(true);
+
       try {
         await catalogueService.addBookmark({
           entityType: entityType as EntityType,
@@ -388,9 +396,17 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
           notes: tags ? `${notes || ''}\n\nTags: ${tags.join(', ')}` : notes,
         });
 
-        setIsBookmarked(true);
+        showNotification({
+          title: "Success",
+          message: "Added to bookmarks",
+          category: "success",
+        });
+
         await refreshData();
       } catch (error) {
+        // Rollback optimistic update
+        setIsBookmarked(wasBookmarked);
+
         logger.error(
           USER_INTERACTIONS_LOGGER_CONTEXT,
           "Failed to bookmark entity",
@@ -400,6 +416,13 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
             error,
           },
         );
+
+        showNotification({
+          title: "Error",
+          message: `Failed to bookmark: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          category: "error",
+        });
+
         throw error;
       }
     },
@@ -409,6 +432,8 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
       location.pathname,
       location.search,
       refreshData,
+      isBookmarked,
+      showNotification,
     ],
   );
 
@@ -416,6 +441,10 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
     if (!entityId || !entityType) {
       throw new Error("Entity ID and type are required to unbookmark");
     }
+
+    // Optimistic update
+    const wasBookmarked = isBookmarked;
+    setIsBookmarked(false);
 
     try {
       // Find the bookmark record for this entity
@@ -426,10 +455,19 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
 
       if (bookmark?.id) {
         await catalogueService.removeBookmark(bookmark.id);
-        setIsBookmarked(false);
+
+        showNotification({
+          title: "Success",
+          message: "Removed from bookmarks",
+          category: "success",
+        });
+
         await refreshData();
       }
     } catch (error) {
+      // Rollback optimistic update
+      setIsBookmarked(wasBookmarked);
+
       logger.error(
         USER_INTERACTIONS_LOGGER_CONTEXT,
         "Failed to unbookmark entity",
@@ -439,9 +477,16 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
           error,
         },
       );
+
+      showNotification({
+        title: "Error",
+        message: `Failed to remove bookmark: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        category: "error",
+      });
+
       throw error;
     }
-  }, [entityId, entityType, refreshData]);
+  }, [entityId, entityType, refreshData, isBookmarked, showNotification]);
 
   const bookmarkSearch = useCallback(
     async ({
@@ -468,6 +513,13 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
         });
 
         setIsBookmarked(true);
+
+        showNotification({
+          title: "Success",
+          message: "Saved search to bookmarks",
+          category: "success",
+        });
+
         await refreshData();
       } catch (error) {
         logger.error(
@@ -479,10 +531,17 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
             error,
           },
         );
+
+        showNotification({
+          title: "Error",
+          message: `Failed to save search: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          category: "error",
+        });
+
         throw error;
       }
     },
-    [location.pathname, location.search, refreshData],
+    [location.pathname, location.search, refreshData, showNotification],
   );
 
   const bookmarkList = useCallback(
@@ -508,6 +567,13 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
         });
 
         setIsBookmarked(true);
+
+        showNotification({
+          title: "Success",
+          message: "Saved list to bookmarks",
+          category: "success",
+        });
+
         await refreshData();
       } catch (error) {
         logger.error(
@@ -518,16 +584,26 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
             error,
           },
         );
+
+        showNotification({
+          title: "Error",
+          message: `Failed to save list: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          category: "error",
+        });
+
         throw error;
       }
     },
-    [refreshData],
+    [refreshData, showNotification],
   );
 
   const unbookmarkSearch = useCallback(async () => {
     if (!searchQuery) {
       throw new Error("Search query is required to unbookmark");
     }
+
+    const wasBookmarked = isBookmarked;
+    setIsBookmarked(false);
 
     try {
       // Find the bookmark record for this search
@@ -539,10 +615,19 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
 
       if (bookmark?.id) {
         await catalogueService.removeBookmark(bookmark.id);
-        setIsBookmarked(false);
+
+        showNotification({
+          title: "Success",
+          message: "Removed saved search from bookmarks",
+          category: "success",
+        });
+
         await refreshData();
       }
     } catch (error) {
+      // Rollback optimistic update
+      setIsBookmarked(wasBookmarked);
+
       logger.error(
         USER_INTERACTIONS_LOGGER_CONTEXT,
         "Failed to unbookmark search",
@@ -552,14 +637,24 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
           error,
         },
       );
+
+      showNotification({
+        title: "Error",
+        message: `Failed to remove: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        category: "error",
+      });
+
       throw error;
     }
-  }, [searchQuery, filters, refreshData]);
+  }, [searchQuery, filters, refreshData, isBookmarked, showNotification]);
 
   const unbookmarkList = useCallback(async () => {
     if (!url) {
       throw new Error("URL is required to unbookmark list");
     }
+
+    const wasBookmarked = isBookmarked;
+    setIsBookmarked(false);
 
     try {
       // Find the bookmark record for this list
@@ -571,10 +666,19 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
 
       if (bookmark?.id) {
         await catalogueService.removeBookmark(bookmark.id);
-        setIsBookmarked(false);
+
+        showNotification({
+          title: "Success",
+          message: "Removed saved list from bookmarks",
+          category: "success",
+        });
+
         await refreshData();
       }
     } catch (error) {
+      // Rollback optimistic update
+      setIsBookmarked(wasBookmarked);
+
       logger.error(
         USER_INTERACTIONS_LOGGER_CONTEXT,
         "Failed to unbookmark list",
@@ -583,9 +687,16 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
           error,
         },
       );
+
+      showNotification({
+        title: "Error",
+        message: `Failed to remove: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        category: "error",
+      });
+
       throw error;
     }
-  }, [url, refreshData]);
+  }, [url, refreshData, isBookmarked, showNotification]);
 
   const updateBookmark = useCallback(
     async (
@@ -680,6 +791,12 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
           });
         }
 
+        showNotification({
+          title: "Success",
+          message: `Removed ${success} bookmark${success !== 1 ? 's' : ''}${failed > 0 ? ` (${failed} failed)` : ''}`,
+          category: "success",
+        });
+
         await refreshData(); // Refresh data after bulk operation
         return { success, failed };
       } catch (error) {
@@ -691,15 +808,29 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
             error,
           },
         );
+
+        showNotification({
+          title: "Error",
+          message: `Bulk remove failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          category: "error",
+        });
+
         throw error;
       }
     },
-    [refreshData],
+    [refreshData, showNotification],
   );
 
   const clearHistory = useCallback(async () => {
     try {
       await catalogueService.clearHistory();
+
+      showNotification({
+        title: "Success",
+        message: "History cleared",
+        category: "success",
+      });
+
       await refreshData();
     } catch (error) {
       logger.error(
@@ -707,9 +838,16 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
         "Failed to clear history",
         { error }
       );
+
+      showNotification({
+        title: "Error",
+        message: `Failed to clear history: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        category: "error",
+      });
+
       throw error;
     }
-  }, [refreshData]);
+  }, [refreshData, showNotification]);
 
   return {
     // Page visit tracking (now using catalogue history)

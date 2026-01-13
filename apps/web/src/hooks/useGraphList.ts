@@ -13,6 +13,7 @@ import {
 } from "@bibgraph/utils";
 import { useCallback, useEffect, useState } from "react";
 
+import { useNotifications } from "@/contexts/NotificationContext";
 import { useStorageProvider } from "@/contexts/storage-provider-context";
 import { useUndoRedoContext } from "@/contexts/UndoRedoContext";
 
@@ -84,6 +85,7 @@ export interface UseGraphListResult {
 export const useGraphList = (): UseGraphListResult => {
   const storage = useStorageProvider();
   const { addAction } = useUndoRedoContext();
+  const { showNotification } = useNotifications();
 
   // State
   const [nodes, setNodes] = useState<GraphListNode[]>([]);
@@ -176,6 +178,12 @@ export const useGraphList = (): UseGraphListResult => {
     try {
       const nodeId = await storage.addToGraphList(params);
 
+      showNotification({
+        title: "Success",
+        message: `Added ${params.label || params.entityId} to graph`,
+        category: "success",
+      });
+
       logger.debug(GRAPH_LIST_LOGGER_CONTEXT, "Node added to graph list", {
         entityType: params.entityType,
         entityId: params.entityId,
@@ -192,6 +200,12 @@ export const useGraphList = (): UseGraphListResult => {
 
       // Rollback optimistic update on error
       setNodes(prevNodes => prevNodes.filter(n => n.id !== optimisticNode.id));
+
+      showNotification({
+        title: "Error",
+        message: `Failed to add to graph: ${errorObj.message}`,
+        category: "error",
+      });
 
       logger.error(GRAPH_LIST_LOGGER_CONTEXT, "Failed to add node to graph list", {
         params,
@@ -240,6 +254,12 @@ export const useGraphList = (): UseGraphListResult => {
     try {
       const nodeIds = await storage.batchAddToGraphList(params);
 
+      showNotification({
+        title: "Success",
+        message: `Added ${params.length} nodes to graph`,
+        category: "success",
+      });
+
       logger.debug(GRAPH_LIST_LOGGER_CONTEXT, "Batch added nodes to graph list", {
         count: params.length,
         nodeIds
@@ -256,6 +276,12 @@ export const useGraphList = (): UseGraphListResult => {
       // Rollback optimistic updates on error
       const tempIds = new Set(optimisticNodes.map(n => n.id));
       setNodes(prevNodes => prevNodes.filter(n => !tempIds.has(n.id)));
+
+      showNotification({
+        title: "Error",
+        message: `Failed to add nodes: ${errorObj.message}`,
+        category: "error",
+      });
 
       logger.error(GRAPH_LIST_LOGGER_CONTEXT, "Failed to batch add nodes to graph list", {
         count: params.length,
@@ -276,6 +302,12 @@ export const useGraphList = (): UseGraphListResult => {
 
     try {
       await storage.removeFromGraphList(entityId);
+
+      showNotification({
+        title: "Success",
+        message: `Removed ${removedNode?.label || entityId} from graph`,
+        category: "success",
+      });
 
       // T045: Add undo/redo action for destructive operation
       if (removedNode) {
@@ -311,6 +343,12 @@ export const useGraphList = (): UseGraphListResult => {
       // Rollback optimistic update on error
       setNodes(previousNodes);
 
+      showNotification({
+        title: "Error",
+        message: `Failed to remove: ${errorObj.message}`,
+        category: "error",
+      });
+
       logger.error(GRAPH_LIST_LOGGER_CONTEXT, "Failed to remove node from graph list", {
         entityId,
         error: err
@@ -329,6 +367,12 @@ export const useGraphList = (): UseGraphListResult => {
 
     try {
       await storage.clearGraphList();
+
+      showNotification({
+        title: "Success",
+        message: `Cleared graph (${previousNodes.length} nodes removed)`,
+        category: "success",
+      });
 
       // T045: Add undo/redo action for destructive operation
       addAction({
@@ -362,6 +406,12 @@ export const useGraphList = (): UseGraphListResult => {
 
       // Rollback optimistic update on error
       setNodes(previousNodes);
+
+      showNotification({
+        title: "Error",
+        message: `Failed to clear graph: ${errorObj.message}`,
+        category: "error",
+      });
 
       logger.error(GRAPH_LIST_LOGGER_CONTEXT, "Failed to clear graph list", {
         error: err
