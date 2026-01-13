@@ -6,8 +6,8 @@ This directory contains all feature specifications for BibGraph, organized using
 
 | Status | Count |
 |--------|-------|
-| ✅ Complete | 22 |
-| 🚧 In Progress | 4 |
+| ✅ Complete | 23 |
+| 🚧 In Progress | 3 |
 | 📝 Draft | 4 |
 | ⚠️ Archived | 2 |
 
@@ -185,9 +185,9 @@ Implementation of all 12 OpenAlex entity types: Works, Authors, Sources, Institu
 ---
 
 ### spec-020: E2E Test Coverage
-**Status**: 🚧 In Progress | **Progress**: 0/107 tasks
+**Status**: ✅ Complete | **Completed**: 2026-01-13
 
-E2E test coverage enhancement. Plan to add missing tests for untested routes, implement workflow tests, add error scenario coverage, and automate high-value manual tests.
+E2E test coverage enhancement with 100% route coverage. Added route manifest documenting all 37 routes across 12 entity types. All entity tests passing with dedicated tests for domains, fields, subfields, and keywords. Auto-discovery tests (page-smoke) cover all routes.
 
 [View Spec](./020-e2e-test-coverage/)
 
