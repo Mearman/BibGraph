@@ -1,3 +1,19 @@
+## 24.7.0 (2026-01-13)
+
+* fix(algorithms): remove non-null assertions violating constitution ([e1daea0](https://github.com/Mearman/BibGraph/commit/e1daea0))
+* fix(config): allow apps/web/coverage/ source files ([a059c25](https://github.com/Mearman/BibGraph/commit/a059c25))
+* test(algorithms): add extended features unit tests for path ranking ([e721380](https://github.com/Mearman/BibGraph/commit/e721380)), closes [hi#weight](https://github.com/hi/issues/weight)
+* test(algorithms): add mutual information unit tests ([931ca21](https://github.com/Mearman/BibGraph/commit/931ca21))
+* test(algorithms): add path ranking unit tests ([be01384](https://github.com/Mearman/BibGraph/commit/be01384))
+* test(algorithms): require explicit directed traversal in edge direction test ([2d2f2b5](https://github.com/Mearman/BibGraph/commit/2d2f2b5))
+* feat(algorithms): add information-theoretic path ranking module ([7a801fd](https://github.com/Mearman/BibGraph/commit/7a801fd))
+* feat(algorithms): add mutual information computation module ([930c55d](https://github.com/Mearman/BibGraph/commit/930c55d))
+* feat(algorithms): add traversal and weight modes to path ranking ([757b2fb](https://github.com/Mearman/BibGraph/commit/757b2fb))
+* feat(algorithms): export path ranking modules from index ([cc50732](https://github.com/Mearman/BibGraph/commit/cc50732))
+* feat(algorithms): extend mutual information with graph property modifiers ([17435c7](https://github.com/Mearman/BibGraph/commit/17435c7))
+* docs(spec): mark spec-005 test environment MSW as complete ([42d9aef](https://github.com/Mearman/BibGraph/commit/42d9aef))
+* style(web): convert functions to arrow functions in route-manifest.ts ([f8832a9](https://github.com/Mearman/BibGraph/commit/f8832a9))
+
 ## 24.6.0 (2026-01-13)
 
 * fix(config): exclude coverage directories from ESLint ignores ([14cf052](https://github.com/Mearman/BibGraph/commit/14cf052))
