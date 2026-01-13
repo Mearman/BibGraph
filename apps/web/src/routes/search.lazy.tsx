@@ -18,6 +18,7 @@ import {
   Stack,
   Table,
   Text,
+  TextInput,
   Title,
   Tooltip,
 } from "@mantine/core";
@@ -28,8 +29,10 @@ import {
   IconGraph,
   IconLayoutGrid,
   IconList,
+  IconSearch,
   IconTable,
   IconToggleLeft,
+  IconX,
 } from "@tabler/icons-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute, useSearch } from "@tanstack/react-router";
@@ -211,6 +214,9 @@ const SearchPage = () => {
 
   // Entity type filter state
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+
+  // Search within results refinement state
+  const [refinementQuery, setRefinementQuery] = useState<string>("");
 
   // Search duration tracking
   const [searchStartTime, setSearchStartTime] = useState<number>(0);
@@ -449,12 +455,28 @@ const SearchPage = () => {
   const hasResults = searchResults && searchResults.length > 0;
   const hasQuery = Boolean(searchFilters.query.trim());
 
-  // Filter results by selected entity types
+  // Filter results by selected entity types and refinement query
   const filteredResults = useMemo(() => {
     if (!searchResults) return [];
-    if (selectedTypes.length === 0) return searchResults;
-    return searchResults.filter(result => selectedTypes.includes(result.entity_type));
-  }, [searchResults, selectedTypes]);
+
+    let results = searchResults;
+
+    // Filter by entity type
+    if (selectedTypes.length > 0) {
+      results = results.filter(result => selectedTypes.includes(result.entity_type));
+    }
+
+    // Filter by refinement query (search within results)
+    if (refinementQuery.trim()) {
+      const query = refinementQuery.toLowerCase();
+      results = results.filter(result =>
+        result.display_name.toLowerCase().includes(query) ||
+        (result.id && result.id.toLowerCase().includes(query))
+      );
+    }
+
+    return results;
+  }, [searchResults, selectedTypes, refinementQuery]);
 
   // Sort and filter results by selected sort option
   const sortedResults = useMemo(() => {
@@ -890,6 +912,37 @@ const SearchPage = () => {
           isLoading={isLoading}
           placeholder="Search for works, authors, institutions, topics... e.g. 'machine learning', 'Marie Curie', 'MIT'"
         />
+
+        {/* Search Within Results Refinement */}
+        {hasQuery && hasResults && (
+          <Card padding="sm" radius="sm" style={{ border: BORDER_STYLE_GRAY_3 }}>
+            <TextInput
+              placeholder="Search within results..."
+              value={refinementQuery}
+              onChange={(e) => setRefinementQuery(e.currentTarget.value)}
+              leftSection={<IconSearch size={ICON_SIZE.SM} />}
+              rightSection={
+                refinementQuery && (
+                  <ActionIcon
+                    size="sm"
+                    variant="transparent"
+                    color="gray"
+                    onClick={() => setRefinementQuery('')}
+                    aria-label="Clear refinement"
+                  >
+                    <IconX size={ICON_SIZE.XS} />
+                  </ActionIcon>
+                )
+              }
+              size="sm"
+            />
+            {refinementQuery && (
+              <Text size="xs" c="dimmed" mt="xs">
+                Filtering {sortedResults.length} of {searchResults.length} results by "{refinementQuery}"
+              </Text>
+            )}
+          </Card>
+        )}
 
         {hasQuery && <Card style={{ border: BORDER_STYLE_GRAY_3 }}>{renderSearchResults()}</Card>}
 
