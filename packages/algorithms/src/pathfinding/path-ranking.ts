@@ -226,8 +226,14 @@ const findAllShortestPaths = <N extends Node, E extends Edge>(
   };
 
   while (queue.length > 0) {
-    const current = queue.shift()!;
-    const currentDist = distances.get(current)!;
+    const current = queue.shift();
+    if (current === undefined) {
+      break;
+    }
+    const currentDist = distances.get(current);
+    if (currentDist === undefined) {
+      continue;
+    }
 
     // Stop if we've exceeded the target distance
     if (currentDist >= targetDistance) {
@@ -252,7 +258,10 @@ const findAllShortestPaths = <N extends Node, E extends Edge>(
         }
       } else if (existingDist === newDist) {
         // Found another shortest path to this node
-        predecessors.get(neighbour)!.push({ nodeId: current, edge });
+        const predList = predecessors.get(neighbour);
+        if (predList) {
+          predList.push({ nodeId: current, edge });
+        }
       }
       // If existingDist < newDist, we already have a shorter path, skip
     }

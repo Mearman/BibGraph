@@ -574,10 +574,12 @@ export const precomputeMutualInformation = <N extends Node, E extends Edge>(
 
   // Helper to get/cache neighbour set
   const getOrCacheNeighbourSet = (nodeId: string): Set<string> => {
-    if (!neighbourCache.has(nodeId)) {
-      neighbourCache.set(nodeId, getNeighbourSet(graph, nodeId));
+    let neighbourSet = neighbourCache.get(nodeId);
+    if (!neighbourSet) {
+      neighbourSet = getNeighbourSet(graph, nodeId);
+      neighbourCache.set(nodeId, neighbourSet);
     }
-    return neighbourCache.get(nodeId)!;
+    return neighbourSet;
   };
 
   // Compute base MI for an edge
