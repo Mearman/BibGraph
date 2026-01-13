@@ -16,8 +16,37 @@ import {
  * Ranks paths between two nodes based on the geometric mean of mutual
  * information along their edges, with an optional length penalty.
  *
+ * Supports:
+ * - **Traversal modes**: Directed or undirected traversal (independent of graph structure)
+ * - **Weight modes**: None, divide by mean weight, or multiplicative penalty
+ * - **Length penalty**: Exponential penalty for longer paths
+ *
  * @module pathfinding/path-ranking
  */
+
+/**
+ * Traversal mode determines how edges are traversed during path finding.
+ *
+ * This is INDEPENDENT of the graph's inherent directionality:
+ * - **directed**: Only traverse edges in their natural direction
+ *   - On directed graph: Follow edge direction strictly
+ *   - On undirected graph: Treat as ordered sequence
+ * - **undirected**: Traverse edges in both directions
+ *   - On directed graph: Can go against edge direction
+ *   - On undirected graph: Bidirectional (default behaviour)
+ */
+export type TraversalMode = 'directed' | 'undirected';
+
+/**
+ * Weight mode determines how edge weights affect path scoring.
+ *
+ * - **none**: Ignore edge weights (default)
+ * - **divide**: Divide MI score by arithmetic mean of edge weights
+ *   Score = geometric_mean(MI) / arithmetic_mean(weights)
+ * - **multiplicative**: Apply multiplicative penalty from weights
+ *   Score = geometric_mean(MI) × exp(-mean(log(weights)))
+ */
+export type WeightMode = 'none' | 'divide' | 'multiplicative';
 
 /**
  * A ranked path with its computed score.
@@ -36,13 +65,28 @@ export interface RankedPath<N extends Node, E extends Edge> {
 
   /** Individual MI values for each edge in the path */
   edgeMIValues: number[];
+
+  /** Length penalty factor exp(-λk), only present if lambda > 0 */
+  lengthPenalty?: number;
+
+  /** Weight factor applied to score, only present if weightMode != 'none' */
+  weightFactor?: number;
 }
 
 /**
  * Configuration for path ranking.
  * @template N - Node type
+ * @template E - Edge type
  */
-export interface PathRankingConfig<N extends Node> {
+export interface PathRankingConfig<N extends Node, E extends Edge = Edge> {
+  /**
+   * Traversal mode for path finding.
+   * - 'directed': Only traverse edges in their natural direction
+   * - 'undirected': Traverse edges in both directions (default)
+   * @default 'undirected'
+   */
+  traversalMode?: TraversalMode;
+
   /**
    * Length penalty parameter λ.
    * - λ = 0: Path length irrelevant, purely information quality (default)
@@ -51,6 +95,21 @@ export interface PathRankingConfig<N extends Node> {
    * @default 0
    */
   lambda?: number;
+
+  /**
+   * Weight mode for incorporating edge weights.
+   * - 'none': Ignore weights (default)
+   * - 'divide': Divide score by mean weight
+   * - 'multiplicative': Apply multiplicative weight penalty
+   * @default 'none'
+   */
+  weightMode?: WeightMode;
+
+  /**
+   * Extract weight from an edge.
+   * If not provided, uses edge.weight property (defaulting to 1).
+   */
+  weightExtractor?: (edge: E) => number;
 
   /**
    * Maximum number of paths to return.
@@ -75,7 +134,7 @@ export interface PathRankingConfig<N extends Node> {
   /**
    * Configuration for MI computation (only used if miCache not provided).
    */
-  miConfig?: MutualInformationConfig<N>;
+  miConfig?: MutualInformationConfig<N, E>;
 
   /**
    * Small constant to avoid log(0).
@@ -94,6 +153,7 @@ export interface PathRankingConfig<N extends Node> {
  * @param graph - The graph to search
  * @param startId - Source node ID
  * @param endId - Target node ID
+ * @param traversalMode - How to traverse edges
  * @returns Array of all shortest paths
  * @internal
  */
@@ -101,6 +161,7 @@ const findAllShortestPaths = <N extends Node, E extends Edge>(
   graph: Graph<N, E>,
   startId: string,
   endId: string,
+  traversalMode: TraversalMode = 'undirected',
 ): Path<N, E>[] => {
   if (startId === endId) {
     const node = graph.getNode(startId);
@@ -120,6 +181,50 @@ const findAllShortestPaths = <N extends Node, E extends Edge>(
   const queue: string[] = [startId];
   let targetDistance = Infinity;
 
+  // For undirected traversal, pre-compute all edges where node is target
+  // This allows traversing edges in reverse direction on directed graphs
+  const incomingEdgesByNode = new Map<string, E[]>();
+  if (traversalMode === 'undirected') {
+    for (const edge of graph.getAllEdges()) {
+      // Store edges by their target node (for reverse traversal)
+      const targetEdges = incomingEdgesByNode.get(edge.target) ?? [];
+      targetEdges.push(edge);
+      incomingEdgesByNode.set(edge.target, targetEdges);
+    }
+  }
+
+  // Helper to get traversable neighbours based on traversal mode
+  const getTraversableNeighbours = (current: string): Array<{ neighbour: string; edge: E }> => {
+    const result: Array<{ neighbour: string; edge: E }> = [];
+    const seenEdges = new Set<string>();
+
+    // Get outgoing edges (always valid)
+    const outgoing = graph.getOutgoingEdges(current);
+    if (outgoing.ok) {
+      for (const edge of outgoing.value) {
+        const neighbour = edge.source === current ? edge.target : edge.source;
+        result.push({ neighbour, edge });
+        seenEdges.add(edge.id);
+      }
+    }
+
+    // For undirected traversal, also include edges where current is the target
+    // (allows traversing edges in reverse direction)
+    if (traversalMode === 'undirected') {
+      const incoming = incomingEdgesByNode.get(current) ?? [];
+      for (const edge of incoming) {
+        if (!seenEdges.has(edge.id)) {
+          // Current is the target, so source is the neighbour
+          const neighbour = edge.source;
+          result.push({ neighbour, edge });
+          seenEdges.add(edge.id);
+        }
+      }
+    }
+
+    return result;
+  };
+
   while (queue.length > 0) {
     const current = queue.shift()!;
     const currentDist = distances.get(current)!;
@@ -129,11 +234,9 @@ const findAllShortestPaths = <N extends Node, E extends Edge>(
       continue;
     }
 
-    const edgesResult = graph.getOutgoingEdges(current);
-    if (!edgesResult.ok) continue;
+    const neighbours = getTraversableNeighbours(current);
 
-    for (const edge of edgesResult.value) {
-      const neighbour = edge.source === current ? edge.target : edge.source;
+    for (const { neighbour, edge } of neighbours) {
       const newDist = currentDist + 1;
 
       const existingDist = distances.get(neighbour);
@@ -205,14 +308,28 @@ const findAllShortestPaths = <N extends Node, E extends Edge>(
 };
 
 /**
+ * Score result from path computation.
+ * @internal
+ */
+interface PathScoreResult {
+  score: number;
+  geometricMeanMI: number;
+  edgeMIValues: number[];
+  lengthPenalty?: number;
+  weightFactor?: number;
+}
+
+/**
  * Compute the ranking score for a path.
  *
- * M(P) = exp((1/k) × Σᵢ log(I(uᵢ; vᵢ))) × exp(-λk)
+ * M(P) = exp((1/k) × Σᵢ log(I(uᵢ; vᵢ))) × exp(-λk) × weightFactor
  *
  * @param path - The path to score
  * @param miCache - Pre-computed MI values
  * @param lambda - Length penalty parameter
  * @param epsilon - Small constant for log safety
+ * @param weightMode - How to incorporate edge weights
+ * @param weightExtractor - Function to extract weight from edge
  * @returns Object containing score and component values
  * @internal
  */
@@ -221,7 +338,9 @@ const computePathScore = <N extends Node, E extends Edge>(
   miCache: MutualInformationCache,
   lambda: number,
   epsilon: number,
-): { score: number; geometricMeanMI: number; edgeMIValues: number[] } => {
+  weightMode: WeightMode = 'none',
+  weightExtractor?: (edge: E) => number,
+): PathScoreResult => {
   const k = path.edges.length;
 
   if (k === 0) {
@@ -233,22 +352,54 @@ const computePathScore = <N extends Node, E extends Edge>(
   const edgeMIValues: number[] = [];
   let sumLogMI = 0;
 
+  // Collect weights if needed
+  const weights: number[] = [];
+
   for (const edge of path.edges) {
     const mi = miCache.get(edge.id) ?? epsilon;
     edgeMIValues.push(mi);
     sumLogMI += Math.log(mi + epsilon);
+
+    if (weightMode !== 'none') {
+      const weight = weightExtractor ? weightExtractor(edge) : (edge.weight ?? 1);
+      weights.push(Math.max(weight, epsilon)); // Ensure positive
+    }
   }
 
   // Geometric mean: exp(mean(log(MI)))
   const geometricMeanMI = Math.exp(sumLogMI / k);
 
   // Length penalty: exp(-λk)
-  const lengthPenalty = Math.exp(-lambda * k);
+  const lengthPenalty = lambda > 0 ? Math.exp(-lambda * k) : undefined;
+
+  // Weight factor
+  let weightFactor: number | undefined;
+  if (weightMode === 'divide' && weights.length > 0) {
+    // Divide by arithmetic mean of weights
+    const meanWeight = weights.reduce((a, b) => a + b, 0) / weights.length;
+    weightFactor = 1 / Math.max(meanWeight, epsilon);
+  } else if (weightMode === 'multiplicative' && weights.length > 0) {
+    // Multiplicative penalty: exp(-mean(log(weights)))
+    const meanLogWeight = weights.reduce((a, w) => a + Math.log(w), 0) / weights.length;
+    weightFactor = Math.exp(-meanLogWeight);
+  }
 
   // Final score
-  const score = geometricMeanMI * lengthPenalty;
+  let score = geometricMeanMI;
+  if (lengthPenalty !== undefined) {
+    score *= lengthPenalty;
+  }
+  if (weightFactor !== undefined) {
+    score *= weightFactor;
+  }
 
-  return { score, geometricMeanMI, edgeMIValues };
+  return {
+    score,
+    geometricMeanMI,
+    edgeMIValues,
+    lengthPenalty,
+    weightFactor,
+  };
 };
 
 /**
@@ -297,10 +448,13 @@ export const rankPaths = <N extends Node, E extends Edge>(
   graph: Graph<N, E>,
   startId: string,
   endId: string,
-  config: PathRankingConfig<N> = {},
+  config: PathRankingConfig<N, E> = {},
 ): Result<Option<RankedPath<N, E>[]>, GraphError> => {
   const {
+    traversalMode = 'undirected',
     lambda = 0,
+    weightMode = 'none',
+    weightExtractor,
     maxPaths = 10,
     miCache: providedCache,
     miConfig = {},
@@ -334,8 +488,8 @@ export const rankPaths = <N extends Node, E extends Edge>(
   // Get or compute MI cache
   const miCache = providedCache ?? precomputeMutualInformation(graph, miConfig);
 
-  // Find all shortest paths
-  const paths = findAllShortestPaths(graph, startId, endId);
+  // Find all shortest paths with specified traversal mode
+  const paths = findAllShortestPaths(graph, startId, endId, traversalMode);
 
   if (paths.length === 0) {
     return Ok(None()); // No path exists
@@ -343,18 +497,22 @@ export const rankPaths = <N extends Node, E extends Edge>(
 
   // Score and rank paths
   const rankedPaths: RankedPath<N, E>[] = paths.map((path) => {
-    const { score, geometricMeanMI, edgeMIValues } = computePathScore(
+    const scoreResult = computePathScore(
       path,
       miCache,
       lambda,
       epsilon,
+      weightMode,
+      weightExtractor,
     );
 
     return {
       path,
-      score,
-      geometricMeanMI,
-      edgeMIValues,
+      score: scoreResult.score,
+      geometricMeanMI: scoreResult.geometricMeanMI,
+      edgeMIValues: scoreResult.edgeMIValues,
+      lengthPenalty: scoreResult.lengthPenalty,
+      weightFactor: scoreResult.weightFactor,
     };
   });
 
@@ -393,7 +551,7 @@ export const getBestPath = <N extends Node, E extends Edge>(
   graph: Graph<N, E>,
   startId: string,
   endId: string,
-  config: PathRankingConfig<N> = {},
+  config: PathRankingConfig<N, E> = {},
 ): Result<Option<RankedPath<N, E>>, GraphError> => {
   const result = rankPaths(graph, startId, endId, { ...config, maxPaths: 1 });
 
@@ -435,7 +593,7 @@ export const getBestPath = <N extends Node, E extends Edge>(
  */
 export const createPathRanker = <N extends Node, E extends Edge>(
   graph: Graph<N, E>,
-  config: Omit<PathRankingConfig<N>, 'miCache'> = {},
+  config: Omit<PathRankingConfig<N, E>, 'miCache'> = {},
 ) => {
   // Pre-compute MI cache once
   const miCache = precomputeMutualInformation(graph, config.miConfig ?? {});
@@ -447,7 +605,7 @@ export const createPathRanker = <N extends Node, E extends Edge>(
     rank: (
       startId: string,
       endId: string,
-      overrides: Partial<PathRankingConfig<N>> = {},
+      overrides: Partial<PathRankingConfig<N, E>> = {},
     ) => rankPaths(graph, startId, endId, { ...config, ...overrides, miCache }),
 
     /**
@@ -456,7 +614,7 @@ export const createPathRanker = <N extends Node, E extends Edge>(
     getBest: (
       startId: string,
       endId: string,
-      overrides: Partial<PathRankingConfig<N>> = {},
+      overrides: Partial<PathRankingConfig<N, E>> = {},
     ) =>
       getBestPath(graph, startId, endId, { ...config, ...overrides, miCache }),
 
