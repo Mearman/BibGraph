@@ -166,7 +166,9 @@ flowchart LR
 
     %% Task dependencies
     algorithms_typecheck --> algorithms_build
+    types_build --> algorithms_build
     algorithms_typecheck --> algorithms_test
+    types_build --> algorithms_typecheck
     client_build --> cli_test
     types_build --> cli_test
     utils_build --> cli_test
