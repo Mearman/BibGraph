@@ -41,6 +41,8 @@ export * from "./partitioning/spectral";
 // Pathfinding algorithms
 export * from "./pathfinding/priority-queue";
 export * from "./pathfinding/dijkstra";
+export * from "./pathfinding/mutual-information";
+export * from "./pathfinding/path-ranking";
 
 // Traversal algorithms
 export * from "./traversal/bfs";
