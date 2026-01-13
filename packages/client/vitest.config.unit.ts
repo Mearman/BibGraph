@@ -11,9 +11,9 @@ export default defineConfig({
 	plugins: [nxViteTsPaths(), nxCopyAssetsPlugin(["*.md"])],
 	resolve: {
 		alias: {
-			"@academic-explorer/types/entities": path.resolve(__dirname, "../../packages/types/src/entities/index.ts"),
-			"@academic-explorer/types": path.resolve(__dirname, "../../packages/types/src/index.ts"),
-			"@academic-explorer/utils": path.resolve(__dirname, "../../packages/utils/src/index.ts"),
+			"@bibgraph/types/entities": path.resolve(__dirname, "../../packages/types/src/entities/index.ts"),
+			"@bibgraph/types": path.resolve(__dirname, "../../packages/types/src/index.ts"),
+			"@bibgraph/utils": path.resolve(__dirname, "../../packages/utils/src/index.ts"),
 		},
 	},
 	test: {
