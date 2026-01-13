@@ -6,9 +6,9 @@ This directory contains all feature specifications for BibGraph, organized using
 
 | Status | Count |
 |--------|-------|
-| ✅ Complete | 25 |
+| ✅ Complete | 26 |
 | 🚧 In Progress | 1 |
-| 📝 Draft | 4 |
+| 📝 Draft | 3 |
 | ⚠️ Archived | 2 |
 
 ## Specifications
@@ -50,9 +50,9 @@ All test failures resolved. Current status: 1,422 tests passing (605 web + 817 g
 ---
 
 ### spec-005: Test Environment MSW
-**Status**: 📝 Draft
+**Status**: ✅ Complete | **Completed**: 2026-01-13
 
-Mock Service Worker (MSW) integration for test environment API mocking. E2E tests to run reliably without external API dependencies.
+Mock Service Worker (MSW) integration for test environment API mocking. Fixed Playwright webServer configuration (use `nx serve web` instead of `pnpm dev`), resolved ESLint configuration issues with coverage utility files, and updated gitignore to properly distinguish between generated reports and source files. E2E tests now run reliably without external API dependencies: 147 tests passing with ZERO HTTP 403 errors from OpenAlex API.
 
 [View Spec](./005-test-environment-msw/)
 
