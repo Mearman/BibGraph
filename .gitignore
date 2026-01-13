@@ -18,6 +18,8 @@ coverage-reports
 
 # Test results and artifacts
 test-results
+playwright-report*
+playwright-report-shard-*/
 
 # Editor directories and files
 .vscode/*
@@ -92,7 +94,6 @@ tools/dist/**/lib/
 graph.json
 
 # Test cache data files (generated during test execution with unified hex encoding)
-
 test-results.json
 
 # Working files protection (Constitution Principle XIV - Working Files Hygiene)
@@ -103,6 +104,9 @@ test-results.json
 *.png
 *.jpg
 *.jpeg
+
+# Route coverage reports (generated during E2E test verification)
+tools/scripts/route-coverage-report.md
 
 vite.config.*.timestamp*
 vitest.config.*.timestamp*
