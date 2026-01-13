@@ -464,23 +464,19 @@ export const COVERAGE_STATS = {
 
 /**
  * Get routes by test tag
+ * @param tag
  */
-export function getRoutesByTag(tag: string): readonly RoutePattern[] {
-  return ROUTE_MANIFEST.filter((route) =>
+export const getRoutesByTag = (tag: string): readonly RoutePattern[] => ROUTE_MANIFEST.filter((route) =>
     route.testTags.some((t) => t === tag || t.startsWith(tag))
   );
-}
 
 /**
  * Get routes by entity type
+ * @param entityType
  */
-export function getRoutesByEntityType(entityType: string): readonly RoutePattern[] {
-  return ROUTE_MANIFEST.filter((route) => route.entityType === entityType);
-}
+export const getRoutesByEntityType = (entityType: string): readonly RoutePattern[] => ROUTE_MANIFEST.filter((route) => route.entityType === entityType);
 
 /**
  * Get routes without coverage
  */
-export function getUncoveredRoutes(): readonly RoutePattern[] {
-  return ROUTE_MANIFEST.filter((route) => !route.hasCoverage);
-}
+export const getUncoveredRoutes = (): readonly RoutePattern[] => ROUTE_MANIFEST.filter((route) => !route.hasCoverage);
