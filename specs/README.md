@@ -6,9 +6,9 @@ This directory contains all feature specifications for BibGraph, organized using
 
 | Status | Count |
 |--------|-------|
-| ✅ Complete | 21 |
+| ✅ Complete | 22 |
 | 🚧 In Progress | 4 |
-| 📝 Draft | 5 |
+| 📝 Draft | 4 |
 | ⚠️ Archived | 2 |
 
 ## Specifications
@@ -59,9 +59,9 @@ Mock Service Worker (MSW) integration for test environment API mocking. E2E test
 ---
 
 ### spec-006: Application Rename
-**Status**: 📝 Draft
+**Status**: ✅ Complete | **Completed**: 2026-01-13
 
-Rename application to reflect updated scope and branding.
+Application renamed from "Academic Explorer" to "BibGraph". All public-facing URLs, package aliases, and meta tags updated.
 
 [View Spec](./006-application-rename/)
 
@@ -362,4 +362,4 @@ All specifications must align with the [BibGraph Constitution](../.specify/memor
 
 ---
 
-**Last Updated**: 2025-12-02 | **Total Specs**: 32 | **Maintained by**: [Constitution Principle XII](../.specify/memory/constitution.md#xii-spec-index-maintenance-non-negotiable)
+**Last Updated**: 2026-01-13 | **Total Specs**: 32 | **Maintained by**: [Constitution Principle XII](../.specify/memory/constitution.md#xii-spec-index-maintenance-non-negotiable)
