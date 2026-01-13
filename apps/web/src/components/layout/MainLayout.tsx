@@ -32,10 +32,12 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { KeyboardShortcutsButton, KeyboardShortcutsHelp } from "@/components/modals/KeyboardShortcutsHelp";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { OnboardingTutorial } from "@/components/onboarding";
 import { SyncStatusIndicator } from "@/components/sync/SyncStatusIndicator";
 import { UndoRedoControls } from "@/components/undo-redo/UndoRedoControls";
 import { ICON_SIZE } from "@/config/style-constants";
 import { useGlobalHotkeys } from "@/hooks/use-hotkeys";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { useLayoutStore } from "@/stores/layout-store";
 import { sprinkles } from "@/styles/sprinkles";
 import {
@@ -86,6 +88,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   // Keyboard shortcuts state
   const [shortcutsHelpOpened, setShortcutsHelpOpened] = useState(false);
+
+  // User onboarding state
+  const { showOnboarding, closeOnboarding } = useOnboarding();
 
   // Set up global keyboard shortcuts
   useGlobalHotkeys({
@@ -704,6 +709,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       <KeyboardShortcutsHelp
         opened={shortcutsHelpOpened}
         onClose={() => setShortcutsHelpOpened(false)}
+      />
+
+      {/* User Onboarding Tutorial */}
+      <OnboardingTutorial
+        opened={showOnboarding}
+        onClose={closeOnboarding}
       />
 
       </AppShell>
