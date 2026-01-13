@@ -125,10 +125,10 @@ export default defineConfig({
 
   // Web server configuration for E2E tests
   webServer: process.env.CI ? undefined : {
-    // In dev, use dev server for hot reload and better DX
+    // In dev, use serve command for modern Vite setup
     // In CI, no webServer - expect external server to be running
     // Commands run from apps/web directory (set by Nx e2e target)
-    command: "pnpm dev",
+    command: "nx serve web",
     port: 5173,
     reuseExistingServer: true,
     stdout: "pipe",
