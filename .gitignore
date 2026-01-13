@@ -12,9 +12,11 @@ dist
 dist-ssr
 *.local
 
-# Test coverage
-coverage
+# Test coverage (root-level coverage reports from vitest/jest)
+/coverage
 coverage-reports
+# But allow source files in apps/*/coverage/ directories (test infrastructure utilities)
+!apps/web/coverage/
 
 # Test results and artifacts
 test-results

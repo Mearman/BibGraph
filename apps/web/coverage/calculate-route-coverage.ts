@@ -7,7 +7,7 @@
  * @module coverage/calculate-route-coverage
  */
 
-import { ROUTE_MANIFEST, COVERAGE_STATS } from './route-manifest';
+import { COVERAGE_STATS,ROUTE_MANIFEST } from './route-manifest';
 
 console.log('═══════════════════════════════════════════════════════════════');
 console.log('BibGraph E2E Route Coverage Report');
