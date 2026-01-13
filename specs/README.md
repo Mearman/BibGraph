@@ -275,9 +275,9 @@ Enhanced catalogue feature for advanced literature review workflows including PR
 ---
 
 ### spec-030: Remove Algorithm Result Truncation
-**Status**: 📝 Draft | **Created**: 2025-11-30
+**Status**: ✅ Complete | **Completed**: 2026-01-13
 
-Remove algorithm result truncation to show all results instead of "+N more" text, enabling complete data visibility for research analysis.
+Removed algorithm result truncation to show all results instead of "+N more" text. All motif detection results (triangles, star patterns, co-citations, bib coupling) now display completely. Button text updated to "Highlight All Triangles". Other components already displayed full results.
 
 [View Spec](./030-remove-algorithm-truncation/)
 
