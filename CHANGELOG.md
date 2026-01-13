@@ -1,3 +1,20 @@
+## 24.6.0 (2026-01-13)
+
+* fix(config): exclude coverage directories from ESLint ignores ([14cf052](https://github.com/Mearman/BibGraph/commit/14cf052))
+* fix(web): complete Academic Explorer to BibGraph migration ([856cb23](https://github.com/Mearman/BibGraph/commit/856cb23))
+* fix(web): resolve TypeScript compilation errors after catalogue refactoring ([eb1b657](https://github.com/Mearman/BibGraph/commit/eb1b657))
+* fix(web): use nx serve web command in Playwright webServer config ([2803734](https://github.com/Mearman/BibGraph/commit/2803734))
+* chore(gitignore): ignore generated test artifacts ([cea6cd2](https://github.com/Mearman/BibGraph/commit/cea6cd2))
+* docs(spec): mark spec-006 application rename as complete ([f4c4049](https://github.com/Mearman/BibGraph/commit/f4c4049))
+* docs(spec): mark spec-010 landing page layout as complete ([3859d17](https://github.com/Mearman/BibGraph/commit/3859d17))
+* docs(spec): mark spec-020 E2E test coverage as complete ([e2dab59](https://github.com/Mearman/BibGraph/commit/e2dab59))
+* docs(spec): mark spec-023 CI optimization as complete ([7de4c19](https://github.com/Mearman/BibGraph/commit/7de4c19))
+* docs(spec): mark spec-030 as complete ([40dc619](https://github.com/Mearman/BibGraph/commit/40dc619))
+* test(algorithms): fix flaky Louvain scaling test ([e1a4f6c](https://github.com/Mearman/BibGraph/commit/e1a4f6c))
+* test(web): add route coverage calculation script ([45668d2](https://github.com/Mearman/BibGraph/commit/45668d2))
+* feat(web): add route manifest for coverage tracking ([982a1e4](https://github.com/Mearman/BibGraph/commit/982a1e4))
+* feat(web): remove algorithm result truncation ([9139afd](https://github.com/Mearman/BibGraph/commit/9139afd))
+
 ## 24.5.0 (2026-01-13)
 
 * docs: document related repositories and update task graph ([f5b065e](https://github.com/Mearman/BibGraph/commit/f5b065e))
