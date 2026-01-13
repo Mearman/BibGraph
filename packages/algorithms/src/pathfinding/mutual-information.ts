@@ -121,6 +121,37 @@ export interface MutualInformationConfig<N extends Node, E extends Edge = Edge> 
    * @default 1e-10
    */
   epsilon?: number;
+
+  /**
+   * Enable degree-based penalty to reduce MI for high-degree nodes (hubs).
+   * Penalizes edges connected to nodes with many connections.
+   * @default false
+   */
+  useDegreeBasedPenalty?: boolean;
+
+  /**
+   * Penalty factor for degree-based MI reduction.
+   * MI_adjusted = MI_base × exp(-degreeBasedPenaltyFactor × (log(deg(u)+1) + log(deg(v)+1)))
+   * Higher values = stronger penalty for high-degree nodes.
+   * @default 0.5
+   */
+  degreeBasedPenaltyFactor?: number;
+
+  /**
+   * Enable IDF-style weighting to reduce MI for high-degree nodes.
+   * Uses inverse document frequency formula from information retrieval.
+   * MI_adjusted = MI_base × log(N/(deg(u)+1)) × log(N/(deg(v)+1))
+   * @default false
+   */
+  useIDFWeighting?: boolean;
+
+  /**
+   * Enable edge type rarity penalty.
+   * Penalizes common edge types (like "has_concept") and boosts rare ones.
+   * MI_adjusted = MI_base × (-log(P(edge_type)))
+   * @default false
+   */
+  useEdgeTypeRarity?: boolean;
 }
 
 /**
@@ -493,6 +524,10 @@ export const precomputeMutualInformation = <N extends Node, E extends Edge>(
     temporalDecay = 0.001,
     referenceTime = Date.now(),
     epsilon = 1e-10,
+    useDegreeBasedPenalty = false,
+    degreeBasedPenaltyFactor = 0.5,
+    useIDFWeighting = false,
+    useEdgeTypeRarity = false,
   } = config;
 
   const cache = new Map<string, number>();
@@ -553,6 +588,29 @@ export const precomputeMutualInformation = <N extends Node, E extends Edge>(
           (edgeTypeCounts.get(edge.type) ?? 0) + 1,
         );
       }
+    }
+  }
+
+  // Pre-compute node degrees for degree-based penalties
+  const nodeDegrees = new Map<string, number>();
+  const totalNodes = graph.getNodeCount();
+
+  if (useDegreeBasedPenalty || useIDFWeighting) {
+    for (const edge of edges) {
+      nodeDegrees.set(edge.source, (nodeDegrees.get(edge.source) ?? 0) + 1);
+      nodeDegrees.set(edge.target, (nodeDegrees.get(edge.target) ?? 0) + 1);
+    }
+  }
+
+  // Pre-compute edge type rarity for edge type penalty
+  const totalEdges = edges.length;
+  const edgeTypeRarity = new Map<string, number>();
+
+  if (useEdgeTypeRarity && edgeTypeCounts) {
+    for (const [edgeType, count] of edgeTypeCounts.entries()) {
+      const probability = count / totalEdges;
+      // Rarity = -log(P(edge_type))
+      edgeTypeRarity.set(edgeType, -Math.log(probability + epsilon));
     }
   }
 
@@ -673,6 +731,32 @@ export const precomputeMutualInformation = <N extends Node, E extends Edge>(
       const community1 = communityExtractor(sourceNode.value);
       const community2 = communityExtractor(targetNode.value);
       modifier *= computeCommunityModifier(community1, community2, communityBoost);
+    }
+
+    // Option 1: Degree-based exponential penalty
+    // MI_adjusted = MI_base × exp(-α × (log(deg(u)+1) + log(deg(v)+1)))
+    if (useDegreeBasedPenalty) {
+      const sourceDegree = nodeDegrees.get(edge.source) ?? 0;
+      const targetDegree = nodeDegrees.get(edge.target) ?? 0;
+      const degreeSum = Math.log(sourceDegree + 1) + Math.log(targetDegree + 1);
+      modifier *= Math.exp(-degreeBasedPenaltyFactor * degreeSum);
+    }
+
+    // Option 2: IDF-style weighting
+    // MI_adjusted = MI_base × log(N/(deg(u)+1)) × log(N/(deg(v)+1))
+    if (useIDFWeighting) {
+      const sourceDegree = nodeDegrees.get(edge.source) ?? 0;
+      const targetDegree = nodeDegrees.get(edge.target) ?? 0;
+      const sourceIDF = Math.log((totalNodes / (sourceDegree + 1)) + epsilon);
+      const targetIDF = Math.log((totalNodes / (targetDegree + 1)) + epsilon);
+      modifier *= sourceIDF * targetIDF;
+    }
+
+    // Option 3: Edge type rarity penalty
+    // MI_adjusted = MI_base × (-log(P(edge_type)))
+    if (useEdgeTypeRarity) {
+      const rarity = edgeTypeRarity.get(edge.type) ?? 1.0;
+      modifier *= rarity;
     }
 
     return modifier;
