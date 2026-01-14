@@ -1,4 +1,4 @@
-import type { GraphExpander, Neighbor } from '../../src/traversal/bidirectional-bfs';
+import type { GraphExpander, Neighbor } from '@bibgraph/graph-expansion';
 import type { TestGraph, TestNode, TestEdge } from './graph-generator';
 
 /**
