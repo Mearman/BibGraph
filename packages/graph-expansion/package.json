@@ -1,0 +1,28 @@
+{
+  "name": "@bibgraph/graph-expansion",
+  "description": "Generic graph expansion and neighborhood traversal system",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "vite": "7.3.1",
+    "vitest": "4.0.16"
+  },
+  "peerDependencies": {
+    "typescript": "5.9.3"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT"
+}

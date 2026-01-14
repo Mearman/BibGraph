@@ -48,6 +48,8 @@
       "@bibgraph/client/*": ["packages/client/src/*"],
       "@bibgraph/graph-gen": ["packages/graph-gen/src/index.ts"],
       "@bibgraph/graph-gen/*": ["packages/graph-gen/src/*"],
+      "@bibgraph/graph-expansion": ["packages/graph-expansion/src/index.ts"],
+      "@bibgraph/graph-expansion/*": ["packages/graph-expansion/src/*"],
       "@bibgraph/utils": ["packages/utils/src/index.ts"],
       "@bibgraph/utils/*": ["packages/utils/src/*"],
       "@bibgraph/ui": ["packages/ui/src/index.ts"],

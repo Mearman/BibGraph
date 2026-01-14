@@ -1,0 +1,50 @@
+{
+  "name": "graph-expansion",
+  "projectType": "library",
+  "sourceRoot": "packages/graph-expansion/src",
+  "targets": {
+    "build": {
+      "executor": "@nx/vite:build",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "outputPath": "dist/packages/graph-expansion",
+        "configFile": "packages/graph-expansion/vite.config.ts"
+      },
+      "configurations": {
+        "production": {
+          "mode": "production"
+        }
+      }
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "outputs": ["{workspaceRoot}/coverage/packages/graph-expansion"],
+      "options": {
+        "configFile": "packages/graph-expansion/vitest.config.ts",
+        "passWithNoTests": true
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p packages/graph-expansion/tsconfig.json",
+        "cwd": "."
+      }
+    },
+    "lint": {
+      "executor": "@nx/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["packages/graph-expansion/**/*.{ts,tsx}"]
+      }
+    },
+    "clean": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "rm -rf dist packages/graph-expansion/*.tsbuildinfo",
+        "cwd": "."
+      }
+    }
+  }
+}
