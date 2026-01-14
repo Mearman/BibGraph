@@ -1,5 +1,5 @@
-import type { GraphSpec } from '../../__tests__/fixtures/graph-spec';
-import type { TestGraph, TestNode, TestEdge } from '../../__tests__/fixtures/graph-generator';
+import type { GraphSpec } from '../graph-spec';
+import type { TestGraph, TestNode, TestEdge } from '../graph-generator';
 import { isConnected } from './helper-functions';
 
 /**

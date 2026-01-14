@@ -2,8 +2,8 @@
  * Algorithms package main exports
  */
 
-// Graph property analysis
-export * from "./graph-spec-analyzer";
+// Graph property analysis (moved to @bibgraph/graph-gen)
+// export * from "./graph-spec-analyzer";
 
 // Core analysis algorithms
 export * from "./analysis/scc";
