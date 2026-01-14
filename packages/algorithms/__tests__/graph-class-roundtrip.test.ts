@@ -8,6 +8,7 @@
  */
 
 import { describe, test, expect } from "vitest";
+import type { AnalyzerGraph } from "@bibgraph/algorithms";
 import {
   // Predicates
   isTree,
@@ -27,9 +28,7 @@ import {
   isPermutation,
   isUnitDisk,
   isComparability,
-  // Types
-  type AnalyzerGraph,
-} from "@bibgraph/algorithms";
+} from "@bibgraph/graph-gen";
 
 describe("Graph Class Round-trip Tests", () => {
   describe("Basic graph classes", () => {
