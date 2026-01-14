@@ -6,6 +6,9 @@
 // Import from there directly:
 // import { ... } from '@bibgraph/graph-gen';
 
+// Adapter for graph-expansion algorithms
+export { GraphAdapter } from "./graph-adapter";
+
 // Core analysis algorithms
 export * from "./analysis/scc";
 export * from "./analysis/connected-components";
@@ -24,7 +27,6 @@ export * from "./decomposition/core-periphery";
 export * from "./decomposition/k-core";
 
 // Extraction algorithms
-export * from "./extraction/ego-network";
 export * from "./extraction/subgraph";
 export * from "./extraction/filter";
 export * from "./extraction/truss";
@@ -48,11 +50,8 @@ export * from "./pathfinding/dijkstra";
 export * from "./pathfinding/mutual-information";
 export * from "./pathfinding/path-ranking";
 
-// Traversal algorithms
-export * from "./traversal/bfs";
-export * from "./traversal/dfs";
-export * from "./traversal/priority-queue";
-export * from "./traversal/bidirectional-bfs";
+// Traversal algorithms moved to @bibgraph/graph-expansion
+// Import from: @bibgraph/graph-expansion
 
 // Metrics
 export * from "./metrics/cluster-quality";
