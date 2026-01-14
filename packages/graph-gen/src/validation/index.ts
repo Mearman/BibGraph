@@ -10,11 +10,13 @@ export type { PropertyValidationResult, GraphValidationResult } from './types';
 
 // Export helper functions
 export {
-  isConnected,
   buildAdjacencyList,
   findComponentsForDensity,
   checkBipartiteWithBFS
 } from './helper-functions';
+
+// Note: isConnected is not re-exported to avoid conflict with graph-spec.isConnected
+// Import directly from './helper-functions' if needed for runtime graph checking
 
 // Export basic validators
 export {

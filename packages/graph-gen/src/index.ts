@@ -5,5 +5,17 @@
  * and mathematical constraint validation.
  */
 
-// Placeholder exports - will be populated when moving code from algorithms package
-export {};
+// Graph specification types
+export * from "./graph-spec";
+
+// Graph property analysis
+export * from "./graph-spec-analyzer";
+
+// Mathematical constraint validation
+export * from "./graph-spec-constraints";
+
+// Graph validation
+export * from "./validation/index";
+
+// Test fixture generation
+export * from "./graph-generator";

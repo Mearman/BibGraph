@@ -2061,9 +2061,10 @@ export function isRegular(g: AnalyzerGraph): boolean {
 }
 
 /**
- * Check if graph is connected.
+ * Check if graph is connected (runtime check for AnalyzerGraph).
+ * Note: Different from graph-spec.isConnected which is a type guard for GraphSpec.
  */
-export function isConnected(g: AnalyzerGraph): boolean {
+export function isGraphConnected(g: AnalyzerGraph): boolean {
   return axisKindIs("connectivity", "connected")(g);
 }
 

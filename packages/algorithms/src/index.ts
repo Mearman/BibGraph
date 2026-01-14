@@ -3,7 +3,8 @@
  */
 
 // Graph property analysis (moved to @bibgraph/graph-gen)
-// export * from "./graph-spec-analyzer";
+// Re-export for backward compatibility
+export * from "@bibgraph/graph-gen";
 
 // Core analysis algorithms
 export * from "./analysis/scc";
