@@ -132,6 +132,13 @@ flowchart LR
         client_typecheck{{"typecheck"}}
     end
 
+    subgraph graph_gen["graph-gen"]
+        graph_gen_build[["build"]]
+        graph_gen_lint{{"lint"}}
+        graph_gen_test(["test"])
+        graph_gen_typecheck{{"typecheck"}}
+    end
+
     subgraph tools["tools"]
         tools_lint{{"lint"}}
         tools_typecheck{{"typecheck"}}
@@ -182,6 +189,8 @@ flowchart LR
     utils_build --> client_test
     types_build --> client_typecheck
     utils_build --> client_typecheck
+    graph_gen_typecheck --> graph_gen_build
+    graph_gen_typecheck --> graph_gen_test
     web_build --> tools_typecheck
     types_typecheck --> types_build
     ui_typecheck --> ui_build
