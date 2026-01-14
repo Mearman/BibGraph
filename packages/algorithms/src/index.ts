@@ -2,6 +2,9 @@
  * Algorithms package main exports
  */
 
+// Graph property analysis
+export * from "./graph-spec-analyzer";
+
 // Core analysis algorithms
 export * from "./analysis/scc";
 export * from "./analysis/connected-components";
@@ -47,6 +50,8 @@ export * from "./pathfinding/path-ranking";
 // Traversal algorithms
 export * from "./traversal/bfs";
 export * from "./traversal/dfs";
+export * from "./traversal/priority-queue";
+export * from "./traversal/bidirectional-bfs";
 
 // Metrics
 export * from "./metrics/cluster-quality";

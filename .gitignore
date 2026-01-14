@@ -149,3 +149,10 @@ vitest.config.base.d.ts
 .env
 .env.*
 !.env.example
+
+# OpenAlex fixtures (generated, large - regenerate with scripts/build-connection-graph.ts)
+fixtures/.entity-cache.json
+fixtures/connection-graph.json
+fixtures/works-sample.json
+scripts/fixtures/*.json
+!scripts/fixtures/.gitkeep
