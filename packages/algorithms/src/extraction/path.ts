@@ -3,8 +3,9 @@
  * Provides shortest path finding and reachability subgraph extraction.
  */
 import { Graph } from '../graph/graph';
+import { GraphAdapter } from '../graph-adapter';
+import { bfs } from '@bibgraph/graph-expansion';
 import { dijkstra } from '../pathfinding/dijkstra';
-import { bfs } from '../traversal/bfs';
 import type { Path } from '../types/algorithm-results';
 import type { ExtractionError } from '../types/errors';
 import type { Edge,Node } from '../types/graph';
@@ -216,7 +217,8 @@ const checkIfWeighted = <N extends Node, E extends Edge>(graph: Graph<N, E>): bo
  * @internal
  */
 const findPathWithBFS = <N extends Node, E extends Edge>(graph: Graph<N, E>, sourceId: string, targetId: string): Result<Option<Path<N, E>>, ExtractionError> => {
-  const bfsResult = bfs(graph, sourceId);
+  const adapter = new GraphAdapter(graph);
+  const bfsResult = bfs(adapter, sourceId);
 
   if (!bfsResult.ok) {
     // Convert traversal error to extraction error
