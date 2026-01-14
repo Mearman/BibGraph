@@ -13,7 +13,7 @@ import type { PropertyValidationResult } from './types';
  * @param adjustments - Optional validation adjustments for constrained graphs
  * @returns PropertyValidationResult with validation details
  */
-export const validateDensityAndCompleteness = (graph: TestGraph, adjustments: Record<string, boolean> = {}): PropertyValidationResult => {
+export const validateDensityAndCompleteness = (graph: TestGraph, adjustments: Partial<Record<string, boolean>> = {}): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
   const n = nodes.length;
 

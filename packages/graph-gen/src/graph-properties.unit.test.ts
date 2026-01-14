@@ -4,10 +4,10 @@ import {
   describeSpec,
   makeGraphSpec,
   type GraphSpec,
-} from './graph-spec';
-import { generateGraph, type GraphGenerationConfig } from './graph-generator';
+} from './spec';
+import { generateGraph, type GraphGenerationConfig } from './generator';
 import { validateGraphProperties } from './graph-validator';
-import { isGraphSpecImpossible, analyzeGraphSpecConstraints } from '../../src/graph-spec-constraints';
+import { isGraphSpecImpossible, analyzeGraphSpecConstraints } from './constraints';
 
 describe('Graph Spec Permutation E2E Tests', () => {
   describe('All valid spec combinations', () => {

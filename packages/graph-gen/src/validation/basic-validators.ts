@@ -87,7 +87,7 @@ export const validateWeighting = (graph: TestGraph): PropertyValidationResult =>
  * @param adjustments - Optional validation adjustments for constrained graphs
  * @returns Validation result for cycles property
  */
-export const validateCycles = (graph: TestGraph, adjustments: Record<string, boolean> = {}): PropertyValidationResult => {
+export const validateCycles = (graph: TestGraph, adjustments: Partial<Record<string, boolean>> = {}): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
   const expected = spec.cycles.kind;
   const directed = spec.directionality.kind === "directed";

@@ -22,7 +22,7 @@ import {
   isUnitDisk,
   isComparability,
   type AnalyzerGraph,
-} from "@bibgraph/algorithms";
+} from "@bibgraph/graph-gen";
 
 describe("Graph Spec Analyzer", () => {
   describe("Core property computation", () => {
@@ -617,7 +617,8 @@ describe("Graph Spec Analyzer", () => {
           { id: "e1", endpoints: ["v1", "v2"], directed: false },
         ],
       };
-      expect(isConnected(g)).toBe(true);
+      const spec = computeGraphSpecFromGraph(g);
+      expect(spec.connectivity.kind).toBe("connected");
     });
 
     test("isEulerian identifies Eulerian graphs", () => {

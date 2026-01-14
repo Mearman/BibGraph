@@ -7,6 +7,7 @@ export interface TestNode {
   id: string;
   type?: string; // For heterogeneous graphs
   data?: Record<string, unknown>;
+  partition?: 'left' | 'right'; // For bipartite graphs
 }
 
 /**
@@ -132,9 +133,9 @@ const generateNodes = (spec: GraphSpec, config: GraphGenerationConfig, rng: Seed
     // Assign bipartite partition if needed
     if (spec.partiteness?.kind === "bipartite" || spec.completeBipartite?.kind === "complete_bipartite") {
       if (i < leftPartitionSize) {
-        (node as any).partition = "left";
+        node.partition = "left";
       } else if (i < leftPartitionSize + rightPartitionSize) {
-        (node as any).partition = "right";
+        node.partition = "right";
       }
     }
 
@@ -321,15 +322,12 @@ const generateTreeEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec
   if (nodes.length === 0) return;
 
   // Build tree by randomly connecting each node to a previous node
-  const connected = new Set([nodes[0].id]);
-
   for (let i = 1; i < nodes.length; i++) {
     const target = nodes[i].id;
     const parentIndex = rng.integer(0, i - 1);
     const source = nodes[parentIndex].id;
 
     addEdge(edges, source, target, spec, rng);
-    connected.add(target);
   }
 };
 
@@ -526,7 +524,9 @@ const generateBinaryTreeEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gra
     let nextChild = 1;
 
     while (parentQueue.length > 0 && nextChild < nodes.length) {
-      const parentIndex = parentQueue.shift()!;
+      const parentIndex = parentQueue.shift();
+      if (parentIndex === undefined) break;
+
       const needsChildren = rng.next() > 0.5; // Randomly decide if this parent gets children
 
       if (needsChildren && nextChild + 1 < nodes.length) {
@@ -550,7 +550,8 @@ const generateBinaryTreeEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gra
     let nextChild = 1;
 
     while (parentQueue.length > 0 && nextChild < nodes.length) {
-      const parentIndex = parentQueue.shift()!;
+      const parentIndex = parentQueue.shift();
+      if (parentIndex === undefined) break;
 
       // Determine how many children to add (1-2, or 0 if we have enough parents in queue)
       // We must add at least 1 child if queue would become empty and there are still nodes to connect
@@ -585,14 +586,14 @@ const generateTournamentEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gra
   // Generate one directed edge for each unordered pair of vertices
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
-      const source = nodes[i].id;
-      const target = nodes[j].id;
+      const nodeId1 = nodes[i].id;
+      const nodeId2 = nodes[j].id;
 
       // Randomly decide direction: either i→j or j→i
       if (rng.next() > 0.5) {
-        addEdge(edges, source, target, spec, rng);
+        addEdge(edges, nodeId1, nodeId2, spec, rng);
       } else {
-        addEdge(edges, target, source, spec, rng);
+        addEdge(edges, nodeId2, nodeId1, spec, rng);
       }
     }
   }
@@ -747,14 +748,12 @@ const generateEulerianEdges = (nodes: TestNode[], edges: TestEdge[], spec: Graph
         (degree1 % 2 === 0 ? 1 : -1) +  // node1 flips parity
         (degree2 % 2 === 0 ? 1 : -1);   // node2 flips parity
 
-      if (isSemiEulerian && oddCountAfter === 2) {
-        // Valid for semi-Eulerian
-        addEdge(edges, node1, node2, spec, rng);
-        degrees.set(node1, degree1 + 1);
-        degrees.set(node2, degree2 + 1);
-        existingEdges.add(edgeKey);
-      } else if (!isSemiEulerian && oddCountAfter === 0) {
-        // Valid for Eulerian
+      // Check if adding this edge maintains parity constraints
+      const validParity = isSemiEulerian
+        ? oddCountAfter === 2  // Semi-Eulerian: exactly 2 odd-degree vertices
+        : oddCountAfter === 0; // Eulerian: all even-degree vertices
+
+      if (validParity) {
         addEdge(edges, node1, node2, spec, rng);
         degrees.set(node1, degree1 + 1);
         degrees.set(node2, degree2 + 1);
@@ -1067,13 +1066,11 @@ const generateKColorableEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gra
   }
 
   // Assign each vertex a color from {0, 1, ..., k-1}
-  const colors: Map<string, number> = new Map();
   const partitions: string[][] = Array.from({ length: k }, () => []);
 
   for (let i = 0; i < n; i++) {
     const node = nodes[i];
     const color = rng.integer(0, k - 1);
-    colors.set(node.id, color);
     partitions[color].push(node.id);
   }
 
@@ -1107,7 +1104,6 @@ const generateKColorableEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gra
       const targetEdges = Math.floor(maxEdgesBetween * edgeRatio);
 
       // Add edges between partitions
-      const existingEdges = new Set<string>();
       let addedEdges = 0;
 
       // Shuffle to get random edges
@@ -1363,8 +1359,12 @@ const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, 
 
   // Get bipartite partitions if applicable
   const isBipartite = spec.partiteness?.kind === "bipartite";
-  const leftPartition = isBipartite ? nodes.filter((node: any) => node.partition === "left") : [];
-  const rightPartition = isBipartite ? nodes.filter((node: any) => node.partition === "right") : [];
+  const leftPartition = isBipartite
+    ? nodes.filter((node): node is TestNode & { partition: 'left' } => node.partition === "left")
+    : [];
+  const rightPartition = isBipartite
+    ? nodes.filter((node): node is TestNode & { partition: 'right' } => node.partition === "right")
+    : [];
 
   // For disconnected graphs, find components to calculate true maxPossibleEdges
   let components: string[][] = [];
@@ -1412,9 +1412,6 @@ const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, 
     spec.cycles.kind === "acyclic" &&
     spec.connectivity.kind === "connected";
 
-  // Account for edges already added by generateBaseStructure
-  const existingEdgeCount = edges.length;
-
   if (spec.completeness.kind === "complete") {
     targetEdgeCount = maxPossibleEdges;
   } else if (isUndirectedTree) {
@@ -1428,9 +1425,6 @@ const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, 
   } else {
     targetEdgeCount = Math.floor(maxPossibleEdges * edgePercentage[spec.density.kind]);
   }
-
-  // Calculate how many MORE edges we need to add (account for existing edges)
-  const edgesToAdd = targetEdgeCount - existingEdgeCount;
 
   // For complete graphs, use deterministic edge generation instead of random
   if (spec.completeness.kind === "complete" && spec.edgeMultiplicity.kind === "simple") {
@@ -1535,15 +1529,26 @@ const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, 
 
     if (isBipartite) {
       // For bipartite graphs, select one node from each partition
-      const sourceNode = rng.choice(leftPartition.length > 0 && rightPartition.length > 0
-        ? (Math.random() < 0.5 ? leftPartition : rightPartition)
-        : (leftPartition.length > 0 ? leftPartition : rightPartition));
+      // Helper to pick a random node from either partition
+      const pickRandomFromPartitions = (): TestNode => {
+        const partitions: TestNode[] = [];
+        if (leftPartition.length > 0) partitions.push(...leftPartition);
+        if (rightPartition.length > 0) partitions.push(...rightPartition);
+        return rng.choice(partitions);
+      };
+
+      const sourceNode = pickRandomFromPartitions();
 
       // Select target from opposite partition
-      const oppositePartition = (sourceNode as any).partition === "left" ? rightPartition : leftPartition;
-      if (oppositePartition.length === 0) continue; // No valid target
+      let targetNode: TestNode;
+      if (sourceNode.partition === "left" && rightPartition.length > 0) {
+        targetNode = rng.choice(rightPartition);
+      } else if (leftPartition.length > 0) {
+        targetNode = rng.choice(leftPartition);
+      } else {
+        continue; // No valid target available
+      }
 
-      const targetNode = rng.choice(oppositePartition);
       source = sourceNode.id;
       target = targetNode.id;
     } else if (spec.connectivity.kind === "unconstrained" && components.length > 0) {
@@ -1639,9 +1644,15 @@ const detectCycleInGraph = (nodes: TestNode[], edges: TestEdge[], directed: bool
     adjacency.set(node.id, []);
   }
   for (const edge of edges) {
-    adjacency.get(edge.source)!.push(edge.target);
+    const sourceList = adjacency.get(edge.source);
+    if (sourceList) {
+      sourceList.push(edge.target);
+    }
     if (!directed) {
-      adjacency.get(edge.target)!.push(edge.source);
+      const targetList = adjacency.get(edge.target);
+      if (targetList) {
+        targetList.push(edge.source);
+      }
     }
   }
 
@@ -1689,9 +1700,15 @@ const findComponents = (nodes: TestNode[], edges: TestEdge[], directed: boolean)
     adjacency.set(node.id, []);
   }
   for (const edge of edges) {
-    adjacency.get(edge.source)!.push(edge.target);
+    const sourceList = adjacency.get(edge.source);
+    if (sourceList) {
+      sourceList.push(edge.target);
+    }
     if (!directed) {
-      adjacency.get(edge.target)!.push(edge.source);
+      const targetList = adjacency.get(edge.target);
+      if (targetList) {
+        targetList.push(edge.source);
+      }
     }
   }
 
@@ -1703,7 +1720,8 @@ const findComponents = (nodes: TestNode[], edges: TestEdge[], directed: boolean)
     const queue: string[] = [node.id];
 
     while (queue.length > 0) {
-      const current = queue.shift()!;
+      const current = queue.shift();
+      if (current === undefined) break;
       if (visited.has(current)) continue;
 
       visited.add(current);
@@ -1728,8 +1746,8 @@ const findComponents = (nodes: TestNode[], edges: TestEdge[], directed: boolean)
  * @param nodes
  */
 const getBipartitePartitions = (nodes: TestNode[]): { left: TestNode[]; right: TestNode[] } => {
-  const left = nodes.filter(n => (n as any).partition === "left");
-  const right = nodes.filter(n => (n as any).partition === "right");
+  const left = nodes.filter((node): node is TestNode & { partition: 'left' } => node.partition === "left");
+  const right = nodes.filter((node): node is TestNode & { partition: 'right' } => node.partition === "right");
   return { left, right };
 };
 
@@ -1746,13 +1764,8 @@ const generateCompleteBipartiteEdges = (nodes: TestNode[], edges: TestEdge[], sp
   // Add all possible edges between left and right partitions
   for (const leftNode of left) {
     for (const rightNode of right) {
-      if (spec.directionality.kind === "directed") {
-        // For directed bipartite, add edge in both directions or one direction based on spec
-        addEdge(edges, leftNode.id, rightNode.id, spec, rng);
-      } else {
-        // For undirected, add one edge
-        addEdge(edges, leftNode.id, rightNode.id, spec, rng);
-      }
+      // Both directed and undirected bipartite graphs use the same edge structure
+      addEdge(edges, leftNode.id, rightNode.id, spec, rng);
     }
   }
 };
@@ -1781,7 +1794,7 @@ const generateBipartiteTreeEdges = (nodes: TestNode[], edges: TestEdge[], spec: 
 
   for (const node of allNodes) {
     // Connect to a random node in opposite partition that's already connected
-    const oppositePartition = (node as any).partition === "left" ? right : left;
+    const oppositePartition = node.partition === "left" ? right : left;
     const connectedOpposite = oppositePartition.filter(n => connected.has(n.id));
 
     if (connectedOpposite.length > 0) {
@@ -1852,8 +1865,8 @@ const generateBipartiteForestEdges = (nodes: TestNode[], edges: TestEdge[], spec
     if (componentNodes.length < 2) continue;
 
     // For bipartite, ensure each component has at least one node from each partition
-    const compLeft = componentNodes.filter(n => (n as any).partition === "left");
-    const compRight = componentNodes.filter(n => (n as any).partition === "right");
+    const compLeft = componentNodes.filter((node): node is TestNode & { partition: 'left' } => node.partition === "left");
+    const compRight = componentNodes.filter((node): node is TestNode & { partition: 'right' } => node.partition === "right");
 
     if (compLeft.length === 0 || compRight.length === 0) continue;
 
@@ -1865,7 +1878,7 @@ const generateBipartiteForestEdges = (nodes: TestNode[], edges: TestEdge[], spec
 
     // Connect rest of component
     for (const node of remaining) {
-      const oppositePartition = (node as any).partition === "left" ? compRight : compLeft;
+      const oppositePartition = node.partition === "left" ? compRight : compLeft;
       const connectedOpposite = oppositePartition.filter(n => connected.has(n.id));
 
       if (connectedOpposite.length > 0) {
@@ -1898,8 +1911,8 @@ const generateBipartiteDisconnectedEdges = (nodes: TestNode[], edges: TestEdge[]
     const endIdx = Math.min(startIdx + nodesPerComponent, nodes.length);
     const componentNodes = nodes.slice(startIdx, endIdx);
 
-    const compLeft = componentNodes.filter(n => (n as any).partition === "left");
-    const compRight = componentNodes.filter(n => (n as any).partition === "right");
+    const compLeft = componentNodes.filter((node): node is TestNode & { partition: 'left' } => node.partition === "left");
+    const compRight = componentNodes.filter((node): node is TestNode & { partition: 'right' } => node.partition === "right");
 
     if (compLeft.length === 0 || compRight.length === 0) continue;
 
@@ -1913,7 +1926,7 @@ const generateBipartiteDisconnectedEdges = (nodes: TestNode[], edges: TestEdge[]
 
     // Add edges to connect rest of component
     for (const node of [...compLeft.slice(1), ...compRight.slice(1)]) {
-      const oppositePartition = (node as any).partition === "left" ? compRight : compLeft;
+      const oppositePartition = node.partition === "left" ? compRight : compLeft;
       const connectedOpposite = oppositePartition.filter(n => connected.has(n.id));
 
       if (connectedOpposite.length > 0) {

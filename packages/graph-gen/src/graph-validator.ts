@@ -1,6 +1,6 @@
-import type { GraphSpec } from './graph-spec';
-import type { TestGraph } from './graph-generator';
-import { analyzeGraphSpecConstraints, getAdjustedValidationExpectations } from '../../src/graph-spec-constraints';
+import type { GraphSpec } from './spec';
+import type { TestGraph } from './generator';
+import { analyzeGraphSpecConstraints, getAdjustedValidationExpectations } from './constraints';
 import {
   validateDirectionality,
   validateWeighting,
@@ -21,7 +21,7 @@ import {
   validateFlowNetwork,
   type PropertyValidationResult,
   type GraphValidationResult
-} from '../../src/validation';
+} from './validation';
 
 /**
  * Validate that a generated graph actually has its claimed properties.

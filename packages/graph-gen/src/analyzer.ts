@@ -119,7 +119,8 @@ const isConnectedUndirectedBinary = (g: AnalyzerGraph): boolean => {
   const seen = new Set<AnalyzerVertexId>();
   const stack: AnalyzerVertexId[] = [start];
   while (stack.length > 0) {
-    const cur = stack.pop()!;
+    const cur = stack.pop();
+    if (!cur) continue;
     if (seen.has(cur)) continue;
     seen.add(cur);
     for (const nxt of adj[cur] ?? []) if (!seen.has(nxt)) stack.push(nxt);
@@ -147,7 +148,8 @@ const isAcyclicDirectedBinary = (g: AnalyzerGraph): boolean => {
 
   let processed = 0;
   while (q.length > 0) {
-    const v = q.pop()!;
+    const v = q.pop();
+    if (!v) continue;
     processed++;
     for (const w of out[v]) {
       indeg[w] -= 1;
@@ -165,14 +167,9 @@ const degreesUndirectedBinary = (g: AnalyzerGraph): number[] => {
     if (e.endpoints.length !== 2) continue;
     const [u, v] = e.endpoints;
     if (u === v) continue;
-    if (!e.directed) {
-      deg[idx[u]] += 1;
-      deg[idx[v]] += 1;
-    } else {
-      // if directed, treat as out+in for "degree" when classifying undirected degree constraints
-      deg[idx[u]] += 1;
-      deg[idx[v]] += 1;
-    }
+    // Treat both directed and undirected as total degree for this classifier
+    deg[idx[u]] += 1;
+    deg[idx[v]] += 1;
   }
   return deg;
 };
@@ -185,8 +182,10 @@ const isBipartiteUndirectedBinary = (g: AnalyzerGraph): boolean => {
     const queue: AnalyzerVertexId[] = [v.id];
     colour.set(v.id, 0);
     while (queue.length > 0) {
-      const cur = queue.shift()!;
-      const c = colour.get(cur)!;
+      const cur = queue.shift();
+      if (!cur) break;
+      const c = colour.get(cur);
+      if (c === undefined) break;
       for (const nxt of adj[cur] ?? []) {
         if (!colour.has(nxt)) {
           colour.set(nxt, (c ^ 1) as 0 | 1);
@@ -277,7 +276,7 @@ export const computeDirectionality = (g: AnalyzerGraph):
   return { kind: "directed" };
 };
 
-export const computeWeighting = (g: AnalyzerGraph, policy: ComputePolicy): { kind: "unweighted" } | { kind: "weighted_numeric"; min?: number; max?: number } => {
+export const computeWeighting = (g: AnalyzerGraph, _policy: ComputePolicy): { kind: "unweighted" } | { kind: "weighted_numeric"; min?: number; max?: number } => {
   if (g.edges.length === 0) return { kind: "unweighted" };
 
   const allNumeric = g.edges.every(e => typeof e.weight === "number");
@@ -611,7 +610,6 @@ export const computeScaleFree = (g: AnalyzerGraph): { kind: "scale_free"; expone
   // Simple power-law test: check if log-log plot is roughly linear
   // For proper implementation, use Clauset et al. (2009) method
   const xmin = Math.min(...degrees);
-  const xmax = Math.max(...degrees);
 
   // Count degrees >= xmin
   let total = 0;
@@ -695,7 +693,8 @@ export const computeSmallWorld = (g: AnalyzerGraph): { kind: "small_world" } | {
     const queue: AnalyzerVertexId[] = [start.id];
 
     while (queue.length > 0) {
-      const cur = queue.shift()!;
+      const cur = queue.shift();
+      if (!cur) break;
       const dist = dists[cur];
 
       for (const nb of adj[cur] ?? []) {
@@ -768,7 +767,8 @@ export const computeCommunityStructure = (g: AnalyzerGraph, policy: ComputePolic
     visited.add(v.id);
 
     while (queue.length > 0) {
-      const cur = queue.shift()!;
+      const cur = queue.shift();
+      if (!cur) break;
       for (const nb of adj[cur] ?? []) {
         if (!visited.has(nb)) {
           visited.add(nb);
@@ -803,7 +803,6 @@ export const computeHamiltonian = (g: AnalyzerGraph): { kind: "hamiltonian" } | 
   if (n < 3) return { kind: "non_hamiltonian" }; // Need at least 3 vertices for cycle
 
   const adj = buildAdjUndirectedBinary(g);
-  const directed = g.edges[0]?.directed ?? false;
 
   // Check necessary condition: minimum degree >= 2
   const degs = degreesUndirectedBinary(g);
@@ -1419,8 +1418,10 @@ export const computeCompleteBipartite = (g: AnalyzerGraph): { kind: "complete_bi
     color.set(v.id, 0);
 
     while (queue.length > 0) {
-      const cur = queue.shift()!;
-      const c = color.get(cur)!;
+      const cur = queue.shift();
+      if (!cur) break;
+      const c = color.get(cur);
+      if (c === undefined) break;
 
       for (const nxt of adj[cur] ?? []) {
         if (!color.has(nxt)) {
@@ -1670,7 +1671,8 @@ export const hasGraphSpec = (expected: Partial<InferredGraphSpec>, policy: Parti
     for (const k of Object.keys(expected) as Array<keyof InferredGraphSpec>) {
       const got = spec[k];
       const want = expected[k] as InferredGraphSpec[typeof k];
-      if (!compareAxisValues(got as any, want as any)) return false;
+      // Compare values - need to cast to satisfy generic constraint
+      if (!compareAxisValues(got as never as { kind: string }, want as never as { kind: string })) return false;
     }
     return true;
   };
@@ -1799,7 +1801,7 @@ const isChordalUndirectedBinary = (g: AnalyzerGraph): boolean => {
   }
 
   // Check each set of later neighbors forms a clique
-  for (const [v, laterNbs] of laterNeighbors) {
+  for (const [, laterNbs] of laterNeighbors) {
     const nbs = [...laterNbs];
     for (let i = 0; i < nbs.length; i++) {
       for (let j = i + 1; j < nbs.length; j++) {
@@ -1831,7 +1833,6 @@ const isIntervalUndirectedBinary = (g: AnalyzerGraph): boolean => {
   // Maximal cliques can be ordered consecutively in interval graphs
   // Use a simplified clique-based approach
   const visited = new Set<AnalyzerVertexId>();
-  const maximalCliques: Set<AnalyzerVertexId>[] = [];
 
   for (const v of g.vertices) {
     if (visited.has(v.id)) continue;
@@ -1859,7 +1860,6 @@ const isIntervalUndirectedBinary = (g: AnalyzerGraph): boolean => {
     }
 
     for (const c of clique) visited.add(c);
-    maximalCliques.push(clique);
   }
 
   // For interval graphs, maximal cliques can be linearly ordered
@@ -1888,7 +1888,8 @@ const isUnitDiskGraph = (g: AnalyzerGraph, policy: ComputePolicy): boolean => {
   // This is a conservative check
   const positions = new Map<AnalyzerVertexId, { x: number; y: number }>();
   for (const v of g.vertices) {
-    const pos = v.attrs![policy.posKey] as { x: number; y: number };
+    const pos = v.attrs?.[policy.posKey] as { x: number; y: number } | undefined;
+    if (!pos) return false;
     positions.set(v.id, pos);
   }
 
@@ -1919,8 +1920,9 @@ const isUnitDiskGraph = (g: AnalyzerGraph, policy: ComputePolicy): boolean => {
         return (eu === u && ev === v) || (eu === v && ev === u);
       });
 
-      const pu = positions.get(u)!;
-      const pv = positions.get(v)!;
+      const pu = positions.get(u);
+      const pv = positions.get(v);
+      if (!pu || !pv) continue;
       const dist = Math.sqrt((pu.x - pv.x) ** 2 + (pu.y - pv.y) ** 2);
 
       if (hasEdge && dist > threshold) return false;
