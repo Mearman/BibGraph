@@ -132,6 +132,13 @@ flowchart LR
         client_typecheck{{"typecheck"}}
     end
 
+    subgraph graph_expansion["graph-expansion"]
+        graph_expansion_build[["build"]]
+        graph_expansion_lint{{"lint"}}
+        graph_expansion_test(["test"])
+        graph_expansion_typecheck{{"typecheck"}}
+    end
+
     subgraph graph_gen["graph-gen"]
         graph_gen_build[["build"]]
         graph_gen_lint{{"lint"}}
@@ -173,8 +180,10 @@ flowchart LR
 
     %% Task dependencies
     algorithms_typecheck --> algorithms_build
+    graph_gen_build --> algorithms_build
     types_build --> algorithms_build
     algorithms_typecheck --> algorithms_test
+    graph_gen_build --> algorithms_typecheck
     types_build --> algorithms_typecheck
     client_build --> cli_test
     types_build --> cli_test
@@ -189,6 +198,7 @@ flowchart LR
     utils_build --> client_test
     types_build --> client_typecheck
     utils_build --> client_typecheck
+    graph_expansion_typecheck --> graph_expansion_build
     graph_gen_typecheck --> graph_gen_build
     graph_gen_typecheck --> graph_gen_test
     web_build --> tools_typecheck
