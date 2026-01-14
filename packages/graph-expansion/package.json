@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@bibgraph/graph-gen": "workspace:*",
     "vite": "7.3.1",
     "vitest": "4.0.16"
   },
