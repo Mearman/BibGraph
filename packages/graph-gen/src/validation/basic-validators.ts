@@ -1,6 +1,6 @@
+import type { TestEdge,TestGraph, TestNode } from "../graph-generator";
 import type { GraphSpec } from "../graph-spec";
-import type { TestGraph, TestNode, TestEdge } from "../graph-generator";
-import { isConnected, buildAdjacencyList } from "./helper-functions";
+import { buildAdjacencyList,isConnected } from "./helper-functions";
 import type { PropertyValidationResult } from "./types";
 
 // ============================================================================
@@ -14,9 +14,7 @@ import type { PropertyValidationResult } from "./types";
  * @param graph - Test graph to validate
  * @returns Validation result for directionality property
  */
-export function validateDirectionality(
-  graph: TestGraph,
-): PropertyValidationResult {
+export const validateDirectionality = (graph: TestGraph): PropertyValidationResult => {
   const { spec, edges } = graph;
   const expected = spec.directionality.kind;
 
@@ -35,7 +33,7 @@ export function validateDirectionality(
       ? undefined
       : `Graph should be ${expected} but has incompatible edge structure`,
   };
-}
+};
 
 /**
  * Validate graph weighting matches spec.
@@ -44,7 +42,7 @@ export function validateDirectionality(
  * @param graph - Test graph to validate
  * @returns Validation result for weighting property
  */
-export function validateWeighting(graph: TestGraph): PropertyValidationResult {
+export const validateWeighting = (graph: TestGraph): PropertyValidationResult => {
   const { spec, edges } = graph;
   const expected = spec.weighting.kind;
 
@@ -79,7 +77,7 @@ export function validateWeighting(graph: TestGraph): PropertyValidationResult {
     valid,
     message,
   };
-}
+};
 
 /**
  * Validate graph cyclicity matches spec.
@@ -89,10 +87,7 @@ export function validateWeighting(graph: TestGraph): PropertyValidationResult {
  * @param adjustments - Optional validation adjustments for constrained graphs
  * @returns Validation result for cycles property
  */
-export function validateCycles(
-  graph: TestGraph,
-  adjustments: Record<string, boolean> = {}
-): PropertyValidationResult {
+export const validateCycles = (graph: TestGraph, adjustments: Record<string, boolean> = {}): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
   const expected = spec.cycles.kind;
   const directed = spec.directionality.kind === "directed";
@@ -109,7 +104,7 @@ export function validateCycles(
     valid,
     message: valid ? undefined : `Graph should be ${expected} but ${actual}`,
   };
-}
+};
 
 /**
  * Validate graph connectivity matches spec.
@@ -118,9 +113,7 @@ export function validateCycles(
  * @param graph - Test graph to validate
  * @returns Validation result for connectivity property
  */
-export function validateConnectivity(
-  graph: TestGraph
-): PropertyValidationResult {
+export const validateConnectivity = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
   const expected = spec.connectivity.kind;
   const directed = spec.directionality.kind === "directed";
@@ -139,7 +132,7 @@ export function validateConnectivity(
       ? undefined
       : `Graph should be ${expected} but is disconnected`,
   };
-}
+};
 
 /**
  * Validate graph schema homogeneity matches spec.
@@ -148,7 +141,7 @@ export function validateConnectivity(
  * @param graph - Test graph to validate
  * @returns Validation result for schema property
  */
-export function validateSchema(graph: TestGraph): PropertyValidationResult {
+export const validateSchema = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
   const expected = spec.schema.kind;
 
@@ -199,7 +192,7 @@ export function validateSchema(graph: TestGraph): PropertyValidationResult {
     valid,
     message,
   };
-}
+};
 
 /**
  * Validate graph edge multiplicity matches spec.
@@ -208,9 +201,7 @@ export function validateSchema(graph: TestGraph): PropertyValidationResult {
  * @param graph - Test graph to validate
  * @returns Validation result for edge multiplicity property
  */
-export function validateEdgeMultiplicity(
-  graph: TestGraph,
-): PropertyValidationResult {
+export const validateEdgeMultiplicity = (graph: TestGraph): PropertyValidationResult => {
   const { spec, edges } = graph;
   const expected = spec.edgeMultiplicity.kind;
   const directed = spec.directionality.kind === "directed";
@@ -229,7 +220,7 @@ export function validateEdgeMultiplicity(
   }
 
   // Check if any pair has multiple edges
-  const hasParallelEdges = Array.from(edgeCounts.values()).some(
+  const hasParallelEdges = [...edgeCounts.values()].some(
     (count) => count > 1,
   );
   actual = hasParallelEdges ? "multi" : "simple";
@@ -238,9 +229,7 @@ export function validateEdgeMultiplicity(
     valid = !hasParallelEdges;
     message = valid
       ? undefined
-      : `Graph should be simple but has parallel edges: ${Array.from(
-          edgeCounts.entries(),
-        )
+      : `Graph should be simple but has parallel edges: ${[...edgeCounts.entries()]
           .filter(([_, count]) => count > 1)
           .map(([key, count]) => `${key} (${count} edges)`)
           .join(", ")}`;
@@ -261,7 +250,7 @@ export function validateEdgeMultiplicity(
     valid,
     message,
   };
-}
+};
 
 /**
  * Validate graph self-loop property matches spec.
@@ -270,7 +259,7 @@ export function validateEdgeMultiplicity(
  * @param graph - Test graph to validate
  * @returns Validation result for self-loops property
  */
-export function validateSelfLoops(graph: TestGraph): PropertyValidationResult {
+export const validateSelfLoops = (graph: TestGraph): PropertyValidationResult => {
   const { spec, edges } = graph;
   const expected = spec.selfLoops.kind;
 
@@ -300,7 +289,7 @@ export function validateSelfLoops(graph: TestGraph): PropertyValidationResult {
     valid,
     message,
   };
-}
+};
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -322,18 +311,14 @@ export function validateSelfLoops(graph: TestGraph): PropertyValidationResult {
  * @param directed - Whether the graph is directed
  * @returns true if a cycle exists, false otherwise
  */
-export function detectCycle(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  directed: boolean,
-): boolean {
+export const detectCycle = (nodes: TestNode[], edges: TestEdge[], directed: boolean): boolean => {
   if (nodes.length < 2) return false;
 
   const adjacency = buildAdjacencyList(nodes, edges, directed);
   const visited = new Set<string>();
   const recursionStack = new Set<string>();
 
-  function dfs(nodeId: string, parent: string | null): boolean {
+  const dfs = (nodeId: string, parent: string | null): boolean => {
     visited.add(nodeId);
 
     if (directed) {
@@ -367,14 +352,12 @@ export function detectCycle(
     }
 
     return false;
-  }
+  };
 
   // Check all components (graph might be disconnected)
   for (const node of nodes) {
-    if (!visited.has(node.id)) {
-      if (dfs(node.id, null)) return true;
-    }
+    if (!visited.has(node.id) && dfs(node.id, null)) return true;
   }
 
   return false;
-}
+};

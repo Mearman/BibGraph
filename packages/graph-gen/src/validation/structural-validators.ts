@@ -1,7 +1,7 @@
+import type { TestEdge,TestGraph, TestNode } from '../graph-generator';
 import type { GraphSpec } from '../graph-spec';
-import type { TestGraph, TestNode, TestEdge } from '../graph-generator';
+import { buildAdjacencyList,checkBipartiteWithBFS, findComponentsForDensity } from './helper-functions';
 import type { PropertyValidationResult } from './types';
-import { findComponentsForDensity, checkBipartiteWithBFS, buildAdjacencyList } from './helper-functions';
 
 /**
  * Validates graph density and completeness properties.
@@ -13,10 +13,7 @@ import { findComponentsForDensity, checkBipartiteWithBFS, buildAdjacencyList } f
  * @param adjustments - Optional validation adjustments for constrained graphs
  * @returns PropertyValidationResult with validation details
  */
-export function validateDensityAndCompleteness(
-  graph: TestGraph,
-  adjustments: Record<string, boolean> = {}
-): PropertyValidationResult {
+export const validateDensityAndCompleteness = (graph: TestGraph, adjustments: Record<string, boolean> = {}): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
   const n = nodes.length;
 
@@ -177,7 +174,7 @@ export function validateDensityAndCompleteness(
       ? undefined
       : `Expected ${spec.density.kind} but found ${actualTarget} (${(densityRatio * 100).toFixed(1)}% edge density: ${actualEdgeCount}/${maxPossibleEdges})`,
   };
-}
+};
 
 /**
  * Validates whether a graph is bipartite using BFS-based coloring.
@@ -189,9 +186,7 @@ export function validateDensityAndCompleteness(
  * @param graph - The graph to validate
  * @returns PropertyValidationResult with validation details
  */
-export function validateBipartite(
-  graph: TestGraph
-): PropertyValidationResult {
+export const validateBipartite = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
 
   // Only validate when spec requires bipartite
@@ -216,7 +211,7 @@ export function validateBipartite(
       ? undefined
       : "Graph contains odd-length cycle(s), which violates bipartite property",
   };
-}
+};
 
 /**
  * Validates tournament graph properties.
@@ -233,9 +228,7 @@ export function validateBipartite(
  * @param graph - The graph to validate
  * @returns PropertyValidationResult with validation details
  */
-export function validateTournament(
-  graph: TestGraph
-): PropertyValidationResult {
+export const validateTournament = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
   const numNodes = nodes.length;
 
@@ -320,4 +313,4 @@ export function validateTournament(
       ? `Tournament violated: Bidirectional edges found between ${problematicPairs.length} pair(s)`
       : `Tournament violated: Missing edges between ${problematicPairs.length} pair(s)`,
   };
-}
+};

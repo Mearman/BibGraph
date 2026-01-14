@@ -1,7 +1,7 @@
+import type { TestEdge,TestGraph, TestNode } from '../graph-generator';
 import type { GraphSpec } from '../graph-spec';
-import type { TestGraph, TestNode, TestEdge } from '../graph-generator';
-import type { PropertyValidationResult } from './types';
 import { buildAdjacencyList } from './helper-functions';
+import type { PropertyValidationResult } from './types';
 
 /**
  * Validate k-colorable property of a graph.
@@ -16,9 +16,7 @@ import { buildAdjacencyList } from './helper-functions';
  * @param graph - The test graph to validate
  * @returns PropertyValidationResult with k-colorable validation
  */
-export function validateKColorable(
-  graph: TestGraph
-): PropertyValidationResult {
+export const validateKColorable = (graph: TestGraph): PropertyValidationResult => {
   const { nodes, edges, spec } = graph;
 
   // Only validate when spec requires k_colorable
@@ -80,7 +78,7 @@ export function validateKColorable(
 
   // For k >= 3, use greedy coloring to get upper bound on χ(G)
   const coloring = greedyColoring(nodes, edges, spec.directionality.kind === 'directed');
-  const maxColorUsed = Math.max(...Array.from(coloring.values()));
+  const maxColorUsed = Math.max(...coloring.values());
 
   // If greedy needs more than k colors, graph is definitely not k-colorable
   if (maxColorUsed > k - 1) {
@@ -100,7 +98,7 @@ export function validateKColorable(
     actual: `${k}_colorable`,
     valid: true,
   };
-}
+};
 
 /**
  * Greedy graph coloring algorithm.
@@ -119,11 +117,7 @@ export function validateKColorable(
  * @param directed - Whether the graph is directed
  * @returns Map of node ID to color (0-indexed)
  */
-export function greedyColoring(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  directed: boolean
-): Map<string, number> {
+export const greedyColoring = (nodes: TestNode[], edges: TestEdge[], directed: boolean): Map<string, number> => {
   const colors = new Map<string, number>();
 
   // Edge case: empty graph
@@ -165,7 +159,7 @@ export function greedyColoring(
   }
 
   return colors;
-}
+};
 
 /**
  * Check if a graph is bipartite (2-colorable) using BFS.
@@ -179,11 +173,7 @@ export function greedyColoring(
  * @param directed - Whether the graph is directed
  * @returns true if the graph is bipartite, false otherwise
  */
-function isBipartite(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  directed: boolean
-): boolean {
+const isBipartite = (nodes: TestNode[], edges: TestEdge[], directed: boolean): boolean => {
   if (nodes.length === 0) {
     return true;
   }
@@ -192,7 +182,7 @@ function isBipartite(
   const colors = new Map<string, number>(); // 0 or 1 for bipartition
   const visited = new Set<string>();
 
-  function bfs(startNode: string): boolean {
+  const bfs = (startNode: string): boolean => {
     const queue: string[] = [startNode];
     colors.set(startNode, 0);
     visited.add(startNode);
@@ -217,16 +207,14 @@ function isBipartite(
     }
 
     return true;
-  }
+  };
 
   // Check all components (graph might be disconnected)
   for (const node of nodes) {
-    if (!visited.has(node.id)) {
-      if (!bfs(node.id)) {
+    if (!visited.has(node.id) && !bfs(node.id)) {
         return false;
       }
-    }
   }
 
   return true;
-}
+};

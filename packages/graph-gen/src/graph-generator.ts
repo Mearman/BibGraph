@@ -79,11 +79,10 @@ class SeededRandom {
 
 /**
  * Generate a test graph matching specified properties.
+ * @param spec
+ * @param config
  */
-export function generateGraph(
-  spec: GraphSpec,
-  config: GraphGenerationConfig
-): TestGraph {
+export const generateGraph = (spec: GraphSpec, config: GraphGenerationConfig): TestGraph => {
   const rng = new SeededRandom(config.seed);
   const nodes = generateNodes(spec, config, rng);
 
@@ -99,16 +98,15 @@ export function generateGraph(
   }
 
   return { nodes, edges, spec };
-}
+};
 
 /**
  * Generate nodes with appropriate types and partitions.
+ * @param spec
+ * @param config
+ * @param rng
  */
-function generateNodes(
-  spec: GraphSpec,
-  config: GraphGenerationConfig,
-  rng: SeededRandom
-): TestNode[] {
+const generateNodes = (spec: GraphSpec, config: GraphGenerationConfig, rng: SeededRandom): TestNode[] => {
   const nodes: TestNode[] = [];
 
   // For bipartite graphs, determine partition sizes
@@ -160,17 +158,16 @@ function generateNodes(
   }
 
   return nodes;
-}
+};
 
 /**
  * Generate base graph structure based on connectivity and cyclicity.
+ * @param nodes
+ * @param spec
+ * @param _config
+ * @param rng
  */
-function generateBaseStructure(
-  nodes: TestNode[],
-  spec: GraphSpec,
-  _config: GraphGenerationConfig,
-  rng: SeededRandom
-): TestEdge[] {
+const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: GraphGenerationConfig, rng: SeededRandom): TestEdge[] => {
   const edges: TestEdge[] = [];
 
   // Handle complete bipartite K_{m,n} first
@@ -311,17 +308,16 @@ function generateBaseStructure(
   }
 
   return edges;
-}
+};
 
 /**
  * Generate tree structure (connected, acyclic).
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
-function generateTreeEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  rng: SeededRandom
-): void {
+const generateTreeEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length === 0) return;
 
   // Build tree by randomly connecting each node to a previous node
@@ -335,18 +331,17 @@ function generateTreeEdges(
     addEdge(edges, source, target, spec, rng);
     connected.add(target);
   }
-}
+};
 
 /**
  * Generate star graph (center node connected to all other nodes).
  * Star graphs are trees with one central node and n-1 leaves.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
-function generateStarEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  rng: SeededRandom
-): void {
+const generateStarEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length === 0) return;
 
   // First node is the center
@@ -357,19 +352,18 @@ function generateStarEdges(
     const leaf = nodes[i].id;
     addEdge(edges, center, leaf, spec, rng);
   }
-}
+};
 
 /**
  * Generate wheel graph (cycle + hub).
  * Wheel graphs have a central hub connected to all nodes in a cycle.
  * The hub is the first node, and the remaining nodes form the cycle.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param _rng
  */
-function generateWheelEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  _rng: SeededRandom
-): void {
+const generateWheelEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
   if (nodes.length < 4) {
     // Wheel graphs need at least 4 nodes (1 hub + 3-cycle minimum)
     // For smaller graphs, fall back to star or complete graph
@@ -406,18 +400,17 @@ function generateWheelEdges(
   for (const node of cycleNodes) {
     addEdge(edges, hub, node.id, spec, _rng);
   }
-}
+};
 
 /**
  * Generate grid graph (2D lattice).
  * Grid graphs are arranged in rows × cols grid with 4-connectivity.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param _rng
  */
-function generateGridEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  _rng: SeededRandom
-): void {
+const generateGridEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
   if (nodes.length === 0) return;
   if (!spec.grid || spec.grid.kind !== "grid") return;
 
@@ -452,18 +445,17 @@ function generateGridEdges(
       }
     }
   }
-}
+};
 
 /**
  * Generate toroidal graph (grid with wraparound).
  * Toroidal graphs are grids where edges wrap around both horizontally and vertically.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param _rng
  */
-function generateToroidalEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  _rng: SeededRandom
-): void {
+const generateToroidalEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
   if (nodes.length === 0) return;
   if (!spec.toroidal || spec.toroidal.kind !== "toroidal") return;
 
@@ -496,7 +488,7 @@ function generateToroidalEdges(
       }
     }
   }
-}
+};
 
 /**
  * Generate binary tree (each node has ≤ 2 children).
@@ -504,13 +496,12 @@ function generateToroidalEdges(
  * - binary_tree: each node has 0, 1, or 2 children
  * - full_binary: each node has 0 or 2 children (no nodes with 1 child)
  * - complete_binary: all levels filled except possibly last, filled left-to-right
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
-function generateBinaryTreeEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  rng: SeededRandom
-): void {
+const generateBinaryTreeEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length === 0) return;
 
   const kind = spec.binaryTree?.kind;
@@ -577,19 +568,18 @@ function generateBinaryTreeEdges(
       }
     }
   }
-}
+};
 
 /**
  * Generate tournament graph (complete oriented graph).
  * Tournament graphs have exactly one directed edge between each pair of vertices.
  * For every pair (u, v), exactly one of u→v or v→u exists, never both.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
-function generateTournamentEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  rng: SeededRandom
-): void {
+const generateTournamentEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 2) return;
 
   // Generate one directed edge for each unordered pair of vertices
@@ -606,19 +596,18 @@ function generateTournamentEdges(
       }
     }
   }
-}
+};
 
 /**
  * Generate k-regular graph (all vertices have degree k).
  * Uses the configuration model: create k stubs per vertex, then randomly pair them.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param k
+ * @param rng
  */
-function generateRegularEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  k: number,
-  rng: SeededRandom
-): void {
+const generateRegularEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, k: number, rng: SeededRandom): void => {
   const n = nodes.length;
 
   // Validation: k-regular graph requires n > k and n*k to be even
@@ -670,19 +659,18 @@ function generateRegularEdges(
       existingEdges.add(edgeKey);
     }
   }
-}
+};
 
 /**
  * Generate Eulerian or semi-Eulerian graph.
  * Eulerian graphs have all vertices with even degree (allow Eulerian circuit).
  * Semi-Eulerian graphs have exactly 2 vertices with odd degree (allow Eulerian trail).
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
-function generateEulerianEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  rng: SeededRandom
-): void {
+const generateEulerianEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   const n = nodes.length;
   if (n < 2) return;
 
@@ -700,7 +688,7 @@ function generateEulerianEdges(
     // Remove a random edge from the cycle
     const edgeToRemove = rng.choice(edges);
     const index = edges.indexOf(edgeToRemove);
-    if (index > -1) {
+    if (index !== -1) {
       edges.splice(index, 1);
     }
   }
@@ -754,7 +742,7 @@ function generateEulerianEdges(
 
     if (spec.directionality.kind === "undirected") {
       // For undirected, adding edge affects both vertices
-      const oddCountBefore = Array.from(degrees.values()).filter(d => d % 2 === 1).length;
+      const oddCountBefore = [...degrees.values()].filter(d => d % 2 === 1).length;
       const oddCountAfter = oddCountBefore +
         (degree1 % 2 === 0 ? 1 : -1) +  // node1 flips parity
         (degree2 % 2 === 0 ? 1 : -1);   // node2 flips parity
@@ -779,7 +767,7 @@ function generateEulerianEdges(
       break;
     }
   }
-}
+};
 
 /**
  * Generate k-vertex-connected graph.
@@ -789,14 +777,13 @@ function generateEulerianEdges(
  * Construction approach:
  * 1. Start with K_{k+1} (complete graph on k+1 vertices)
  * 2. Add remaining vertices, each connected to at least k existing vertices
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param k
+ * @param rng
  */
-function generateKVertexConnectedEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  k: number,
-  rng: SeededRandom
-): void {
+const generateKVertexConnectedEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, k: number, rng: SeededRandom): void => {
   const n = nodes.length;
 
   // Validation: k-vertex-connected requires at least k+1 vertices
@@ -832,7 +819,7 @@ function generateKVertexConnectedEdges(
       addEdge(edges, newNode, shuffled[j].id, spec, rng);
     }
   }
-}
+};
 
 /**
  * Generate k-edge-connected graph.
@@ -842,14 +829,13 @@ function generateKVertexConnectedEdges(
  * Construction approach:
  * 1. Create a k-regular or near-k-regular graph
  * 2. This ensures minimum degree ≥ k, which guarantees edge connectivity ≥ k
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param k
+ * @param rng
  */
-function generateKEdgeConnectedEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  k: number,
-  rng: SeededRandom
-): void {
+const generateKEdgeConnectedEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, k: number, rng: SeededRandom): void => {
   const n = nodes.length;
 
   // Validation: k-edge-connected requires at least k+1 vertices
@@ -907,7 +893,7 @@ function generateKEdgeConnectedEdges(
     attempts++;
 
     // Find a vertex with degree < k
-    const lowDegreeVertices = Array.from(degrees.entries())
+    const lowDegreeVertices = [...degrees.entries()]
       .filter(([_, degree]) => degree < k)
       .map(([nodeId, _]) => nodeId);
 
@@ -937,7 +923,7 @@ function generateKEdgeConnectedEdges(
     degrees.set(node1, (degrees.get(node1) || 0) + 1);
     degrees.set(node2, (degrees.get(node2) || 0) + 1);
   }
-}
+};
 
 /**
  * Generate treewidth-bounded graph using k-tree construction.
@@ -948,14 +934,13 @@ function generateKEdgeConnectedEdges(
  * 2. Repeatedly add new vertices, each connected to a k-clique of existing vertices
  *
  * This generates a chordal graph with treewidth exactly k.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param k
+ * @param rng
  */
-function generateTreewidthBoundedEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  k: number,
-  rng: SeededRandom
-): void {
+const generateTreewidthBoundedEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, k: number, rng: SeededRandom): void => {
   const n = nodes.length;
 
   // Validation: treewidth k requires at least k+1 vertices
@@ -1012,7 +997,7 @@ function generateTreewidthBoundedEdges(
     // Generate all k-sized combinations of the initial (k+1)-clique
     const initialClique = nodes.slice(0, cliqueSize).map(n => n.id);
 
-    function generateCombinations(arr: string[], k: number): string[][] {
+    const generateCombinations = (arr: string[], k: number): string[][] => {
       if (k === 0) return [[]];
       if (arr.length === 0) return [];
 
@@ -1021,7 +1006,7 @@ function generateTreewidthBoundedEdges(
       const combsWithoutFirst = generateCombinations(rest, k);
 
       return [...combsWithFirst, ...combsWithoutFirst];
-    }
+    };
 
     cliques.push(...generateCombinations(initialClique, k));
   } else {
@@ -1052,7 +1037,7 @@ function generateTreewidthBoundedEdges(
       cliques.push(newClique);
     }
   }
-}
+};
 
 /**
  * Generate k-colorable graph.
@@ -1062,14 +1047,13 @@ function generateTreewidthBoundedEdges(
  * Construction approach: Create a k-partite graph
  * 1. Partition vertices into k color classes
  * 2. Add edges only between vertices of different colors
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param k
+ * @param rng
  */
-function generateKColorableEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  k: number,
-  rng: SeededRandom
-): void {
+const generateKColorableEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, k: number, rng: SeededRandom): void => {
   const n = nodes.length;
 
   // Validation: k must be at least 1
@@ -1172,7 +1156,7 @@ function generateKColorableEdges(
         if (visited.size === 0) break;
 
         // Connect to a random visited node (from earlier color)
-        const parent = rng.choice(Array.from(visited));
+        const parent = rng.choice([...visited]);
         addEdge(edges, parent, nodeId, spec, rng);
         visited.add(nodeId);
       }
@@ -1182,24 +1166,23 @@ function generateKColorableEdges(
     for (let colorIdx = 0; colorIdx < k; colorIdx++) {
       for (const nodeId of colorQueue[colorIdx]) {
         if (!visited.has(nodeId) && visited.size > 0) {
-          const parent = rng.choice(Array.from(visited));
+          const parent = rng.choice([...visited]);
           addEdge(edges, parent, nodeId, spec, rng);
           visited.add(nodeId);
         }
       }
     }
   }
-}
+};
 
 /**
  * Generate connected graph with cycles.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
-function generateConnectedCyclicEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  rng: SeededRandom
-): void {
+const generateConnectedCyclicEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length === 0) return;
 
   // First create a cycle through all nodes
@@ -1208,17 +1191,16 @@ function generateConnectedCyclicEdges(
     const target = nodes[(i + 1) % nodes.length].id;
     addEdge(edges, source, target, spec, rng);
   }
-}
+};
 
 /**
  * Generate forest (disconnected trees).
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
-function generateForestEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  rng: SeededRandom
-): void {
+const generateForestEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 2) return;
 
   // Split nodes into 2-3 components
@@ -1238,19 +1220,18 @@ function generateForestEdges(
       addEdge(edges, source, target, spec, rng);
     }
   }
-}
+};
 
 /**
  * Generate disconnected graph.
  * For sparse, creates forest then optionally adds 1 edge for cycles.
  * For higher densities, creates components with cycles.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
-function generateDisconnectedEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  rng: SeededRandom
-): void {
+const generateDisconnectedEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 2) return;
 
   // Use minimal structure (trees) for sparse and moderate, then add edges to reach target
@@ -1321,18 +1302,17 @@ function generateDisconnectedEdges(
       }
     }
   }
-}
+};
 
 /**
  * Add additional edges to achieve desired density.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param _config
+ * @param rng
  */
-function addDensityEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  _config: GraphGenerationConfig,
-  rng: SeededRandom
-): void {
+const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _config: GraphGenerationConfig, rng: SeededRandom): void => {
   const n = nodes.length;
 
   // Early exit for graphs with exact structures that shouldn't be modified
@@ -1466,9 +1446,7 @@ function addDensityEdges(
         const target = nodeIds[j];
 
         // Skip for undirected: only add when i < j, OR allow self-loops when i === j
-        if (spec.directionality.kind === "undirected") {
-          if (i >= j && (i !== j || spec.selfLoops.kind !== "allowed")) continue;
-        }
+        if (spec.directionality.kind === "undirected" && i >= j && (i !== j || spec.selfLoops.kind !== "allowed")) continue;
 
         // Skip self-loops if not allowed
         if (spec.selfLoops.kind === "disallowed" && source === target) continue;
@@ -1591,8 +1569,8 @@ function addDensityEdges(
     // For acyclic graphs, ensure we don't create cycles
     if (spec.cycles.kind === 'acyclic' && spec.directionality.kind === 'directed') {
       // Simple check: only add edge if target ID > source ID (topological ordering)
-      const sourceNum = parseInt(source.slice(1), 10);
-      const targetNum = parseInt(target.slice(1), 10);
+      const sourceNum = Number.parseInt(source.slice(1), 10);
+      const targetNum = Number.parseInt(target.slice(1), 10);
       if (targetNum <= sourceNum) continue;
     }
 
@@ -1631,23 +1609,29 @@ function addDensityEdges(
     const edgeToDouble = rng.choice(edges);
     addEdge(edges, edgeToDouble.source, edgeToDouble.target, spec, rng);
   }
-}
+};
 
 /**
  * Add weights to edges.
+ * @param edges
+ * @param config
+ * @param rng
  */
-function addWeights(edges: TestEdge[], config: GraphGenerationConfig, rng: SeededRandom): void {
+const addWeights = (edges: TestEdge[], config: GraphGenerationConfig, rng: SeededRandom): void => {
   const { min = 1, max = 100 } = config.weightRange ?? {};
 
   for (const edge of edges) {
     edge.weight = rng.integer(min, max);
   }
-}
+};
 
 /**
  * Detect cycles in a graph using DFS (simplified version for internal use).
+ * @param nodes
+ * @param edges
+ * @param directed
  */
-function detectCycleInGraph(nodes: TestNode[], edges: TestEdge[], directed: boolean): boolean {
+const detectCycleInGraph = (nodes: TestNode[], edges: TestEdge[], directed: boolean): boolean => {
   if (nodes.length < 2) return false;
 
   const adjacency = new Map<string, string[]>();
@@ -1664,7 +1648,7 @@ function detectCycleInGraph(nodes: TestNode[], edges: TestEdge[], directed: bool
   const visited = new Set<string>();
   const recursionStack = new Set<string>();
 
-  function dfs(nodeId: string): boolean {
+  const dfs = (nodeId: string): boolean => {
     visited.add(nodeId);
     recursionStack.add(nodeId);
 
@@ -1679,22 +1663,23 @@ function detectCycleInGraph(nodes: TestNode[], edges: TestEdge[], directed: bool
 
     recursionStack.delete(nodeId);
     return false;
-  }
+  };
 
   for (const node of nodes) {
-    if (!visited.has(node.id)) {
-      if (dfs(node.id)) return true;
-    }
+    if (!visited.has(node.id) && dfs(node.id)) return true;
   }
 
   return false;
-}
+};
 
 /**
  * Find connected components in the graph using BFS.
  * Returns array of components, where each component is an array of node IDs.
+ * @param nodes
+ * @param edges
+ * @param directed
  */
-function findComponents(nodes: TestNode[], edges: TestEdge[], directed: boolean): string[][] {
+const findComponents = (nodes: TestNode[], edges: TestEdge[], directed: boolean): string[][] => {
   const components: string[][] = [];
   const visited = new Set<string>();
 
@@ -1732,7 +1717,7 @@ function findComponents(nodes: TestNode[], edges: TestEdge[], directed: boolean)
   }
 
   return components;
-}
+};
 
 // ============================================================================
 // BIPARTITE GRAPH GENERATORS
@@ -1740,22 +1725,22 @@ function findComponents(nodes: TestNode[], edges: TestEdge[], directed: boolean)
 
 /**
  * Get nodes in left and right partitions for bipartite graphs.
+ * @param nodes
  */
-function getBipartitePartitions(nodes: TestNode[]): { left: TestNode[]; right: TestNode[] } {
+const getBipartitePartitions = (nodes: TestNode[]): { left: TestNode[]; right: TestNode[] } => {
   const left = nodes.filter(n => (n as any).partition === "left");
   const right = nodes.filter(n => (n as any).partition === "right");
   return { left, right };
-}
+};
 
 /**
  * Generate complete bipartite K_{m,n} graph.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
-function generateCompleteBipartiteEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  rng: SeededRandom
-): void {
+const generateCompleteBipartiteEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   const { left, right } = getBipartitePartitions(nodes);
 
   // Add all possible edges between left and right partitions
@@ -1770,17 +1755,16 @@ function generateCompleteBipartiteEdges(
       }
     }
   }
-}
+};
 
 /**
  * Generate bipartite tree (connected, acyclic bipartite graph).
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
-function generateBipartiteTreeEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  rng: SeededRandom
-): void {
+const generateBipartiteTreeEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   const { left, right } = getBipartitePartitions(nodes);
 
   if (left.length === 0 || right.length === 0) return;
@@ -1806,17 +1790,16 @@ function generateBipartiteTreeEdges(
       connected.add(node.id);
     }
   }
-}
+};
 
 /**
  * Generate connected bipartite graph with even-length cycles.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
-function generateBipartiteConnectedEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  rng: SeededRandom
-): void {
+const generateBipartiteConnectedEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   const { left, right } = getBipartitePartitions(nodes);
 
   if (left.length === 0 || right.length === 0) return;
@@ -1843,17 +1826,16 @@ function generateBipartiteConnectedEdges(
 
     addEdge(edges, source.id, target.id, spec, rng);
   }
-}
+};
 
 /**
  * Generate bipartite forest (disconnected acyclic bipartite graphs).
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
-function generateBipartiteForestEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  rng: SeededRandom
-): void {
+const generateBipartiteForestEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   const { left, right } = getBipartitePartitions(nodes);
 
   if (left.length === 0 || right.length === 0) return;
@@ -1893,17 +1875,16 @@ function generateBipartiteForestEdges(
       }
     }
   }
-}
+};
 
 /**
  * Generate disconnected bipartite graph with cycles.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
-function generateBipartiteDisconnectedEdges(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec,
-  rng: SeededRandom
-): void {
+const generateBipartiteDisconnectedEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   const { left, right } = getBipartitePartitions(nodes);
 
   if (left.length === 0 || right.length === 0) return;
@@ -1959,20 +1940,19 @@ function generateBipartiteDisconnectedEdges(
       addEdge(edges, source.id, target.id, spec, rng);
     }
   }
-}
+};
 
 /**
  * Add edge to edge list.
  * NOTE: For undirected graphs, only store one direction - the validator's
  * buildAdjacencyList will create bidirectional adjacency.
+ * @param edges
+ * @param source
+ * @param target
+ * @param spec
+ * @param rng
  */
-function addEdge(
-  edges: TestEdge[],
-  source: string,
-  target: string,
-  spec: GraphSpec,
-  rng: SeededRandom
-): void {
+const addEdge = (edges: TestEdge[], source: string, target: string, spec: GraphSpec, rng: SeededRandom): void => {
   const edge: TestEdge = { source, target };
 
   if (spec.schema.kind === 'heterogeneous') {
@@ -1981,4 +1961,4 @@ function addEdge(
   }
 
   edges.push(edge);
-}
+};

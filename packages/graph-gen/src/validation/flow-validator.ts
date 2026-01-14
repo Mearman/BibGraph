@@ -1,4 +1,4 @@
-import type { TestGraph, TestEdge } from '../graph-generator';
+import type { TestEdge,TestGraph } from '../graph-generator';
 import type { PropertyValidationResult } from './types';
 
 /**
@@ -14,7 +14,7 @@ import type { PropertyValidationResult } from './types';
  * @param graph - The graph to validate
  * @returns PropertyValidationResult with flow network validation
  */
-export function validateFlowNetwork(graph: TestGraph): PropertyValidationResult {
+export const validateFlowNetwork = (graph: TestGraph): PropertyValidationResult => {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -152,11 +152,9 @@ export function validateFlowNetwork(graph: TestGraph): PropertyValidationResult 
     // Nodes that don't lie on any source-to-sink path
     const disconnectedNodes: string[] = [];
     for (const node of nodes) {
-      if (node.id !== source && node.id !== sink) {
-        if (!reachableFromSource.has(node.id) || !canReachSink.has(node.id)) {
+      if (node.id !== source && node.id !== sink && (!reachableFromSource.has(node.id) || !canReachSink.has(node.id))) {
           disconnectedNodes.push(node.id);
         }
-      }
     }
 
     if (disconnectedNodes.length > 0) {
@@ -184,4 +182,4 @@ export function validateFlowNetwork(graph: TestGraph): PropertyValidationResult 
     valid,
     message,
   };
-}
+};

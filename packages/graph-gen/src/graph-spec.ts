@@ -603,10 +603,9 @@ export type GraphSpecPatch = Partial<Omit<GraphSpec,
 /**
  * Create a GraphSpec from defaults + overrides.
  * Provides type-safe property composition.
+ * @param patch
  */
-export function makeGraphSpec(patch: GraphSpecPatch = {}): GraphSpec {
-  return { ...defaultGraphSpec, ...patch };
-}
+export const makeGraphSpec = (patch: GraphSpecPatch = {}): GraphSpec => ({ ...defaultGraphSpec, ...patch });
 
 // ============================================================================
 // COMMON GRAPH CLASS TYPES
@@ -689,7 +688,7 @@ export const weightedDirectedNetwork: WeightedDirectedNetworkSpec = makeGraphSpe
  * Generate all valid permutations of core GraphSpec properties.
  * Filters out invalid combinations (e.g., connected + acyclic + complete).
  */
-export function generateCoreSpecPermutations(): GraphSpec[] {
+export const generateCoreSpecPermutations = (): GraphSpec[] => {
   const permutations: GraphSpec[] = [];
 
   const directionalityOptions: Directionality[] = [
@@ -776,12 +775,13 @@ export function generateCoreSpecPermutations(): GraphSpec[] {
   }
 
   return permutations;
-}
+};
 
 /**
  * Validate that a GraphSpec doesn't contain contradictory properties.
+ * @param spec
  */
-export function isValidSpec(spec: GraphSpec): boolean {
+export const isValidSpec = (spec: GraphSpec): boolean => {
   // Self-loops require cycles
   if (spec.selfLoops.kind === "allowed" && spec.cycles.kind === "acyclic") {
     return false;
@@ -803,35 +803,32 @@ export function isValidSpec(spec: GraphSpec): boolean {
   }
 
   // Connected acyclic graphs (trees/DAGs) have structural edge constraints
-  if (spec.cycles.kind === "acyclic" && spec.connectivity.kind === "connected") {
-    // Trees need at least n-1 edges, which for n=10 is 10% (sparse range)
+  if (spec.cycles.kind === "acyclic" && spec.connectivity.kind === "connected" && // Trees need at least n-1 edges, which for n=10 is 10% (sparse range)
     // They can't be dense or complete
-    if (spec.density.kind === "dense" || spec.completeness.kind === "complete") {
+    (spec.density.kind === "dense" || spec.completeness.kind === "complete")) {
       return false;
     }
-  }
 
   // Disconnected acyclic graphs (forests) also have minimum edge constraints
-  if (spec.cycles.kind === "acyclic" && spec.connectivity.kind === "unconstrained") {
-    // Forests with multiple components need edges within each component
+  if (spec.cycles.kind === "acyclic" && spec.connectivity.kind === "unconstrained" && // Forests with multiple components need edges within each component
     // For n=10 split into 3 components, minimum is ~7-9 edges = 8-10%
     // Can only be sparse, not moderate/dense/complete
-    if (spec.density.kind === "moderate" || spec.density.kind === "dense" || spec.completeness.kind === "complete") {
+    (spec.density.kind === "moderate" || spec.density.kind === "dense" || spec.completeness.kind === "complete")) {
       return false;
     }
-  }
 
   // Connected dense graphs need enough edges - for n=10, dense requires ~70% = 63 edges
   // But the generator may not achieve this for all configurations
   // Allow dense + connected but be tolerant in validation
 
   return true;
-}
+};
 
 /**
  * Generate a human-readable description of a GraphSpec.
+ * @param spec
  */
-export function describeSpec(spec: GraphSpec): string {
+export const describeSpec = (spec: GraphSpec): string => {
   const parts: string[] = [];
 
   if (spec.directionality.kind === "directed") parts.push("directed");
@@ -855,48 +852,56 @@ export function describeSpec(spec: GraphSpec): string {
   if (spec.completeness.kind === "complete") parts.push("complete");
 
   return parts.join(", ") || "default graph";
-}
+};
 
 // ============================================================================
 // CONVENIENCE EXPORTS
 // ============================================================================
 
-/** Convenience helper for creating specs with commonly-used properties */
-export function createSpec(overrides: GraphSpecPatch = {}): GraphSpec {
-  return makeGraphSpec(overrides);
-}
+/**
+ * Convenience helper for creating specs with commonly-used properties
+ * @param overrides
+ */
+export const createSpec = (overrides: GraphSpecPatch = {}): GraphSpec => makeGraphSpec(overrides);
 
-/** Type guard for directed graphs */
-export function isDirected(spec: GraphSpec): spec is GraphSpec & { directionality: { kind: "directed" } } {
-  return spec.directionality.kind === "directed";
-}
+/**
+ * Type guard for directed graphs
+ * @param spec
+ */
+export const isDirected = (spec: GraphSpec): spec is GraphSpec & { directionality: { kind: "directed" } } => spec.directionality.kind === "directed";
 
-/** Type guard for weighted graphs */
-export function isWeighted(spec: GraphSpec): spec is GraphSpec & { weighting: { kind: "weighted_numeric" } } {
-  return spec.weighting.kind === "weighted_numeric";
-}
+/**
+ * Type guard for weighted graphs
+ * @param spec
+ */
+export const isWeighted = (spec: GraphSpec): spec is GraphSpec & { weighting: { kind: "weighted_numeric" } } => spec.weighting.kind === "weighted_numeric";
 
-/** Type guard for acyclic graphs */
-export function isAcyclic(spec: GraphSpec): spec is GraphSpec & { cycles: { kind: "acyclic" } } {
-  return spec.cycles.kind === "acyclic";
-}
+/**
+ * Type guard for acyclic graphs
+ * @param spec
+ */
+export const isAcyclic = (spec: GraphSpec): spec is GraphSpec & { cycles: { kind: "acyclic" } } => spec.cycles.kind === "acyclic";
 
-/** Type guard for connected graphs */
-export function isConnected(spec: GraphSpec): spec is GraphSpec & { connectivity: { kind: "connected" } } {
-  return spec.connectivity.kind === "connected";
-}
+/**
+ * Type guard for connected graphs
+ * @param spec
+ */
+export const isConnected = (spec: GraphSpec): spec is GraphSpec & { connectivity: { kind: "connected" } } => spec.connectivity.kind === "connected";
 
-/** Type guard for heterogeneous graphs */
-export function isHeterogeneous(spec: GraphSpec): spec is GraphSpec & { schema: { kind: "heterogeneous" } } {
-  return spec.schema.kind === "heterogeneous";
-}
+/**
+ * Type guard for heterogeneous graphs
+ * @param spec
+ */
+export const isHeterogeneous = (spec: GraphSpec): spec is GraphSpec & { schema: { kind: "heterogeneous" } } => spec.schema.kind === "heterogeneous";
 
-/** Type guard for multigraphs */
-export function isMultigraph(spec: GraphSpec): spec is GraphSpec & { edgeMultiplicity: { kind: "multi" } } {
-  return spec.edgeMultiplicity.kind === "multi";
-}
+/**
+ * Type guard for multigraphs
+ * @param spec
+ */
+export const isMultigraph = (spec: GraphSpec): spec is GraphSpec & { edgeMultiplicity: { kind: "multi" } } => spec.edgeMultiplicity.kind === "multi";
 
-/** Type guard for graphs allowing self-loops */
-export function allowsSelfLoops(spec: GraphSpec): spec is GraphSpec & { selfLoops: { kind: "allowed" } } {
-  return spec.selfLoops.kind === "allowed";
-}
+/**
+ * Type guard for graphs allowing self-loops
+ * @param spec
+ */
+export const allowsSelfLoops = (spec: GraphSpec): spec is GraphSpec & { selfLoops: { kind: "allowed" } } => spec.selfLoops.kind === "allowed";

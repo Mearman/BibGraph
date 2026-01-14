@@ -1,7 +1,7 @@
+import type { TestEdge,TestGraph, TestNode } from '../graph-generator';
 import type { GraphSpec } from '../graph-spec';
-import type { TestGraph, TestNode, TestEdge } from '../graph-generator';
-import type { PropertyValidationResult } from './types';
 import { buildAdjacencyList } from './helper-functions';
+import type { PropertyValidationResult } from './types';
 
 /**
  * Validate that a graph has treewidth ≤ specified bound.
@@ -19,9 +19,7 @@ import { buildAdjacencyList } from './helper-functions';
  * @param graph - Test graph to validate
  * @returns PropertyValidationResult with treewidth validation
  */
-export function validateTreewidth(
-  graph: TestGraph
-): PropertyValidationResult {
+export const validateTreewidth = (graph: TestGraph): PropertyValidationResult => {
   const { nodes, edges, spec } = graph;
 
   // Handle empty graph
@@ -43,17 +41,16 @@ export function validateTreewidth(
     actual: `treewidth_${approxTreewidth}`,
     valid: true,
   };
-}
+};
 
 /**
  * Check if graph is a forest (acyclic).
  * Forests have treewidth 0.
+ * @param nodes
+ * @param edges
+ * @param spec
  */
-function isForest(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec
-): boolean {
+const isForest = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec): boolean => {
   if (spec.cycles.kind === 'acyclic') {
     return true;
   }
@@ -65,7 +62,7 @@ function isForest(
   const visited = new Set<string>();
   const recursionStack = new Set<string>();
 
-  function hasCycle(nodeId: string): boolean {
+  const hasCycle = (nodeId: string): boolean => {
     visited.add(nodeId);
     recursionStack.add(nodeId);
 
@@ -82,18 +79,16 @@ function isForest(
 
     recursionStack.delete(nodeId);
     return false;
-  }
+  };
 
   for (const node of nodes) {
-    if (!visited.has(node.id)) {
-      if (hasCycle(node.id)) {
+    if (!visited.has(node.id) && hasCycle(node.id)) {
         return false; // Has cycle, not a forest
       }
-    }
   }
 
   return true; // No cycles found
-}
+};
 
 /**
  * Approximate treewidth using minimum degree heuristic.
@@ -104,12 +99,11 @@ function isForest(
  * 3. Treewidth = max_clique_size - 1
  *
  * This gives an upper bound on the true treewidth.
+ * @param nodes
+ * @param edges
+ * @param spec
  */
-function approximateTreewidth(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  spec: GraphSpec
-): number {
+const approximateTreewidth = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec): number => {
   if (nodes.length === 0) {
     return 0;
   }
@@ -156,7 +150,7 @@ function approximateTreewidth(
 
   // Treewidth = max clique size - 1
   return maxCliqueSize - 1;
-}
+};
 
 /**
  * Find maximum clique size in a subset of vertices.
@@ -167,10 +161,7 @@ function approximateTreewidth(
  * @param adjacency - Graph adjacency list
  * @returns Size of maximum clique
  */
-function findMaxCliqueSizeInSet(
-  vertices: Set<string>,
-  adjacency: Map<string, string[]>
-): number {
+const findMaxCliqueSizeInSet = (vertices: Set<string>, adjacency: Map<string, string[]>): number => {
   if (vertices.size === 0) {
     return 0;
   }
@@ -178,11 +169,7 @@ function findMaxCliqueSizeInSet(
   let maxSize = 0;
 
   // Bron-Kerbosch with pivot
-  function bronKerbosch(
-    R: Set<string>,
-    P: Set<string>,
-    X: Set<string>
-  ): void {
+  const bronKerbosch = (R: Set<string>, P: Set<string>, X: Set<string>): void => {
     if (P.size === 0 && X.size === 0) {
       // R is a maximal clique
       maxSize = Math.max(maxSize, R.size);
@@ -209,11 +196,11 @@ function findMaxCliqueSizeInSet(
     }
 
     // Branch on vertices in P \ N(pivot)
-    const pivotNeighbors = pivot ? new Set(adjacency.get(pivot) ?? []) : new Set();
-    const candidates = Array.from(P).filter(v => !pivotNeighbors.has(v));
+    const pivotNeighbors = pivot ? new Set(adjacency.get(pivot)) : new Set();
+    const candidates = [...P].filter(v => !pivotNeighbors.has(v));
 
     for (const v of candidates) {
-      const vNeighbors = new Set(adjacency.get(v) ?? []);
+      const vNeighbors = new Set(adjacency.get(v));
 
       const newR = new Set([...R, v]);
       const newP = new Set([...P].filter(n => vNeighbors.has(n)));
@@ -224,13 +211,13 @@ function findMaxCliqueSizeInSet(
       P.delete(v);
       X.add(v);
     }
-  }
+  };
 
   const initialP = new Set(vertices);
   bronKerbosch(new Set(), initialP, new Set());
 
   return maxSize;
-}
+};
 
 /**
  * Find the size of the maximum clique in a graph.
@@ -245,11 +232,7 @@ function findMaxCliqueSizeInSet(
  * @param directed - Whether graph is directed
  * @returns Size of maximum clique
  */
-export function findMaxCliqueSize(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  directed: boolean
-): number {
+export const findMaxCliqueSize = (nodes: TestNode[], edges: TestEdge[], directed: boolean): number => {
   if (nodes.length === 0) {
     return 0;
   }
@@ -264,11 +247,7 @@ export function findMaxCliqueSize(
   let maxSize = 0;
 
   // Bron-Kerbosch with pivot
-  function bronKerbosch(
-    R: Set<string>,
-    P: Set<string>,
-    X: Set<string>
-  ): void {
+  const bronKerbosch = (R: Set<string>, P: Set<string>, X: Set<string>): void => {
     if (P.size === 0 && X.size === 0) {
       // R is a maximal clique
       maxSize = Math.max(maxSize, R.size);
@@ -295,11 +274,11 @@ export function findMaxCliqueSize(
     }
 
     // Branch on vertices in P \ N(pivot)
-    const pivotNeighbors = pivot ? new Set(adjacency.get(pivot) ?? []) : new Set();
-    const candidates = Array.from(P).filter(v => !pivotNeighbors.has(v));
+    const pivotNeighbors = pivot ? new Set(adjacency.get(pivot)) : new Set();
+    const candidates = [...P].filter(v => !pivotNeighbors.has(v));
 
     for (const v of candidates) {
-      const vNeighbors = new Set(adjacency.get(v) ?? []);
+      const vNeighbors = new Set(adjacency.get(v));
 
       const newR = new Set([...R, v]);
       const newP = new Set([...P].filter(n => vNeighbors.has(n)));
@@ -310,11 +289,11 @@ export function findMaxCliqueSize(
       P.delete(v);
       X.add(v);
     }
-  }
+  };
 
   // Initialize with all vertices
   const allVertices = new Set(nodes.map(n => n.id));
   bronKerbosch(new Set(), allVertices, new Set());
 
   return maxSize;
-}
+};

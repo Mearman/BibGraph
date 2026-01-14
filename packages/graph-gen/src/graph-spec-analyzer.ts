@@ -73,39 +73,33 @@ export const defaultComputePolicy: ComputePolicy = {
 // Shared Helpers
 // ============================================================================
 
-function unique<T>(xs: readonly T[]): T[] {
-  return Array.from(new Set(xs));
-}
+const unique = <T>(xs: readonly T[]): T[] => [...new Set(xs)];
 
-function allEqual<T>(xs: readonly T[], eq: (a: T, b: T) => boolean): boolean {
+const allEqual = <T>(xs: readonly T[], eq: (a: T, b: T) => boolean): boolean => {
   if (xs.length <= 1) return true;
   for (let i = 1; i < xs.length; i++) if (!eq(xs[0], xs[i])) return false;
   return true;
-}
+};
 
-function edgeKeyBinary(u: AnalyzerVertexId, v: AnalyzerVertexId, directed: boolean): string {
+const edgeKeyBinary = (u: AnalyzerVertexId, v: AnalyzerVertexId, directed: boolean): string => {
   if (directed) return `${u}->${v}`;
   return u < v ? `${u}--${v}` : `${v}--${u}`;
-}
+};
 
-function hasAnyDirectedEdges(g: AnalyzerGraph): boolean {
-  return g.edges.some(e => e.directed);
-}
+const hasAnyDirectedEdges = (g: AnalyzerGraph): boolean => g.edges.some(e => e.directed);
 
-function hasAnyUndirectedEdges(g: AnalyzerGraph): boolean {
-  return g.edges.some(e => !e.directed);
-}
+const hasAnyUndirectedEdges = (g: AnalyzerGraph): boolean => g.edges.some(e => !e.directed);
 
-function countSelfLoopsBinary(g: AnalyzerGraph): number {
+const countSelfLoopsBinary = (g: AnalyzerGraph): number => {
   let c = 0;
   for (const e of g.edges) {
     if (e.endpoints.length !== 2) continue;
     if (e.endpoints[0] === e.endpoints[1]) c++;
   }
   return c;
-}
+};
 
-function buildAdjUndirectedBinary(g: AnalyzerGraph): Record<AnalyzerVertexId, AnalyzerVertexId[]> {
+const buildAdjUndirectedBinary = (g: AnalyzerGraph): Record<AnalyzerVertexId, AnalyzerVertexId[]> => {
   const adj: Record<string, string[]> = {};
   for (const v of g.vertices) adj[v.id] = [];
   for (const e of g.edges) {
@@ -116,24 +110,24 @@ function buildAdjUndirectedBinary(g: AnalyzerGraph): Record<AnalyzerVertexId, An
     adj[b].push(a);
   }
   return adj;
-}
+};
 
-function isConnectedUndirectedBinary(g: AnalyzerGraph): boolean {
+const isConnectedUndirectedBinary = (g: AnalyzerGraph): boolean => {
   if (g.vertices.length === 0) return true;
   const adj = buildAdjUndirectedBinary(g);
   const start = g.vertices[0].id;
   const seen = new Set<AnalyzerVertexId>();
   const stack: AnalyzerVertexId[] = [start];
-  while (stack.length) {
+  while (stack.length > 0) {
     const cur = stack.pop()!;
     if (seen.has(cur)) continue;
     seen.add(cur);
     for (const nxt of adj[cur] ?? []) if (!seen.has(nxt)) stack.push(nxt);
   }
   return seen.size === g.vertices.length;
-}
+};
 
-function isAcyclicDirectedBinary(g: AnalyzerGraph): boolean {
+const isAcyclicDirectedBinary = (g: AnalyzerGraph): boolean => {
   const verts = g.vertices.map(v => v.id);
   const indeg: Record<AnalyzerVertexId, number> = {};
   const out: Record<AnalyzerVertexId, AnalyzerVertexId[]> = {};
@@ -152,7 +146,7 @@ function isAcyclicDirectedBinary(g: AnalyzerGraph): boolean {
   for (const v of verts) if (indeg[v] === 0) q.push(v);
 
   let processed = 0;
-  while (q.length) {
+  while (q.length > 0) {
     const v = q.pop()!;
     processed++;
     for (const w of out[v]) {
@@ -161,9 +155,9 @@ function isAcyclicDirectedBinary(g: AnalyzerGraph): boolean {
     }
   }
   return processed === verts.length;
-}
+};
 
-function degreesUndirectedBinary(g: AnalyzerGraph): number[] {
+const degreesUndirectedBinary = (g: AnalyzerGraph): number[] => {
   const idx: Record<AnalyzerVertexId, number> = {};
   g.vertices.forEach((v, i) => (idx[v.id] = i));
   const deg = Array.from({ length: g.vertices.length }, () => 0);
@@ -181,16 +175,16 @@ function degreesUndirectedBinary(g: AnalyzerGraph): number[] {
     }
   }
   return deg;
-}
+};
 
-function isBipartiteUndirectedBinary(g: AnalyzerGraph): boolean {
+const isBipartiteUndirectedBinary = (g: AnalyzerGraph): boolean => {
   const adj = buildAdjUndirectedBinary(g);
   const colour = new Map<AnalyzerVertexId, 0 | 1>();
   for (const v of g.vertices) {
     if (colour.has(v.id)) continue;
     const queue: AnalyzerVertexId[] = [v.id];
     colour.set(v.id, 0);
-    while (queue.length) {
+    while (queue.length > 0) {
       const cur = queue.shift()!;
       const c = colour.get(cur)!;
       for (const nxt of adj[cur] ?? []) {
@@ -204,41 +198,36 @@ function isBipartiteUndirectedBinary(g: AnalyzerGraph): boolean {
     }
   }
   return true;
-}
+};
 
 // ============================================================================
 // Axis Compute Functions
 // ============================================================================
 
-export function computeVertexCardinality(g: AnalyzerGraph): { kind: "finite"; n: number } {
-  return { kind: "finite", n: g.vertices.length };
-}
+export const computeVertexCardinality = (g: AnalyzerGraph): { kind: "finite"; n: number } => ({ kind: "finite", n: g.vertices.length });
 
-export function computeVertexIdentity(g: AnalyzerGraph): { kind: "distinguishable" } | { kind: "indistinguishable" } {
+export const computeVertexIdentity = (g: AnalyzerGraph): { kind: "distinguishable" } | { kind: "indistinguishable" } => {
   const ids = g.vertices.map(v => v.id);
   return new Set(ids).size === ids.length ? { kind: "distinguishable" } : { kind: "indistinguishable" };
-}
+};
 
-export function computeVertexOrdering(
-  g: AnalyzerGraph,
-  policy: ComputePolicy
-): { kind: "unordered" } | { kind: "total_order" } | { kind: "partial_order" } {
+export const computeVertexOrdering = (g: AnalyzerGraph, policy: ComputePolicy): { kind: "unordered" } | { kind: "total_order" } | { kind: "partial_order" } => {
   const orders = g.vertices.map(v => v.attrs?.[policy.vertexOrderKey]);
   if (!orders.every(x => typeof x === "number")) return { kind: "unordered" };
   const nums = orders as number[];
   return new Set(nums).size === nums.length ? { kind: "total_order" } : { kind: "partial_order" };
-}
+};
 
-export function computeEdgeArity(g: AnalyzerGraph): { kind: "binary" } | { kind: "k_ary"; k: number } {
+export const computeEdgeArity = (g: AnalyzerGraph): { kind: "binary" } | { kind: "k_ary"; k: number } => {
   if (g.edges.length === 0) return { kind: "binary" };
   const arities = g.edges.map(e => e.endpoints.length);
   const all2 = arities.every(a => a === 2);
   if (all2) return { kind: "binary" };
   if (allEqual(arities, (a, b) => a === b)) return { kind: "k_ary", k: arities[0] };
   throw new Error(`Mixed edge arity cannot be represented as a single EdgeArity: ${unique(arities).join(", ")}`);
-}
+};
 
-export function computeEdgeMultiplicity(g: AnalyzerGraph): { kind: "simple" } | { kind: "multi" } {
+export const computeEdgeMultiplicity = (g: AnalyzerGraph): { kind: "simple" } | { kind: "multi" } => {
   const seen = new Set<string>();
   for (const e of g.edges) {
     if (e.endpoints.length === 2) {
@@ -247,24 +236,22 @@ export function computeEdgeMultiplicity(g: AnalyzerGraph): { kind: "simple" } | 
       if (seen.has(k)) return { kind: "multi" };
       seen.add(k);
     } else {
-      const k = `H:${e.endpoints.slice().sort().join("|")}`;
+      const k = `H:${[...e.endpoints].sort().join("|")}`;
       if (seen.has(k)) return { kind: "multi" };
       seen.add(k);
     }
   }
   return { kind: "simple" };
-}
+};
 
-export function computeSelfLoops(g: AnalyzerGraph): { kind: "disallowed" } | { kind: "allowed" } {
-  return countSelfLoopsBinary(g) > 0 ? { kind: "allowed" } : { kind: "disallowed" };
-}
+export const computeSelfLoops = (g: AnalyzerGraph): { kind: "disallowed" } | { kind: "allowed" } => countSelfLoopsBinary(g) > 0 ? { kind: "allowed" } : { kind: "disallowed" };
 
-export function computeDirectionality(g: AnalyzerGraph):
+export const computeDirectionality = (g: AnalyzerGraph):
   | { kind: "undirected" }
   | { kind: "directed" }
   | { kind: "mixed" }
   | { kind: "bidirected" }
-  | { kind: "antidirected" } {
+  | { kind: "antidirected" } => {
   const hasDir = hasAnyDirectedEdges(g);
   const hasUndir = hasAnyUndirectedEdges(g);
   if (hasDir && hasUndir) return { kind: "mixed" };
@@ -288,52 +275,46 @@ export function computeDirectionality(g: AnalyzerGraph):
   if (antidirected && directedBinary.length > 0) return { kind: "antidirected" };
 
   return { kind: "directed" };
-}
+};
 
-export function computeWeighting(
-  g: AnalyzerGraph,
-  policy: ComputePolicy
-): { kind: "unweighted" } | { kind: "weighted_numeric"; min?: number; max?: number } {
+export const computeWeighting = (g: AnalyzerGraph, policy: ComputePolicy): { kind: "unweighted" } | { kind: "weighted_numeric"; min?: number; max?: number } => {
   if (g.edges.length === 0) return { kind: "unweighted" };
 
   const allNumeric = g.edges.every(e => typeof e.weight === "number");
   if (allNumeric) return { kind: "weighted_numeric" };
 
   return { kind: "unweighted" };
-}
+};
 
-export function computeSignedness(g: AnalyzerGraph): { kind: "unsigned" } | { kind: "signed" } {
+export const computeSignedness = (g: AnalyzerGraph): { kind: "unsigned" } | { kind: "signed" } => {
   const anySigned = g.edges.some(e => e.sign === -1 || e.sign === 1);
   return anySigned ? { kind: "signed" } : { kind: "unsigned" };
-}
+};
 
-export function computeUncertainty(
-  g: AnalyzerGraph,
-  policy: ComputePolicy
-): { kind: "deterministic" } | { kind: "probabilistic"; min?: number; max?: number } {
+export const computeUncertainty = (g: AnalyzerGraph, policy: ComputePolicy): { kind: "deterministic" } | { kind: "probabilistic"; min?: number; max?: number } => {
   const anyProb =
     g.edges.some(e => typeof e.probability === "number") ||
     g.edges.some(e => typeof e.attrs?.[policy.probabilityKey] === "number");
   return anyProb ? { kind: "probabilistic" } : { kind: "deterministic" };
-}
+};
 
-export function computeVertexData(g: AnalyzerGraph): { kind: "unlabelled" } | { kind: "labelled" } | { kind: "attributed" } {
+export const computeVertexData = (g: AnalyzerGraph): { kind: "unlabelled" } | { kind: "labelled" } | { kind: "attributed" } => {
   const anyAttrs = g.vertices.some(v => v.attrs && Object.keys(v.attrs).length > 0);
   const anyLabels = g.vertices.some(v => typeof v.label === "string" && v.label.length > 0);
   if (anyAttrs) return { kind: "attributed" };
   if (anyLabels) return { kind: "labelled" };
   return { kind: "unlabelled" };
-}
+};
 
-export function computeEdgeData(g: AnalyzerGraph): { kind: "unlabelled" } | { kind: "labelled" } | { kind: "attributed" } {
+export const computeEdgeData = (g: AnalyzerGraph): { kind: "unlabelled" } | { kind: "labelled" } | { kind: "attributed" } => {
   const anyAttrs = g.edges.some(e => e.attrs && Object.keys(e.attrs).length > 0);
   const anyLabels = g.edges.some(e => typeof e.label === "string" && e.label.length > 0);
   if (anyAttrs) return { kind: "attributed" };
   if (anyLabels) return { kind: "labelled" };
   return { kind: "unlabelled" };
-}
+};
 
-export function computeSchemaHomogeneity(g: AnalyzerGraph): { kind: "homogeneous" } | { kind: "heterogeneous" } {
+export const computeSchemaHomogeneity = (g: AnalyzerGraph): { kind: "homogeneous" } | { kind: "heterogeneous" } => {
   // Convention:
   // - homogeneous if all vertices share the same set of attr keys AND all edges share the same set of attr keys
   // - otherwise heterogeneous
@@ -342,17 +323,17 @@ export function computeSchemaHomogeneity(g: AnalyzerGraph): { kind: "homogeneous
   const vHom = allEqual(vertexKeySets, (a, b) => a === b);
   const eHom = allEqual(edgeKeySets, (a, b) => a === b);
   return vHom && eHom ? { kind: "homogeneous" } : { kind: "heterogeneous" };
-}
+};
 
-export function computeConnectivity(g: AnalyzerGraph): { kind: "unconstrained" } | { kind: "connected" } {
+export const computeConnectivity = (g: AnalyzerGraph): { kind: "unconstrained" } | { kind: "connected" } => {
   // We only compute "connected" safely for undirected binary graphs.
   // Otherwise return unconstrained.
   const isUndirectedBinary = g.edges.every(e => !e.directed && e.endpoints.length === 2);
   if (!isUndirectedBinary) return { kind: "unconstrained" };
   return isConnectedUndirectedBinary(g) ? { kind: "connected" } : { kind: "unconstrained" };
-}
+};
 
-export function computeCycles(g: AnalyzerGraph): { kind: "cycles_allowed" } | { kind: "acyclic" } {
+export const computeCycles = (g: AnalyzerGraph): { kind: "cycles_allowed" } | { kind: "acyclic" } => {
   // Check if all edges are binary directed
   const isDirectedBinary = g.edges.length > 0 && g.edges.every(e => e.directed && e.endpoints.length === 2);
   // Check if all edges are binary undirected
@@ -372,12 +353,12 @@ export function computeCycles(g: AnalyzerGraph): { kind: "cycles_allowed" } | { 
 
   // Mixed or non-binary graphs: conservative fallback
   return { kind: "cycles_allowed" };
-}
+};
 
-export function computeDegreeConstraint(g: AnalyzerGraph):
+export const computeDegreeConstraint = (g: AnalyzerGraph):
   | { kind: "unconstrained" }
   | { kind: "regular"; degree: number }
-  | { kind: "degree_sequence"; sequence: readonly number[] } {
+  | { kind: "degree_sequence"; sequence: readonly number[] } => {
   // Safe, non-committal: return degree_sequence for undirected-binary graphs, else unconstrained.
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
   if (!isBinary) return { kind: "unconstrained" };
@@ -389,9 +370,9 @@ export function computeDegreeConstraint(g: AnalyzerGraph):
   if (deg.length > 0 && new Set(deg).size === 1) return { kind: "regular", degree: deg[0] };
 
   return { kind: "degree_sequence", sequence: deg };
-}
+};
 
-export function computeCompleteness(g: AnalyzerGraph): { kind: "incomplete" } | { kind: "complete" } {
+export const computeCompleteness = (g: AnalyzerGraph): { kind: "incomplete" } | { kind: "complete" } => {
   // Only meaningful for simple graphs (binary, no multi-edges) when checking complete vs incomplete.
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
   if (!isBinary) return { kind: "incomplete" };
@@ -422,17 +403,17 @@ export function computeCompleteness(g: AnalyzerGraph): { kind: "incomplete" } | 
 
   // mixed graphs: we won't call them complete here
   return { kind: "incomplete" };
-}
+};
 
-export function computePartiteness(g: AnalyzerGraph): { kind: "unrestricted" } | { kind: "bipartite" } {
+export const computePartiteness = (g: AnalyzerGraph): { kind: "unrestricted" } | { kind: "bipartite" } => {
   // We only compute bipartite for undirected binary graphs.
   const isUndirectedBinary = g.edges.every(e => !e.directed && e.endpoints.length === 2);
   if (!isUndirectedBinary) return { kind: "unrestricted" };
 
   return isBipartiteUndirectedBinary(g) ? { kind: "bipartite" } : { kind: "unrestricted" };
-}
+};
 
-export function computeDensity(g: AnalyzerGraph): { kind: "unconstrained" } | { kind: "sparse" } | { kind: "dense" } {
+export const computeDensity = (g: AnalyzerGraph): { kind: "unconstrained" } | { kind: "sparse" } | { kind: "dense" } => {
   // Simple heuristic on undirected binary graphs:
   // density = m / (n*(n-1)/2). Call sparse if <= 0.1, dense if >= 0.9.
   const isUndirectedBinary = g.edges.every(e => !e.directed && e.endpoints.length === 2);
@@ -445,12 +426,9 @@ export function computeDensity(g: AnalyzerGraph): { kind: "unconstrained" } | { 
   if (d <= 0.1) return { kind: "sparse" };
   if (d >= 0.9) return { kind: "dense" };
   return { kind: "unconstrained" };
-}
+};
 
-export function computeEmbedding(
-  g: AnalyzerGraph,
-  policy: ComputePolicy
-): { kind: "abstract" } | { kind: "geometric_metric_space" } | { kind: "spatial_coordinates"; dims: 2 | 3 } {
+export const computeEmbedding = (g: AnalyzerGraph, policy: ComputePolicy): { kind: "abstract" } | { kind: "geometric_metric_space" } | { kind: "spatial_coordinates"; dims: 2 | 3 } => {
   // Convention: if every vertex has pos {x,y} or {x,y,z}, treat as spatial_coordinates.
   const poss = g.vertices.map(v => v.attrs?.[policy.posKey]);
   const allHavePos = poss.length > 0 && poss.every(p => typeof p === "object" && p != null);
@@ -471,9 +449,9 @@ export function computeEmbedding(
   if (uniq.length === 1) return { kind: "spatial_coordinates", dims: uniq[0] };
   // mixed dims -> fall back
   return { kind: "abstract" };
-}
+};
 
-export function computeRooting(g: AnalyzerGraph, policy: ComputePolicy): { kind: "unrooted" } | { kind: "rooted" } | { kind: "multi_rooted" } {
+export const computeRooting = (g: AnalyzerGraph, policy: ComputePolicy): { kind: "unrooted" } | { kind: "rooted" } | { kind: "multi_rooted" } => {
   // Convention:
   // - rooted if exactly one vertex has attrs[rootKey] === true
   // - multi_rooted if >1
@@ -482,14 +460,14 @@ export function computeRooting(g: AnalyzerGraph, policy: ComputePolicy): { kind:
   if (roots.length === 1) return { kind: "rooted" };
   if (roots.length > 1) return { kind: "multi_rooted" };
   return { kind: "unrooted" };
-}
+};
 
-export function computeTemporal(g: AnalyzerGraph, policy: ComputePolicy):
+export const computeTemporal = (g: AnalyzerGraph, policy: ComputePolicy):
   | { kind: "static" }
   | { kind: "dynamic_structure" }
   | { kind: "temporal_edges" }
   | { kind: "temporal_vertices" }
-  | { kind: "time_ordered" } {
+  | { kind: "time_ordered" } => {
   // Convention:
   // - temporal_vertices if any vertex has attrs[timeKey]
   // - temporal_edges if any edge has attrs[timeKey]
@@ -507,13 +485,13 @@ export function computeTemporal(g: AnalyzerGraph, policy: ComputePolicy):
   if (anyV) return { kind: "temporal_vertices" };
   if (anyE) return { kind: "temporal_edges" };
   return { kind: "static" };
-}
+};
 
-export function computeLayering(g: AnalyzerGraph, policy: ComputePolicy):
+export const computeLayering = (g: AnalyzerGraph, policy: ComputePolicy):
   | { kind: "single_layer" }
   | { kind: "multi_layer" }
   | { kind: "multiplex" }
-  | { kind: "interdependent" } {
+  | { kind: "interdependent" } => {
   // Convention:
   // - multi_layer if vertices or edges have a layer label and >1 unique layers
   const layers: Array<string | number> = [];
@@ -527,21 +505,21 @@ export function computeLayering(g: AnalyzerGraph, policy: ComputePolicy):
   }
   const uniq = unique(layers.map(String));
   return uniq.length > 1 ? { kind: "multi_layer" } : { kind: "single_layer" };
-}
+};
 
-export function computeEdgeOrdering(g: AnalyzerGraph, policy: ComputePolicy): { kind: "unordered" } | { kind: "ordered" } {
+export const computeEdgeOrdering = (g: AnalyzerGraph, policy: ComputePolicy): { kind: "unordered" } | { kind: "ordered" } => {
   const orders = g.edges.map(e => e.attrs?.[policy.edgeOrderKey]);
   if (!orders.every(x => typeof x === "number")) return { kind: "unordered" };
   return { kind: "ordered" };
-}
+};
 
-export function computePorts(g: AnalyzerGraph, policy: ComputePolicy): { kind: "none" } | { kind: "port_labelled_vertices" } {
+export const computePorts = (g: AnalyzerGraph, policy: ComputePolicy): { kind: "none" } | { kind: "port_labelled_vertices" } => {
   // Convention: vertex.attrs[portKey] exists => ports
   const anyPorts = g.vertices.some(v => v.attrs?.[policy.portKey] != null);
   return anyPorts ? { kind: "port_labelled_vertices" } : { kind: "none" };
-}
+};
 
-export function computeObservability(g: AnalyzerGraph): { kind: "fully_specified" } | { kind: "partially_observed" } | { kind: "latent_or_inferred" } {
+export const computeObservability = (g: AnalyzerGraph): { kind: "fully_specified" } | { kind: "partially_observed" } | { kind: "latent_or_inferred" } => {
   // Convention: if any vertex/edge has attrs.latent===true => latent_or_inferred
   // else if any has attrs.observed===false => partially_observed
   // else fully_specified
@@ -558,12 +536,12 @@ export function computeObservability(g: AnalyzerGraph): { kind: "fully_specified
   if (anyUnobserved) return { kind: "partially_observed" };
 
   return { kind: "fully_specified" };
-}
+};
 
-export function computeOperationalSemantics(g: AnalyzerGraph):
+export const computeOperationalSemantics = (g: AnalyzerGraph):
   | { kind: "structural_only" }
   | { kind: "annotated_with_functions" }
-  | { kind: "executable" } {
+  | { kind: "executable" } => {
   // Convention: if any vertex/edge has attrs.exec===true => executable
   // else if any has attrs.fn present => annotated_with_functions
   // else structural_only
@@ -578,9 +556,9 @@ export function computeOperationalSemantics(g: AnalyzerGraph):
   if (anyFn) return { kind: "annotated_with_functions" };
 
   return { kind: "structural_only" };
-}
+};
 
-export function computeMeasureSemantics(g: AnalyzerGraph): { kind: "none" } | { kind: "metric" } | { kind: "cost" } | { kind: "utility" } {
+export const computeMeasureSemantics = (g: AnalyzerGraph): { kind: "none" } | { kind: "metric" } | { kind: "cost" } | { kind: "utility" } => {
   // Convention: if weights exist => metric/cost/utility is unknown; choose "metric"
   // If attrs.cost exists => cost; attrs.utility exists => utility
   const anyCost =
@@ -599,7 +577,7 @@ export function computeMeasureSemantics(g: AnalyzerGraph): { kind: "none" } | { 
   if (anyWeight) return { kind: "metric" };
 
   return { kind: "none" };
-}
+};
 
 // ============================================================================
 // NETWORK ANALYSIS PROPERTIES
@@ -608,8 +586,9 @@ export function computeMeasureSemantics(g: AnalyzerGraph): { kind: "none" } | { 
 /**
  * Compute scale-free property (power-law degree distribution).
  * Uses maximum likelihood estimation and Kolmogorov-Smirnov test.
+ * @param g
  */
-export function computeScaleFree(g: AnalyzerGraph): { kind: "scale_free"; exponent: number } | { kind: "not_scale_free" } {
+export const computeScaleFree = (g: AnalyzerGraph): { kind: "scale_free"; exponent: number } | { kind: "not_scale_free" } => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -664,12 +643,13 @@ export function computeScaleFree(g: AnalyzerGraph): { kind: "scale_free"; expone
   }
 
   return { kind: "not_scale_free" };
-}
+};
 
 /**
  * Compute small-world property (high clustering + short paths).
+ * @param g
  */
-export function computeSmallWorld(g: AnalyzerGraph): { kind: "small_world" } | { kind: "not_small_world" } | { kind: "unconstrained" } {
+export const computeSmallWorld = (g: AnalyzerGraph): { kind: "small_world" } | { kind: "not_small_world" } | { kind: "unconstrained" } => {
   // Only valid for undirected binary connected graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -714,7 +694,7 @@ export function computeSmallWorld(g: AnalyzerGraph): { kind: "small_world" } | {
     const dists: Record<string, number> = { [start.id]: 0 };
     const queue: AnalyzerVertexId[] = [start.id];
 
-    while (queue.length) {
+    while (queue.length > 0) {
       const cur = queue.shift()!;
       const dist = dists[cur];
 
@@ -741,16 +721,15 @@ export function computeSmallWorld(g: AnalyzerGraph): { kind: "small_world" } | {
   const shortPaths = avgPathLength <= randomPathLength * 1.5; // Similar to or shorter than random
 
   return highClustering && shortPaths ? { kind: "small_world" } : { kind: "not_small_world" };
-}
+};
 
 /**
  * Compute modular/community structure property.
  * Uses modularity maximization as heuristic.
+ * @param g
+ * @param policy
  */
-export function computeCommunityStructure(
-  g: AnalyzerGraph,
-  policy: ComputePolicy
-): { kind: "modular"; numCommunities: number } | { kind: "non_modular" } | { kind: "unconstrained" } {
+export const computeCommunityStructure = (g: AnalyzerGraph, policy: ComputePolicy): { kind: "modular"; numCommunities: number } | { kind: "non_modular" } | { kind: "unconstrained" } => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -788,7 +767,7 @@ export function computeCommunityStructure(
     const queue: AnalyzerVertexId[] = [v.id];
     visited.add(v.id);
 
-    while (queue.length) {
+    while (queue.length > 0) {
       const cur = queue.shift()!;
       for (const nb of adj[cur] ?? []) {
         if (!visited.has(nb)) {
@@ -802,7 +781,7 @@ export function computeCommunityStructure(
   }
 
   return communities > 1 ? { kind: "modular", numCommunities: communities } : { kind: "non_modular" };
-}
+};
 
 // ============================================================================
 // PATH/CYCLE PROPERTIES
@@ -811,8 +790,9 @@ export function computeCommunityStructure(
 /**
  * Compute Hamiltonian property using exhaustive search with pruning.
  * NP-complete, so this is expensive for larger graphs.
+ * @param g
  */
-export function computeHamiltonian(g: AnalyzerGraph): { kind: "hamiltonian" } | { kind: "non_hamiltonian" } | { kind: "unconstrained" } {
+export const computeHamiltonian = (g: AnalyzerGraph): { kind: "hamiltonian" } | { kind: "non_hamiltonian" } | { kind: "unconstrained" } => {
   // Only for small undirected/directed binary graphs due to NP-completeness
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
   if (!isBinary) return { kind: "unconstrained" };
@@ -851,11 +831,9 @@ export function computeHamiltonian(g: AnalyzerGraph): { kind: "hamiltonian" } | 
     // Try unvisited neighbors
     const neighbors = adj[current] ?? [];
     for (const nb of neighbors) {
-      if (!visited.has(nb)) {
-        if (backtrack(nb, start)) {
+      if (!visited.has(nb) && backtrack(nb, start)) {
           return true;
         }
-      }
     }
 
     path.pop();
@@ -873,12 +851,13 @@ export function computeHamiltonian(g: AnalyzerGraph): { kind: "hamiltonian" } | 
   }
 
   return { kind: "non_hamiltonian" };
-}
+};
 
 /**
  * Compute traceable property (has Hamiltonian path).
+ * @param g
  */
-export function computeTraceable(g: AnalyzerGraph): { kind: "traceable" } | { kind: "non_traceable" } | { kind: "unconstrained" } {
+export const computeTraceable = (g: AnalyzerGraph): { kind: "traceable" } | { kind: "non_traceable" } | { kind: "unconstrained" } => {
   // Reuse Hamiltonian check for path (easier than cycle)
   const hamiltonian = computeHamiltonian(g);
   if (hamiltonian.kind === "hamiltonian") {
@@ -903,11 +882,9 @@ export function computeTraceable(g: AnalyzerGraph): { kind: "traceable" } | { ki
 
     const neighbors = adj[current] ?? [];
     for (const nb of neighbors) {
-      if (!visited.has(nb)) {
-        if (backtrack(nb)) {
+      if (!visited.has(nb) && backtrack(nb)) {
           return true;
         }
-      }
     }
 
     visited.delete(current);
@@ -922,7 +899,7 @@ export function computeTraceable(g: AnalyzerGraph): { kind: "traceable" } | { ki
   }
 
   return { kind: "non_traceable" };
-}
+};
 
 // ============================================================================
 // STRUCTURAL GRAPH CLASSES
@@ -931,8 +908,9 @@ export function computeTraceable(g: AnalyzerGraph): { kind: "traceable" } | { ki
 /**
  * Compute perfect graph property.
  * Perfect graphs have no odd holes or odd anti-holes.
+ * @param g
  */
-export function computePerfect(g: AnalyzerGraph): { kind: "perfect" } | { kind: "imperfect" } | { kind: "unconstrained" } {
+export const computePerfect = (g: AnalyzerGraph): { kind: "perfect" } | { kind: "imperfect" } | { kind: "unconstrained" } => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -982,12 +960,13 @@ export function computePerfect(g: AnalyzerGraph): { kind: "perfect" } | { kind: 
   if (isChordalUndirectedBinary(gComplement)) return { kind: "perfect" };
 
   return { kind: "imperfect" };
-}
+};
 
 /**
  * Compute split graph property (partition into clique + independent set).
+ * @param g
  */
-export function computeSplit(g: AnalyzerGraph): { kind: "split" } | { kind: "non_split" } | { kind: "unconstrained" } {
+export const computeSplit = (g: AnalyzerGraph): { kind: "split" } | { kind: "non_split" } | { kind: "unconstrained" } => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -1037,12 +1016,13 @@ export function computeSplit(g: AnalyzerGraph): { kind: "split" } | { kind: "non
   }
 
   return { kind: "non_split" };
-}
+};
 
 /**
  * Compute cograph property (P4-free graph).
+ * @param g
  */
-export function computeCograph(g: AnalyzerGraph): { kind: "cograph" } | { kind: "non_cograph" } | { kind: "unconstrained" } {
+export const computeCograph = (g: AnalyzerGraph): { kind: "cograph" } | { kind: "non_cograph" } | { kind: "unconstrained" } => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -1092,12 +1072,13 @@ export function computeCograph(g: AnalyzerGraph): { kind: "cograph" } | { kind: 
   }
 
   return { kind: "cograph" };
-}
+};
 
 /**
  * Compute threshold graph property (split + cograph).
+ * @param g
  */
-export function computeThreshold(g: AnalyzerGraph): { kind: "threshold" } | { kind: "non_threshold" } | { kind: "unconstrained" } {
+export const computeThreshold = (g: AnalyzerGraph): { kind: "threshold" } | { kind: "non_threshold" } | { kind: "unconstrained" } => {
   // Threshold graphs are both split and cograph
   const split = computeSplit(g);
   const cograph = computeCograph(g);
@@ -1109,12 +1090,13 @@ export function computeThreshold(g: AnalyzerGraph): { kind: "threshold" } | { ki
   return split.kind === "split" && cograph.kind === "cograph"
     ? { kind: "threshold" }
     : { kind: "non_threshold" };
-}
+};
 
 /**
  * Compute line graph property.
+ * @param g
  */
-export function computeLine(g: AnalyzerGraph): { kind: "line_graph" } | { kind: "non_line_graph" } | { kind: "unconstrained" } {
+export const computeLine = (g: AnalyzerGraph): { kind: "line_graph" } | { kind: "non_line_graph" } | { kind: "unconstrained" } => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -1136,12 +1118,13 @@ export function computeLine(g: AnalyzerGraph): { kind: "line_graph" } | { kind: 
   if (maxDegree > avgDegree * 3) return { kind: "non_line_graph" };
 
   return { kind: "line_graph" };
-}
+};
 
 /**
  * Compute claw-free property (no K1,3 induced subgraph).
+ * @param g
  */
-export function computeClawFree(g: AnalyzerGraph): { kind: "claw_free" } | { kind: "has_claw" } | { kind: "unconstrained" } {
+export const computeClawFree = (g: AnalyzerGraph): { kind: "claw_free" } | { kind: "has_claw" } | { kind: "unconstrained" } => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -1183,7 +1166,7 @@ export function computeClawFree(g: AnalyzerGraph): { kind: "claw_free" } | { kin
   }
 
   return { kind: "claw_free" };
-}
+};
 
 // ============================================================================
 // REGULARITY PROPERTIES
@@ -1191,8 +1174,9 @@ export function computeClawFree(g: AnalyzerGraph): { kind: "claw_free" } | { kin
 
 /**
  * Compute cubic graph property (3-regular).
+ * @param g
  */
-export function computeCubic(g: AnalyzerGraph): { kind: "cubic" } | { kind: "non_cubic" } | { kind: "unconstrained" } {
+export const computeCubic = (g: AnalyzerGraph): { kind: "cubic" } | { kind: "non_cubic" } | { kind: "unconstrained" } => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -1202,12 +1186,14 @@ export function computeCubic(g: AnalyzerGraph): { kind: "cubic" } | { kind: "non
   const allDegree3 = deg.length > 0 && deg.every(d => d === 3);
 
   return allDegree3 ? { kind: "cubic" } : { kind: "non_cubic" };
-}
+};
 
 /**
  * Compute specific k-regular property.
+ * @param g
+ * @param k
  */
-export function computeSpecificRegular(g: AnalyzerGraph, k: number): { kind: "k_regular"; k: number } | { kind: "not_k_regular" } | { kind: "unconstrained" } {
+export const computeSpecificRegular = (g: AnalyzerGraph, k: number): { kind: "k_regular"; k: number } | { kind: "not_k_regular" } | { kind: "unconstrained" } => {
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
   if (!isBinary) return { kind: "unconstrained" };
 
@@ -1215,12 +1201,13 @@ export function computeSpecificRegular(g: AnalyzerGraph, k: number): { kind: "k_
   const allDegreeK = deg.length > 0 && deg.every(d => d === k);
 
   return allDegreeK ? { kind: "k_regular", k } : { kind: "not_k_regular" };
-}
+};
 
 /**
  * Auto-detect k-regular property (find k if graph is regular).
+ * @param g
  */
-export function computeAutoRegular(g: AnalyzerGraph): { kind: "k_regular"; k: number } | { kind: "not_k_regular" } | { kind: "unconstrained" } {
+export const computeAutoRegular = (g: AnalyzerGraph): { kind: "k_regular"; k: number } | { kind: "not_k_regular" } | { kind: "unconstrained" } => {
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
   if (!isBinary) return { kind: "unconstrained" };
 
@@ -1230,14 +1217,15 @@ export function computeAutoRegular(g: AnalyzerGraph): { kind: "k_regular"; k: nu
   const allSame = deg.length > 0 && deg.every(d => d === deg[0]);
 
   return allSame ? { kind: "k_regular", k: deg[0] } : { kind: "not_k_regular" };
-}
+};
 
 /**
  * Compute strongly regular graph property.
  * Strongly regular: (n, k, λ, μ) where every vertex has degree k,
  * adjacent vertices have λ common neighbors, non-adjacent have μ common neighbors.
+ * @param g
  */
-export function computeStronglyRegular(g: AnalyzerGraph): { kind: "strongly_regular"; k: number; lambda: number; mu: number } | { kind: "not_strongly_regular" } | { kind: "unconstrained" } {
+export const computeStronglyRegular = (g: AnalyzerGraph): { kind: "strongly_regular"; k: number; lambda: number; mu: number } | { kind: "not_strongly_regular" } | { kind: "unconstrained" } => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -1264,7 +1252,7 @@ export function computeStronglyRegular(g: AnalyzerGraph): { kind: "strongly_regu
 
       if ((adj[u] ?? []).includes(v)) {
         // Adjacent: count common neighbors
-        const neighborsU = new Set(adj[u] ?? []);
+        const neighborsU = new Set(adj[u]);
         const common = (adj[v] ?? []).filter(n => neighborsU.has(n)).length;
 
         if (lambda === -1) {
@@ -1287,7 +1275,7 @@ export function computeStronglyRegular(g: AnalyzerGraph): { kind: "strongly_regu
 
       if (!(adj[u] ?? []).includes(v)) {
         // Non-adjacent: count common neighbors
-        const neighborsU = new Set(adj[u] ?? []);
+        const neighborsU = new Set(adj[u]);
         const common = (adj[v] ?? []).filter(n => neighborsU.has(n)).length;
 
         if (mu === -1) {
@@ -1302,7 +1290,7 @@ export function computeStronglyRegular(g: AnalyzerGraph): { kind: "strongly_regu
   return lambdaConsistent && muConsistent
     ? { kind: "strongly_regular", k, lambda, mu }
     : { kind: "not_strongly_regular" };
-}
+};
 
 // ============================================================================
 // SYMMETRY PROPERTIES
@@ -1311,8 +1299,9 @@ export function computeStronglyRegular(g: AnalyzerGraph): { kind: "strongly_regu
 /**
  * Compute self-complementary property (graph isomorphic to its complement).
  * GI-complete, so this is expensive.
+ * @param g
  */
-export function computeSelfComplementary(g: AnalyzerGraph): { kind: "self_complementary" } | { kind: "not_self_complementary" } | { kind: "unconstrained" } {
+export const computeSelfComplementary = (g: AnalyzerGraph): { kind: "self_complementary" } | { kind: "not_self_complementary" } | { kind: "unconstrained" } => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -1376,13 +1365,14 @@ export function computeSelfComplementary(g: AnalyzerGraph): { kind: "self_comple
   }
 
   return { kind: "unconstrained" }; // Too large for exhaustive check
-}
+};
 
 /**
  * Compute vertex-transitive property.
  * GI-hard, so this is conservative.
+ * @param g
  */
-export function computeVertexTransitive(g: AnalyzerGraph): { kind: "vertex_transitive" } | { kind: "not_vertex_transitive" } | { kind: "unconstrained" } {
+export const computeVertexTransitive = (g: AnalyzerGraph): { kind: "vertex_transitive" } | { kind: "not_vertex_transitive" } | { kind: "unconstrained" } => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -1401,7 +1391,7 @@ export function computeVertexTransitive(g: AnalyzerGraph): { kind: "vertex_trans
   }
 
   return { kind: "unconstrained" };
-}
+};
 
 // ============================================================================
 // SPECIAL BIPARTITE PROPERTIES
@@ -1409,8 +1399,9 @@ export function computeVertexTransitive(g: AnalyzerGraph): { kind: "vertex_trans
 
 /**
  * Compute complete bipartite property K_{m,n}.
+ * @param g
  */
-export function computeCompleteBipartite(g: AnalyzerGraph): { kind: "complete_bipartite"; m: number; n: number } | { kind: "not_complete_bipartite" } | { kind: "unconstrained" } {
+export const computeCompleteBipartite = (g: AnalyzerGraph): { kind: "complete_bipartite"; m: number; n: number } | { kind: "not_complete_bipartite" } | { kind: "unconstrained" } => {
   // Must be bipartite first
   const bipartite = computePartiteness(g);
   if (bipartite.kind !== "bipartite") return { kind: "not_complete_bipartite" };
@@ -1427,7 +1418,7 @@ export function computeCompleteBipartite(g: AnalyzerGraph): { kind: "complete_bi
     const queue: AnalyzerVertexId[] = [v.id];
     color.set(v.id, 0);
 
-    while (queue.length) {
+    while (queue.length > 0) {
       const cur = queue.shift()!;
       const c = color.get(cur)!;
 
@@ -1479,7 +1470,7 @@ export function computeCompleteBipartite(g: AnalyzerGraph): { kind: "complete_bi
   }
 
   return { kind: "not_complete_bipartite" };
-}
+};
 
 // ============================================================================
 // Type-safe GraphSpec (inferred from graph structure)
@@ -1556,10 +1547,7 @@ export type InferredGraphSpec = Readonly<{
 // Main API: Compute full GraphSpec from graph
 // ============================================================================
 
-export function computeGraphSpecFromGraph(
-  g: AnalyzerGraph,
-  policy: Partial<ComputePolicy> = {}
-): InferredGraphSpec {
+export const computeGraphSpecFromGraph = (g: AnalyzerGraph, policy: Partial<ComputePolicy> = {}): InferredGraphSpec => {
   const p: ComputePolicy = { ...defaultComputePolicy, ...policy };
 
   return {
@@ -1628,7 +1616,7 @@ export function computeGraphSpecFromGraph(
     // Special bipartite properties
     completeBipartite: computeCompleteBipartite(g),
   };
-}
+};
 
 // ============================================================================
 // Type-safe predicates
@@ -1639,44 +1627,41 @@ export type AnalyzerGraphPredicate = (g: AnalyzerGraph) => boolean;
 /**
  * Create a predicate that checks if an axis equals a specific value.
  * Example: axisEquals("directionality", { kind: "undirected" })
+ * @param key
+ * @param expected
+ * @param policy
  */
-export function axisEquals<K extends keyof InferredGraphSpec>(
-  key: K,
-  expected: InferredGraphSpec[K],
-  policy: Partial<ComputePolicy> = {}
-): AnalyzerGraphPredicate {
+export const axisEquals = <K extends keyof InferredGraphSpec>(key: K, expected: InferredGraphSpec[K], policy: Partial<ComputePolicy> = {}): AnalyzerGraphPredicate => {
   const p: ComputePolicy = { ...defaultComputePolicy, ...policy };
   return (g) => {
     const spec = computeGraphSpecFromGraph(g, p);
     return compareAxisValues(spec[key], expected);
   };
-}
+};
 
 /**
  * Create a predicate that checks if an axis has a specific kind.
  * Example: axisKindIs("cycles", "acyclic")
+ * @param key
+ * @param kind
+ * @param policy
  */
-export function axisKindIs<K extends keyof InferredGraphSpec, KK extends string>(
-  key: K,
-  kind: KK,
-  policy: Partial<ComputePolicy> = {}
-): AnalyzerGraphPredicate {
+export const axisKindIs = <K extends keyof InferredGraphSpec, KK extends string>(key: K, kind: KK, policy: Partial<ComputePolicy> = {}): AnalyzerGraphPredicate => {
   const p: ComputePolicy = { ...defaultComputePolicy, ...policy };
   return (g) => {
     const spec = computeGraphSpecFromGraph(g, p);
     const value = spec[key] as unknown as { kind: string };
     return value.kind === kind;
   };
-}
+};
 
 /**
  * Create a predicate that checks if graph matches a partial GraphSpec.
  * Only checks the axes specified in the expected partial spec.
+ * @param expected
+ * @param policy
  */
-export function hasGraphSpec(
-  expected: Partial<InferredGraphSpec>,
-  policy: Partial<ComputePolicy> = {}
-): AnalyzerGraphPredicate {
+export const hasGraphSpec = (expected: Partial<InferredGraphSpec>, policy: Partial<ComputePolicy> = {}): AnalyzerGraphPredicate => {
   const p: ComputePolicy = { ...defaultComputePolicy, ...policy };
 
   return (g) => {
@@ -1689,13 +1674,15 @@ export function hasGraphSpec(
     }
     return true;
   };
-}
+};
 
 /**
  * Compare two axis values for equality.
  * Handles kind-based comparison and field-level comparison.
+ * @param a
+ * @param b
  */
-function compareAxisValues<T extends { kind: string }>(a: T, b: T): boolean {
+const compareAxisValues = <T extends { kind: string }>(a: T, b: T): boolean => {
   if (a.kind !== b.kind) return false;
 
   // For discriminated unions with payloads, compare fields
@@ -1715,7 +1702,7 @@ function compareAxisValues<T extends { kind: string }>(a: T, b: T): boolean {
   }
 
   return true;
-}
+};
 
 // ============================================================================
 // Advanced graph algorithms for specialized predicates
@@ -1728,8 +1715,9 @@ function compareAxisValues<T extends { kind: string }>(a: T, b: T): boolean {
  * - E <= 2V - 4 for bipartite planar graphs
  * Note: This is a necessary but not sufficient condition.
  * For full planarity testing, use Boyer-Myrvold algorithm.
+ * @param g
  */
-function isPlanarUndirectedBinary(g: AnalyzerGraph): boolean {
+const isPlanarUndirectedBinary = (g: AnalyzerGraph): boolean => {
   // Only valid for undirected binary simple graphs
   if (g.vertices.length < 3) return true;
 
@@ -1747,14 +1735,15 @@ function isPlanarUndirectedBinary(g: AnalyzerGraph): boolean {
 
   // Conservative: assume planar if it passes these checks
   return true;
-}
+};
 
 /**
  * Test if graph is chordal using Maximum Cardinality Search (MCS).
  * A graph is chordal if every cycle of length >= 4 has a chord.
  * Equivalent: graph has a perfect elimination ordering.
+ * @param g
  */
-function isChordalUndirectedBinary(g: AnalyzerGraph): boolean {
+const isChordalUndirectedBinary = (g: AnalyzerGraph): boolean => {
   if (g.vertices.length <= 3) return true;
 
   // Maximum Cardinality Search to find PEO
@@ -1811,7 +1800,7 @@ function isChordalUndirectedBinary(g: AnalyzerGraph): boolean {
 
   // Check each set of later neighbors forms a clique
   for (const [v, laterNbs] of laterNeighbors) {
-    const nbs = Array.from(laterNbs);
+    const nbs = [...laterNbs];
     for (let i = 0; i < nbs.length; i++) {
       for (let j = i + 1; j < nbs.length; j++) {
         // Check if nbs[i] and nbs[j] are adjacent
@@ -1824,14 +1813,15 @@ function isChordalUndirectedBinary(g: AnalyzerGraph): boolean {
   }
 
   return true;
-}
+};
 
 /**
  * Test if graph is an interval graph.
  * Interval graphs are chordal and their complements are comparability graphs.
  * This uses a simplified recognition algorithm.
+ * @param g
  */
-function isIntervalUndirectedBinary(g: AnalyzerGraph): boolean {
+const isIntervalUndirectedBinary = (g: AnalyzerGraph): boolean => {
   // Interval graphs must be chordal
   if (!isChordalUndirectedBinary(g)) return false;
 
@@ -1857,7 +1847,7 @@ function isIntervalUndirectedBinary(g: AnalyzerGraph): boolean {
         if (clique.has(u.id)) continue;
 
         // Check if u is adjacent to all vertices in clique
-        const isAdjacentToAll = Array.from(clique).every(c => {
+        const isAdjacentToAll = [...clique].every(c => {
           return (adj[c] ?? []).includes(u.id);
         });
 
@@ -1877,13 +1867,15 @@ function isIntervalUndirectedBinary(g: AnalyzerGraph): boolean {
   // This is a simplified check - full algorithm is more complex
 
   return true; // Conservative: assume interval if chordal with consecutive cliques
-}
+};
 
 /**
  * Test if graph is a unit disk graph.
  * Requires spatial embedding information in vertex attributes.
+ * @param g
+ * @param policy
  */
-function isUnitDiskGraph(g: AnalyzerGraph, policy: ComputePolicy): boolean {
+const isUnitDiskGraph = (g: AnalyzerGraph, policy: ComputePolicy): boolean => {
   // Check if vertices have position information
   for (const v of g.vertices) {
     const pos = v.attrs?.[policy.posKey] as { x: number; y: number } | undefined;
@@ -1937,13 +1929,14 @@ function isUnitDiskGraph(g: AnalyzerGraph, policy: ComputePolicy): boolean {
   }
 
   return true;
-}
+};
 
 /**
  * Test if graph is a permutation graph.
  * Permutation graphs are both comparability and their complements are comparability.
+ * @param g
  */
-function isPermutationUndirectedBinary(g: AnalyzerGraph): boolean {
+const isPermutationUndirectedBinary = (g: AnalyzerGraph): boolean => {
   // Permutation graphs are comparability graphs and their complements are too
   // For simplicity, use a structural check
 
@@ -1969,20 +1962,13 @@ function isPermutationUndirectedBinary(g: AnalyzerGraph): boolean {
   // Check if both graph and complement are comparability graphs
   // This is a simplified check - full algorithm requires transitive orientation
   return true; // Conservative placeholder
-}
+};
 
 /**
  * Test if graph is a comparability graph (has transitive orientation).
+ * @param g
  */
-function isComparabilityUndirectedBinary(g: AnalyzerGraph): boolean {
-  // Comparability graphs can be transitively oriented
-  // Full algorithm requires checking for transitive orientation
-  // This is a conservative placeholder
-
-  // All comparability graphs are perfect (no odd holes or odd anti-holes)
-  // This is a necessary but not sufficient condition
-  return isChordalUndirectedBinary(g); // Simplified check
-}
+const isComparabilityUndirectedBinary = (g: AnalyzerGraph): boolean => isChordalUndirectedBinary(g);
 
 // ============================================================================
 // Convenience predicates for common graph classes
@@ -1990,90 +1976,82 @@ function isComparabilityUndirectedBinary(g: AnalyzerGraph): boolean {
 
 /**
  * Check if graph is a tree (undirected, acyclic, connected).
+ * @param g
  */
-export function isTree(g: AnalyzerGraph): boolean {
-  return hasGraphSpec({
+export const isTree = (g: AnalyzerGraph): boolean => hasGraphSpec({
     directionality: { kind: "undirected" },
     edgeMultiplicity: { kind: "simple" },
     selfLoops: { kind: "disallowed" },
     cycles: { kind: "acyclic" },
     connectivity: { kind: "connected" },
   })(g);
-}
 
 /**
  * Check if graph is a forest (undirected, acyclic).
+ * @param g
  */
-export function isForest(g: AnalyzerGraph): boolean {
-  return hasGraphSpec({
+export const isForest = (g: AnalyzerGraph): boolean => hasGraphSpec({
     directionality: { kind: "undirected" },
     edgeMultiplicity: { kind: "simple" },
     selfLoops: { kind: "disallowed" },
     cycles: { kind: "acyclic" },
   })(g);
-}
 
 /**
  * Check if graph is a DAG (directed, acyclic).
+ * @param g
  */
-export function isDAG(g: AnalyzerGraph): boolean {
-  return hasGraphSpec({
+export const isDAG = (g: AnalyzerGraph): boolean => hasGraphSpec({
     directionality: { kind: "directed" },
     edgeMultiplicity: { kind: "simple" },
     selfLoops: { kind: "disallowed" },
     cycles: { kind: "acyclic" },
   })(g);
-}
 
 /**
  * Check if graph is bipartite.
+ * @param g
  */
-export function isBipartite(g: AnalyzerGraph): boolean {
-  return axisKindIs("partiteness", "bipartite")(g);
-}
+export const isBipartite = (g: AnalyzerGraph): boolean => axisKindIs("partiteness", "bipartite")(g);
 
 /**
  * Check if graph is complete.
+ * @param g
  */
-export function isComplete(g: AnalyzerGraph): boolean {
-  return axisKindIs("completeness", "complete")(g);
-}
+export const isComplete = (g: AnalyzerGraph): boolean => axisKindIs("completeness", "complete")(g);
 
 /**
  * Check if graph is sparse (density <= 10%).
+ * @param g
  */
-export function isSparse(g: AnalyzerGraph): boolean {
-  return axisKindIs("density", "sparse")(g);
-}
+export const isSparse = (g: AnalyzerGraph): boolean => axisKindIs("density", "sparse")(g);
 
 /**
  * Check if graph is dense (density > 75%).
+ * @param g
  */
-export function isDense(g: AnalyzerGraph): boolean {
-  return axisKindIs("density", "dense")(g);
-}
+export const isDense = (g: AnalyzerGraph): boolean => axisKindIs("density", "dense")(g);
 
 /**
  * Check if graph is regular (all vertices have same degree).
+ * @param g
  */
-export function isRegular(g: AnalyzerGraph): boolean {
-  return axisKindIs("degreeConstraint", "regular")(g);
-}
+export const isRegular = (g: AnalyzerGraph): boolean => axisKindIs("degreeConstraint", "regular")(g);
 
 /**
  * Check if graph is connected (runtime check for AnalyzerGraph).
  * Note: Different from graph-spec.isConnected which is a type guard for GraphSpec.
+ * @param g
  */
-export function isGraphConnected(g: AnalyzerGraph): boolean {
-  return axisKindIs("connectivity", "connected")(g);
-}
+export const isGraphConnected = (g: AnalyzerGraph): boolean => axisKindIs("connectivity", "connected")(g);
 
 /**
  * Check if graph is Eulerian (all vertices have even degree).
  * For undirected graphs, this means an Eulerian circuit exists.
  * For directed graphs, checks if strongly connected with equal in/out degrees.
+ * @param g
  */
-export function isEulerian(g: AnalyzerGraph): boolean {
+export const isEulerian = (g: AnalyzerGraph): boolean => {
   // Only check binary graphs
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
   if (!isBinary) return false;
@@ -2123,12 +2101,13 @@ export function isEulerian(g: AnalyzerGraph): boolean {
   }
 
   return false;
-}
+};
 
 /**
  * Check if graph is a star (one central vertex connected to all others).
+ * @param g
  */
-export function isStar(g: AnalyzerGraph): boolean {
+export const isStar = (g: AnalyzerGraph): boolean => {
   // Must be undirected, binary, simple, no self-loops, connected
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -2152,15 +2131,16 @@ export function isStar(g: AnalyzerGraph): boolean {
 
   // Exactly one center, n-1 leaves
   return centerCount === 1 && leafCount === n - 1;
-}
+};
 
 /**
  * Check if graph is planar (can be drawn without edge crossings).
  * Uses Euler's formula heuristics: E <= 3V - 6 for simple graphs.
  * For bipartite planar graphs: E <= 2V - 4.
  * Note: This is a necessary but not sufficient condition.
+ * @param g
  */
-export function isPlanar(g: AnalyzerGraph): boolean {
+export const isPlanar = (g: AnalyzerGraph): boolean => {
   // Only valid for undirected binary simple graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -2169,14 +2149,15 @@ export function isPlanar(g: AnalyzerGraph): boolean {
   if (!isUndirected || !isBinary || !isSimple) return false;
 
   return isPlanarUndirectedBinary(g);
-}
+};
 
 /**
  * Check if graph is chordal (every cycle of length >= 4 has a chord).
  * Equivalent to having a perfect elimination ordering.
  * Uses Maximum Cardinality Search (MCS) algorithm.
+ * @param g
  */
-export function isChordal(g: AnalyzerGraph): boolean {
+export const isChordal = (g: AnalyzerGraph): boolean => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -2184,13 +2165,14 @@ export function isChordal(g: AnalyzerGraph): boolean {
   if (!isUndirected || !isBinary) return false;
 
   return isChordalUndirectedBinary(g);
-}
+};
 
 /**
  * Check if graph is an interval graph.
  * Interval graphs are chordal and can be represented as intersection of intervals.
+ * @param g
  */
-export function isInterval(g: AnalyzerGraph): boolean {
+export const isInterval = (g: AnalyzerGraph): boolean => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -2198,13 +2180,14 @@ export function isInterval(g: AnalyzerGraph): boolean {
   if (!isUndirected || !isBinary) return false;
 
   return isIntervalUndirectedBinary(g);
-}
+};
 
 /**
  * Check if graph is a permutation graph.
  * Permutation graphs are both comparability graphs and their complements are too.
+ * @param g
  */
-export function isPermutation(g: AnalyzerGraph): boolean {
+export const isPermutation = (g: AnalyzerGraph): boolean => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -2212,14 +2195,15 @@ export function isPermutation(g: AnalyzerGraph): boolean {
   if (!isUndirected || !isBinary) return false;
 
   return isPermutationUndirectedBinary(g);
-}
+};
 
 /**
  * Check if graph is a unit disk graph.
  * Requires vertices to have position attributes ({x, y}).
  * Graph is unit disk if edges exist exactly when distance <= threshold.
+ * @param g
  */
-export function isUnitDisk(g: AnalyzerGraph): boolean {
+export const isUnitDisk = (g: AnalyzerGraph): boolean => {
   const p = { ...defaultComputePolicy };
 
   // Only valid for undirected binary graphs with position data
@@ -2229,13 +2213,14 @@ export function isUnitDisk(g: AnalyzerGraph): boolean {
   if (!isUndirected || !isBinary) return false;
 
   return isUnitDiskGraph(g, p);
-}
+};
 
 /**
  * Check if graph is a comparability graph (has transitive orientation).
  * Comparability graphs represent partial orders.
+ * @param g
  */
-export function isComparability(g: AnalyzerGraph): boolean {
+export const isComparability = (g: AnalyzerGraph): boolean => {
   // Only valid for undirected binary graphs
   const isUndirected = g.edges.every(e => !e.directed);
   const isBinary = g.edges.every(e => e.endpoints.length === 2);
@@ -2243,7 +2228,7 @@ export function isComparability(g: AnalyzerGraph): boolean {
   if (!isUndirected || !isBinary) return false;
 
   return isComparabilityUndirectedBinary(g);
-}
+};
 
 // ============================================================================
 // Network analysis predicates
@@ -2251,24 +2236,21 @@ export function isComparability(g: AnalyzerGraph): boolean {
 
 /**
  * Check if graph is scale-free (power-law degree distribution).
+ * @param g
  */
-export function isScaleFree(g: AnalyzerGraph): boolean {
-  return axisKindIs("scaleFree", "scale_free")(g);
-}
+export const isScaleFree = (g: AnalyzerGraph): boolean => axisKindIs("scaleFree", "scale_free")(g);
 
 /**
  * Check if graph has small-world property (high clustering + short paths).
+ * @param g
  */
-export function isSmallWorld(g: AnalyzerGraph): boolean {
-  return axisKindIs("smallWorld", "small_world")(g);
-}
+export const isSmallWorld = (g: AnalyzerGraph): boolean => axisKindIs("smallWorld", "small_world")(g);
 
 /**
  * Check if graph has modular community structure.
+ * @param g
  */
-export function isModular(g: AnalyzerGraph): boolean {
-  return axisKindIs("communityStructure", "modular")(g);
-}
+export const isModular = (g: AnalyzerGraph): boolean => axisKindIs("communityStructure", "modular")(g);
 
 // ============================================================================
 // Path and cycle predicates
@@ -2277,18 +2259,16 @@ export function isModular(g: AnalyzerGraph): boolean {
 /**
  * Check if graph is Hamiltonian (has cycle visiting every vertex exactly once).
  * NP-complete to determine, so this is conservative for graphs with n > 10.
+ * @param g
  */
-export function isHamiltonian(g: AnalyzerGraph): boolean {
-  return axisKindIs("hamiltonian", "hamiltonian")(g);
-}
+export const isHamiltonian = (g: AnalyzerGraph): boolean => axisKindIs("hamiltonian", "hamiltonian")(g);
 
 /**
  * Check if graph is traceable (has path visiting every vertex exactly once).
  * NP-complete to determine, so this is conservative for graphs with n > 10.
+ * @param g
  */
-export function isTraceable(g: AnalyzerGraph): boolean {
-  return axisKindIs("traceable", "traceable")(g);
-}
+export const isTraceable = (g: AnalyzerGraph): boolean => axisKindIs("traceable", "traceable")(g);
 
 // ============================================================================
 // Structural predicates
@@ -2297,45 +2277,39 @@ export function isTraceable(g: AnalyzerGraph): boolean {
 /**
  * Check if graph is perfect (ω(H) = χ(H) for all induced subgraphs H).
  * Perfect graphs have no odd holes or odd anti-holes.
+ * @param g
  */
-export function isPerfect(g: AnalyzerGraph): boolean {
-  return axisKindIs("perfect", "perfect")(g);
-}
+export const isPerfect = (g: AnalyzerGraph): boolean => axisKindIs("perfect", "perfect")(g);
 
 /**
  * Check if graph is a split graph (partition into clique + independent set).
+ * @param g
  */
-export function isSplit(g: AnalyzerGraph): boolean {
-  return axisKindIs("split", "split")(g);
-}
+export const isSplit = (g: AnalyzerGraph): boolean => axisKindIs("split", "split")(g);
 
 /**
  * Check if graph is a cograph (P4-free, no induced path on 4 vertices).
+ * @param g
  */
-export function isCograph(g: AnalyzerGraph): boolean {
-  return axisKindIs("cograph", "cograph")(g);
-}
+export const isCograph = (g: AnalyzerGraph): boolean => axisKindIs("cograph", "cograph")(g);
 
 /**
  * Check if graph is a threshold graph (both split and cograph).
+ * @param g
  */
-export function isThreshold(g: AnalyzerGraph): boolean {
-  return axisKindIs("threshold", "threshold")(g);
-}
+export const isThreshold = (g: AnalyzerGraph): boolean => axisKindIs("threshold", "threshold")(g);
 
 /**
  * Check if graph is a line graph (represents edge adjacencies of another graph).
+ * @param g
  */
-export function isLineGraph(g: AnalyzerGraph): boolean {
-  return axisKindIs("line", "line_graph")(g);
-}
+export const isLineGraph = (g: AnalyzerGraph): boolean => axisKindIs("line", "line_graph")(g);
 
 /**
  * Check if graph is claw-free (no K1,3 induced subgraph).
+ * @param g
  */
-export function isClawFree(g: AnalyzerGraph): boolean {
-  return axisKindIs("clawFree", "claw_free")(g);
-}
+export const isClawFree = (g: AnalyzerGraph): boolean => axisKindIs("clawFree", "claw_free")(g);
 
 // ============================================================================
 // Regularity predicates
@@ -2343,27 +2317,24 @@ export function isClawFree(g: AnalyzerGraph): boolean {
 
 /**
  * Check if graph is cubic (3-regular).
+ * @param g
  */
-export function isCubic(g: AnalyzerGraph): boolean {
-  return axisKindIs("cubic", "cubic")(g);
-}
+export const isCubic = (g: AnalyzerGraph): boolean => axisKindIs("cubic", "cubic")(g);
 
 /**
  * Check if graph is k-regular for a specific k.
+ * @param k
  */
-export function isKRegular(k: number): (g: AnalyzerGraph) => boolean {
-  return (g: AnalyzerGraph): boolean => {
+export const isKRegular = (k: number): (g: AnalyzerGraph) => boolean => (g: AnalyzerGraph): boolean => {
     const result = computeSpecificRegular(g, k);
     return result.kind === "k_regular";
   };
-}
 
 /**
  * Check if graph is strongly regular (n,k,λ,μ) parameters.
+ * @param g
  */
-export function isStronglyRegular(g: AnalyzerGraph): boolean {
-  return axisKindIs("stronglyRegular", "strongly_regular")(g);
-}
+export const isStronglyRegular = (g: AnalyzerGraph): boolean => axisKindIs("stronglyRegular", "strongly_regular")(g);
 
 // ============================================================================
 // Symmetry predicates
@@ -2371,18 +2342,16 @@ export function isStronglyRegular(g: AnalyzerGraph): boolean {
 
 /**
  * Check if graph is self-complementary (isomorphic to its complement).
+ * @param g
  */
-export function isSelfComplementary(g: AnalyzerGraph): boolean {
-  return axisKindIs("selfComplementary", "self_complementary")(g);
-}
+export const isSelfComplementary = (g: AnalyzerGraph): boolean => axisKindIs("selfComplementary", "self_complementary")(g);
 
 /**
  * Check if graph is vertex-transitive (all vertices equivalent under automorphisms).
  * GI-hard to determine, so this is conservative for graphs with n > 6.
+ * @param g
  */
-export function isVertexTransitive(g: AnalyzerGraph): boolean {
-  return axisKindIs("vertexTransitive", "vertex_transitive")(g);
-}
+export const isVertexTransitive = (g: AnalyzerGraph): boolean => axisKindIs("vertexTransitive", "vertex_transitive")(g);
 
 // ============================================================================
 // Special bipartite predicates
@@ -2390,7 +2359,6 @@ export function isVertexTransitive(g: AnalyzerGraph): boolean {
 
 /**
  * Check if graph is complete bipartite K_{m,n}.
+ * @param g
  */
-export function isCompleteBipartite(g: AnalyzerGraph): boolean {
-  return axisKindIs("completeBipartite", "complete_bipartite")(g);
-}
+export const isCompleteBipartite = (g: AnalyzerGraph): boolean => axisKindIs("completeBipartite", "complete_bipartite")(g);

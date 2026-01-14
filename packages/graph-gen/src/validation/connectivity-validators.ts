@@ -1,5 +1,5 @@
+import type { TestEdge,TestGraph, TestNode } from '../graph-generator';
 import type { GraphSpec } from '../graph-spec';
-import type { TestGraph, TestNode, TestEdge } from '../graph-generator';
 import { isConnected } from './helper-functions';
 
 /**
@@ -23,8 +23,9 @@ export interface PropertyValidationResult {
  * 1. At least k+1 vertices
  * 2. Minimum degree ≥ k (necessary condition)
  * 3. Graph is connected
+ * @param graph
  */
-export function validateKVertexConnected(graph: TestGraph): PropertyValidationResult {
+export const validateKVertexConnected = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
 
   // Only validate when spec requires k-vertex-connected
@@ -75,7 +76,7 @@ export function validateKVertexConnected(graph: TestGraph): PropertyValidationRe
     }
   }
 
-  const minDegree = Math.min(...Array.from(degrees.values()));
+  const minDegree = Math.min(...degrees.values());
   if (minDegree < k) {
     return {
       property: "kVertexConnected",
@@ -113,7 +114,7 @@ export function validateKVertexConnected(graph: TestGraph): PropertyValidationRe
     actual: `${k}-vertex-connected`,
     valid: true,
   };
-}
+};
 
 /**
  * Validate k-edge-connected property.
@@ -125,8 +126,9 @@ export function validateKVertexConnected(graph: TestGraph): PropertyValidationRe
  * 1. At least k+1 vertices
  * 2. Minimum degree ≥ k (necessary and sufficient for many graphs)
  * 3. Graph is connected
+ * @param graph
  */
-export function validateKEdgeConnected(graph: TestGraph): PropertyValidationResult {
+export const validateKEdgeConnected = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
 
   // Only validate when spec requires k-edge-connected
@@ -178,7 +180,7 @@ export function validateKEdgeConnected(graph: TestGraph): PropertyValidationResu
     }
   }
 
-  const minDegree = Math.min(...Array.from(degrees.values()));
+  const minDegree = Math.min(...degrees.values());
   if (minDegree < k) {
     return {
       property: "kEdgeConnected",
@@ -195,4 +197,4 @@ export function validateKEdgeConnected(graph: TestGraph): PropertyValidationResu
     actual: `${k}-edge-connected`,
     valid: true,
   };
-}
+};

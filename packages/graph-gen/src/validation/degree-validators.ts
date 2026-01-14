@@ -1,18 +1,19 @@
+import type { TestEdge,TestGraph, TestNode } from '../graph-generator';
 import type { GraphSpec } from '../graph-spec';
-import type { TestGraph, TestNode, TestEdge } from '../graph-generator';
 
 /**
  * Validate regular graph properties (cubic or k-regular).
  * A k-regular graph has all vertices with degree exactly k.
  * Cubic graphs are 3-regular.
+ * @param graph
  */
-export function validateRegularGraph(graph: TestGraph): {
+export const validateRegularGraph = (graph: TestGraph): {
   property: string;
   expected: string;
   actual: string;
   valid: boolean;
   message?: string;
-} {
+} => {
   const { spec, nodes, edges } = graph;
 
   // Get expected degree from spec
@@ -53,7 +54,7 @@ export function validateRegularGraph(graph: TestGraph): {
   }
 
   // Check all vertices have the expected degree
-  const actualDegrees = Array.from(degrees.values());
+  const actualDegrees = [...degrees.values()];
   const allHaveCorrectDegree = actualDegrees.every(d => d === expectedDegree);
 
   if (!allHaveCorrectDegree) {
@@ -79,20 +80,21 @@ export function validateRegularGraph(graph: TestGraph): {
     actual: regularityType,
     valid: true,
   };
-}
+};
 
 /**
  * Validate Eulerian graph properties.
  * Eulerian graphs have all vertices with even degree (Eulerian circuit exists).
  * Semi-Eulerian graphs have exactly 2 vertices with odd degree (Eulerian trail exists).
+ * @param graph
  */
-export function validateEulerian(graph: TestGraph): {
+export const validateEulerian = (graph: TestGraph): {
   property: string;
   expected: string;
   actual: string;
   valid: boolean;
   message?: string;
-} {
+} => {
   const { spec, nodes, edges } = graph;
 
   // Only validate when spec requires eulerian or semi_eulerian
@@ -180,4 +182,4 @@ export function validateEulerian(graph: TestGraph): {
     actual: "unconstrained",
     valid: true,
   };
-}
+};

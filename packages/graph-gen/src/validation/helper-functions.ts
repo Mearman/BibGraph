@@ -1,9 +1,12 @@
-import type { TestNode, TestEdge } from '../graph-generator';
+import type { TestEdge,TestNode } from '../graph-generator';
 
 /**
  * Check if graph is connected using BFS.
+ * @param nodes
+ * @param edges
+ * @param directed
  */
-export function isConnected(nodes: TestNode[], edges: TestEdge[], directed: boolean): boolean {
+export const isConnected = (nodes: TestNode[], edges: TestEdge[], directed: boolean): boolean => {
   if (nodes.length === 0) return true;
 
   const adjacency = buildAdjacencyList(nodes, edges, directed);
@@ -20,16 +23,15 @@ export function isConnected(nodes: TestNode[], edges: TestEdge[], directed: bool
   }
 
   return visited.size === nodes.length;
-}
+};
 
 /**
  * Build adjacency list from edges.
+ * @param nodes
+ * @param edges
+ * @param directed
  */
-export function buildAdjacencyList(
-  nodes: TestNode[],
-  edges: TestEdge[],
-  directed: boolean
-): Map<string, string[]> {
+export const buildAdjacencyList = (nodes: TestNode[], edges: TestEdge[], directed: boolean): Map<string, string[]> => {
   const adjacency = new Map<string, string[]>();
 
   // Initialize all nodes
@@ -46,13 +48,16 @@ export function buildAdjacencyList(
   }
 
   return adjacency;
-}
+};
 
 /**
  * Find connected components for density calculation.
  * Returns array of components, where each component is an array of node IDs.
+ * @param nodes
+ * @param edges
+ * @param directed
  */
-export function findComponentsForDensity(nodes: TestNode[], edges: TestEdge[], directed: boolean): string[][] {
+export const findComponentsForDensity = (nodes: TestNode[], edges: TestEdge[], directed: boolean): string[][] => {
   const components: string[][] = [];
   const visited = new Set<string>();
 
@@ -81,20 +86,23 @@ export function findComponentsForDensity(nodes: TestNode[], edges: TestEdge[], d
   }
 
   return components;
-}
+};
 
 /**
  * Check if a graph is bipartite using BFS 2-coloring.
  * A graph is bipartite if and only if it is 2-colorable.
+ * @param nodes
+ * @param edges
+ * @param directed
  */
-export function checkBipartiteWithBFS(nodes: TestNode[], edges: TestEdge[], directed: boolean): boolean {
+export const checkBipartiteWithBFS = (nodes: TestNode[], edges: TestEdge[], directed: boolean): boolean => {
   if (nodes.length === 0) return true;
 
   const adjacency = buildAdjacencyList(nodes, edges, directed);
   const colors = new Map<string, number>(); // 0 or 1 for bipartition
   const visited = new Set<string>();
 
-  function bfs(startNode: string): boolean {
+  const bfs = (startNode: string): boolean => {
     const queue: string[] = [startNode];
     colors.set(startNode, 0);
     visited.add(startNode);
@@ -119,16 +127,14 @@ export function checkBipartiteWithBFS(nodes: TestNode[], edges: TestEdge[], dire
     }
 
     return true;
-  }
+  };
 
   // Check all components (graph might be disconnected)
   for (const node of nodes) {
-    if (!visited.has(node.id)) {
-      if (!bfs(node.id)) {
+    if (!visited.has(node.id) && !bfs(node.id)) {
         return false;
       }
-    }
   }
 
   return true;
-}
+};

@@ -11,8 +11,9 @@ export interface GraphSpecImpossibility {
 
 /**
  * Analyze a graph spec for mathematically impossible combinations.
+ * @param spec
  */
-export function analyzeGraphSpecConstraints(spec: GraphSpec): GraphSpecImpossibility[] {
+export const analyzeGraphSpecConstraints = (spec: GraphSpec): GraphSpecImpossibility[] => {
   const impossibilities: GraphSpecImpossibility[] = [];
 
   // 1. Complete graphs must be connected
@@ -334,23 +335,23 @@ export function analyzeGraphSpecConstraints(spec: GraphSpec): GraphSpecImpossibi
   }
 
   return impossibilities;
-}
+};
 
 /**
  * Check if a graph spec combination is mathematically impossible.
+ * @param spec
  */
-export function isGraphSpecImpossible(spec: GraphSpec): boolean {
+export const isGraphSpecImpossible = (spec: GraphSpec): boolean => {
   const impossibilities = analyzeGraphSpecConstraints(spec);
   return impossibilities.some(imp => imp.severity === "error");
-}
+};
 
 /**
  * Get adjusted validation expectations for impossible combinations.
  * For specs with warnings, relax certain validation constraints.
+ * @param spec
  */
-export function getAdjustedValidationExpectations(
-  spec: GraphSpec
-): Partial<Record<string, boolean>> {
+export const getAdjustedValidationExpectations = (spec: GraphSpec): Partial<Record<string, boolean>> => {
   const adjustments: Partial<Record<string, boolean>> = {};
   const impossibilities = analyzeGraphSpecConstraints(spec);
 
@@ -377,4 +378,4 @@ export function getAdjustedValidationExpectations(
   }
 
   return adjustments;
-}
+};
