@@ -1,0 +1,46 @@
+{
+  "name": "@bibgraph/graph-gen",
+  "description": "Graph specification, generation, and validation system for test fixtures. Type-safe graph property specifications with mathematical constraint validation.",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "nx run graph-gen:build",
+    "clean": "nx run graph-gen:clean",
+    "lint": "nx run graph-gen:lint",
+    "test": "nx run graph-gen:test",
+    "test:coverage": "nx run graph-gen:test:coverage",
+    "test:integration": "nx run graph-gen:test:integration",
+    "test:unit": "nx run graph-gen:test:unit",
+    "test:watch": "nx run graph-gen:test:watch",
+    "typecheck": "nx run graph-gen:typecheck"
+  },
+  "devDependencies": {},
+  "author": "BibGraph",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "academic-research",
+    "graph-generation",
+    "graph-specification",
+    "graph-theory",
+    "graph-validation",
+    "test-fixtures",
+    "type-safe",
+    "typescript"
+  ],
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "nx": {
+    "includedScripts": []
+  },
+  "types": "./dist/index.d.ts"
+}
