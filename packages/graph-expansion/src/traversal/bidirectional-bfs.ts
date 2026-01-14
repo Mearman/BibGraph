@@ -1,55 +1,5 @@
+import { GraphExpander, type Neighbor } from '../interfaces/graph-expander';
 import { PriorityQueue } from './priority-queue';
-
-/**
- * Neighbor relationship returned by GraphExpander.
- */
-export interface Neighbor {
-  targetId: string;
-  relationshipType: string;
-}
-
-/**
- * Interface for dynamic neighbor discovery during graph traversal.
- * Allows BFS to work with any data source (API, database, file system, etc.).
- *
- * @template T - Type of node data
- */
-export interface GraphExpander<T> {
-  /**
-   * Get neighbors of a node, potentially fetching from external source.
-   *
-   * @param nodeId - Node whose neighbors to fetch
-   * @returns Array of neighbor relationships
-   */
-  getNeighbors(nodeId: string): Promise<Neighbor[]>;
-
-  /**
-   * Get node degree for priority computation.
-   * Used to prioritize low-degree (specific) nodes over high-degree (generic) nodes.
-   *
-   * @param nodeId - Node to get degree for
-   * @returns Number of relationships (higher = lower priority)
-   */
-  getDegree(nodeId: string): number;
-
-  /**
-   * Get node data (may fetch from cache/API).
-   *
-   * @param nodeId - Node to retrieve
-   * @returns Node data or null if not found
-   */
-  getNode(nodeId: string): Promise<T | null>;
-
-  /**
-   * Add an edge to the final graph output.
-   * Called during node expansion to track discovered relationships.
-   *
-   * @param source - Source node ID
-   * @param target - Target node ID
-   * @param relationshipType - Type of relationship
-   */
-  addEdge(source: string, target: string, relationshipType: string): void;
-}
 
 /**
  * Configuration options for bidirectional BFS.
