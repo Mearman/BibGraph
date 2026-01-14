@@ -1,4 +1,4 @@
-import type { TestEdge,TestNode } from '../graph-generator';
+import type { TestEdge,TestNode } from '../generator';
 
 /**
  * Check if graph is connected using BFS.

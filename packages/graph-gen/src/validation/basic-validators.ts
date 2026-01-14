@@ -1,5 +1,5 @@
-import type { TestEdge,TestGraph, TestNode } from "../graph-generator";
-import type { GraphSpec } from "../graph-spec";
+import type { TestEdge,TestGraph, TestNode } from "../generator";
+import type { GraphSpec } from "../spec";
 import { buildAdjacencyList,isConnected } from "./helper-functions";
 import type { PropertyValidationResult } from "./types";
 

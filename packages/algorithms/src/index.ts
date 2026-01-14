@@ -2,9 +2,9 @@
  * Algorithms package main exports
  */
 
-// Graph property analysis (moved to @bibgraph/graph-gen)
-// Re-export for backward compatibility
-export * from "@bibgraph/graph-gen";
+// Graph property analysis has moved to @bibgraph/graph-gen
+// Import from there directly:
+// import { ... } from '@bibgraph/graph-gen';
 
 // Core analysis algorithms
 export * from "./analysis/scc";

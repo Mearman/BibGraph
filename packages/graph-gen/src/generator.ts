@@ -1,4 +1,4 @@
-import type { GraphSpec } from './graph-spec';
+import type { GraphSpec } from './spec';
 
 /**
  * Node in a generated test graph.

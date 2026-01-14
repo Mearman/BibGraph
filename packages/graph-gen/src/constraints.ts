@@ -1,4 +1,4 @@
-import type { GraphSpec } from './graph-spec';
+import type { GraphSpec } from './spec';
 
 /**
  * Mathematical impossibility in a graph specification.

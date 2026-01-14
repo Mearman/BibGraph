@@ -1,4 +1,4 @@
-import type { TestEdge,TestGraph } from '../graph-generator';
+import type { TestEdge,TestGraph } from '../generator';
 import type { PropertyValidationResult } from './types';
 
 /**

@@ -6,16 +6,16 @@
  */
 
 // Graph specification types
-export * from "./graph-spec";
+export * from "./spec";
 
 // Graph property analysis
-export * from "./graph-spec-analyzer";
+export * from "./analyzer";
 
 // Mathematical constraint validation
-export * from "./graph-spec-constraints";
+export * from "./constraints";
 
 // Graph validation
 export * from "./validation/index";
 
 // Test fixture generation
-export * from "./graph-generator";
+export * from "./generator";
