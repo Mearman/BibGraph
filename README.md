@@ -186,26 +186,18 @@ flowchart LR
 
     %% Task dependencies
     algorithms_typecheck --> algorithms_build
+    types_build --> algorithms_build
     graph_expansion_build --> algorithms_build
     graph_gen_build --> algorithms_build
-    types_build --> algorithms_build
     algorithms_typecheck --> algorithms_test
-    graph_expansion_build --> algorithms_typecheck
-    graph_gen_build --> algorithms_typecheck
-    types_build --> algorithms_typecheck
     client_build --> cli_test
     types_build --> cli_test
     utils_build --> cli_test
-    client_build --> cli_typecheck
-    types_build --> cli_typecheck
-    utils_build --> cli_typecheck
     client_typecheck --> client_build
     types_build --> client_build
     utils_build --> client_build
     types_build --> client_test
     utils_build --> client_test
-    types_build --> client_typecheck
-    utils_build --> client_typecheck
     graph_core_typecheck --> graph_core_build
     algorithms_build --> graph_core_build
     graph_expansion_build --> graph_core_build
@@ -214,19 +206,15 @@ flowchart LR
     graph_gen_build --> graph_expansion_test
     graph_gen_typecheck --> graph_gen_build
     graph_gen_typecheck --> graph_gen_test
-    web_build --> tools_typecheck
     types_typecheck --> types_build
     ui_typecheck --> ui_build
     types_build --> ui_build
     utils_build --> ui_build
     types_build --> ui_test
     utils_build --> ui_test
-    types_build --> ui_typecheck
-    utils_build --> ui_typecheck
     utils_typecheck --> utils_build
     types_build --> utils_build
     types_build --> utils_test
-    types_build --> utils_typecheck
     web_typecheck --> web_build
     types_build --> web_build
     algorithms_build --> web_build
@@ -242,13 +230,6 @@ flowchart LR
     graph_expansion_build --> web_test
     ui_build --> web_test
     utils_build --> web_test
-    types_build --> web_typecheck
-    algorithms_build --> web_typecheck
-    client_build --> web_typecheck
-    graph_core_build --> web_typecheck
-    graph_expansion_build --> web_typecheck
-    ui_build --> web_typecheck
-    utils_build --> web_typecheck
 ```
 <!-- nx-task-graph-end -->
 
