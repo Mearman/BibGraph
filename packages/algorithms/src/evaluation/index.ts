@@ -28,3 +28,12 @@ export {
   precisionAtK,
   recallAtK
 } from './ir-metrics';
+
+// Export baseline rankers
+export {
+  randomRanker,
+  degreeBasedRanker,
+  pageRankRanker,
+  shortestPathRanker,
+  weightBasedRanker
+} from './baselines';
