@@ -381,6 +381,25 @@ export type DominationNumber =
   | { kind: "unconstrained" };
 
 // ============================================================================
+// SPECTRAL PROPERTIES
+// ============================================================================
+
+/** Full spectrum: eigenvalue-based properties */
+export type Spectrum =
+  | { kind: "spectrum"; eigenvalues: readonly number[] }
+  | { kind: "unconstrained" };
+
+/** Algebraic connectivity (λ₂): second smallest Laplacian eigenvalue (Fiedler value) */
+export type AlgebraicConnectivity =
+  | { kind: "algebraic_connectivity"; value: number }
+  | { kind: "unconstrained" };
+
+/** Spectral radius (ρ): largest eigenvalue (Perron-Frobenius for non-negative) */
+export type SpectralRadius =
+  | { kind: "spectral_radius"; value: number }
+  | { kind: "unconstrained" };
+
+// ============================================================================
 // SPECIAL BIPARTITE PROPERTIES
 // ============================================================================
 
@@ -638,6 +657,11 @@ export type GraphSpec = Readonly<{
   vertexCover?: VertexCover;
   dominationNumber?: DominationNumber;
 
+  // Spectral properties
+  spectrum?: Spectrum;
+  algebraicConnectivity?: AlgebraicConnectivity;
+  spectralRadius?: SpectralRadius;
+
   // Special bipartite properties
   completeBipartite?: CompleteBipartite;
 
@@ -710,6 +734,7 @@ export type GraphSpecPatch = Partial<Omit<GraphSpec,
   "selfComplementary" | "vertexTransitive" | "edgeTransitive" | "arcTransitive" |
   "diameter" | "radius" | "girth" | "circumference" | "hereditaryClass" |
   "independenceNumber" | "vertexCover" | "dominationNumber" |
+  "spectrum" | "algebraicConnectivity" | "spectralRadius" |
   "completeBipartite"
 >>;
 
