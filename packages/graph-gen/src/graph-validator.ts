@@ -57,6 +57,10 @@ import {
   validateCage,
   validateMooreGraph,
   validateRamanujan,
+  validateCartesianProduct,
+  validateTensorProduct,
+  validateStrongProduct,
+  validateLexicographicProduct,
   validateWeighting} from './validation';
 
 /**
@@ -128,6 +132,10 @@ export const validateGraphProperties = (graph: TestGraph): GraphValidationResult
   results.push(validateCage(graph));
   results.push(validateMooreGraph(graph));
   results.push(validateRamanujan(graph));
+  results.push(validateCartesianProduct(graph));
+  results.push(validateTensorProduct(graph));
+  results.push(validateStrongProduct(graph));
+  results.push(validateLexicographicProduct(graph));
   results.push(validateRegularGraph(graph));
   results.push(validateEulerian(graph));
   results.push(validateKVertexConnected(graph));
