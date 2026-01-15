@@ -27,7 +27,10 @@ export {
 export {
   validateDensityAndCompleteness,
   validateBipartite,
-  validateTournament,
+  validateTournament
+} from './structural';
+
+export {
   validateSplit,
   validateCograph,
   validateClawFree,
@@ -35,44 +38,74 @@ export {
   validateInterval,
   validatePermutation,
   validateComparability,
-  validatePerfect,
+  validatePerfect
+} from './structural-class';
+
+export {
   validateScaleFree,
   validateSmallWorld,
-  validateModular,
-  validateLine,
-  validateSelfComplementary,
-  validateThreshold,
+  validateModular
+} from './network';
+
+export {
   validateUnitDisk,
-  validatePlanar,
+  validatePlanar
+} from './geometric';
+
+export {
   validateHamiltonian,
   validateTraceable,
-  validateStronglyRegular,
-  validateVertexTransitive,
-  validateEdgeTransitive,
-  validateArcTransitive,
   validateDiameter,
   validateRadius,
   validateGirth,
-  validateCircumference,
+  validateCircumference
+} from './path-cycle';
+
+export {
+  validateLine,
+  validateSelfComplementary,
+  validateThreshold,
+  validateStronglyRegular,
+  validateVertexTransitive,
+  validateEdgeTransitive,
+  validateArcTransitive
+} from './symmetry';
+
+export {
   validateHereditaryClass,
   validateIndependenceNumber,
   validateVertexCover,
-  validateDominationNumber,
+  validateDominationNumber
+} from './invariant';
+
+export {
   validateSpectrum,
   validateAlgebraicConnectivity,
-  validateSpectralRadius,
+  validateSpectralRadius
+} from './spectral';
+
+export {
   validateToughness,
-  validateIntegrity,
+  validateIntegrity
+} from './robustness';
+
+export {
   validateCage,
   validateMooreGraph,
-  validateRamanujan,
+  validateRamanujan
+} from './extremal';
+
+export {
   validateCartesianProduct,
   validateTensorProduct,
   validateStrongProduct,
-  validateLexicographicProduct,
+  validateLexicographicProduct
+} from './product';
+
+export {
   validateMinorFree,
   validateTopologicalMinorFree
-} from './structural-validators';
+} from './minor';
 
 // Export degree validators
 export {
