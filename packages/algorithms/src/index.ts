@@ -6,9 +6,6 @@
 // Import from there directly:
 // import { ... } from '@bibgraph/graph-gen';
 
-// Adapter for graph-expansion algorithms
-export { GraphAdapter } from "./graph-adapter";
-
 // Core analysis algorithms
 export * from "./analysis/scc";
 export * from "./analysis/connected-components";
