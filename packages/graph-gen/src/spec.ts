@@ -436,6 +436,34 @@ export type Ramanujan =
   | { kind: "unconstrained" };
 
 // ============================================================================
+// GRAPH PRODUCTS
+// ============================================================================
+
+/** Cartesian product G □ H */
+export type CartesianProduct =
+  | { kind: "cartesian_product"; leftFactors: number; rightFactors: number }
+  | { kind: "not_cartesian_product" }
+  | { kind: "unconstrained" };
+
+/** Tensor (direct) product G × H */
+export type TensorProduct =
+  | { kind: "tensor_product"; leftFactors: number; rightFactors: number }
+  | { kind: "not_tensor_product" }
+  | { kind: "unconstrained" };
+
+/** Strong product G ⊠ H */
+export type StrongProduct =
+  | { kind: "strong_product"; leftFactors: number; rightFactors: number }
+  | { kind: "not_strong_product" }
+  | { kind: "unconstrained" };
+
+/** Lexicographic product G ∘ H */
+export type LexicographicProduct =
+  | { kind: "lexicographic_product"; leftFactors: number; rightFactors: number }
+  | { kind: "not_lexicographic_product" }
+  | { kind: "unconstrained" };
+
+// ============================================================================
 // SPECIAL BIPARTITE PROPERTIES
 // ============================================================================
 
@@ -707,6 +735,12 @@ export type GraphSpec = Readonly<{
   moore?: MooreGraph;
   ramanujan?: Ramanujan;
 
+  // Graph products
+  cartesianProduct?: CartesianProduct;
+  tensorProduct?: TensorProduct;
+  strongProduct?: StrongProduct;
+  lexicographicProduct?: LexicographicProduct;
+
   // Special bipartite properties
   completeBipartite?: CompleteBipartite;
 
@@ -782,6 +816,7 @@ export type GraphSpecPatch = Partial<Omit<GraphSpec,
   "spectrum" | "algebraicConnectivity" | "spectralRadius" |
   "toughness" | "integrity" |
   "cage" | "moore" | "ramanujan" |
+  "cartesianProduct" | "tensorProduct" | "strongProduct" | "lexicographicProduct" |
   "completeBipartite"
 >>;
 
