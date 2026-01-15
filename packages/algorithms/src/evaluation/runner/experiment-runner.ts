@@ -2,38 +2,38 @@
  * Experiment runner infrastructure
  */
 
-import type { Edge, Node } from '../../types/graph';
 import { Graph } from '../../graph/graph';
 import type { Path } from '../../types/algorithm-results';
+import type { Edge, Node } from '../../types/graph';
 import {
-  spearmanCorrelation,
-  kendallTau,
-} from '../rank-correlation';
-import {
-  ndcg,
   meanAveragePrecision,
   meanReciprocalRank,
+  ndcg,
   precisionAtK,
   recallAtK,
 } from '../ir-metrics';
 import {
-  pairedTTest,
-  wilcoxonSignedRank,
-  bootstrapDifferenceTest,
-} from '../statistics';
-import {
-  plantGroundTruthPaths,
   addNoisePaths,
   type PlantedPathResult,
+  plantGroundTruthPaths,
 } from '../path-planting';
+import {
+  kendallTau,
+  spearmanCorrelation,
+} from '../rank-correlation';
+import {
+  bootstrapDifferenceTest,
+  pairedTTest,
+  wilcoxonSignedRank,
+} from '../statistics';
+import type { ExperimentReport, MethodComparison, StatisticalTestResult } from '../types';
 import type {
   ExperimentConfig,
-  MetricType,
   MethodConfig,
-  StatisticalTestType,
+  MetricType,
   PathRanker,
+  StatisticalTestType,
 } from './experiment-config';
-import type { ExperimentReport, MethodComparison, StatisticalTestResult } from '../types';
 
 /**
  * Run a complete evaluation experiment.
@@ -66,10 +66,7 @@ import type { ExperimentReport, MethodComparison, StatisticalTestResult } from '
  * console.log(report.winner); // 'MI' (if significantly better)
  * ```
  */
-export async function runExperiment<N extends Node, E extends Edge>(
-  config: ExperimentConfig<N, E>,
-  baseGraph: Graph<N, E>
-): Promise<ExperimentReport> {
+export const runExperiment = async <N extends Node, E extends Edge>(config: ExperimentConfig<N, E>, baseGraph: Graph<N, E>): Promise<ExperimentReport> => {
   const startTime = Date.now();
 
   // Plant ground truth paths
@@ -78,7 +75,7 @@ export async function runExperiment<N extends Node, E extends Edge>(
   const relevanceScores = plantedResult.relevanceScores;
 
   // Add noise paths if configured
-  let graph = plantedResult.graph;
+  const graph = plantedResult.graph;
   // Note: Noise paths would be added here if configured
   // For now, we'll skip noise to keep experiments simple
 
@@ -142,7 +139,7 @@ export async function runExperiment<N extends Node, E extends Edge>(
     timestamp: new Date().toISOString(),
     duration: Date.now() - startTime,
   };
-}
+};
 
 /**
  * Run cross-validation experiment.
@@ -164,15 +161,11 @@ export async function runExperiment<N extends Node, E extends Edge>(
  * console.log(result.stdDev.spearman);    // Standard deviation
  * ```
  */
-export async function runCrossValidation<N extends Node, E extends Edge>(
-  config: ExperimentConfig<N, E>,
-  baseGraph: Graph<N, E>,
-  folds: number = 5
-): Promise<{
+export const runCrossValidation = async <N extends Node, E extends Edge>(config: ExperimentConfig<N, E>, baseGraph: Graph<N, E>, folds: number = 5): Promise<{
   foldResults: ExperimentReport[];
   aggregated: ExperimentReport;
   stdDev: ExperimentReport;
-}> {
+}> => {
   const foldResults: ExperimentReport[] = [];
 
   // Run experiment for each fold
@@ -194,17 +187,16 @@ export async function runCrossValidation<N extends Node, E extends Edge>(
   const stdDev = calculateStdDev(foldResults);
 
   return { foldResults, aggregated, stdDev };
-}
+};
 
 /**
  * Compute evaluation metrics for a single method run.
+ * @param rankedPaths
+ * @param groundTruthPaths
+ * @param relevanceScores
+ * @param metricTypes
  */
-function computeMetrics<N extends Node, E extends Edge>(
-  rankedPaths: Array<{ path: Path<N, E>; score: number }>,
-  groundTruthPaths: Path<N, E>[],
-  relevanceScores: Map<string, number>,
-  metricTypes: MetricType[]
-): Map<string, number> {
+const computeMetrics = <N extends Node, E extends Edge>(rankedPaths: Array<{ path: Path<N, E>; score: number }>, groundTruthPaths: Path<N, E>[], relevanceScores: Map<string, number>, metricTypes: MetricType[]): Map<string, number> => {
   const metrics = new Map<string, number>();
 
   // Extract predicted ranking (path IDs in order)
@@ -272,15 +264,14 @@ function computeMetrics<N extends Node, E extends Edge>(
   }
 
   return metrics;
-}
+};
 
 /**
  * Aggregate metrics across repetitions.
+ * @param repetitions
+ * @param metricTypes
  */
-function aggregateMetrics(
-  repetitions: Array<Map<string, number>>,
-  metricTypes: MetricType[]
-): ExperimentReport['methods'][number]['results'] {
+const aggregateMetrics = (repetitions: Array<Map<string, number>>, metricTypes: MetricType[]): ExperimentReport['methods'][number]['results'] => {
   const aggregated: Record<string, number> = {};
 
   // Collect values for each metric
@@ -309,16 +300,15 @@ function aggregateMetrics(
   }
 
   return aggregated as ExperimentReport['methods'][number]['results'];
-}
+};
 
 /**
  * Run statistical tests comparing methods.
+ * @param methodResults
+ * @param testTypes
+ * @param alpha
  */
-function runStatisticalTests(
-  methodResults: Array<{ method: string; repetitions: Array<Map<string, number>> }>,
-  testTypes: StatisticalTestType[],
-  alpha: number
-): StatisticalTestResult[] {
+const runStatisticalTests = (methodResults: Array<{ method: string; repetitions: Array<Map<string, number>> }>, testTypes: StatisticalTestType[], alpha: number): StatisticalTestResult[] => {
   const tests: StatisticalTestResult[] = [];
 
   // Find best method (by first metric)
@@ -394,15 +384,14 @@ function runStatisticalTests(
   }
 
   return tests;
-}
+};
 
 /**
  * Determine winning method based on primary metric.
+ * @param methods
+ * @param primaryMetric
  */
-function determineWinner(
-  methods: MethodComparison[],
-  primaryMetric: string
-): string {
+const determineWinner = (methods: MethodComparison[], primaryMetric: string): string => {
   const sorted = [...methods].sort((a, b) => {
     const scoreA = a.results[primaryMetric] ?? 0;
     const scoreB = b.results[primaryMetric] ?? 0;
@@ -410,12 +399,14 @@ function determineWinner(
   });
 
   return sorted[0]?.method ?? 'unknown';
-}
+};
 
 /**
  * Average metric value across repetitions.
+ * @param repetitions
+ * @param metric
  */
-function averageMetric(repetitions: Array<Map<string, number>>, metric: string): number {
+const averageMetric = (repetitions: Array<Map<string, number>>, metric: string): number => {
   let sum = 0;
   let count = 0;
 
@@ -428,12 +419,13 @@ function averageMetric(repetitions: Array<Map<string, number>>, metric: string):
   }
 
   return count > 0 ? sum / count : 0;
-}
+};
 
 /**
  * Aggregate fold results for cross-validation.
+ * @param folds
  */
-function aggregateFoldResults(folds: ExperimentReport[]): ExperimentReport {
+const aggregateFoldResults = (folds: ExperimentReport[]): ExperimentReport => {
   const firstFold = folds[0]!;
 
   // Aggregate methods
@@ -463,12 +455,13 @@ function aggregateFoldResults(folds: ExperimentReport[]): ExperimentReport {
     methods: aggregatedMethods,
     statisticalTests: aggregatedTests,
   };
-}
+};
 
 /**
  * Calculate standard deviation across folds.
+ * @param folds
  */
-function calculateStdDev(folds: ExperimentReport[]): ExperimentReport {
+const calculateStdDev = (folds: ExperimentReport[]): ExperimentReport => {
   const firstFold = folds[0]!;
 
   // Calculate std dev for each method's metrics
@@ -497,4 +490,4 @@ function calculateStdDev(folds: ExperimentReport[]): ExperimentReport {
     methods: methodsWithStdDev,
     statisticalTests: [],
   };
-}
+};

@@ -2,9 +2,9 @@
  * Experiment configuration types
  */
 
-import type { Edge, Node } from '../../types/graph';
 import { Graph } from '../../graph/graph';
 import type { Path } from '../../types/algorithm-results';
+import type { Edge, Node } from '../../types/graph';
 import type { PlantedPathConfig } from '../path-planting/path-generator';
 
 /**

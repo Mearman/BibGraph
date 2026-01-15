@@ -28,7 +28,7 @@ import type { ExperimentReport, MethodComparison, StatisticalTestResult } from '
  * // | Random | 0.02     | 0.01    | 0.05 |
  * // ```
  */
-export function generateMarkdownReport(report: ExperimentReport): string {
+export const generateMarkdownReport = (report: ExperimentReport): string => {
   const lines: string[] = [];
 
   // Title
@@ -83,7 +83,7 @@ export function generateMarkdownReport(report: ExperimentReport): string {
   lines.push(generateInterpretation(report));
 
   return lines.join('\n');
-}
+};
 
 /**
  * Generate LaTeX table from experiment results.
@@ -109,34 +109,34 @@ export function generateMarkdownReport(report: ExperimentReport): string {
  * // \\end{table}
  * ```
  */
-export function generateLatexTable(report: ExperimentReport): string {
+export const generateLatexTable = (report: ExperimentReport): string => {
   const lines: string[] = [];
 
-  lines.push('\\begin{table}[h]');
-  lines.push('\\centering');
-  lines.push('\\caption{Results for ' + escapeLaTeX(report.name) + '}');
+  lines.push(String.raw`\begin{table}[h]`);
+  lines.push(String.raw`\centering`);
+  lines.push(String.raw`\caption{Results for ` + escapeLaTeX(report.name) + '}');
 
   // Table specification
   const numCols = Object.keys(report.methods[0]!.results).length + 1;
-  lines.push('\\begin{tabular}{l' + 'c'.repeat(numCols - 1) + '}');
+  lines.push(String.raw`\begin{tabular}{l` + 'c'.repeat(numCols - 1) + '}');
 
   // Header
-  lines.push('\\toprule');
-  lines.push('Method & ' + getMetricHeaders(report).join(' & ') + ' \\\\ ');
+  lines.push(String.raw`\toprule`);
+  lines.push('Method & ' + getMetricHeaders(report).join(' & ') + String.raw` \\ `);
 
   // Data rows
-  lines.push('\\midrule');
+  lines.push(String.raw`\midrule`);
   for (const method of report.methods) {
     const values = Object.values(method.results).map((v) => v.toFixed(4));
-    lines.push(escapeLaTeX(method.method) + ' & ' + values.join(' & ') + ' \\\\ ');
+    lines.push(escapeLaTeX(method.method) + ' & ' + values.join(' & ') + String.raw` \\ `);
   }
 
-  lines.push('\\bottomrule');
-  lines.push('\\end{tabular}');
-  lines.push('\\end{table}');
+  lines.push(String.raw`\bottomrule`);
+  lines.push(String.raw`\end{tabular}`);
+  lines.push(String.raw`\end{table}`);
 
   return lines.join('\n');
-}
+};
 
 /**
  * Generate JSON summary for programmatic access.
@@ -151,7 +151,7 @@ export function generateLatexTable(report: ExperimentReport): string {
  * console.log(data.methods[0].results.spearman); // 0.85
  * ```
  */
-export function generateJSONSummary(report: ExperimentReport): string {
+export const generateJSONSummary = (report: ExperimentReport): string => {
   const summary = {
     name: report.name,
     timestamp: report.timestamp,
@@ -171,12 +171,13 @@ export function generateJSONSummary(report: ExperimentReport): string {
   };
 
   return JSON.stringify(summary, null, 2);
-}
+};
 
 /**
  * Get metric headers for tables.
+ * @param report
  */
-function getMetricHeaders(report: ExperimentReport): string[] {
+const getMetricHeaders = (report: ExperimentReport): string[] => {
   const metrics = new Set<string>();
 
   for (const method of report.methods) {
@@ -191,30 +192,30 @@ function getMetricHeaders(report: ExperimentReport): string[] {
     }
   }
 
-  return Array.from(metrics);
-}
+  return [...metrics];
+};
 
 /**
  * Escape special LaTeX characters.
+ * @param str
  */
-function escapeLaTeX(str: string): string {
-  return str
-    .replace(/\\/g, '\\textbackslash{}')
-    .replace(/%/g, '\\%')
-    .replace(/\$/g, '\\$')
-    .replace(/#/g, '\\#')
-    .replace(/_/g, '\\_')
-    .replace(/\{/g, '\\{')
-    .replace(/\}/g, '\\}')
-    .replace(/&/g, '\\&')
-    .replace(/~/g, '\\textasciitilde{}')
-    .replace(/\^/g, '\\^{}');
-}
+const escapeLaTeX = (str: string): string => str
+    .replaceAll('\\', String.raw`\textbackslash{}`)
+    .replaceAll('%', String.raw`\%`)
+    .replaceAll('$', String.raw`\$`)
+    .replaceAll('#', String.raw`\#`)
+    .replaceAll('_', String.raw`\_`)
+    .replaceAll('{', String.raw`\{`)
+    .replaceAll('}', String.raw`\}`)
+    .replaceAll('&', String.raw`\&`)
+    .replaceAll('~', String.raw`\textasciitilde{}`)
+    .replaceAll('^', String.raw`\^{}`);
 
 /**
  * Generate interpretation text for experiment results.
+ * @param report
  */
-function generateInterpretation(report: ExperimentReport): string {
+const generateInterpretation = (report: ExperimentReport): string => {
   const lines: string[] = [];
 
   const winner = report.methods.find((m) => m.method === report.winner);
@@ -259,7 +260,7 @@ function generateInterpretation(report: ExperimentReport): string {
   }
 
   return lines.join('');
-}
+};
 
 /**
  * Generate comprehensive HTML report.
@@ -274,7 +275,7 @@ function generateInterpretation(report: ExperimentReport): string {
  * fs.writeFileSync('report.html', html);
  * ```
  */
-export function generateHTMLReport(report: ExperimentReport): string {
+export const generateHTMLReport = (report: ExperimentReport): string => {
   const lines: string[] = [];
 
   lines.push('<!DOCTYPE html>');
@@ -364,16 +365,15 @@ export function generateHTMLReport(report: ExperimentReport): string {
   lines.push('</html>');
 
   return lines.join('\n');
-}
+};
 
 /**
  * Escape special HTML characters.
+ * @param str
  */
-function escapeHTML(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+const escapeHTML = (str: string): string => str
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('\'', '&#039;');
