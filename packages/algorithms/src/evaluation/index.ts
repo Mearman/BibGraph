@@ -50,3 +50,19 @@ export {
   type CitationPathConfig,
   type CitationPathType
 } from './path-planting';
+
+// Export statistical significance testing
+export {
+  pairedTTest,
+  wilcoxonSignedRank,
+  bootstrapCI,
+  bootstrapDifferenceTest,
+  bonferroniCorrection,
+  benjaminiHochberg,
+  holmBonferroni,
+  storeyQValues,
+  cohensD,
+  cliffsDelta,
+  glassDelta,
+  rankBiserialCorrelation,
+} from './statistics';
