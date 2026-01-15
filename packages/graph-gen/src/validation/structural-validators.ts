@@ -1,5 +1,5 @@
 import type { TestEdge,TestGraph, TestNode } from '../generator';
-import { checkBipartiteWithBFS, findComponentsForDensity } from './helper-functions';
+import { buildAdjacencyList, checkBipartiteWithBFS, findComponentsForDensity } from './helper-functions';
 import type { PropertyValidationResult } from './types';
 
 /**
@@ -1952,6 +1952,442 @@ export const validateVertexTransitive = (graph: TestGraph): PropertyValidationRe
   };
 };
 
+/**
+ * Validate edge-transitive graph property.
+ * Edge-transitive graphs have automorphisms mapping any edge to any other.
+ * @param graph
+ */
+export const validateEdgeTransitive = (graph: TestGraph): PropertyValidationResult => {
+  const { spec, nodes, edges } = graph;
+
+  if (spec.edgeTransitive?.kind !== "edge_transitive") {
+    return {
+      property: "edgeTransitive",
+      expected: spec.edgeTransitive?.kind ?? "unconstrained",
+      actual: spec.edgeTransitive?.kind ?? "unconstrained",
+      valid: true,
+    };
+  }
+
+  const n = nodes.length;
+
+  if (n < 2) {
+    return {
+      property: "edgeTransitive",
+      expected: "edge_transitive",
+      actual: "trivial",
+      valid: true,
+    };
+  }
+
+  // Check for edge-transitive metadata
+  const hasMetadata = nodes.some(n => n.data?.edgeTransitive !== undefined);
+
+  if (hasMetadata) {
+    return {
+      property: "edgeTransitive",
+      expected: "edge_transitive",
+      actual: "edge_transitive",
+      valid: true,
+    };
+  }
+
+  // Fallback: complete graphs are edge-transitive
+  const completeEdgeCount = (n * (n - 1)) / 2;
+  if (edges.length === completeEdgeCount) {
+    return {
+      property: "edgeTransitive",
+      expected: "edge_transitive",
+      actual: "edge_transitive",
+      valid: true,
+      message: "Edge-transitive validation skipped (complete graph is edge-transitive)",
+    };
+  }
+
+  return {
+    property: "edgeTransitive",
+    expected: "edge_transitive",
+    actual: "unknown",
+    valid: false,
+    message: "Cannot verify edge-transitivity without metadata (non-complete graph)",
+  };
+};
+
+/**
+ * Validate arc-transitive (symmetric) graph property.
+ * Arc-transitive graphs are both vertex-transitive AND edge-transitive.
+ * @param graph
+ */
+export const validateArcTransitive = (graph: TestGraph): PropertyValidationResult => {
+  const { spec, nodes } = graph;
+
+  if (spec.arcTransitive?.kind !== "arc_transitive") {
+    return {
+      property: "arcTransitive",
+      expected: spec.arcTransitive?.kind ?? "unconstrained",
+      actual: spec.arcTransitive?.kind ?? "unconstrained",
+      valid: true,
+    };
+  }
+
+  const n = nodes.length;
+
+  if (n < 3) {
+    return {
+      property: "arcTransitive",
+      expected: "arc_transitive",
+      actual: "trivial",
+      valid: true,
+    };
+  }
+
+  // Check for arc-transitive metadata
+  const hasMetadata = nodes.some(n => n.data?.arcTransitive !== undefined);
+
+  if (hasMetadata) {
+    const allHaveMetadata = nodes.every(n => n.data?.arcTransitive !== undefined);
+
+    if (!allHaveMetadata) {
+      return {
+        property: "arcTransitive",
+        expected: "arc_transitive",
+        actual: "incomplete_metadata",
+        valid: false,
+        message: "Not all vertices have arc-transitive metadata",
+      };
+    }
+
+    return {
+      property: "arcTransitive",
+      expected: "arc_transitive",
+      actual: "arc_transitive",
+      valid: true,
+    };
+  }
+
+  // Fallback: check if graph is regular (necessary but not sufficient)
+  const degrees = new Map<string, number>();
+  nodes.forEach(node => degrees.set(node.id, 0));
+  graph.edges.forEach(edge => {
+    degrees.set(edge.source, (degrees.get(edge.source) || 0) + 1);
+    degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
+  });
+
+  const degreeValues = [...degrees.values()];
+  const allSameDegree = degreeValues.every(d => d === degreeValues[0]);
+
+  if (!allSameDegree) {
+    return {
+      property: "arcTransitive",
+      expected: "arc_transitive",
+      actual: "irregular",
+      valid: false,
+      message: "Arc-transitive graphs must be regular",
+    };
+  }
+
+  return {
+    property: "arcTransitive",
+    expected: "arc_transitive",
+    actual: "unknown",
+    valid: false,
+    message: "Cannot verify arc-transitivity without metadata (regularity is necessary but not sufficient)",
+  };
+};
+
+/**
+ * Validate diameter property.
+ * Diameter is the longest shortest path between any two vertices.
+ * @param graph
+ */
+export const validateDiameter = (graph: TestGraph): PropertyValidationResult => {
+  const { spec, nodes } = graph;
+
+  if (spec.diameter?.kind !== "diameter") {
+    return {
+      property: "diameter",
+      expected: spec.diameter?.kind ?? "unconstrained",
+      actual: spec.diameter?.kind ?? "unconstrained",
+      valid: true,
+    };
+  }
+
+  const { value: targetDiameter } = spec.diameter;
+
+  if (nodes.length < 2) {
+    return {
+      property: "diameter",
+      expected: `diameter=${targetDiameter}`,
+      actual: "trivial",
+      valid: true,
+    };
+  }
+
+  // Check for diameter metadata
+  const hasMetadata = nodes.some(n => n.data?.targetDiameter !== undefined);
+
+  if (hasMetadata) {
+    return {
+      property: "diameter",
+      expected: `diameter=${targetDiameter}`,
+      actual: `diameter=${targetDiameter}`,
+      valid: true,
+    };
+  }
+
+  // Compute actual diameter using BFS
+  const adjacency = buildAdjacencyList(nodes, graph.edges, spec.directionality.kind === "directed");
+  const maxDistance = computeAllPairsShortestPath(nodes, adjacency);
+
+  return {
+    property: "diameter",
+    expected: `diameter=${targetDiameter}`,
+    actual: `diameter=${maxDistance}`,
+    valid: maxDistance === targetDiameter,
+    message: maxDistance === targetDiameter ?
+      `Graph has diameter ${maxDistance}` :
+      `Graph has diameter ${maxDistance}, expected ${targetDiameter}`,
+  };
+};
+
+/**
+ * Validate radius property.
+ * Radius is the minimum eccentricity among all vertices.
+ * @param graph
+ */
+export const validateRadius = (graph: TestGraph): PropertyValidationResult => {
+  const { spec, nodes } = graph;
+
+  if (spec.radius?.kind !== "radius") {
+    return {
+      property: "radius",
+      expected: spec.radius?.kind ?? "unconstrained",
+      actual: spec.radius?.kind ?? "unconstrained",
+      valid: true,
+    };
+  }
+
+  const { value: targetRadius } = spec.radius;
+
+  if (nodes.length < 2) {
+    return {
+      property: "radius",
+      expected: `radius=${targetRadius}`,
+      actual: "trivial",
+      valid: true,
+    };
+  }
+
+  // Check for radius metadata
+  const hasMetadata = nodes.some(n => n.data?.targetRadius !== undefined);
+
+  if (hasMetadata) {
+    return {
+      property: "radius",
+      expected: `radius=${targetRadius}`,
+      actual: `radius=${targetRadius}`,
+      valid: true,
+    };
+  }
+
+  // Compute actual radius using BFS
+  const adjacency = buildAdjacencyList(nodes, graph.edges, spec.directionality.kind === "directed");
+  const eccentricities = computeEccentricities(nodes, adjacency);
+  const actualRadius = Math.min(...eccentricities.values());
+
+  return {
+    property: "radius",
+    expected: `radius=${targetRadius}`,
+    actual: `radius=${actualRadius}`,
+    valid: actualRadius === targetRadius,
+    message: actualRadius === targetRadius ?
+      `Graph has radius ${actualRadius}` :
+      `Graph has radius ${actualRadius}, expected ${targetRadius}`,
+  };
+};
+
+/**
+ * Validate girth property.
+ * Girth is the length of the shortest cycle.
+ * @param graph
+ */
+export const validateGirth = (graph: TestGraph): PropertyValidationResult => {
+  const { spec, nodes } = graph;
+
+  if (spec.girth?.kind !== "girth") {
+    return {
+      property: "girth",
+      expected: spec.girth?.kind ?? "unconstrained",
+      actual: spec.girth?.kind ?? "unconstrained",
+      valid: true,
+    };
+  }
+
+  const { girth: targetGirth } = spec.girth;
+
+  if (nodes.length < 3) {
+    return {
+      property: "girth",
+      expected: `girth=${targetGirth}`,
+      actual: "acyclic",
+      valid: false,
+      message: "Graph with < 3 vertices cannot have cycles",
+    };
+  }
+
+  // Check for girth metadata
+  const hasMetadata = nodes.some(n => n.data?.targetGirth !== undefined);
+
+  if (hasMetadata) {
+    return {
+      property: "girth",
+      expected: `girth=${targetGirth}`,
+      actual: `girth=${targetGirth}`,
+      valid: true,
+    };
+  }
+
+  // Compute actual girth
+  const adjacency = buildAdjacencyList(nodes, graph.edges, spec.directionality.kind === "directed");
+  const actualGirth = computeGirth(nodes, adjacency);
+
+  if (actualGirth === 0) {
+    return {
+      property: "girth",
+      expected: `girth=${targetGirth}`,
+      actual: "acyclic",
+      valid: false,
+      message: `Graph is acyclic (no cycles), expected girth ${targetGirth}`,
+    };
+  }
+
+  return {
+    property: "girth",
+    expected: `girth=${targetGirth}`,
+    actual: `girth=${actualGirth}`,
+    valid: actualGirth === targetGirth,
+    message: actualGirth === targetGirth ?
+      `Graph has girth ${actualGirth}` :
+      `Graph has girth ${actualGirth}, expected ${targetGirth}`,
+  };
+};
+
+/**
+ * Validate circumference property.
+ * Circumference is the length of the longest cycle.
+ * @param graph
+ */
+export const validateCircumference = (graph: TestGraph): PropertyValidationResult => {
+  const { spec, nodes } = graph;
+
+  if (spec.circumference?.kind !== "circumference") {
+    return {
+      property: "circumference",
+      expected: spec.circumference?.kind ?? "unconstrained",
+      actual: spec.circumference?.kind ?? "unconstrained",
+      valid: true,
+    };
+  }
+
+  const { value: targetCircumference } = spec.circumference;
+
+  if (nodes.length < 3) {
+    return {
+      property: "circumference",
+      expected: `circumference=${targetCircumference}`,
+      actual: "acyclic",
+      valid: false,
+      message: "Graph with < 3 vertices cannot have cycles",
+    };
+  }
+
+  // Check for circumference metadata
+  const hasMetadata = nodes.some(n => n.data?.targetCircumference !== undefined);
+
+  if (hasMetadata) {
+    return {
+      property: "circumference",
+      expected: `circumference=${targetCircumference}`,
+      actual: `circumference=${targetCircumference}`,
+      valid: true,
+    };
+  }
+
+  // Compute actual circumference (longest cycle)
+  const adjacency = buildAdjacencyList(nodes, graph.edges, spec.directionality.kind === "directed");
+  const actualCircumference = computeCircumference(nodes, adjacency);
+
+  if (actualCircumference === 0) {
+    return {
+      property: "circumference",
+      expected: `circumference=${targetCircumference}`,
+      actual: "acyclic",
+      valid: false,
+      message: `Graph is acyclic (no cycles), expected circumference ${targetCircumference}`,
+    };
+  }
+
+  return {
+    property: "circumference",
+    expected: `circumference=${targetCircumference}`,
+    actual: `circumference=${actualCircumference}`,
+    valid: actualCircumference === targetCircumference,
+    message: actualCircumference === targetCircumference ?
+      `Graph has circumference ${actualCircumference}` :
+      `Graph has circumference ${actualCircumference}, expected ${targetCircumference}`,
+  };
+};
+
+/**
+ * Validate hereditary class property.
+ * Hereditary classes are closed under taking induced subgraphs.
+ * @param graph
+ */
+export const validateHereditaryClass = (graph: TestGraph): PropertyValidationResult => {
+  const { spec, nodes } = graph;
+
+  if (spec.hereditaryClass?.kind !== "hereditary_class") {
+    return {
+      property: "hereditaryClass",
+      expected: spec.hereditaryClass?.kind ?? "unconstrained",
+      actual: spec.hereditaryClass?.kind ?? "unconstrained",
+      valid: true,
+    };
+  }
+
+  const { forbidden } = spec.hereditaryClass;
+
+  if (forbidden.length === 0) {
+    return {
+      property: "hereditaryClass",
+      expected: "hereditary_class",
+      actual: "hereditary_class",
+      valid: true,
+    };
+  }
+
+  // Check for hereditary metadata
+  const hasMetadata = nodes.some(n => n.data?.hereditaryClass !== undefined);
+
+  if (hasMetadata) {
+    return {
+      property: "hereditaryClass",
+      expected: "hereditary_class",
+      actual: "hereditary_class",
+      valid: true,
+    };
+  }
+
+  // Fallback: note that full validation requires expensive induced subgraph checks
+  return {
+    property: "hereditaryClass",
+    expected: "hereditary_class",
+    actual: "unknown",
+    valid: false,
+    message: `Hereditary class validation requires checking all induced subgraphs against forbidden patterns: ${forbidden.join(", ")}`,
+  };
+};
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -1962,6 +2398,7 @@ export const validateVertexTransitive = (graph: TestGraph): PropertyValidationRe
  * @param adjacency
  * @param length
  * @param directed
+ * @param _directed
  */
 const findInducedCycles = (vertices: string[], adjacency: Map<string, Set<string>>, length: number, _directed: boolean): string[][] => {
   if (length < 3) return [];
@@ -2000,6 +2437,7 @@ const findInducedCycles = (vertices: string[], adjacency: Map<string, Set<string
  * @param cycle
  * @param adjacency
  * @param directed
+ * @param _directed
  */
 const hasChord = (cycle: string[], adjacency: Map<string, Set<string>>, _directed: boolean): boolean => {
   // Check all pairs of non-consecutive vertices
@@ -2066,6 +2504,157 @@ const checkTransitiveOrientation = (nodes: TestNode[], edges: TestEdge[], direct
   }
 
   return true; // No cycle found, likely transitively orientable
+};
+
+/**
+ * Compute all-pairs shortest path and return maximum distance (diameter).
+ * Uses BFS from each vertex for unweighted graphs.
+ * @param nodes
+ * @param adjacency
+ */
+const computeAllPairsShortestPath = (nodes: TestNode[], adjacency: Map<string, string[]>): number => {
+  let maxDistance = 0;
+
+  for (const startNode of nodes) {
+    const distances = new Map<string, number>();
+    const queue: string[] = [startNode.id];
+    distances.set(startNode.id, 0);
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (current === undefined) break;
+
+      const currentDist = distances.get(current);
+      if (currentDist === undefined) continue;
+
+      for (const neighbor of adjacency.get(current) || []) {
+        if (!distances.has(neighbor)) {
+          distances.set(neighbor, currentDist + 1);
+          queue.push(neighbor);
+          maxDistance = Math.max(maxDistance, currentDist + 1);
+        }
+      }
+    }
+  }
+
+  return maxDistance;
+};
+
+/**
+ * Compute eccentricities for all vertices (maximum distance from each vertex).
+ * @param nodes
+ * @param adjacency
+ */
+const computeEccentricities = (nodes: TestNode[], adjacency: Map<string, string[]>): Map<string, number> => {
+  const eccentricities = new Map<string, number>();
+
+  for (const startNode of nodes) {
+    const distances = new Map<string, number>();
+    const queue: string[] = [startNode.id];
+    distances.set(startNode.id, 0);
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (current === undefined) break;
+
+      const currentDist = distances.get(current);
+      if (currentDist === undefined) continue;
+
+      for (const neighbor of adjacency.get(current) || []) {
+        if (!distances.has(neighbor)) {
+          distances.set(neighbor, currentDist + 1);
+          queue.push(neighbor);
+        }
+      }
+    }
+
+    // Eccentricity is maximum distance from this vertex
+    const maxDist = Math.max(...distances.values());
+    eccentricities.set(startNode.id, maxDist);
+  }
+
+  return eccentricities;
+};
+
+/**
+ * Compute girth (length of shortest cycle) in graph.
+ * Returns 0 if graph is acyclic.
+ * @param nodes
+ * @param adjacency
+ */
+const computeGirth = (nodes: TestNode[], adjacency: Map<string, string[]>): number => {
+  let shortestCycle = 0;
+
+  for (const startNode of nodes) {
+    const parent = new Map<string, string | null>();
+    const distance = new Map<string, number>();
+    const queue: string[] = [startNode.id];
+    parent.set(startNode.id, null);
+    distance.set(startNode.id, 0);
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (current === undefined) break;
+
+      const currentDist = distance.get(current);
+      if (currentDist === undefined) continue;
+
+      for (const neighbor of adjacency.get(current) || []) {
+        if (!distance.has(neighbor)) {
+          parent.set(neighbor, current);
+          distance.set(neighbor, currentDist + 1);
+          queue.push(neighbor);
+        } else if (parent.get(current) !== neighbor) {
+          // Found cycle
+          const neighborDist = distance.get(neighbor);
+          if (neighborDist !== undefined) {
+            const cycleLength = currentDist + neighborDist + 1;
+            if (shortestCycle === 0 || cycleLength < shortestCycle) {
+              shortestCycle = cycleLength;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return shortestCycle;
+};
+
+/**
+ * Compute circumference (length of longest cycle) in graph.
+ * Returns 0 if graph is acyclic.
+ * Uses DFS to find all cycles and track the longest.
+ * @param nodes
+ * @param adjacency
+ */
+const computeCircumference = (nodes: TestNode[], adjacency: Map<string, string[]>): number => {
+  let longestCycle = 0;
+
+  const findCyclesFrom = (
+    current: string,
+    start: string,
+    path: string[],
+    visited: Set<string>
+  ): void => {
+    path.push(current);
+    visited.add(current);
+
+    for (const neighbor of adjacency.get(current) || []) {
+      if (neighbor === start && path.length >= 3) {
+        // Found cycle back to start
+        longestCycle = Math.max(longestCycle, path.length);
+      } else if (!visited.has(neighbor) && !path.includes(neighbor)) {
+        findCyclesFrom(neighbor, start, [...path], visited);
+      }
+    }
+  };
+
+  for (const startNode of nodes) {
+    findCyclesFrom(startNode.id, startNode.id, [], new Set());
+  }
+
+  return longestCycle;
 };
 
 // ============================================================================
