@@ -425,6 +425,19 @@ describe('Validation functions', () => {
 
         const result = validateRegularGraph(graph);
 
+        // Debug: check degree distribution
+        const degrees = new Map<string, number>();
+        for (const node of graph.nodes) {
+          degrees.set(node.id, 0);
+        }
+        for (const edge of graph.edges) {
+          degrees.set(edge.source, (degrees.get(edge.source) || 0) + 1);
+          degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
+        }
+        const degreeValues = [...degrees.values()];
+        console.log('Cubic graph degree distribution:', degreeValues.sort((a, b) => a - b));
+        console.log('Expected: all 3s, Got:', degreeValues);
+
         expect(result.valid).toBe(true);
       });
 
@@ -566,7 +579,7 @@ describe('Validation functions', () => {
     it('should validate flow network', () => {
       const spec: GraphSpec = {
         directionality: { kind: 'directed' },
-        weighting: { kind: 'unweighted' },
+        weighting: { kind: 'weighted_numeric' },
         connectivity: { kind: 'connected' },
         cycles: { kind: 'cycles_allowed' },
         density: { kind: 'moderate' },
@@ -574,7 +587,7 @@ describe('Validation functions', () => {
         edgeMultiplicity: { kind: 'simple' },
         selfLoops: { kind: 'disallowed' },
         schema: { kind: 'homogeneous' },
-        flowNetwork: { kind: 'flow_network', source: 'node-0', sink: 'node-9' },
+        flowNetwork: { kind: 'flow_network', source: 'N0', sink: 'N9' },
       };
       const graph = generateGraph(spec, { nodeCount: 10 });
 

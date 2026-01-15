@@ -146,7 +146,7 @@ describe('validateGraphProperties', () => {
       expect(propertyNames).toContain('density');
       expect(propertyNames).toContain('partiteness');
       expect(propertyNames).toContain('tournament');
-      expect(propertyNames).toContain('regularGraph');
+      expect(propertyNames).toContain('regularity');
     });
 
     it('should mark individual property validation failures', () => {
@@ -201,7 +201,7 @@ describe('validateGraphProperties', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThanOrEqual(1);
-      expect(result.errors).toContain(expect.stringContaining('should not allow self-loops'));
+      expect(result.errors.some(e => e.includes('should not allow self-loops but has'))).toBe(true);
     });
   });
 

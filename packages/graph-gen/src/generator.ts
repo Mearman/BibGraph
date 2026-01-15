@@ -245,6 +245,12 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
     return edges;
   }
 
+  // Handle flow networks
+  if (spec.flowNetwork?.kind === "flow_network") {
+    generateFlowNetworkEdges(nodes, edges, spec, spec.flowNetwork.source, spec.flowNetwork.sink, rng);
+    return edges;
+  }
+
   // Handle Eulerian and semi-Eulerian graphs
   if (spec.eulerian?.kind === "eulerian" || spec.eulerian?.kind === "semi_eulerian") {
     generateEulerianEdges(nodes, edges, spec, rng);
@@ -619,45 +625,200 @@ const generateRegularEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphS
     throw new Error(`k-regular graph requires n*k to be even (got n=${n}, k=${k}, n*k=${n*k})`);
   }
 
-  // Create stubs (half-edges): each vertex has k stubs
-  const stubs: string[] = [];
-  for (const node of nodes) {
-    for (let i = 0; i < k; i++) {
-      stubs.push(node.id);
+  // Use configuration model with retry logic
+  // Keep trying until we successfully create all n*k/2 edges
+  const maxAttempts = 1000;
+  let attempt = 0;
+
+  while (attempt < maxAttempts && edges.length < (n * k) / 2) {
+    attempt++;
+
+    // Clear previous failed attempt
+    if (attempt > 1) {
+      edges.length = 0;
+    }
+
+    // Create stubs (half-edges): each vertex has k stubs
+    const stubs: string[] = [];
+    for (const node of nodes) {
+      for (let i = 0; i < k; i++) {
+        stubs.push(node.id);
+      }
+    }
+
+    // Shuffle stubs randomly
+    for (let i = stubs.length - 1; i > 0; i--) {
+      const j = rng.integer(0, i);
+      [stubs[i], stubs[j]] = [stubs[j], stubs[i]];
+    }
+
+    // Track existing edges to avoid duplicates in simple graphs
+    const existingEdges = new Set<string>();
+
+    // Pair up stubs to create edges
+    let success = true;
+    for (let i = 0; i < stubs.length; i += 2) {
+      const source = stubs[i];
+      const target = stubs[i + 1];
+
+      // Skip self-loops (unless allowed) - fail this attempt
+      if (source === target && spec.selfLoops.kind === "disallowed") {
+        success = false;
+        break;
+      }
+
+      // For simple graphs, check for duplicate edges - fail this attempt
+      const edgeKey = spec.directionality.kind === 'directed'
+        ? `${source}→${target}`
+        : [source, target].sort().join('-');
+
+      if (spec.edgeMultiplicity.kind === 'simple' && existingEdges.has(edgeKey)) {
+        success = false;
+        break;
+      }
+
+      addEdge(edges, source, target, spec, rng);
+
+      if (spec.edgeMultiplicity.kind === 'simple') {
+        existingEdges.add(edgeKey);
+      }
+    }
+
+    // If we successfully created all edges, we're done
+    if (success && edges.length === (n * k) / 2) {
+      break;
     }
   }
 
-  // Shuffle stubs randomly
-  for (let i = stubs.length - 1; i > 0; i--) {
-    const j = rng.integer(0, i);
-    [stubs[i], stubs[j]] = [stubs[j], stubs[i]];
+  // If we failed after max attempts, throw an error
+  if (edges.length < (n * k) / 2) {
+    throw new Error(`Failed to generate ${k}-regular graph after ${maxAttempts} attempts (got ${edges.length} edges, expected ${(n * k) / 2})`);
+  }
+};
+
+/**
+ * Generate flow network edges.
+ * Flow networks have:
+ * - Directed edges from source toward sink
+ * - Weighted edges (capacities)
+ * - Every node on some path from source to sink
+ * - No edges entering source
+ * - No edges leaving sink
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param source
+ * @param sink
+ * @param rng
+ */
+const generateFlowNetworkEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, source: string, sink: string, rng: SeededRandom): void => {
+  const n = nodes.length;
+
+  // Validate source and sink exist
+  const sourceNode = nodes.find(node => node.id === source);
+  const sinkNode = nodes.find(node => node.id === sink);
+
+  if (!sourceNode) {
+    throw new Error(`Source node '${source}' not found in nodes`);
+  }
+  if (!sinkNode) {
+    throw new Error(`Sink node '${sink}' not found in nodes`);
+  }
+  if (source === sink) {
+    throw new Error('Source and sink must be different nodes');
   }
 
-  // Pair up stubs to create edges
-  const existingEdges = new Set<string>();
-  for (let i = 0; i < stubs.length; i += 2) {
-    const source = stubs[i];
-    const target = stubs[i + 1];
+  // Build layers to ensure all nodes lie on source→sink paths
+  // Layer 0: source
+  // Layer 1: intermediate nodes
+  // Layer 2: sink
+  const sourceLayer = new Set<string>([source]);
+  const sinkLayer = new Set<string>([sink]);
+  const intermediateLayer = new Set<string>(
+    nodes.filter(node => node.id !== source && node.id !== sink).map(node => node.id)
+  );
 
-    // Skip self-loops (unless allowed)
-    if (source === target && spec.selfLoops.kind === "disallowed") {
-      continue;
+  // Connect source to intermediate nodes (50-75% connectivity)
+  const sourceConnectivity = 0.5 + rng.next() * 0.25;
+  for (const targetId of intermediateLayer) {
+    if (rng.next() < sourceConnectivity) {
+      edges.push({
+        id: `edge-${source}-${targetId}`,
+        source,
+        target: targetId,
+        directed: true,
+        weight: Math.floor(rng.next() * 10) + 1, // Capacity 1-10
+      });
     }
+  }
 
-    // For simple graphs, skip duplicate edges
-    const edgeKey = spec.directionality.kind === 'directed'
-      ? `${source}→${target}`
-      : [source, target].sort().join('-');
+  // Connect intermediate nodes among themselves (creating paths)
+  const intermediateArray = Array.from(intermediateLayer);
+  if (intermediateArray.length > 1) {
+    // Create a roughly connected structure among intermediate nodes
+    for (let i = 0; i < intermediateArray.length; i++) {
+      const fromId = intermediateArray[i];
 
-    if (spec.edgeMultiplicity.kind === 'simple' && existingEdges.has(edgeKey)) {
-      // Skip this edge if it's a duplicate and we want a simple graph
-      continue;
+      // Connect to next 1-2 nodes to create paths
+      const connections = Math.floor(rng.next() * 2) + 1;
+      for (let j = 1; j <= connections; j++) {
+        const toIndex = (i + j) % intermediateArray.length;
+        const toId = intermediateArray[toIndex];
+
+        // Avoid backward edges (maintain general flow direction)
+        if (rng.next() < 0.7) {
+          edges.push({
+            id: `edge-${fromId}-${toId}`,
+            source: fromId,
+            target: toId,
+            directed: true,
+            weight: Math.floor(rng.next() * 10) + 1,
+          });
+        }
+      }
     }
+  }
 
-    addEdge(edges, source, target, spec, rng);
+  // Connect intermediate nodes to sink (50-75% connectivity)
+  const sinkConnectivity = 0.5 + rng.next() * 0.25;
+  for (const sourceId of intermediateLayer) {
+    if (rng.next() < sinkConnectivity) {
+      edges.push({
+        id: `edge-${sourceId}-${sink}`,
+        source: sourceId,
+        target: sink,
+        directed: true,
+        weight: Math.floor(rng.next() * 10) + 1,
+      });
+    }
+  }
 
-    if (spec.edgeMultiplicity.kind === 'simple') {
-      existingEdges.add(edgeKey);
+  // Also add a direct source→sink edge sometimes (higher capacity)
+  if (rng.next() < 0.3) {
+    edges.push({
+      id: `edge-${source}-${sink}`,
+      source,
+      target: sink,
+      directed: true,
+      weight: Math.floor(rng.next() * 20) + 10, // Higher capacity 10-30
+    });
+  }
+
+  // Ensure minimum edge count for connectivity
+  if (edges.length < n - 1) {
+    // Add more connections from source
+    for (const targetId of intermediateLayer) {
+      const hasEdge = edges.some(e => e.source === source && e.target === targetId);
+      if (!hasEdge) {
+        edges.push({
+          id: `edge-${source}-${targetId}`,
+          source,
+          target: targetId,
+          directed: true,
+          weight: Math.floor(rng.next() * 10) + 1,
+        });
+        if (edges.length >= n - 1) break;
+      }
     }
   }
 };
@@ -1340,6 +1501,9 @@ const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, 
   }
   if (spec.specificRegular?.kind === "k_regular") {
     return; // k-regular graphs have exact structure
+  }
+  if (spec.flowNetwork?.kind === "flow_network") {
+    return; // Flow networks have exact structure
   }
   if (spec.eulerian?.kind === "eulerian" || spec.eulerian?.kind === "semi_eulerian") {
     return; // Eulerian graphs have exact structure
