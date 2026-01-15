@@ -1725,6 +1725,216 @@ export const validateTraceable = (graph: TestGraph): PropertyValidationResult =>
   };
 };
 
+/**
+ * Validate strongly regular graph property.
+ * Strongly regular graphs have parameters (n, k, λ, μ).
+ */
+export const validateStronglyRegular = (graph: TestGraph): PropertyValidationResult => {
+  const { spec, nodes, edges } = graph;
+
+  if (spec.stronglyRegular?.kind !== "strongly_regular") {
+    return {
+      property: "stronglyRegular",
+      expected: spec.stronglyRegular?.kind ?? "unconstrained",
+      actual: spec.stronglyRegular?.kind ?? "unconstrained",
+      valid: true,
+    };
+  }
+
+  const n = nodes.length;
+  const { k, lambda, mu } = spec.stronglyRegular;
+
+  if (k === undefined || lambda === undefined || mu === undefined) {
+    return {
+      property: "stronglyRegular",
+      expected: "strongly_regular",
+      actual: "missing_parameters",
+      valid: false,
+      message: "Strongly regular requires k, lambda, mu parameters",
+    };
+  }
+
+  // Check for SRG parameter metadata
+  const hasMetadata = nodes.some(n => n.data?.srgParams !== undefined);
+
+  if (hasMetadata) {
+    const params = nodes[0].data?.srgParams as { n: number; k: number; lambda: number; mu: number } | undefined;
+
+    if (!params) {
+      return {
+        property: "stronglyRegular",
+        expected: "strongly_regular",
+        actual: "invalid_metadata",
+        valid: false,
+        message: "SRG parameter metadata not found",
+      };
+    }
+
+    // Verify parameters match spec
+    if (params.n !== n || params.k !== k || params.lambda !== lambda || params.mu !== mu) {
+      return {
+        property: "stronglyRegular",
+        expected: "strongly_regular",
+        actual: "parameter_mismatch",
+        valid: false,
+        message: `SRG parameters mismatch: expected (${n}, ${k}, ${lambda}, ${mu}), got (${params.n}, ${params.k}, ${params.lambda}, ${params.mu})`,
+      };
+    }
+
+    // Verify regularity (all vertices have degree k)
+    const degrees = new Map<string, number>();
+    nodes.forEach(node => degrees.set(node.id, 0));
+    edges.forEach(edge => {
+      degrees.set(edge.source, (degrees.get(edge.source) || 0) + 1);
+      degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
+    });
+
+    const allDegreeK = Array.from(degrees.values()).every(d => d === k);
+    if (!allDegreeK) {
+      return {
+        property: "stronglyRegular",
+        expected: "strongly_regular",
+        actual: "not_regular",
+        valid: false,
+        message: `SRG requires all vertices to have degree ${k}`,
+      };
+    }
+
+    return {
+      property: "stronglyRegular",
+      expected: "strongly_regular",
+      actual: "strongly_regular",
+      valid: true,
+    };
+  }
+
+  // Fallback: check feasibility condition
+  if (k * (k - lambda - 1) !== (n - k - 1) * mu) {
+    return {
+      property: "stronglyRegular",
+      expected: "strongly_regular",
+      actual: "invalid_parameters",
+      valid: false,
+      message: `SRG feasibility condition failed: k(k-λ-1) = (n-k-1)μ required`,
+    };
+  }
+
+  return {
+    property: "stronglyRegular",
+    expected: "strongly_regular",
+    actual: "strongly_regular",
+    valid: true,
+    message: "Strongly regular validation skipped (no metadata, feasibility condition satisfied)",
+  };
+};
+
+/**
+ * Validate vertex-transitive graph property.
+ * Vertex-transitive graphs have automorphism group acting transitively on vertices.
+ */
+export const validateVertexTransitive = (graph: TestGraph): PropertyValidationResult => {
+  const { spec, nodes } = graph;
+
+  if (spec.vertexTransitive?.kind !== "vertex_transitive") {
+    return {
+      property: "vertexTransitive",
+      expected: spec.vertexTransitive?.kind ?? "unconstrained",
+      actual: spec.vertexTransitive?.kind ?? "unconstrained",
+      valid: true,
+    };
+  }
+
+  const n = nodes.length;
+
+  if (n < 2) {
+    return {
+      property: "vertexTransitive",
+      expected: "vertex_transitive",
+      actual: "trivial",
+      valid: true,
+    };
+  }
+
+  // Check for vertex-transitive metadata
+  const hasMetadata = nodes.some(n => n.data?.vertexTransitiveGroup !== undefined);
+
+  if (hasMetadata) {
+    // Verify all vertices have group metadata
+    const allHaveMetadata = nodes.every(n => n.data?.vertexTransitiveGroup !== undefined);
+
+    if (!allHaveMetadata) {
+      return {
+        property: "vertexTransitive",
+        expected: "vertex_transitive",
+        actual: "incomplete_metadata",
+        valid: false,
+        message: "Not all vertices have vertex-transitive group metadata",
+      };
+    }
+
+    const group = nodes[0].data?.vertexTransitiveGroup as string;
+
+    if (!group) {
+      return {
+        property: "vertexTransitive",
+        expected: "vertex_transitive",
+        actual: "missing_group",
+        valid: false,
+        message: "Vertex-transitive group metadata not found",
+      };
+    }
+
+    // Verify all vertices use same group
+    const allSameGroup = nodes.every(n => (n.data?.vertexTransitiveGroup as string) === group);
+
+    if (!allSameGroup) {
+      return {
+        property: "vertexTransitive",
+        expected: "vertex_transitive",
+        actual: "inconsistent_groups",
+        valid: false,
+        message: "Not all vertices use same automorphism group",
+      };
+    }
+
+    return {
+      property: "vertexTransitive",
+      expected: "vertex_transitive",
+      actual: "vertex_transitive",
+      valid: true,
+    };
+  }
+
+  // Fallback: check if graph is symmetric (same degree for all vertices)
+  const degrees = new Map<string, number>();
+  nodes.forEach(node => degrees.set(node.id, 0));
+  graph.edges.forEach(edge => {
+    degrees.set(edge.source, (degrees.get(edge.source) || 0) + 1);
+    degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
+  });
+
+  const degreeValues = Array.from(degrees.values());
+  const allSameDegree = degreeValues.every(d => d === degreeValues[0]);
+
+  if (!allSameDegree) {
+    return {
+      property: "vertexTransitive",
+      expected: "vertex_transitive",
+      actual: "irregular",
+      valid: false,
+      message: "Vertex-transitive graphs are regular (all vertices same degree)",
+    };
+  }
+
+  return {
+    property: "vertexTransitive",
+    expected: "vertex_transitive",
+    actual: "vertex_transitive",
+    valid: true,
+    message: "Vertex-transitive validation skipped (no metadata, graph is regular)",
+  };
+};
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================

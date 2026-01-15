@@ -1811,5 +1811,154 @@ describe('Phase 5: Advanced Structural Graph Generators', () => {
       }
     });
   });
+
+  describe('Strongly Regular graphs', () => {
+    it('should generate strongly regular graph with parameters (n, k, λ, μ)', () => {
+      // Using C5 as example: (5, 2, 0, 1)
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'connected' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'moderate' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        stronglyRegular: { kind: 'strongly_regular', k: 2, lambda: 0, mu: 1 },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 5, seed: 42 });
+      expect(result.nodes).toHaveLength(5);
+
+      // Verify all vertices have SRG parameter metadata
+      result.nodes.forEach(node => {
+        expect(node.data?.srgParams).toBeDefined();
+        if (node.data?.srgParams) {
+          const params = node.data.srgParams as { n: number; k: number; lambda: number; mu: number };
+          expect(params.n).toBe(5);
+          expect(params.k).toBe(2);
+          expect(params.lambda).toBe(0);
+          expect(params.mu).toBe(1);
+        }
+      });
+
+      // Verify regularity (all vertices have degree k=2)
+      const degrees = new Map<string, number>();
+      result.nodes.forEach(node => degrees.set(node.id, 0));
+      result.edges.forEach(edge => {
+        degrees.set(edge.source, (degrees.get(edge.source) || 0) + 1);
+        degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
+      });
+
+      const allDegreeTwo = Array.from(degrees.values()).every(d => d === 2);
+      expect(allDegreeTwo).toBe(true);
+    });
+
+    it('should validate SRG feasibility condition', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'connected' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'moderate' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        stronglyRegular: { kind: 'strongly_regular', k: 2, lambda: 0, mu: 1 },
+      };
+
+      // Should not throw for valid parameters (C5: k(k-λ-1) = 2(2-0-1) = 2, (n-k-1)μ = (5-2-1)(1) = 2)
+      expect(() => generateGraph(spec, { nodeCount: 5, seed: 42 })).not.toThrow();
+    });
+
+    it('should reject invalid SRG parameters', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'connected' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'moderate' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        stronglyRegular: { kind: 'strongly_regular', k: 3, lambda: 1, mu: 1 }, // Invalid for n=5
+      };
+
+      // Should throw for invalid parameters
+      expect(() => generateGraph(spec, { nodeCount: 5, seed: 42 })).toThrow();
+    });
+  });
+
+  describe('Vertex-Transitive graphs', () => {
+    it('should generate vertex-transitive graph using cyclic group', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'connected' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'moderate' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        vertexTransitive: { kind: 'vertex_transitive' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 8, seed: 42 });
+      expect(result.nodes).toHaveLength(8);
+      expect(result.edges.length).toBeGreaterThan(0);
+
+      // Verify all vertices have vertex-transitive metadata
+      result.nodes.forEach(node => {
+        expect(node.data?.vertexTransitiveGroup).toBeDefined();
+        expect(node.data?.vertexTransitiveGroup).toBe('cyclic');
+      });
+
+      // Verify graph is regular (all vertices same degree)
+      const degrees = new Map<string, number>();
+      result.nodes.forEach(node => degrees.set(node.id, 0));
+      result.edges.forEach(edge => {
+        degrees.set(edge.source, (degrees.get(edge.source) || 0) + 1);
+        degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
+      });
+
+      const degreeValues = Array.from(degrees.values());
+      const allSameDegree = degreeValues.every(d => d === degreeValues[0]);
+      expect(allSameDegree).toBe(true);
+    });
+
+    it('should generate vertex-transitive graph for even n with opposite connections', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'connected' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'moderate' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        vertexTransitive: { kind: 'vertex_transitive' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 6, seed: 42 });
+      expect(result.nodes).toHaveLength(6);
+
+      // For even n, should have connections to opposite vertices
+      // Each vertex should have degree at least 2 (next + opposite)
+      const degrees = new Map<string, number>();
+      result.nodes.forEach(node => degrees.set(node.id, 0));
+      result.edges.forEach(edge => {
+        degrees.set(edge.source, (degrees.get(edge.source) || 0) + 1);
+        degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
+      });
+
+      const minDegree = Math.min(...Array.from(degrees.values()));
+      expect(minDegree).toBeGreaterThanOrEqual(2);
+    });
+  });
 });
 

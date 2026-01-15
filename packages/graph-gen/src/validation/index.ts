@@ -45,7 +45,9 @@ export {
   validateUnitDisk,
   validatePlanar,
   validateHamiltonian,
-  validateTraceable
+  validateTraceable,
+  validateStronglyRegular,
+  validateVertexTransitive
 } from './structural-validators';
 
 // Export degree validators

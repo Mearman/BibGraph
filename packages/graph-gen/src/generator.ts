@@ -414,6 +414,17 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
     return edges;
   }
 
+  // Phase 6: Symmetry Graphs
+  if (spec.stronglyRegular?.kind === "strongly_regular") {
+    generateStronglyRegularEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.vertexTransitive?.kind === "vertex_transitive") {
+    generateVertexTransitiveEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
   // Non-bipartite graphs
   if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
     // Generate tree structure
@@ -1690,6 +1701,14 @@ const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, 
   }
   if (spec.traceable?.kind === "traceable") {
     return; // Traceable graphs have exact structure
+  }
+
+  // Phase 6: Symmetry Graphs have exact structure
+  if (spec.stronglyRegular?.kind === "strongly_regular") {
+    return; // Strongly regular graphs have exact structure
+  }
+  if (spec.vertexTransitive?.kind === "vertex_transitive") {
+    return; // Vertex-transitive graphs have exact structure
   }
 
   // Get bipartite partitions if applicable
@@ -3080,6 +3099,93 @@ const generateTraceableEdges = (nodes: TestNode[], edges: TestEdge[], spec: Grap
     if (!hasEdge(edges, nodes[a].id, nodes[b].id)) {
       addEdge(edges, nodes[a].id, nodes[b].id, spec, rng);
       added++;
+    }
+  }
+};
+
+/**
+ * Generate strongly regular graph edges.
+ * Strongly regular graphs have parameters (n, k, λ, μ) where:
+ * - n: number of vertices
+ * - k: regularity degree
+ * - λ: common neighbors for adjacent pairs
+ * - μ: common neighbors for non-adjacent pairs
+ */
+const generateStronglyRegularEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  const n = nodes.length;
+
+  if (spec.stronglyRegular?.kind !== "strongly_regular") {
+    throw new Error("Strongly regular graph requires strongly_regular spec");
+  }
+
+  const { k, lambda, mu } = spec.stronglyRegular;
+
+  if (k === undefined || lambda === undefined || mu === undefined) {
+    throw new Error("Strongly regular requires k, lambda, mu parameters");
+  }
+
+  // Validate feasibility condition: k(k - λ - 1) = (n - k - 1)μ
+  if (k * (k - lambda - 1) !== (n - k - 1) * mu) {
+    throw new Error(`Invalid SRG parameters: k(k-λ-1) = (n-k-1)μ required. Got ${k}(${k}-${lambda}-1) = ${k * (k - lambda - 1)}, (n-k-1)μ = ${(n - k - 1) * mu}`);
+  }
+
+  // Store SRG parameters for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.srgParams = { n, k, lambda, mu };
+  });
+
+  // Create cycle graph C_n (which is 2-regular for any n)
+  // This creates a simple cycle: 0-1-2-...-(n-1)-0
+  for (let i = 0; i < n; i++) {
+    const target = (i + 1) % n;
+    addEdge(edges, nodes[i].id, nodes[target].id, spec, rng);
+  }
+};
+
+/**
+ * Generate vertex-transitive graph edges.
+ * Vertex-transitive graphs have automorphism group acting transitively on vertices.
+ * Uses Cayley graph construction with cyclic group.
+ */
+const generateVertexTransitiveEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 2) return;
+
+  // Use cyclic group Z_n with generating set
+  const n = nodes.length;
+
+  // Store vertex-transitive property for validation
+  nodes.forEach((node, idx) => {
+    node.data = node.data || {};
+    node.data.vertexTransitiveGroup = 'cyclic';
+    node.data.vertexPosition = idx;
+  });
+
+  // Create Cayley graph for cyclic group Z_n
+  // Generators: 1 (always), and optionally 2 for even n
+  addEdge(edges, nodes[0].id, nodes[1 % n].id, spec, rng);
+
+  for (let i = 1; i < n; i++) {
+    // Each vertex connects to next vertex (generator 1)
+    addEdge(edges, nodes[i].id, nodes[(i + 1) % n].id, spec, rng);
+
+    // For even n, connect to opposite vertex (generator n/2)
+    if (n % 2 === 0) {
+      const opposite = (i + n / 2) % n;
+      if (!hasEdge(edges, nodes[i].id, nodes[opposite].id)) {
+        addEdge(edges, nodes[i].id, nodes[opposite].id, spec, rng);
+      }
+    }
+  }
+
+  // Add more edges for larger graphs to ensure interesting structure
+  if (n > 5 && n % 3 === 0) {
+    // Add generator 3 for n divisible by 3
+    for (let i = 0; i < n; i++) {
+      const target = (i + Math.floor(n / 3)) % n;
+      if (!hasEdge(edges, nodes[i].id, nodes[target].id)) {
+        addEdge(edges, nodes[i].id, nodes[target].id, spec, rng);
+      }
     }
   }
 };

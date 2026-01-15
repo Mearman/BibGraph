@@ -37,7 +37,9 @@ import {
   validateUnitDisk,
   validatePlanar,
   validateHamiltonian,
-  validateTraceable} from './validation';
+  validateTraceable,
+  validateStronglyRegular,
+  validateVertexTransitive} from './validation';
 
 /**
  * Validate that a generated graph actually has its claimed properties.
@@ -88,6 +90,8 @@ export const validateGraphProperties = (graph: TestGraph): GraphValidationResult
   results.push(validatePlanar(graph));
   results.push(validateHamiltonian(graph));
   results.push(validateTraceable(graph));
+  results.push(validateStronglyRegular(graph));
+  results.push(validateVertexTransitive(graph));
   results.push(validateRegularGraph(graph));
   results.push(validateEulerian(graph));
   results.push(validateKVertexConnected(graph));
