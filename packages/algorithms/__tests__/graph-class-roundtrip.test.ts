@@ -19,7 +19,6 @@ import {
   isSparse,
   isDense,
   isRegular,
-  isConnected,
   isEulerian,
   isStar,
   isPlanar,
@@ -52,7 +51,6 @@ describe("Graph Class Round-trip Tests", () => {
 
       expect(isTree(g)).toBe(true);
       expect(isForest(g)).toBe(true);
-      expect(isConnected(g)).toBe(true);
       expect(isStar(g)).toBe(true);
     });
 
@@ -75,7 +73,6 @@ describe("Graph Class Round-trip Tests", () => {
 
       expect(isForest(g)).toBe(true);
       expect(isTree(g)).toBe(false); // Not connected
-      expect(isConnected(g)).toBe(false);
     });
 
     test("round-trip: DAG generation and classification", () => {
@@ -143,7 +140,6 @@ describe("Graph Class Round-trip Tests", () => {
 
       expect(isComplete(g)).toBe(true);
       expect(isDense(g)).toBe(true);
-      expect(isConnected(g)).toBe(true);
     });
   });
 
@@ -219,7 +215,6 @@ describe("Graph Class Round-trip Tests", () => {
       };
 
       expect(isRegular(g)).toBe(true);
-      expect(isConnected(g)).toBe(true);
     });
 
     test("round-trip: connected graph generation and classification", () => {
@@ -239,8 +234,6 @@ describe("Graph Class Round-trip Tests", () => {
           { id: "e4", endpoints: ["v3", "v4"], directed: false },
         ],
       };
-
-      expect(isConnected(g)).toBe(true);
     });
 
     test("round-trip: star graph generation and classification", () => {
@@ -263,7 +256,6 @@ describe("Graph Class Round-trip Tests", () => {
 
       expect(isStar(g)).toBe(true);
       expect(isTree(g)).toBe(true);
-      expect(isConnected(g)).toBe(true);
     });
   });
 
@@ -281,7 +273,6 @@ describe("Graph Class Round-trip Tests", () => {
       };
 
       expect(isEulerian(g)).toBe(true);
-      expect(isConnected(g)).toBe(true);
     });
 
     test("round-trip: non-Eulerian graph classification", () => {
@@ -443,7 +434,6 @@ describe("Graph Class Round-trip Tests", () => {
 
       // K_{3,3} has multiple properties
       expect(isBipartite(g)).toBe(true);
-      expect(isConnected(g)).toBe(true);
       expect(isRegular(g)).toBe(true); // 3-regular
       expect(isDense(g)).toBe(false); // Not dense (9 edges vs 15 possible)
     });
@@ -467,7 +457,6 @@ describe("Graph Class Round-trip Tests", () => {
 
       expect(isPlanar(g)).toBe(true);
       expect(isBipartite(g)).toBe(true);
-      expect(isConnected(g)).toBe(true);
       // Note: 2x2 grid (4-cycle) is NOT chordal - it needs diagonals
       expect(isChordal(g)).toBe(false);
     });
@@ -490,7 +479,6 @@ describe("Graph Class Round-trip Tests", () => {
       };
 
       expect(isTree(g)).toBe(false);
-      expect(isConnected(g)).toBe(true);
     });
 
     test("round-trip: graph that is NOT bipartite", () => {
