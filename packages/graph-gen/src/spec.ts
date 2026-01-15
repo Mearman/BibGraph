@@ -464,6 +464,22 @@ export type LexicographicProduct =
   | { kind: "unconstrained" };
 
 // ============================================================================
+// MINOR-FREE GRAPHS
+// ============================================================================
+
+/** Minor-free: excludes specific graph minors (Kuratowski-Wagner theorem) */
+export type MinorFree =
+  | { kind: "minor_free"; forbiddenMinors: string[] }
+  | { kind: "not_minor_free" }
+  | { kind: "unconstrained" };
+
+/** Topological minor-free: excludes specific subdivisions */
+export type TopologicalMinorFree =
+  | { kind: "topological_minor_free"; forbiddenMinors: string[] }
+  | { kind: "not_topological_minor_free" }
+  | { kind: "unconstrained" };
+
+// ============================================================================
 // SPECIAL BIPARTITE PROPERTIES
 // ============================================================================
 
@@ -741,6 +757,10 @@ export type GraphSpec = Readonly<{
   strongProduct?: StrongProduct;
   lexicographicProduct?: LexicographicProduct;
 
+  // Minor-free graphs
+  minorFree?: MinorFree;
+  topologicalMinorFree?: TopologicalMinorFree;
+
   // Special bipartite properties
   completeBipartite?: CompleteBipartite;
 
@@ -817,6 +837,7 @@ export type GraphSpecPatch = Partial<Omit<GraphSpec,
   "toughness" | "integrity" |
   "cage" | "moore" | "ramanujan" |
   "cartesianProduct" | "tensorProduct" | "strongProduct" | "lexicographicProduct" |
+  "minorFree" | "topologicalMinorFree" |
   "completeBipartite"
 >>;
 
