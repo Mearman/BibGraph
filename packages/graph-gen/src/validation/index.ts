@@ -54,7 +54,10 @@ export {
   validateRadius,
   validateGirth,
   validateCircumference,
-  validateHereditaryClass
+  validateHereditaryClass,
+  validateIndependenceNumber,
+  validateVertexCover,
+  validateDominationNumber
 } from './structural-validators';
 
 // Export degree validators
