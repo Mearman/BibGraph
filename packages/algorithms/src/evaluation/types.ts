@@ -20,6 +20,9 @@ export interface PropertyValidationResult {
 
 /**
  * Complete evaluation results for a single experiment.
+ *
+ * Note: The experiment runner uses flexible metric storage (Record<string, number>)
+ * to support different metric combinations without rigid schema requirements.
  */
 export interface EvaluationResult {
   /** Spearman's ρ correlation */
@@ -48,11 +51,17 @@ export interface EvaluationResult {
 }
 
 /**
+ * Flexible metric results storage.
+ * Used by experiment runner for dynamic metric collection.
+ */
+export type MetricResults = Record<string, number>;
+
+/**
  * Comparison between methods.
  */
 export interface MethodComparison {
   method: string;
-  results: EvaluationResult;
+  results: MetricResults;
   runtime: number;
 }
 
@@ -60,12 +69,12 @@ export interface MethodComparison {
  * Statistical test result.
  */
 export interface StatisticalTestResult {
-  test: string;
-  method1: string;
-  method2: string;
+  type: string;
+  comparison: string;
   pValue: number;
   significant: boolean;
-  effectSize?: number;
+  statistic?: number;
+  ci?: { lower: number; upper: number };
 }
 
 /**
@@ -78,4 +87,5 @@ export interface ExperimentReport {
   statisticalTests: StatisticalTestResult[];
   winner: string;
   timestamp: string;
+  duration?: number;
 }

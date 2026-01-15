@@ -66,3 +66,23 @@ export {
   glassDelta,
   rankBiserialCorrelation,
 } from './statistics';
+
+// Export experiment runner
+export type {
+  GraphSpec,
+  MethodConfig,
+  ExperimentConfig,
+  FullExperimentConfig,
+  MetricType,
+  StatisticalTestType,
+  PathRanker,
+} from './runner';
+
+export {
+  runExperiment,
+  runCrossValidation,
+  generateMarkdownReport,
+  generateLatexTable,
+  generateJSONSummary,
+  generateHTMLReport,
+} from './runner';
