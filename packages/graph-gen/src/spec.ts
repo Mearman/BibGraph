@@ -362,6 +362,25 @@ export type HereditaryClass =
   | { kind: "unconstrained" };
 
 // ============================================================================
+// NUMERICAL INVARIANTS
+// ============================================================================
+
+/** Independence number (α): size of largest independent set */
+export type IndependenceNumber =
+  | { kind: "independence_number"; value: number }
+  | { kind: "unconstrained" };
+
+/** Vertex cover number (τ): minimum vertices covering all edges */
+export type VertexCover =
+  | { kind: "vertex_cover"; value: number }
+  | { kind: "unconstrained" };
+
+/** Domination number (γ): minimum vertices dominating all others */
+export type DominationNumber =
+  | { kind: "domination_number"; value: number }
+  | { kind: "unconstrained" };
+
+// ============================================================================
 // SPECIAL BIPARTITE PROPERTIES
 // ============================================================================
 
@@ -614,6 +633,11 @@ export type GraphSpec = Readonly<{
   // Forbidden induced subgraphs
   hereditaryClass?: HereditaryClass;
 
+  // Numerical invariants
+  independenceNumber?: IndependenceNumber;
+  vertexCover?: VertexCover;
+  dominationNumber?: DominationNumber;
+
   // Special bipartite properties
   completeBipartite?: CompleteBipartite;
 
@@ -685,6 +709,7 @@ export type GraphSpecPatch = Partial<Omit<GraphSpec,
   "cubic" | "specificRegular" | "stronglyRegular" |
   "selfComplementary" | "vertexTransitive" | "edgeTransitive" | "arcTransitive" |
   "diameter" | "radius" | "girth" | "circumference" | "hereditaryClass" |
+  "independenceNumber" | "vertexCover" | "dominationNumber" |
   "completeBipartite"
 >>;
 
