@@ -309,6 +309,59 @@ export type VertexTransitive =
   | { kind: "unconstrained" };
 
 // ============================================================================
+// SYMMETRY REFINEMENTS (edge-transitive, arc-transitive)
+// ============================================================================
+
+/** Edge-transitive property (automorphisms can map any edge to any other) */
+export type EdgeTransitive =
+  | { kind: "edge_transitive" }
+  | { kind: "not_edge_transitive" }
+  | { kind: "unconstrained" };
+
+/** Arc-transitive property (both vertex AND edge transitive - symmetric graphs) */
+export type ArcTransitive =
+  | { kind: "arc_transitive" }
+  | { kind: "not_arc_transitive" }
+  | { kind: "unconstrained" };
+
+// ============================================================================
+// DIAMETER-BASED PROPERTIES
+// ============================================================================
+
+/** Longest shortest path in graph */
+export type Diameter =
+  | { kind: "diameter"; value: number }
+  | { kind: "unconstrained" };
+
+/** Minimum eccentricity among all vertices */
+export type Radius =
+  | { kind: "radius"; value: number }
+  | { kind: "unconstrained" };
+
+// ============================================================================
+// GIRTH & CIRCUMFERENCE
+// ============================================================================
+
+/** Length of shortest cycle */
+export type Girth =
+  | { kind: "girth"; girth: number }
+  | { kind: "unconstrained" };
+
+/** Length of longest cycle */
+export type Circumference =
+  | { kind: "circumference"; value: number }
+  | { kind: "unconstrained" };
+
+// ============================================================================
+// FORBIDDEN INDUCED SUBGRAPHS
+// ============================================================================
+
+/** Hereditary class with forbidden induced subgraphs */
+export type HereditaryClass =
+  | { kind: "hereditary_class"; forbidden: readonly string[] }
+  | { kind: "unconstrained" };
+
+// ============================================================================
 // SPECIAL BIPARTITE PROPERTIES
 // ============================================================================
 
@@ -547,6 +600,19 @@ export type GraphSpec = Readonly<{
   // Symmetry properties
   selfComplementary?: SelfComplementary;
   vertexTransitive?: VertexTransitive;
+  edgeTransitive?: EdgeTransitive;
+  arcTransitive?: ArcTransitive;
+
+  // Diameter-based properties
+  diameter?: Diameter;
+  radius?: Radius;
+
+  // Girth & circumference
+  girth?: Girth;
+  circumference?: Circumference;
+
+  // Forbidden induced subgraphs
+  hereditaryClass?: HereditaryClass;
 
   // Special bipartite properties
   completeBipartite?: CompleteBipartite;
@@ -617,7 +683,8 @@ export type GraphSpecPatch = Partial<Omit<GraphSpec,
   "hamiltonian" | "traceable" |
   "perfect" | "split" | "cograph" | "threshold" | "line" | "clawFree" |
   "cubic" | "specificRegular" | "stronglyRegular" |
-  "selfComplementary" | "vertexTransitive" |
+  "selfComplementary" | "vertexTransitive" | "edgeTransitive" | "arcTransitive" |
+  "diameter" | "radius" | "girth" | "circumference" | "hereditaryClass" |
   "completeBipartite"
 >>;
 
