@@ -461,6 +461,22 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
     return edges;
   }
 
+  // Phase 2: Numerical Invariants
+  if (spec.independenceNumber?.kind === "independence_number") {
+    generateIndependenceNumberEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.vertexCover?.kind === "vertex_cover") {
+    generateVertexCoverEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.dominationNumber?.kind === "domination_number") {
+    generateDominationNumberEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
   // Non-bipartite graphs
   if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
     // Generate tree structure
@@ -3603,6 +3619,180 @@ const generateHereditaryClassEdges = (nodes: TestNode[], edges: TestEdge[], spec
   // NOTE: Full hereditary class validation requires checking all induced subgraphs
   // against forbidden patterns. This is computationally expensive and done in validation.
   // The generator creates a random graph; the validator ensures hereditary property.
+};
+
+/**
+ * Generate graph with specified independence number.
+ * Independence number α is the size of the largest independent set (no two vertices adjacent).
+ * Uses greedy construction to create independent set of exact size α.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
+ */
+const generateIndependenceNumberEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (spec.independenceNumber?.kind !== "independence_number") {
+    throw new Error("Independence number graph requires independence_number spec");
+  }
+
+  const { value: targetAlpha } = spec.independenceNumber;
+
+  if (targetAlpha > nodes.length) {
+    throw new Error(`Independence number ${targetAlpha} cannot exceed node count ${nodes.length}`);
+  }
+
+  // Store independence number for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetIndependenceNumber = targetAlpha;
+  });
+
+  // Select α vertices to form the maximum independent set
+  const independentIndices: number[] = [];
+  const remainingIndices = nodes.map((_, i) => i);
+
+  // Randomly select α vertices for the independent set
+  for (let i = 0; i < targetAlpha; i++) {
+    const idx = Math.floor(rng.next() * remainingIndices.length);
+    independentIndices.push(remainingIndices[idx]);
+    remainingIndices.splice(idx, 1);
+  }
+
+  // Mark independent vertices
+  independentIndices.forEach(i => {
+    nodes[i].data = nodes[i].data || {};
+    nodes[i].data.independentSet = true;
+  });
+
+  // Create edges: no edges within independent set, all other edges allowed
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      // Skip edges between independent vertices
+      if (independentIndices.includes(i) && independentIndices.includes(j)) {
+        continue;
+      }
+
+      // Add edges between all other pairs
+      addEdge(edges, nodes[i].id, nodes[j].id, spec, rng);
+    }
+  }
+};
+
+/**
+ * Generate graph with specified vertex cover number.
+ * Vertex cover number τ is the minimum vertices covering all edges.
+ * Uses complement of maximum independent set (Kőnig's theorem: τ + α = n for bipartite).
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
+ */
+const generateVertexCoverEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (spec.vertexCover?.kind !== "vertex_cover") {
+    throw new Error("Vertex cover graph requires vertex_cover spec");
+  }
+
+  const { value: targetTau } = spec.vertexCover;
+
+  if (targetTau > nodes.length) {
+    throw new Error(`Vertex cover number ${targetTau} cannot exceed node count ${nodes.length}`);
+  }
+
+  // Store vertex cover number for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetVertexCover = targetTau;
+  });
+
+  // By complement of independent set: α = n - τ
+  const independenceNumber = nodes.length - targetTau;
+
+  // Select (n - τ) vertices to remove from consideration, leaving τ vertices for the cover
+  const remainingIndices = nodes.map((_, i) => i);
+
+  for (let i = 0; i < independenceNumber; i++) {
+    const idx = Math.floor(rng.next() * remainingIndices.length);
+    remainingIndices.splice(idx, 1);
+  }
+
+  // The remaining vertices form the minimum vertex cover
+  const coverIndices = remainingIndices;
+
+  // Mark cover vertices
+  coverIndices.forEach(i => {
+    nodes[i].data = nodes[i].data || {};
+    nodes[i].data.vertexCover = true;
+  });
+
+  // Create edges: all edges must be incident to cover vertices
+  // This means no edge between two non-cover (independent) vertices
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      // Skip edges between two independent vertices (neither in cover)
+      if (!coverIndices.includes(i) && !coverIndices.includes(j)) {
+        continue;
+      }
+
+      // Add all other edges (at least one endpoint in cover)
+      addEdge(edges, nodes[i].id, nodes[j].id, spec, rng);
+    }
+  }
+};
+
+/**
+ * Generate graph with specified domination number.
+ * Domination number γ is the minimum vertices such that every vertex is either
+ * in the dominating set or adjacent to a vertex in the set.
+ * Uses star-like construction: dominating vertices connected to all others.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
+ */
+const generateDominationNumberEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (spec.dominationNumber?.kind !== "domination_number") {
+    throw new Error("Domination number graph requires domination_number spec");
+  }
+
+  const { value: targetGamma } = spec.dominationNumber;
+
+  if (targetGamma > nodes.length) {
+    throw new Error(`Domination number ${targetGamma} cannot exceed node count ${nodes.length}`);
+  }
+
+  // Store domination number for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetDominationNumber = targetGamma;
+  });
+
+  // Select γ vertices to form the minimum dominating set
+  const dominatingIndices: number[] = [];
+  const remainingIndices = nodes.map((_, i) => i);
+
+  for (let i = 0; i < targetGamma; i++) {
+    const idx = Math.floor(rng.next() * remainingIndices.length);
+    dominatingIndices.push(remainingIndices[idx]);
+    remainingIndices.splice(idx, 1);
+  }
+
+  // Mark dominating vertices
+  dominatingIndices.forEach(i => {
+    nodes[i].data = nodes[i].data || {};
+    nodes[i].data.dominatingSet = true;
+  });
+
+  // Create star-like structure: all dominating vertices connect to all non-dominating vertices
+  // Non-dominating vertices have no edges between themselves
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      // At least one endpoint must be in dominating set
+      if (dominatingIndices.includes(i) || dominatingIndices.includes(j)) {
+        addEdge(edges, nodes[i].id, nodes[j].id, spec, rng);
+      }
+      // No edges between two non-dominating vertices
+    }
+  }
 };
 
 /**
