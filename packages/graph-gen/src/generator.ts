@@ -2451,6 +2451,10 @@ const generateClawFreeEdges = (nodes: TestNode[], edges: TestEdge[], spec: Graph
  * Generate chordal graph edges.
  * Chordal graphs have no induced cycles > 3 (all cycles have chords).
  * Algorithm: Use k-tree construction (simplified treewidth).
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generateChordalEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 3) {
@@ -2492,6 +2496,10 @@ const generateChordalEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphS
  * Generate interval graph edges.
  * Interval graphs = intersection graphs of intervals on real line.
  * Algorithm: Generate random intervals, connect if they intersect.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generateIntervalEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 2) return;
@@ -2527,6 +2535,10 @@ const generateIntervalEdges = (nodes: TestNode[], edges: TestEdge[], spec: Graph
  * Generate permutation graph edges.
  * Permutation graphs = intersection graphs of line segments between parallel lines.
  * Algorithm: Generate permutation π, create edge (i, j) iff (i - j)(π(i) - π(j)) < 0.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generatePermutationEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   const n = nodes.length;
@@ -2561,6 +2573,10 @@ const generatePermutationEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gr
  * Generate comparability graph edges.
  * Comparability graphs = transitively orientable graphs (from partial orders).
  * Algorithm: Generate random DAG, create undirected graph from transitive reduction.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generateComparabilityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 2) return;
@@ -2594,6 +2610,10 @@ const generateComparabilityEdges = (nodes: TestNode[], edges: TestEdge[], spec: 
  * Generate perfect graph edges.
  * Perfect graphs = ω(H) = χ(H) for all induced subgraphs H.
  * Algorithm: Generate graphs known to be perfect (chordal, bipartite, cograph).
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generatePerfectEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 2) return;
@@ -2626,6 +2646,10 @@ const generatePerfectEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphS
 /**
  * Generate scale-free graph edges (Barabási-Albert preferential attachment).
  * Scale-free graphs have power-law degree distribution.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generateScaleFreeEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 3) return;
@@ -2650,7 +2674,7 @@ const generateScaleFreeEdges = (nodes: TestNode[], edges: TestEdge[], spec: Grap
 
   // Add remaining vertices with preferential attachment
   for (let i = initialCoreSize; i < nodes.length; i++) {
-    const totalDegree = Array.from(degrees.values()).reduce((a, b) => a + Math.pow(b, exponent), 0);
+    const totalDegree = [...degrees.values()].reduce((a, b) => a + Math.pow(b, exponent), 0);
     const targetCount = Math.min(3, initialCoreSize);
 
     for (let t = 0; t < targetCount; t++) {
@@ -2687,6 +2711,10 @@ const generateScaleFreeEdges = (nodes: TestNode[], edges: TestEdge[], spec: Grap
 /**
  * Generate small-world graph edges (Watts-Strogatz model).
  * Small-world graphs have high clustering + short paths.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generateSmallWorldEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 4) return;
@@ -2709,7 +2737,7 @@ const generateSmallWorldEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gra
     if (rng.next() < rewireProb) {
       // Remove edge
       const idx = edges.indexOf(edge);
-      if (idx > -1) edges.splice(idx, 1);
+      if (idx !== -1) edges.splice(idx, 1);
 
       // Add new random edge (avoid duplicates and self-loops)
       const sourceIdx = nodes.findIndex(n => n.id === edge.source);
@@ -2743,6 +2771,10 @@ const generateSmallWorldEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gra
 /**
  * Generate modular graph edges (community structure).
  * Modular graphs have dense communities + sparse inter-community edges.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generateModularEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 3) return;
@@ -2754,7 +2786,7 @@ const generateModularEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphS
   // Assign communities
   const communities: TestNode[][] = Array.from({ length: numCommunities }, () => []);
   nodes.forEach((node, i) => {
-    const comm = i % numCommunities!;
+    const comm = i % numCommunities;
     communities[comm].push(node);
     node.data = node.data || {};
     node.data.community = comm;
@@ -2796,6 +2828,10 @@ const generateModularEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphS
 /**
  * Generate line graph edges.
  * Line graph L(G) has vertices representing edges of G, with adjacency when edges share a vertex.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generateLineGraphEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 2) return;
@@ -2852,8 +2888,14 @@ const generateLineGraphEdges = (nodes: TestNode[], edges: TestEdge[], spec: Grap
 /**
  * Generate self-complementary graph edges.
  * Self-complementary graph is isomorphic to its complement.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
+ * @param _spec
+ * @param _rng
  */
-const generateSelfComplementaryEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+const generateSelfComplementaryEdges = (nodes: TestNode[], edges: TestEdge[], _spec: GraphSpec, _rng: SeededRandom): void => {
   const n = nodes.length;
 
   // Self-complementary requires n ≡ 0 or 1 (mod 4)
@@ -2911,6 +2953,10 @@ const generateSelfComplementaryEdges = (nodes: TestNode[], edges: TestEdge[], sp
  * Generate threshold graph edges.
  * Threshold graphs are both split and cograph, built by iteratively adding
  * vertices as either dominant (connected to all existing) or isolated (connected to none).
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generateThresholdEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 2) return;
@@ -2940,6 +2986,10 @@ const generateThresholdEdges = (nodes: TestNode[], edges: TestEdge[], spec: Grap
  * Generate unit disk graph edges.
  * Unit disk graphs are created by placing points in a plane and connecting
  * points within a specified distance (unit radius).
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generateUnitDiskEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   const unitRadius = spec.unitDisk?.kind === "unit_disk" && spec.unitDisk.unitRadius !== undefined
@@ -2979,6 +3029,10 @@ const generateUnitDiskEdges = (nodes: TestNode[], edges: TestEdge[], spec: Graph
  * Generate planar graph edges.
  * Planar graphs can be drawn in the plane without edge crossings.
  * Uses incremental construction starting from a cycle.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generatePlanarEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 4) {
@@ -3021,6 +3075,10 @@ const generatePlanarEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSp
 /**
  * Generate Hamiltonian graph edges.
  * Hamiltonian graphs contain a cycle visiting all vertices exactly once.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generateHamiltonianEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 3) return;
@@ -3061,6 +3119,10 @@ const generateHamiltonianEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gr
 /**
  * Generate traceable graph edges.
  * Traceable graphs contain a Hamiltonian path (visiting all vertices exactly once).
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generateTraceableEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 2) return;
@@ -3110,6 +3172,10 @@ const generateTraceableEdges = (nodes: TestNode[], edges: TestEdge[], spec: Grap
  * - k: regularity degree
  * - λ: common neighbors for adjacent pairs
  * - μ: common neighbors for non-adjacent pairs
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generateStronglyRegularEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   const n = nodes.length;
@@ -3147,6 +3213,10 @@ const generateStronglyRegularEdges = (nodes: TestNode[], edges: TestEdge[], spec
  * Generate vertex-transitive graph edges.
  * Vertex-transitive graphs have automorphism group acting transitively on vertices.
  * Uses Cayley graph construction with cyclic group.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
  */
 const generateVertexTransitiveEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 2) return;

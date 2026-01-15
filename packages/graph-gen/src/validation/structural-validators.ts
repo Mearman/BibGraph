@@ -1,4 +1,4 @@
-import type { TestGraph, TestNode, TestEdge } from '../generator';
+import type { TestEdge,TestGraph, TestNode } from '../generator';
 import { checkBipartiteWithBFS, findComponentsForDensity } from './helper-functions';
 import type { PropertyValidationResult } from './types';
 
@@ -565,7 +565,7 @@ export const validateClawFree = (graph: TestGraph): PropertyValidationResult => 
 
   // Check each vertex as potential claw center
   for (const center of nodes) {
-    const neighbors = Array.from(adjacency.get(center.id) || []);
+    const neighbors = [...adjacency.get(center.id) || []];
 
     if (neighbors.length < 3) continue;
 
@@ -611,6 +611,7 @@ export const validateClawFree = (graph: TestGraph): PropertyValidationResult => 
 /**
  * Validates chordal graph property.
  * Chordal graphs have no induced cycles > 3 (all cycles have chords).
+ * @param graph
  */
 export const validateChordal = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
@@ -679,6 +680,7 @@ export const validateChordal = (graph: TestGraph): PropertyValidationResult => {
 /**
  * Validates interval graph property.
  * Interval graphs = intersection graphs of intervals on real line.
+ * @param graph
  */
 export const validateInterval = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
@@ -706,8 +708,8 @@ export const validateInterval = (graph: TestGraph): PropertyValidationResult => 
   if (hasIntervalData) {
     const intervals = nodes.map(node => ({
       node,
-      start: (node.data!.interval as { start: number; end: number; length: number }).start,
-      end: (node.data!.interval as { start: number; end: number; length: number }).end,
+      start: (node.data?.interval as { start: number; end: number; length: number } | undefined)?.start ?? 0,
+      end: (node.data?.interval as { start: number; end: number; length: number } | undefined)?.end ?? 0,
     }));
 
     // Verify edges match interval intersections
@@ -764,6 +766,7 @@ export const validateInterval = (graph: TestGraph): PropertyValidationResult => 
 /**
  * Validates permutation graph property.
  * Permutation graphs = graphs from permutation π with edge (i,j) iff (i-j)(π(i)-π(j)) < 0.
+ * @param graph
  */
 export const validatePermutation = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
@@ -789,7 +792,7 @@ export const validatePermutation = (graph: TestGraph): PropertyValidationResult 
   // Check if stored permutation data exists
   const hasPermutationData = nodes.every(n => n.data?.permutationValue !== undefined);
   if (hasPermutationData) {
-    const permutation = nodes.map(n => n.data!.permutationValue as number);
+    const permutation = nodes.map(n => (n.data?.permutationValue as number | undefined) ?? 0);
 
     // Verify edges match permutation pattern
     const adjacency = new Map<string, Set<string>>();
@@ -843,6 +846,7 @@ export const validatePermutation = (graph: TestGraph): PropertyValidationResult 
 /**
  * Validates comparability graph property.
  * Comparability graphs = transitively orientable graphs (from partial orders).
+ * @param graph
  */
 export const validateComparability = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
@@ -870,7 +874,7 @@ export const validateComparability = (graph: TestGraph): PropertyValidationResul
   if (hasTopologicalOrder) {
     // If generated with topological order, verify it's a valid DAG orientation
     // For now, just check that the stored order is consistent
-    const orders = nodes.map(n => n.data!.topologicalOrder as number);
+    const orders = nodes.map(n => (n.data?.topologicalOrder as number | undefined) ?? 0);
     const uniqueOrders = new Set(orders);
 
     if (uniqueOrders.size !== nodes.length) {
@@ -919,9 +923,10 @@ export const validateComparability = (graph: TestGraph): PropertyValidationResul
 /**
  * Validates perfect graph property.
  * Perfect graphs = ω(H) = χ(H) for all induced subgraphs H.
+ * @param graph
  */
 export const validatePerfect = (graph: TestGraph): PropertyValidationResult => {
-  const { spec, nodes, edges } = graph;
+  const { spec, nodes } = graph;
 
   if (spec.perfect?.kind !== "perfect") {
     return {
@@ -944,10 +949,10 @@ export const validatePerfect = (graph: TestGraph): PropertyValidationResult => {
   // Check if perfect class metadata exists
   const hasPerfectClass = nodes.every(n => n.data?.perfectClass);
   if (hasPerfectClass) {
-    const perfectClass = nodes[0].data!.perfectClass;
+    const perfectClass = nodes[0].data?.perfectClass;
 
     // Verify all nodes have the same class
-    const consistentClass = nodes.every(n => n.data!.perfectClass === perfectClass);
+    const consistentClass = nodes.every(n => (n.data?.perfectClass as string | undefined) === perfectClass);
     if (!consistentClass) {
       return {
         property: "perfect",
@@ -985,9 +990,10 @@ export const validatePerfect = (graph: TestGraph): PropertyValidationResult => {
 /**
  * Validates scale-free graph property.
  * Scale-free graphs have power-law degree distribution P(k) ~ k^(-γ).
+ * @param graph
  */
 export const validateScaleFree = (graph: TestGraph): PropertyValidationResult => {
-  const { spec, nodes, edges } = graph;
+  const { spec, nodes } = graph;
 
   if (spec.scaleFree?.kind !== "scale_free") {
     return {
@@ -1012,8 +1018,8 @@ export const validateScaleFree = (graph: TestGraph): PropertyValidationResult =>
   const hasExponent = nodes.every(n => n.data?.scaleFreeExponent !== undefined);
   if (hasExponent) {
     // Verify all nodes have the same exponent
-    const exponent = nodes[0].data!.scaleFreeExponent;
-    const consistentExponent = nodes.every(n => n.data!.scaleFreeExponent === exponent);
+    const exponent = nodes[0].data?.scaleFreeExponent;
+    const consistentExponent = nodes.every(n => (n.data?.scaleFreeExponent as number | undefined) === exponent);
 
     if (!consistentExponent) {
       return {
@@ -1058,9 +1064,10 @@ export const validateScaleFree = (graph: TestGraph): PropertyValidationResult =>
 /**
  * Validates small-world graph property.
  * Small-world graphs have high clustering coefficient + short average path length.
+ * @param graph
  */
 export const validateSmallWorld = (graph: TestGraph): PropertyValidationResult => {
-  const { spec, nodes, edges } = graph;
+  const { spec, nodes } = graph;
 
   if (spec.smallWorld?.kind !== "small_world") {
     return {
@@ -1083,13 +1090,13 @@ export const validateSmallWorld = (graph: TestGraph): PropertyValidationResult =
   // Check if stored parameters exist
   const hasParameters = nodes.every(n => n.data?.smallWorldRewireProb !== undefined);
   if (hasParameters) {
-    const rewireProb = nodes[0].data!.smallWorldRewireProb;
-    const meanDegree = nodes[0].data!.smallWorldMeanDegree;
+    const rewireProb = nodes[0].data?.smallWorldRewireProb;
+    const meanDegree = nodes[0].data?.smallWorldMeanDegree;
 
     // Verify all nodes have consistent parameters
     const consistentParams = nodes.every(n =>
-      n.data!.smallWorldRewireProb === rewireProb &&
-      n.data!.smallWorldMeanDegree === meanDegree
+      (n.data?.smallWorldRewireProb as number | undefined) === rewireProb &&
+      (n.data?.smallWorldMeanDegree as number | undefined) === meanDegree
     );
 
     if (!consistentParams) {
@@ -1124,9 +1131,10 @@ export const validateSmallWorld = (graph: TestGraph): PropertyValidationResult =
 /**
  * Validates modular graph property (community structure).
  * Modular graphs have high modularity score Q.
+ * @param graph
  */
 export const validateModular = (graph: TestGraph): PropertyValidationResult => {
-  const { spec, nodes, edges } = graph;
+  const { spec, nodes } = graph;
 
   if (spec.communityStructure?.kind !== "modular") {
     return {
@@ -1150,8 +1158,8 @@ export const validateModular = (graph: TestGraph): PropertyValidationResult => {
   const hasCommunities = nodes.every(n => n.data?.community !== undefined);
   if (hasCommunities) {
     // Verify communities are assigned (0 to numCommunities-1)
-    const numCommunities = nodes[0].data!.numCommunities;
-    const uniqueCommunities = new Set(nodes.map(n => n.data!.community));
+    const numCommunities = nodes[0].data?.numCommunities;
+    const uniqueCommunities = new Set(nodes.map(n => (n.data?.community as number | undefined) ?? 0));
 
     if (uniqueCommunities.size !== numCommunities) {
       return {
@@ -1185,6 +1193,7 @@ export const validateModular = (graph: TestGraph): PropertyValidationResult => {
 /**
  * Validate line graph property.
  * Line graph L(G) has vertices representing edges of G, with adjacency when edges share a vertex.
+ * @param graph
  */
 export const validateLine = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
@@ -1212,14 +1221,14 @@ export const validateLine = (graph: TestGraph): PropertyValidationResult => {
   if (hasBaseEdges) {
     // Verify each vertex represents an edge from base graph
     // Verify adjacency condition: vertices adjacent in L(G) iff edges share vertex in G
-    const baseEdges = nodes.map(n => n.data!.baseEdge as { source: string; target: string });
+    const baseEdges = nodes.map(n => (n.data?.baseEdge as { source: string; target: string } | undefined) ?? { source: '', target: '' });
 
     // Check that each edge in L(G) corresponds to edges sharing a vertex in G
     for (const edge of edges) {
-      const sourceIdx = parseInt(edge.source.replace(/^\D+/g, ''));
-      const targetIdx = parseInt(edge.target.replace(/^\D+/g, ''));
+      const sourceIdx = Number.parseInt(edge.source.replaceAll(/^\D+/g, ''));
+      const targetIdx = Number.parseInt(edge.target.replaceAll(/^\D+/g, ''));
 
-      if (isNaN(sourceIdx) || isNaN(targetIdx) || sourceIdx >= baseEdges.length || targetIdx >= baseEdges.length) {
+      if (Number.isNaN(sourceIdx) || Number.isNaN(targetIdx) || sourceIdx >= baseEdges.length || targetIdx >= baseEdges.length) {
         return {
           property: "line",
           expected: "line_graph",
@@ -1267,6 +1276,7 @@ export const validateLine = (graph: TestGraph): PropertyValidationResult => {
 /**
  * Validate self-complementary property.
  * Self-complementary graph is isomorphic to its complement.
+ * @param graph
  */
 export const validateSelfComplementary = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
@@ -1334,6 +1344,7 @@ export const validateSelfComplementary = (graph: TestGraph): PropertyValidationR
 /**
  * Validate threshold graph property.
  * Threshold graphs are both split and cograph.
+ * @param graph
  */
 export const validateThreshold = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes } = graph;
@@ -1395,6 +1406,7 @@ export const validateThreshold = (graph: TestGraph): PropertyValidationResult =>
 /**
  * Validate unit disk graph property.
  * Unit disk graphs are defined by geometric constraints (points within radius).
+ * @param graph
  */
 export const validateUnitDisk = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
@@ -1468,6 +1480,7 @@ export const validateUnitDisk = (graph: TestGraph): PropertyValidationResult => 
 /**
  * Validate planar graph property.
  * Planar graphs can be drawn in the plane without edge crossings.
+ * @param graph
  */
 export const validatePlanar = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
@@ -1522,6 +1535,7 @@ export const validatePlanar = (graph: TestGraph): PropertyValidationResult => {
 /**
  * Validate Hamiltonian graph property.
  * Hamiltonian graphs contain a cycle visiting all vertices exactly once.
+ * @param graph
  */
 export const validateHamiltonian = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
@@ -1625,6 +1639,7 @@ export const validateHamiltonian = (graph: TestGraph): PropertyValidationResult 
 /**
  * Validate traceable graph property.
  * Traceable graphs contain a Hamiltonian path (visiting all vertices exactly once).
+ * @param graph
  */
 export const validateTraceable = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
@@ -1728,6 +1743,7 @@ export const validateTraceable = (graph: TestGraph): PropertyValidationResult =>
 /**
  * Validate strongly regular graph property.
  * Strongly regular graphs have parameters (n, k, λ, μ).
+ * @param graph
  */
 export const validateStronglyRegular = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
@@ -1789,7 +1805,7 @@ export const validateStronglyRegular = (graph: TestGraph): PropertyValidationRes
       degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
     });
 
-    const allDegreeK = Array.from(degrees.values()).every(d => d === k);
+    const allDegreeK = [...degrees.values()].every(d => d === k);
     if (!allDegreeK) {
       return {
         property: "stronglyRegular",
@@ -1831,6 +1847,7 @@ export const validateStronglyRegular = (graph: TestGraph): PropertyValidationRes
 /**
  * Validate vertex-transitive graph property.
  * Vertex-transitive graphs have automorphism group acting transitively on vertices.
+ * @param graph
  */
 export const validateVertexTransitive = (graph: TestGraph): PropertyValidationResult => {
   const { spec, nodes } = graph;
@@ -1913,7 +1930,7 @@ export const validateVertexTransitive = (graph: TestGraph): PropertyValidationRe
     degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
   });
 
-  const degreeValues = Array.from(degrees.values());
+  const degreeValues = [...degrees.values()];
   const allSameDegree = degreeValues.every(d => d === degreeValues[0]);
 
   if (!allSameDegree) {
@@ -1941,13 +1958,12 @@ export const validateVertexTransitive = (graph: TestGraph): PropertyValidationRe
 
 /**
  * Find all induced cycles of given length.
+ * @param vertices
+ * @param adjacency
+ * @param length
+ * @param directed
  */
-function findInducedCycles(
-  vertices: string[],
-  adjacency: Map<string, Set<string>>,
-  length: number,
-  directed: boolean
-): string[][] {
+const findInducedCycles = (vertices: string[], adjacency: Map<string, Set<string>>, length: number, _directed: boolean): string[][] => {
   if (length < 3) return [];
 
   const cycles: string[][] = [];
@@ -1977,12 +1993,15 @@ function findInducedCycles(
   }
 
   return cycles;
-}
+};
 
 /**
  * Check if cycle has a chord (edge between non-consecutive vertices).
+ * @param cycle
+ * @param adjacency
+ * @param directed
  */
-function hasChord(cycle: string[], adjacency: Map<string, Set<string>>, directed: boolean): boolean {
+const hasChord = (cycle: string[], adjacency: Map<string, Set<string>>, _directed: boolean): boolean => {
   // Check all pairs of non-consecutive vertices
   for (let i = 0; i < cycle.length; i++) {
     for (let j = i + 2; j < cycle.length; j++) {
@@ -1997,12 +2016,15 @@ function hasChord(cycle: string[], adjacency: Map<string, Set<string>>, directed
   }
 
   return false; // No chord found
-}
+};
 
 /**
  * Check if graph is transitively orientable (simplified check).
+ * @param nodes
+ * @param edges
+ * @param directed
  */
-function checkTransitiveOrientation(nodes: TestNode[], edges: TestEdge[], directed: boolean): boolean {
+const checkTransitiveOrientation = (nodes: TestNode[], edges: TestEdge[], directed: boolean): boolean => {
   // Simplified check: try to find a valid topological ordering
   // If graph is already a DAG (no cycles), it's transitively orientable
 
@@ -2044,7 +2066,7 @@ function checkTransitiveOrientation(nodes: TestNode[], edges: TestEdge[], direct
   }
 
   return true; // No cycle found, likely transitively orientable
-}
+};
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -2052,8 +2074,10 @@ function checkTransitiveOrientation(nodes: TestNode[], edges: TestEdge[], direct
 
 /**
  * Generate all k-combinations from array.
+ * @param arr
+ * @param k
  */
-function getCombinations<T>(arr: T[], k: number): T[][] {
+const getCombinations = <T>(arr: T[], k: number): T[][] => {
   if (k === 0) return [[]];
   if (k > arr.length) return [];
 
@@ -2062,12 +2086,15 @@ function getCombinations<T>(arr: T[], k: number): T[][] {
   const combsWithoutFirst = getCombinations(rest, k);
 
   return [...combsWithFirst, ...combsWithoutFirst];
-}
+};
 
 /**
  * Check if 4 vertices form induced P4 (path on 4 vertices).
+ * @param vertices
+ * @param adjacency
+ * @param directed
  */
-function hasInducedP4(vertices: string[], adjacency: Map<string, Set<string>>, directed: boolean): boolean {
+const hasInducedP4 = (vertices: string[], adjacency: Map<string, Set<string>>, directed: boolean): boolean => {
   // For P4, we need exactly 3 edges forming a path: v1-v2-v3-v4
   // with no additional edges
 
@@ -2086,9 +2113,9 @@ function hasInducedP4(vertices: string[], adjacency: Map<string, Set<string>>, d
   }
 
   // P4 has degree sequence: [1, 1, 2, 2] (two endpoints with degree 1, two middle with degree 2)
-  const degrees = Array.from(edgeCount.values()).sort((a, b) => a - b);
+  const degrees = [...edgeCount.values()].sort((a, b) => a - b);
 
   return degrees.length === 4 &&
     degrees[0] === 1 && degrees[1] === 1 &&
     degrees[2] === 2 && degrees[3] === 2;
-}
+};

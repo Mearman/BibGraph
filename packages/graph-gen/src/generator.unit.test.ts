@@ -752,7 +752,7 @@ describe('generateGraph', () => {
               }
             }
           }
-          const degrees = Array.from(edgeCount.values()).sort((a, b) => a - b);
+          const degrees = [...edgeCount.values()].sort((a, b) => a - b);
           // P4 has degree sequence [1, 1, 2, 2]
           return degrees.length === 4 && degrees[0] === 1 && degrees[1] === 1 && degrees[2] === 2 && degrees[3] === 2;
         };
@@ -833,7 +833,7 @@ describe('generateGraph', () => {
 
         // Check each vertex for potential claw center
         for (const center of result.nodes) {
-          const neighbors = Array.from(adjacency.get(center.id) || []);
+          const neighbors = [...adjacency.get(center.id) || []];
 
           if (neighbors.length < 3) continue;
 
@@ -1256,7 +1256,7 @@ describe('Phase 3: Network Science Generators', () => {
       }
 
       // Scale-free networks should have hubs (high-degree nodes)
-      const degrees = Array.from(degreeCounts.keys());
+      const degrees = [...degreeCounts.keys()];
       const maxDegree = Math.max(...degrees);
       expect(maxDegree).toBeGreaterThan(3); // Should have at least one hub
     });
@@ -1383,7 +1383,7 @@ describe('Phase 3: Network Science Generators', () => {
       });
 
       expect(communityCounts.size).toBe(3);
-      communityCounts.forEach((count, comm) => {
+      communityCounts.forEach((count, _comm) => {
         expect(count).toBeGreaterThan(0);
       });
     });
@@ -1445,10 +1445,10 @@ describe('Phase 4: Derived Graph Generators', () => {
       // For a small sample, verify adjacency condition
       const baseEdges = result.nodes.map(n => n.data!.baseEdge as { source: string; target: string });
       for (const edge of result.edges.slice(0, 3)) {
-        const sourceIdx = parseInt(edge.source.replace(/^\D+/g, ''));
-        const targetIdx = parseInt(edge.target.replace(/^\D+/g, ''));
+        const sourceIdx = Number.parseInt(edge.source.replaceAll(/^\D+/g, ''));
+        const targetIdx = Number.parseInt(edge.target.replaceAll(/^\D+/g, ''));
 
-        if (!isNaN(sourceIdx) && !isNaN(targetIdx)) {
+        if (!Number.isNaN(sourceIdx) && !Number.isNaN(targetIdx)) {
           const e1 = baseEdges[sourceIdx];
           const e2 = baseEdges[targetIdx];
 
@@ -1851,7 +1851,7 @@ describe('Phase 5: Advanced Structural Graph Generators', () => {
         degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
       });
 
-      const allDegreeTwo = Array.from(degrees.values()).every(d => d === 2);
+      const allDegreeTwo = [...degrees.values()].every(d => d === 2);
       expect(allDegreeTwo).toBe(true);
     });
 
@@ -1925,7 +1925,7 @@ describe('Phase 5: Advanced Structural Graph Generators', () => {
         degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
       });
 
-      const degreeValues = Array.from(degrees.values());
+      const degreeValues = [...degrees.values()];
       const allSameDegree = degreeValues.every(d => d === degreeValues[0]);
       expect(allSameDegree).toBe(true);
     });
@@ -1956,7 +1956,7 @@ describe('Phase 5: Advanced Structural Graph Generators', () => {
         degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
       });
 
-      const minDegree = Math.min(...Array.from(degrees.values()));
+      const minDegree = Math.min(...degrees.values());
       expect(minDegree).toBeGreaterThanOrEqual(2);
     });
   });

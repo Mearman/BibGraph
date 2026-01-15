@@ -10,7 +10,8 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit --skipLibCheck"
+    "typecheck": "tsc --noEmit --skipLibCheck",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@bibgraph/algorithms": "workspace:*",
