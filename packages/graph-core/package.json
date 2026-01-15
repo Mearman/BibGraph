@@ -8,12 +8,17 @@
     "url": "https://github.com/Mearman/BibGraph.git",
     "directory": "packages/graph-core"
   },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit --skipLibCheck"
+  },
   "dependencies": {
     "@bibgraph/algorithms": "workspace:*",
     "@bibgraph/graph-expansion": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "4.0.16"
   },
   "author": "Joe Mearman",
   "exports": {
