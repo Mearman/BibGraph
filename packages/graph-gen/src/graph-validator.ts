@@ -3,6 +3,7 @@ import type { TestGraph } from './generator';
 import {
   type GraphValidationResult,
   type PropertyValidationResult,
+  validateAlgebraicConnectivity,
   validateArcTransitive,
   validateBipartite,
   validateChordal,
@@ -40,6 +41,8 @@ import {
   validateSelfComplementary,
   validateSelfLoops,
   validateSmallWorld,
+  validateSpectralRadius,
+  validateSpectrum,
   validateSplit,
   validateStronglyRegular,
   validateThreshold,
@@ -112,6 +115,9 @@ export const validateGraphProperties = (graph: TestGraph): GraphValidationResult
   results.push(validateIndependenceNumber(graph));
   results.push(validateVertexCover(graph));
   results.push(validateDominationNumber(graph));
+  results.push(validateSpectrum(graph));
+  results.push(validateAlgebraicConnectivity(graph));
+  results.push(validateSpectralRadius(graph));
   results.push(validateRegularGraph(graph));
   results.push(validateEulerian(graph));
   results.push(validateKVertexConnected(graph));

@@ -57,7 +57,10 @@ export {
   validateHereditaryClass,
   validateIndependenceNumber,
   validateVertexCover,
-  validateDominationNumber
+  validateDominationNumber,
+  validateSpectrum,
+  validateAlgebraicConnectivity,
+  validateSpectralRadius
 } from './structural-validators';
 
 // Export degree validators
