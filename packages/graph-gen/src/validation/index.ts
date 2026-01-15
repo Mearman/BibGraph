@@ -38,7 +38,9 @@ export {
   validatePerfect,
   validateScaleFree,
   validateSmallWorld,
-  validateModular
+  validateModular,
+  validateLine,
+  validateSelfComplementary
 } from './structural-validators';
 
 // Export degree validators

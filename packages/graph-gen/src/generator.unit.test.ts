@@ -1411,3 +1411,130 @@ describe('Phase 3: Network Science Generators', () => {
     });
   });
 });
+
+describe('Phase 4: Derived Graph Generators', () => {
+  describe('Line graphs', () => {
+    it('should generate line graph from base graph', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        line: { kind: 'line_graph' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 10, seed: 42 });
+
+      expect(result.nodes).toHaveLength(10);
+      expect(result.edges.length).toBeGreaterThan(0);
+
+      // Verify all nodes have base edge metadata
+      result.nodes.forEach(node => {
+        expect(node.data?.baseEdge).toBeDefined();
+        const baseEdge = node.data!.baseEdge as { source: string; target: string };
+        expect(baseEdge.source).toMatch(/^B\d+$/);
+        expect(baseEdge.target).toMatch(/^B\d+$/);
+      });
+
+      // Verify line graph property: edges represent shared vertices in base graph
+      // For a small sample, verify adjacency condition
+      const baseEdges = result.nodes.map(n => n.data!.baseEdge as { source: string; target: string });
+      for (const edge of result.edges.slice(0, 3)) {
+        const sourceIdx = parseInt(edge.source.replace(/^\D+/g, ''));
+        const targetIdx = parseInt(edge.target.replace(/^\D+/g, ''));
+
+        if (!isNaN(sourceIdx) && !isNaN(targetIdx)) {
+          const e1 = baseEdges[sourceIdx];
+          const e2 = baseEdges[targetIdx];
+
+          // Edges should share a vertex in base graph
+          const shareVertex = e1.source === e2.source || e1.source === e2.target ||
+                              e1.target === e2.source || e1.target === e2.target;
+          expect(shareVertex).toBe(true);
+        }
+      }
+    });
+
+    it('should handle minimal line graph (n=2)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        line: { kind: 'line_graph' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 2, seed: 42 });
+
+      expect(result.nodes).toHaveLength(2);
+      result.nodes.forEach(node => {
+        expect(node.data?.baseEdge).toBeDefined();
+      });
+    });
+  });
+
+  describe('Self-complementary graphs', () => {
+    it('should generate self-complementary graph (n ≡ 0 mod 4)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        selfComplementary: { kind: 'self_complementary' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 8, seed: 42 });
+
+      expect(result.nodes).toHaveLength(8);
+
+      // Verify edge count is exactly half of total possible
+      const totalPossibleEdges = (8 * 7) / 2;
+      const expectedEdges = totalPossibleEdges / 2;
+      expect(result.edges.length).toBe(expectedEdges);
+
+      // Verify permutation or construction metadata exists
+      const hasPermutation = result.nodes.some(n => n.data?.permutation !== undefined);
+      const hasConstruction = result.nodes.some(n => n.data?.selfComplementaryType !== undefined);
+      expect(hasPermutation || hasConstruction).toBe(true);
+    });
+
+    it('should handle self-complementary graph (n ≡ 1 mod 4)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        selfComplementary: { kind: 'self_complementary' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 5, seed: 42 });
+
+      expect(result.nodes).toHaveLength(5);
+
+      // Verify edge count is exactly half of total possible
+      const totalPossibleEdges = (5 * 4) / 2;
+      const expectedEdges = totalPossibleEdges / 2;
+      expect(result.edges.length).toBe(expectedEdges);
+    });
+  });
+});

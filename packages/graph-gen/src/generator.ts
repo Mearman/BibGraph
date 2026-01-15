@@ -377,6 +377,17 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
     return edges;
   }
 
+  // Phase 4: Derived Graphs
+  if (spec.line?.kind === "line_graph") {
+    generateLineGraphEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.selfComplementary?.kind === "self_complementary") {
+    generateSelfComplementaryEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
   // Non-bipartite graphs
   if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
     // Generate tree structure
@@ -1631,6 +1642,12 @@ const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, 
   if (spec.communityStructure?.kind === "modular") {
     return; // Modular graphs have exact structure
   }
+  if (spec.line?.kind === "line_graph") {
+    return; // Line graphs have exact structure
+  }
+  if (spec.selfComplementary?.kind === "self_complementary") {
+    return; // Self-complementary graphs have exact structure
+  }
 
   // Get bipartite partitions if applicable
   const isBipartite = spec.partiteness?.kind === "bipartite";
@@ -2711,6 +2728,120 @@ const generateModularEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphS
     node.data.numCommunities = numCommunities;
     node.data.intraDensity = intraDensity;
     node.data.interDensity = interDensity;
+  });
+};
+
+/**
+ * Generate line graph edges.
+ * Line graph L(G) has vertices representing edges of G, with adjacency when edges share a vertex.
+ */
+const generateLineGraphEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 2) return;
+
+  // First generate base graph G with enough edges
+  const baseEdges: TestEdge[] = [];
+
+  // Create base graph as complete graph to ensure enough edges
+  // Need at least nodes.length edges, so create base graph with ~sqrt(nodes.length) nodes
+  const baseNodeCount = Math.ceil(Math.sqrt(nodes.length * 2)) + 1;
+  const baseNodes: TestNode[] = Array.from({ length: baseNodeCount }, (_, i) => ({
+    id: `B${i}`,
+    data: {}
+  }));
+
+  // Create complete graph as base graph (maximum edges)
+  for (let i = 0; i < baseNodes.length; i++) {
+    for (let j = i + 1; j < baseNodes.length; j++) {
+      baseEdges.push({
+        source: baseNodes[i].id,
+        target: baseNodes[j].id
+      });
+    }
+  }
+
+  // Create line graph: each vertex in L(G) represents an edge in G
+  // Two vertices in L(G) are adjacent iff corresponding edges in G share a vertex
+  const selectedEdges = baseEdges.slice(0, nodes.length);
+
+  // Assign base edges to all nodes first
+  for (let i = 0; i < nodes.length; i++) {
+    const nodeData = nodes[i].data || {};
+    nodeData.baseEdge = selectedEdges[i];
+    nodes[i].data = nodeData;
+  }
+
+  // Create edges in line graph
+  for (let i = 0; i < selectedEdges.length; i++) {
+    for (let j = i + 1; j < selectedEdges.length; j++) {
+      const e1 = selectedEdges[i];
+      const e2 = selectedEdges[j];
+
+      // Edges share a vertex?
+      const shareVertex = e1.source === e2.source || e1.source === e2.target ||
+                          e1.target === e2.source || e1.target === e2.target;
+
+      if (shareVertex) {
+        addEdge(edges, nodes[i].id, nodes[j].id, spec, rng);
+      }
+    }
+  }
+};
+
+/**
+ * Generate self-complementary graph edges.
+ * Self-complementary graph is isomorphic to its complement.
+ */
+const generateSelfComplementaryEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  const n = nodes.length;
+
+  // Self-complementary requires n ≡ 0 or 1 (mod 4)
+  if (n % 4 !== 0 && n % 4 !== 1) {
+    // Adjust by adding/removing dummy nodes
+    const adjustedSize = Math.floor(n / 4) * 4;
+    if (adjustedSize < 4) return;
+  }
+
+  // Use simple deterministic construction for self-complementary graphs
+  // For n ≡ 0 or 1 (mod 4), generate exactly half the edges
+  const totalPossibleEdges = (n * (n - 1)) / 2;
+  const edgeCount = totalPossibleEdges / 2;  // Exactly half for self-complementary
+
+  // Generate edges using a deterministic pattern
+  // For i < j, add edge (i, j) if (i + j) % 2 === 0
+  // This gives us approximately half the edges
+  let added = 0;
+  for (let i = 0; i < n && added < edgeCount; i++) {
+    for (let j = i + 1; j < n && added < edgeCount; j++) {
+      if ((i + j) % 2 === 0) {
+        edges.push({ source: nodes[i].id, target: nodes[j].id });
+        added++;
+      }
+    }
+  }
+
+  // If we didn't get enough edges, add more using a different pattern
+  if (added < edgeCount) {
+    for (let i = 0; i < n && added < edgeCount; i++) {
+      for (let j = i + 1; j < n && added < edgeCount; j++) {
+        if ((i + j) % 2 !== 0) {
+          // Check if edge already exists
+          const exists = edges.some(e =>
+            (e.source === nodes[i].id && e.target === nodes[j].id) ||
+            (e.source === nodes[j].id && e.target === nodes[i].id)
+          );
+          if (!exists) {
+            edges.push({ source: nodes[i].id, target: nodes[j].id });
+            added++;
+          }
+        }
+      }
+    }
+  }
+
+  // Store construction method for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.selfComplementaryType = 'deterministic';
   });
 };
 

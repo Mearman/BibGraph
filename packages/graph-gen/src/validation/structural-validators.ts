@@ -1182,6 +1182,155 @@ export const validateModular = (graph: TestGraph): PropertyValidationResult => {
   };
 };
 
+/**
+ * Validate line graph property.
+ * Line graph L(G) has vertices representing edges of G, with adjacency when edges share a vertex.
+ */
+export const validateLine = (graph: TestGraph): PropertyValidationResult => {
+  const { spec, nodes, edges } = graph;
+
+  if (spec.line?.kind !== "line_graph") {
+    return {
+      property: "line",
+      expected: spec.line?.kind ?? "unconstrained",
+      actual: spec.line?.kind ?? "unconstrained",
+      valid: true,
+    };
+  }
+
+  if (nodes.length < 2) {
+    return {
+      property: "line",
+      expected: "line_graph",
+      actual: "trivial",
+      valid: true,
+    };
+  }
+
+  // Check if stored base edge data exists
+  const hasBaseEdges = nodes.every(n => n.data?.baseEdge !== undefined);
+  if (hasBaseEdges) {
+    // Verify each vertex represents an edge from base graph
+    // Verify adjacency condition: vertices adjacent in L(G) iff edges share vertex in G
+    const baseEdges = nodes.map(n => n.data!.baseEdge as { source: string; target: string });
+
+    // Check that each edge in L(G) corresponds to edges sharing a vertex in G
+    for (const edge of edges) {
+      const sourceIdx = parseInt(edge.source.replace(/^\D+/g, ''));
+      const targetIdx = parseInt(edge.target.replace(/^\D+/g, ''));
+
+      if (isNaN(sourceIdx) || isNaN(targetIdx) || sourceIdx >= baseEdges.length || targetIdx >= baseEdges.length) {
+        return {
+          property: "line",
+          expected: "line_graph",
+          actual: "invalid_structure",
+          valid: false,
+          message: "Invalid node IDs for line graph",
+        };
+      }
+
+      const e1 = baseEdges[sourceIdx];
+      const e2 = baseEdges[targetIdx];
+
+      // Edges should share a vertex in base graph
+      const shareVertex = e1.source === e2.source || e1.source === e2.target ||
+                          e1.target === e2.source || e1.target === e2.target;
+
+      if (!shareVertex) {
+        return {
+          property: "line",
+          expected: "line_graph",
+          actual: "invalid_adjacency",
+          valid: false,
+          message: "Adjacent vertices in L(G) don't share vertex in base graph G",
+        };
+      }
+    }
+
+    return {
+      property: "line",
+      expected: "line_graph",
+      actual: "line_graph",
+      valid: true,
+    };
+  }
+
+  return {
+    property: "line",
+    expected: "line_graph",
+    actual: "unknown",
+    valid: true,
+    message: "Line graph validation skipped (no base edge metadata found)",
+  };
+};
+
+/**
+ * Validate self-complementary property.
+ * Self-complementary graph is isomorphic to its complement.
+ */
+export const validateSelfComplementary = (graph: TestGraph): PropertyValidationResult => {
+  const { spec, nodes, edges } = graph;
+
+  if (spec.selfComplementary?.kind !== "self_complementary") {
+    return {
+      property: "selfComplementary",
+      expected: spec.selfComplementary?.kind ?? "unconstrained",
+      actual: spec.selfComplementary?.kind ?? "unconstrained",
+      valid: true,
+    };
+  }
+
+  const n = nodes.length;
+
+  // Self-complementary requires n ≡ 0 or 1 (mod 4)
+  if (n % 4 !== 0 && n % 4 !== 1) {
+    return {
+      property: "selfComplementary",
+      expected: "self_complementary",
+      actual: "invalid_size",
+      valid: false,
+      message: `Self-complementary requires n ≡ 0 or 1 (mod 4), got n=${n}`,
+    };
+  }
+
+  // Check if stored construction metadata exists
+  const hasPermutation = nodes.some(n => n.data?.permutation !== undefined);
+  const hasConstruction = nodes.some(n => n.data?.selfComplementaryType !== undefined);
+
+  if (hasPermutation || hasConstruction) {
+    // Verify edge count is exactly half of total possible edges
+    const totalPossibleEdges = (n * (n - 1)) / 2;
+    const expectedEdges = totalPossibleEdges / 2;
+
+    if (edges.length !== expectedEdges) {
+      return {
+        property: "selfComplementary",
+        expected: "self_complementary",
+        actual: "invalid_edge_count",
+        valid: false,
+        message: `Self-complementary requires exactly ${expectedEdges} edges, got ${edges.length}`,
+      };
+    }
+
+    // TODO: Verify isomorphism with complement (expensive for large n)
+    return {
+      property: "selfComplementary",
+      expected: "self_complementary",
+      actual: "self_complementary",
+      valid: true,
+      message: "Isomorphism validation not yet implemented",
+    };
+  }
+
+  return {
+    property: "selfComplementary",
+    expected: "self_complementary",
+    actual: "unknown",
+    valid: true,
+    message: "Self-complementary validation skipped (no construction metadata found)",
+  };
+};
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================

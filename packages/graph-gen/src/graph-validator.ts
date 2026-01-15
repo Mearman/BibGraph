@@ -30,7 +30,9 @@ import {
   validatePerfect,
   validateScaleFree,
   validateSmallWorld,
-  validateModular} from './validation';
+  validateModular,
+  validateLine,
+  validateSelfComplementary} from './validation';
 
 /**
  * Validate that a generated graph actually has its claimed properties.
@@ -74,6 +76,8 @@ export const validateGraphProperties = (graph: TestGraph): GraphValidationResult
   results.push(validateScaleFree(graph));
   results.push(validateSmallWorld(graph));
   results.push(validateModular(graph));
+  results.push(validateLine(graph));
+  results.push(validateSelfComplementary(graph));
   results.push(validateRegularGraph(graph));
   results.push(validateEulerian(graph));
   results.push(validateKVertexConnected(graph));
