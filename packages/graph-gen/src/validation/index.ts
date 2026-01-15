@@ -62,7 +62,10 @@ export {
   validateAlgebraicConnectivity,
   validateSpectralRadius,
   validateToughness,
-  validateIntegrity
+  validateIntegrity,
+  validateCage,
+  validateMooreGraph,
+  validateRamanujan
 } from './structural-validators';
 
 // Export degree validators
