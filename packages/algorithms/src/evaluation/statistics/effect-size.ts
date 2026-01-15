@@ -27,11 +27,11 @@
  * console.log(result.interpretation); // 'very-large'
  * ```
  */
-export function cohensD(group1: number[], group2: number[]): {
+export const cohensD = (group1: number[], group2: number[]): {
   effectSize: number;
   interpretation: 'negligible' | 'small' | 'medium' | 'large' | 'very-large';
   magnitude: number;
-} {
+} => {
   if (group1.length < 2 || group2.length < 2) {
     throw new Error('Cohen\'s d requires at least 2 samples per group');
   }
@@ -72,7 +72,7 @@ export function cohensD(group1: number[], group2: number[]): {
     interpretation,
     magnitude: absD,
   };
-}
+};
 
 /**
  * Cliff's delta (non-parametric effect size).
@@ -101,12 +101,12 @@ export function cohensD(group1: number[], group2: number[]): {
  * console.log(result.probability);  // e.g., 0.96 (96% chance treatment > control)
  * ```
  */
-export function cliffsDelta(group1: number[], group2: number[]): {
+export const cliffsDelta = (group1: number[], group2: number[]): {
   effectSize: number;
   interpretation: 'negligible' | 'small' | 'medium' | 'large';
   probability: number;
   magnitude: number;
-} {
+} => {
   if (group1.length === 0 || group2.length === 0) {
     throw new Error('Cliff\'s delta requires at least 1 sample per group');
   }
@@ -152,7 +152,7 @@ export function cliffsDelta(group1: number[], group2: number[]): {
     probability,
     magnitude: absDelta,
   };
-}
+};
 
 /**
  * Glass's delta (alternative to Cohen's d).
@@ -172,10 +172,10 @@ export function cliffsDelta(group1: number[], group2: number[]): {
  * console.log(result.effectSize); // e.g., 1.8
  * ```
  */
-export function glassDelta(treatment: number[], control: number[]): {
+export const glassDelta = (treatment: number[], control: number[]): {
   effectSize: number;
   interpretation: 'negligible' | 'small' | 'medium' | 'large' | 'very-large';
-} {
+} => {
   if (treatment.length < 2 || control.length < 2) {
     throw new Error('Glass\'s delta requires at least 2 samples per group');
   }
@@ -206,7 +206,7 @@ export function glassDelta(treatment: number[], control: number[]): {
   }
 
   return { effectSize, interpretation };
-}
+};
 
 /**
  * Rank-biserial correlation (non-parametric effect size).
@@ -229,11 +229,11 @@ export function glassDelta(treatment: number[], control: number[]): {
  * console.log(result.effectSize);  // e.g., 0.70 (large effect)
  * ```
  */
-export function rankBiserialCorrelation(group1: number[], group2: number[]): {
+export const rankBiserialCorrelation = (group1: number[], group2: number[]): {
   effectSize: number;
   correlation: number;
   interpretation: 'negligible' | 'small' | 'medium' | 'large';
-} {
+} => {
   if (group1.length === 0 || group2.length === 0) {
     throw new Error('Rank-biserial correlation requires at least 1 sample per group');
   }
@@ -310,4 +310,4 @@ export function rankBiserialCorrelation(group1: number[], group2: number[]): {
     correlation,
     interpretation,
   };
-}
+};

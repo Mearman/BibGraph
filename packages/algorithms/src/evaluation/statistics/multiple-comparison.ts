@@ -20,10 +20,7 @@
  * console.log(result.significant);     // [true, false, false, false, false]
  * ```
  */
-export function bonferroniCorrection(
-  pValues: number[],
-  alpha: number = 0.05
-): { correctedAlpha: number; significant: boolean[] } {
+export const bonferroniCorrection = (pValues: number[], alpha: number = 0.05): { correctedAlpha: number; significant: boolean[] } => {
   if (pValues.length === 0) {
     return { correctedAlpha: alpha, significant: [] };
   }
@@ -35,7 +32,7 @@ export function bonferroniCorrection(
   const significant = pValues.map(p => p < correctedAlpha);
 
   return { correctedAlpha, significant };
-}
+};
 
 /**
  * Benjamini-Hochberg FDR correction.
@@ -60,10 +57,7 @@ export function bonferroniCorrection(
  * console.log(result.significant);     // [true, true, false, false, false]
  * ```
  */
-export function benjaminiHochberg(
-  pValues: number[],
-  fdr: number = 0.05
-): { adjustedPValues: number[]; significant: boolean[] } {
+export const benjaminiHochberg = (pValues: number[], fdr: number = 0.05): { adjustedPValues: number[]; significant: boolean[] } => {
   if (pValues.length === 0) {
     return { adjustedPValues: [], significant: [] };
   }
@@ -100,7 +94,7 @@ export function benjaminiHochberg(
   }
 
   return { adjustedPValues, significant };
-}
+};
 
 /**
  * Holm-Bonferroni method (step-down procedure).
@@ -124,10 +118,7 @@ export function benjaminiHochberg(
  * console.log(result.significant); // [true, false, false, false, false]
  * ```
  */
-export function holmBonferroni(
-  pValues: number[],
-  alpha: number = 0.05
-): { adjustedPValues: number[]; significant: boolean[] } {
+export const holmBonferroni = (pValues: number[], alpha: number = 0.05): { adjustedPValues: number[]; significant: boolean[] } => {
   if (pValues.length === 0) {
     return { adjustedPValues: [], significant: [] };
   }
@@ -181,7 +172,7 @@ export function holmBonferroni(
   }
 
   return { adjustedPValues, significant };
-}
+};
 
 /**
  * Storey's q-value method (FDR-based with estimation of true nulls).
@@ -202,11 +193,7 @@ export function holmBonferroni(
  * console.log(result.significant); // Which tests are significant at FDR=0.05
  * ```
  */
-export function storeyQValues(
-  pValues: number[],
-  fdr: number = 0.05,
-  lambda: number = 0.5
-): { qValues: number[]; significant: boolean[]; pi0: number } {
+export const storeyQValues = (pValues: number[], fdr: number = 0.05, lambda: number = 0.5): { qValues: number[]; significant: boolean[]; pi0: number } => {
   if (pValues.length === 0) {
     return { qValues: [], significant: [], pi0: 1 };
   }
@@ -243,4 +230,4 @@ export function storeyQValues(
   }
 
   return { qValues, significant, pi0 };
-}
+};

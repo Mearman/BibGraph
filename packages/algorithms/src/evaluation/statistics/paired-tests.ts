@@ -22,11 +22,7 @@
  * console.log(result.significant); // true
  * ```
  */
-export function pairedTTest(
-  method1Results: number[],
-  method2Results: number[],
-  alpha: number = 0.05
-): { pValue: number; tStatistic: number; significant: boolean } {
+export const pairedTTest = (method1Results: number[], method2Results: number[], alpha: number = 0.05): { pValue: number; tStatistic: number; significant: boolean } => {
   if (method1Results.length !== method2Results.length) {
     throw new Error('Paired samples must have equal length');
   }
@@ -63,7 +59,7 @@ export function pairedTTest(
     tStatistic,
     significant: pValue < alpha,
   };
-}
+};
 
 /**
  * Wilcoxon signed-rank test (non-parametric alternative to paired t-test).
@@ -84,11 +80,7 @@ export function pairedTTest(
  * console.log(result.pValue); // e.g., 0.031 (significant at α=0.05)
  * ```
  */
-export function wilcoxonSignedRank(
-  method1Results: number[],
-  method2Results: number[],
-  alpha: number = 0.05
-): { pValue: number; statistic: number; significant: boolean } {
+export const wilcoxonSignedRank = (method1Results: number[], method2Results: number[], alpha: number = 0.05): { pValue: number; statistic: number; significant: boolean } => {
   if (method1Results.length !== method2Results.length) {
     throw new Error('Paired samples must have equal length');
   }
@@ -170,15 +162,17 @@ export function wilcoxonSignedRank(
     statistic: w,
     significant: pValue < alpha,
   };
-}
+};
 
 /**
  * Calculate two-tailed p-value from t-statistic using t-distribution.
  *
  * Uses approximation of t-distribution CDF.
  * For large degrees of freedom, converges to normal distribution.
+ * @param t
+ * @param df
  */
-function twoTailedPValue(t: number, df: number): number {
+const twoTailedPValue = (t: number, df: number): number => {
   // Approximate t-distribution with normal for df > 30
   if (df > 30) {
     const z = standardScoreToZ(t, df);
@@ -189,22 +183,22 @@ function twoTailedPValue(t: number, df: number): number {
   // In production, use proper t-distribution tables or numerical integration
   const z = t; // Simplified - less accurate for small df
   return 2 * (1 - normalCDF(Math.abs(z)));
-}
+};
 
 /**
  * Convert t-score to approximate z-score (Welch-Satterthwaite approximation).
+ * @param t
+ * @param df
  */
-function standardScoreToZ(t: number, df: number): number {
-  // For large df, t approaches normal
-  return t;
-}
+const standardScoreToZ = (t: number, df: number): number => t;
 
 /**
  * Standard normal cumulative distribution function.
  *
  * Uses Abramowitz and Stegun approximation (error < 0.00005).
+ * @param x
  */
-function normalCDF(x: number): number {
+const normalCDF = (x: number): number => {
   const a1 = 0.254829592;
   const a2 = -0.284496736;
   const a3 = 1.421413741;
@@ -219,4 +213,4 @@ function normalCDF(x: number): number {
   const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
 
   return 0.5 * (1.0 + sign * y);
-}
+};

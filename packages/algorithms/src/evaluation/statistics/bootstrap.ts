@@ -23,12 +23,7 @@
  * console.log(ci.mean);  // e.g., 0.85
  * ```
  */
-export function bootstrapCI(
-  samples: number[],
-  confidence: number = 0.95,
-  nBootstrap: number = 10000,
-  seed?: number
-): { lower: number; upper: number; mean: number } {
+export const bootstrapCI = (samples: number[], confidence: number = 0.95, nBootstrap: number = 10000, seed?: number): { lower: number; upper: number; mean: number } => {
   if (samples.length < 2) {
     throw new Error('Bootstrap requires at least 2 samples');
   }
@@ -67,7 +62,7 @@ export function bootstrapCI(
   const upper = bootstrapMeans[upperIndex]!;
 
   return { lower, upper, mean: observedMean };
-}
+};
 
 /**
  * Bootstrap test for significant difference between methods.
@@ -93,18 +88,12 @@ export function bootstrapCI(
  * console.log(result.ci.upper);       // e.g., 0.22
  * ```
  */
-export function bootstrapDifferenceTest(
-  method1Samples: number[],
-  method2Samples: number[],
-  nBootstrap: number = 10000,
-  alpha: number = 0.05,
-  seed?: number
-): {
+export const bootstrapDifferenceTest = (method1Samples: number[], method2Samples: number[], nBootstrap: number = 10000, alpha: number = 0.05, seed?: number): {
   pValue: number;
   meanDifference: number;
   ci: { lower: number; upper: number };
   significant: boolean;
-} {
+} => {
   if (method1Samples.length < 2 || method2Samples.length < 2) {
     throw new Error('Both methods require at least 2 samples');
   }
@@ -171,7 +160,7 @@ export function bootstrapDifferenceTest(
     ci,
     significant,
   };
-}
+};
 
 /**
  * Seeded random number generator for reproducible bootstrapping.
