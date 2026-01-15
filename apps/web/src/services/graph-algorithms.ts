@@ -30,6 +30,7 @@ import {
   extractInducedSubgraph,
   extractKTruss,
   filterGraph,
+  Graph,
   // Hierarchical
   hierarchicalClustering,
   infomap,
@@ -43,10 +44,9 @@ import {
   spectralPartition,
   stronglyConnectedComponents,
   topologicalSort,
-  Graph,
 } from '@bibgraph/algorithms';
-import { bfs, dfs, extractEgoNetwork } from '@bibgraph/graph-expansion';
 import { GraphAdapter } from '@bibgraph/graph-core';
+import { bfs, dfs, extractEgoNetwork } from '@bibgraph/graph-expansion';
 import type {
   AuthorPosition,
   EntityType,

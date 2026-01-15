@@ -1,11 +1,12 @@
 /**
  * Unit tests for graph spec constraints analyzer
  */
-import { describe, it, expect } from 'vitest';
+import { describe, expect,it } from 'vitest';
+
 import {
   analyzeGraphSpecConstraints,
-  isGraphSpecImpossible,
   getAdjustedValidationExpectations,
+  isGraphSpecImpossible,
 } from './constraints';
 import type { GraphSpec } from './spec';
 

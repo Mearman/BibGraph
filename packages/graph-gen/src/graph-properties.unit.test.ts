@@ -1,13 +1,14 @@
-import { describe, test, expect } from 'vitest';
-import {
-  generateCoreSpecPermutations,
-  describeSpec,
-  makeGraphSpec,
-  type GraphSpec,
-} from './spec';
+import { describe, expect,test } from 'vitest';
+
+import { analyzeGraphSpecConstraints,isGraphSpecImpossible } from './constraints';
 import { generateGraph, type GraphGenerationConfig } from './generator';
 import { validateGraphProperties } from './graph-validator';
-import { isGraphSpecImpossible, analyzeGraphSpecConstraints } from './constraints';
+import {
+  describeSpec,
+  generateCoreSpecPermutations,
+  type GraphSpec,
+  makeGraphSpec,
+} from './spec';
 
 describe('Graph Spec Permutation E2E Tests', () => {
   describe('All valid spec combinations', () => {

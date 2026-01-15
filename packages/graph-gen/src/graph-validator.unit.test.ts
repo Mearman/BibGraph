@@ -1,11 +1,11 @@
 /**
  * Unit tests for graph validator
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
+import { generateGraph } from './generator';
 import { validateGraphProperties } from './graph-validator';
 import type { GraphSpec } from './spec';
-import type { TestGraph } from './generator';
-import { generateGraph } from './generator';
 
 describe('validateGraphProperties', () => {
   describe('Basic validation', () => {

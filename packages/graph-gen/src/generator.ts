@@ -732,8 +732,6 @@ const generateFlowNetworkEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gr
   // Layer 0: source
   // Layer 1: intermediate nodes
   // Layer 2: sink
-  const sourceLayer = new Set<string>([source]);
-  const sinkLayer = new Set<string>([sink]);
   const intermediateLayer = new Set<string>(
     nodes.filter(node => node.id !== source && node.id !== sink).map(node => node.id)
   );
@@ -751,7 +749,7 @@ const generateFlowNetworkEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gr
   }
 
   // Connect intermediate nodes among themselves (creating paths)
-  const intermediateArray = Array.from(intermediateLayer);
+  const intermediateArray = [...intermediateLayer];
   if (intermediateArray.length > 1) {
     // Create a roughly connected structure among intermediate nodes
     for (let i = 0; i < intermediateArray.length; i++) {

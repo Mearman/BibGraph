@@ -161,7 +161,7 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProps> = ({
     });
 
     // Draw nodes
-    const cleanupFunctions: (() => void)[] = [];
+    const abortController = new AbortController();
 
     nodes.forEach((node) => {
       const pos = nodePositions.get(node.id);
@@ -195,22 +195,15 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProps> = ({
         setHoveredNode(null);
       };
 
-      circle.addEventListener('mouseenter', handleMouseEnter);
-      circle.addEventListener('mouseleave', handleMouseLeave);
-      cleanupFunctions.push(() => {
-        circle.removeEventListener('mouseenter', handleMouseEnter);
-        circle.removeEventListener('mouseleave', handleMouseLeave);
-      });
+      circle.addEventListener('mouseenter', handleMouseEnter, { signal: abortController.signal });
+      circle.addEventListener('mouseleave', handleMouseLeave, { signal: abortController.signal });
 
       // Click to navigate
       const handleClick = () => {
         window.location.href = `/authors/${node.id}`;
       };
 
-      circle.addEventListener('click', handleClick);
-      cleanupFunctions.push(() => {
-        circle.removeEventListener('click', handleClick);
-      });
+      circle.addEventListener('click', handleClick, { signal: abortController.signal });
 
       g.append(circle);
 
@@ -233,7 +226,7 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProps> = ({
 
     // Cleanup event listeners on unmount
     return () => {
-      cleanupFunctions.forEach((cleanup) => cleanup());
+      abortController.abort();
     };
   }, [authorId, limitedCoAuthors, getEntityColor, hoveredNode]);
 

@@ -1,28 +1,26 @@
-import { describe, test, expect } from "vitest";
 import {
-  computeGraphSpecFromGraph,
-  axisKindIs,
+  type AnalyzerGraph,
   axisEquals,
+  axisKindIs,
+  computeGraphSpecFromGraph,
   hasGraphSpec,
-  isTree,
-  isForest,
-  isDAG,
   isBipartite,
-  isComplete,
-  isSparse,
-  isDense,
-  isRegular,
-  isConnected,
-  isEulerian,
-  isStar,
-  isPlanar,
   isChordal,
+  isComparability,
+  isComplete,
+  isDAG,
+  isDense,
+  isEulerian,
   isInterval,
   isPermutation,
+  isPlanar,
+  isRegular,
+  isSparse,
+  isStar,
+  isTree,
   isUnitDisk,
-  isComparability,
-  type AnalyzerGraph,
 } from "@bibgraph/graph-gen";
+import { describe, expect,test } from "vitest";
 
 describe("Graph Spec Analyzer", () => {
   describe("Core property computation", () => {

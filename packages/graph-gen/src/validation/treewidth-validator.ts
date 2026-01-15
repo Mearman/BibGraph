@@ -44,53 +44,6 @@ export const validateTreewidth = (graph: TestGraph): PropertyValidationResult =>
 };
 
 /**
- * Check if graph is a forest (acyclic).
- * Forests have treewidth 0.
- * @param nodes
- * @param edges
- * @param spec
- */
-const isForest = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec): boolean => {
-  if (spec.cycles.kind === 'acyclic') {
-    return true;
-  }
-
-  // Build adjacency list
-  const adjacency = buildAdjacencyList(nodes, edges, spec.directionality.kind === 'directed');
-
-  // Use DFS to detect cycles
-  const visited = new Set<string>();
-  const recursionStack = new Set<string>();
-
-  const hasCycle = (nodeId: string): boolean => {
-    visited.add(nodeId);
-    recursionStack.add(nodeId);
-
-    const neighbors = adjacency.get(nodeId) ?? [];
-    for (const neighbor of neighbors) {
-      if (!visited.has(neighbor)) {
-        if (hasCycle(neighbor)) {
-          return true;
-        }
-      } else if (recursionStack.has(neighbor)) {
-        return true;
-      }
-    }
-
-    recursionStack.delete(nodeId);
-    return false;
-  };
-
-  for (const node of nodes) {
-    if (!visited.has(node.id) && hasCycle(node.id)) {
-        return false; // Has cycle, not a forest
-      }
-  }
-
-  return true; // No cycles found
-};
-
-/**
  * Approximate treewidth using minimum degree heuristic.
  *
  * Algorithm:
@@ -238,9 +191,10 @@ const findMaxCliqueSizeInSet = (vertices: Set<string>, adjacency: Map<string, st
  * @param nodes - Graph nodes
  * @param edges - Graph edges
  * @param directed - Whether graph is directed
+ * @param _directed
  * @returns Size of maximum clique
  */
-export const findMaxCliqueSize = (nodes: TestNode[], edges: TestEdge[], directed: boolean): number => {
+export const findMaxCliqueSize = (nodes: TestNode[], edges: TestEdge[], _directed: boolean): number => {
   if (nodes.length === 0) {
     return 0;
   }

@@ -1,8 +1,9 @@
 /**
  * Unit tests for graph generator
  */
-import { describe, it, expect, beforeEach } from 'vitest';
-import { generateGraph, type TestNode, type TestEdge, type TestGraph } from './generator';
+import { describe, expect, it } from 'vitest';
+
+import { generateGraph } from './generator';
 import type { GraphSpec } from './spec';
 
 describe('generateGraph', () => {
@@ -218,7 +219,7 @@ describe('generateGraph', () => {
       }
 
       // Star should have one node with degree 5 and 5 nodes with degree 1
-      const degrees = Array.from(degreeCount.values()).sort((a, b) => b - a);
+      const degrees = [...degreeCount.values()].sort((a, b) => b - a);
       expect(degrees[0]).toBe(5); // Center
     });
 
@@ -608,7 +609,7 @@ describe('generateGraph', () => {
       }
 
       // All vertices should have even degree for Eulerian
-      for (const [nodeId, degree] of degrees) {
+      for (const [_nodeId, degree] of degrees) {
         expect(degree % 2).toBe(0);
       }
     });

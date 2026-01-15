@@ -1,31 +1,32 @@
 /**
  * Unit tests for validation functions
  */
-import { describe, it, expect } from 'vitest';
-import {
-  validateDirectionality,
-  validateWeighting,
-  validateCycles,
-  validateConnectivity,
-  validateSchema,
-  validateEdgeMultiplicity,
-  validateSelfLoops,
-  detectCycle,
-  validateDensityAndCompleteness,
-  validateBipartite,
-  validateTournament,
-  validateRegularGraph,
-  validateEulerian,
-  validateKVertexConnected,
-  validateKEdgeConnected,
-  validateTreewidth,
-  validateKColorable,
-  validateFlowNetwork,
-  buildAdjacencyList,
-} from './index';
+import { describe, expect, it } from 'vitest';
+
 import type { TestGraph } from '../generator';
 import { generateGraph } from '../generator';
 import type { GraphSpec } from '../spec';
+import { buildAdjacencyList } from './helper-functions';
+import {
+  detectCycle,
+  validateBipartite,
+  validateConnectivity,
+  validateCycles,
+  validateDensityAndCompleteness,
+  validateDirectionality,
+  validateEdgeMultiplicity,
+  validateEulerian,
+  validateFlowNetwork,
+  validateKColorable,
+  validateKEdgeConnected,
+  validateKVertexConnected,
+  validateRegularGraph,
+  validateSchema,
+  validateSelfLoops,
+  validateTournament,
+  validateTreewidth,
+  validateWeighting,
+} from './index';
 
 describe('Validation functions', () => {
   describe('Basic validators', () => {

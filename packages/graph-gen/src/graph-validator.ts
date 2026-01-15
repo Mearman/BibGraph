@@ -1,32 +1,32 @@
-import type { GraphSpec } from './spec';
-import type { TestGraph } from './generator';
 import { analyzeGraphSpecConstraints, getAdjustedValidationExpectations } from './constraints';
+import type { TestGraph } from './generator';
+import type { GraphSpec } from './spec';
 import {
-  validateDirectionality,
-  validateWeighting,
-  validateCycles,
-  validateConnectivity,
-  validateSchema,
-  validateEdgeMultiplicity,
-  validateSelfLoops,
-  validateDensityAndCompleteness,
-  validateBipartite,
-  validateTournament,
-  validateRegularGraph,
-  validateEulerian,
-  validateKVertexConnected,
-  validateKEdgeConnected,
-  validateTreewidth,
-  validateKColorable,
-  validateFlowNetwork,
+  type GraphValidationResult,
   type PropertyValidationResult,
-  type GraphValidationResult
-} from './validation';
+  validateBipartite,
+  validateConnectivity,
+  validateCycles,
+  validateDensityAndCompleteness,
+  validateDirectionality,
+  validateEdgeMultiplicity,
+  validateEulerian,
+  validateFlowNetwork,
+  validateKColorable,
+  validateKEdgeConnected,
+  validateKVertexConnected,
+  validateRegularGraph,
+  validateSchema,
+  validateSelfLoops,
+  validateTournament,
+  validateTreewidth,
+  validateWeighting} from './validation';
 
 /**
  * Validate that a generated graph actually has its claimed properties.
+ * @param graph
  */
-export function validateGraphProperties(graph: TestGraph): GraphValidationResult {
+export const validateGraphProperties = (graph: TestGraph): GraphValidationResult => {
   const results: PropertyValidationResult[] = [];
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -74,7 +74,7 @@ export function validateGraphProperties(graph: TestGraph): GraphValidationResult
     errors,
     warnings: warnings.length > 0 ? warnings : undefined,
   };
-}
+};
 
 // Re-export types for backward compatibility
-export type { PropertyValidationResult, GraphValidationResult };
+

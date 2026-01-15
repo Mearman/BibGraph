@@ -7,7 +7,7 @@
     },
     "autocomplete": {
       "$ref": "./autocomplete",
-      "lastModified": "2025-11-21T16:25:25.132Z"
+      "lastModified": "2026-01-15T08:15:15.663Z"
     },
     "concepts": {
       "$ref": "./concepts",
@@ -31,7 +31,7 @@
     },
     "works": {
       "$ref": "./works",
-      "lastModified": "2025-11-21T16:25:30.357Z"
+      "lastModified": "2026-01-15T08:15:12.475Z"
     }
   },
   "files": {
