@@ -55,6 +55,9 @@ export * from "./metrics/cluster-quality";
 export * from "./metrics/conductance";
 export * from "./metrics/modularity";
 
+// Evaluation framework
+export * from "./evaluation";
+
 // Types
 export * from "./types/errors";
 export * from "./types/result";
