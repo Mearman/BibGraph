@@ -37,3 +37,16 @@ export {
   shortestPathRanker,
   weightBasedRanker
 } from './baselines';
+
+// Export path planting infrastructure
+export {
+  plantGroundTruthPaths,
+  addNoisePaths,
+  plantHeterogeneousPaths,
+  plantCitationPaths,
+  type PlantedPathConfig,
+  type PlantedPathResult,
+  type HeterogeneousPathConfig,
+  type CitationPathConfig,
+  type CitationPathType
+} from './path-planting';
