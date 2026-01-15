@@ -2,10 +2,10 @@
  * Ground truth path planting for evaluation
  */
 
-import type { Edge, Node } from '../../types/graph';
 import { Graph } from '../../graph/graph';
-import type { Path } from '../../types/algorithm-results';
 import type { RankedPath } from '../../pathfinding/path-ranking';
+import type { Path } from '../../types/algorithm-results';
+import type { Edge, Node } from '../../types/graph';
 
 /**
  * Configuration for planted path generation.
@@ -82,6 +82,8 @@ class SeededRandom {
 
   /**
    * Generate random integer in [min, max].
+   * @param min
+   * @param max
    */
   nextInt(min: number, max: number): number {
     return Math.floor(this.next() * (max - min + 1)) + min;
@@ -89,6 +91,7 @@ class SeededRandom {
 
   /**
    * Shuffle array in place.
+   * @param array
    */
   shuffle<T>(array: T[]): T[] {
     const result = [...array];
@@ -102,8 +105,9 @@ class SeededRandom {
 
 /**
  * Convert signal strength to MI value range.
+ * @param signalStrength
  */
-function signalStrengthToMI(signalStrength: 'weak' | 'medium' | 'strong'): { min: number; max: number } {
+const signalStrengthToMI = (signalStrength: 'weak' | 'medium' | 'strong'): { min: number; max: number } => {
   switch (signalStrength) {
     case 'weak':
       return { min: 0.1, max: 0.3 }; // Low MI, hard to distinguish
@@ -112,7 +116,7 @@ function signalStrengthToMI(signalStrength: 'weak' | 'medium' | 'strong'): { min
     case 'strong':
       return { min: 0.8, max: 1.0 }; // High MI, easy to distinguish
   }
-}
+};
 
 /**
  * Plant ground truth paths in a graph for evaluation.
@@ -128,10 +132,7 @@ function signalStrengthToMI(signalStrength: 'weak' | 'medium' | 'strong'): { min
  * @param config - Planting configuration
  * @returns Graph with planted paths and ground truth
  */
-export function plantGroundTruthPaths<N extends Node, E extends Edge>(
-  baseGraph: Graph<N, E>,
-  config: PlantedPathConfig<N, E>
-): PlantedPathResult<N, E> {
+export const plantGroundTruthPaths = <N extends Node, E extends Edge>(baseGraph: Graph<N, E>, config: PlantedPathConfig<N, E>): PlantedPathResult<N, E> => {
   const rng = new SeededRandom(config.seed);
   const miRange = signalStrengthToMI(config.signalStrength);
 
@@ -256,11 +257,10 @@ export function plantGroundTruthPaths<N extends Node, E extends Edge>(
       avgPathMI: totalMI / plantedPaths.length,
     },
   };
-}
+};
 
 /**
  * Generate stable path ID for relevance scoring.
+ * @param path
  */
-function pathId<N extends Node, E extends Edge>(path: Path<N, E>): string {
-  return path.nodes.map(n => n.id).join('→');
-}
+const pathId = <N extends Node, E extends Edge>(path: Path<N, E>): string => path.nodes.map(n => n.id).join('→');

@@ -2,9 +2,9 @@
  * Noise path generation for evaluation
  */
 
-import type { Edge, Node } from '../../types/graph';
 import { Graph } from '../../graph/graph';
 import type { Path } from '../../types/algorithm-results';
+import type { Edge, Node } from '../../types/graph';
 
 /**
  * Add noise paths to make ground truth detection harder.
@@ -20,12 +20,7 @@ import type { Path } from '../../types/algorithm-results';
  * @param seed - Random seed
  * @returns Graph with added noise paths
  */
-export function addNoisePaths<N extends Node, E extends Edge>(
-  graph: Graph<N, E>,
-  groundTruth: Path<N, E>[],
-  numNoisePaths: number,
-  seed?: number
-): Graph<N, E> {
+export const addNoisePaths = <N extends Node, E extends Edge>(graph: Graph<N, E>, groundTruth: Path<N, E>[], numNoisePaths: number, seed?: number): Graph<N, E> => {
   if (numNoisePaths <= 0) {
     return graph;
   }
@@ -89,20 +84,19 @@ export function addNoisePaths<N extends Node, E extends Edge>(
   }
 
   return graph;
-}
+};
 
 /**
  * Create a simple path between two nodes.
+ * @param graph
+ * @param source
+ * @param target
+ * @param length
+ * @param rng
+ * @param nodeOffset
+ * @param edgeOffset
  */
-function createSimplePath<N extends Node, E extends Edge>(
-  graph: Graph<N, E>,
-  source: string,
-  target: string,
-  length: number,
-  rng: SeededRandom,
-  nodeOffset: number,
-  edgeOffset: number
-): Path<N, E> {
+const createSimplePath = <N extends Node, E extends Edge>(graph: Graph<N, E>, source: string, target: string, length: number, rng: SeededRandom, nodeOffset: number, edgeOffset: number): Path<N, E> => {
   const nodes: N[] = [];
   const edges: E[] = [];
 
@@ -159,14 +153,13 @@ function createSimplePath<N extends Node, E extends Edge>(
     edges,
     totalWeight: edges.reduce((sum, e) => sum + (e.weight ?? 0), 0),
   };
-}
+};
 
 /**
  * Generate path signature for deduplication.
+ * @param path
  */
-function pathSignature<N extends Node, E extends Edge>(path: Path<N, E>): string {
-  return path.edges.map(e => `${e.source}-${e.target}`).join('|');
-}
+const pathSignature = <N extends Node, E extends Edge>(path: Path<N, E>): string => path.edges.map(e => `${e.source}-${e.target}`).join('|');
 
 /**
  * Seeded random number generator.
@@ -188,6 +181,8 @@ class SeededRandom {
 
   /**
    * Generate random integer in [min, max].
+   * @param min
+   * @param max
    */
   nextInt(min: number, max: number): number {
     return Math.floor(this.nextDouble() * (max - min + 1)) + min;

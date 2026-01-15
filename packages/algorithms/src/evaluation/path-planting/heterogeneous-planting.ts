@@ -4,10 +4,10 @@
  * For graphs with multiple node types (e.g., OpenAlex with Works, Authors, Institutions)
  */
 
-import type { Edge, Node } from '../../types/graph';
 import { Graph } from '../../graph/graph';
 import type { Path } from '../../types/algorithm-results';
-import { plantGroundTruthPaths, type PlantedPathConfig } from './path-generator';
+import type { Edge, Node } from '../../types/graph';
+import { type PlantedPathConfig,plantGroundTruthPaths } from './path-generator';
 
 /**
  * Extended configuration for heterogeneous graphs.
@@ -22,8 +22,9 @@ export interface HeterogeneousPathConfig<N extends Node, E extends Edge> extends
 
 /**
  * Type-safe node type check.
+ * @param node
  */
-function getNodeType<N extends Node>(node: N): string {
+const getNodeType = <N extends Node>(node: N): string => {
   if ('type' in node && typeof node.type === 'string') {
     return node.type;
   }
@@ -31,7 +32,7 @@ function getNodeType<N extends Node>(node: N): string {
     return node.entityType;
   }
   return 'unknown';
-}
+};
 
 /**
  * Plant paths in heterogeneous graphs respecting entity type constraints.
@@ -45,11 +46,7 @@ function getNodeType<N extends Node>(node: N): string {
  * @param config - Planting configuration
  * @returns Graph with planted heterogeneous paths
  */
-export function plantHeterogeneousPaths<N extends Node, E extends Edge>(
-  graph: Graph<N, E>,
-  pathTemplate: string[],
-  config: HeterogeneousPathConfig<N, E>
-) {
+export const plantHeterogeneousPaths = <N extends Node, E extends Edge>(graph: Graph<N, E>, pathTemplate: string[], config: HeterogeneousPathConfig<N, E>) => {
   // Validate path template
   if (pathTemplate.length < 2) {
     throw new Error('Path template must have at least 2 node types');
@@ -91,22 +88,21 @@ export function plantHeterogeneousPaths<N extends Node, E extends Edge>(
   // Note: The path generator doesn't enforce intermediate node types,
   // so this is a best-effort implementation
   return plantGroundTruthPaths(graph, extendedConfig);
-}
+};
 
 /**
  * Filter nodes by entity type.
+ * @param nodes
+ * @param entityType
  */
-export function filterNodesByType<N extends Node>(nodes: N[], entityType: string): N[] {
-  return nodes.filter(node => getNodeType(node) === entityType);
-}
+export const filterNodesByType = <N extends Node>(nodes: N[], entityType: string): N[] => nodes.filter(node => getNodeType(node) === entityType);
 
 /**
  * Check if a path follows a type template.
+ * @param path
+ * @param template
  */
-export function pathFollowsTemplate<N extends Node, E extends Edge>(
-  path: Path<N, E>,
-  template: string[]
-): boolean {
+export const pathFollowsTemplate = <N extends Node, E extends Edge>(path: Path<N, E>, template: string[]): boolean => {
   if (path.nodes.length !== template.length) {
     return false;
   }
@@ -119,4 +115,4 @@ export function pathFollowsTemplate<N extends Node, E extends Edge>(
   }
 
   return true;
-}
+};
