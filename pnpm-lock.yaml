@@ -368,6 +368,12 @@ importers:
       '@bibgraph/client':
         specifier: workspace:*
         version: link:../../packages/client
+      '@bibgraph/graph-core':
+        specifier: workspace:*
+        version: link:../../packages/graph-core
+      '@bibgraph/graph-expansion':
+        specifier: workspace:*
+        version: link:../../packages/graph-expansion
       '@bibgraph/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -613,6 +619,19 @@ importers:
       vitest-axe:
         specifier: 0.1.0
         version: 0.1.0(vitest@4.0.16)
+
+  packages/graph-core:
+    dependencies:
+      '@bibgraph/algorithms':
+        specifier: workspace:*
+        version: link:../algorithms
+      '@bibgraph/graph-expansion':
+        specifier: workspace:*
+        version: link:../graph-expansion
+    devDependencies:
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
 
   packages/graph-expansion:
     dependencies:

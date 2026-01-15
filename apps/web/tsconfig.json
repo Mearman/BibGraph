@@ -20,7 +20,11 @@
       "@bibgraph/ui": ["../../packages/ui/src/index.ts"],
       "@bibgraph/ui/*": ["../../packages/ui/src/*"],
       "@bibgraph/algorithms": ["../../packages/algorithms/src/index.ts"],
-      "@bibgraph/algorithms/*": ["../../packages/algorithms/src/*"]
+      "@bibgraph/algorithms/*": ["../../packages/algorithms/src/*"],
+      "@bibgraph/graph-core": ["../../packages/graph-core/src/index.ts"],
+      "@bibgraph/graph-core/*": ["../../packages/graph-core/src/*"],
+      "@bibgraph/graph-expansion": ["../../packages/graph-expansion/src/index.ts"],
+      "@bibgraph/graph-expansion/*": ["../../packages/graph-expansion/src/*"]
     }
   },
   "include": [
