@@ -681,6 +681,41 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
     return edges;
   }
 
+  // Phase 7: Minor-Free Graphs
+  // Note: Minor-free graphs are structural classifications, not generation constraints
+  // Generate standard edges first, then store classification metadata
+  if (spec.minorFree?.kind === "minor_free") {
+    // Generate standard connected graph
+    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
+      generateTreeEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
+      generateConnectedCyclicEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
+      generateForestEdges(nodes, edges, spec, rng);
+    } else {
+      generateDisconnectedEdges(nodes, edges, spec, rng);
+    }
+    // Store minor-free metadata
+    computeAndStoreMinorFree(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.topologicalMinorFree?.kind === "topological_minor_free") {
+    // Generate standard connected graph
+    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
+      generateTreeEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
+      generateConnectedCyclicEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
+      generateForestEdges(nodes, edges, spec, rng);
+    } else {
+      generateDisconnectedEdges(nodes, edges, spec, rng);
+    }
+    // Store topological minor-free metadata
+    computeAndStoreTopologicalMinorFree(nodes, edges, spec, rng);
+    return edges;
+  }
+
   // Non-bipartite graphs
   if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
     // Generate tree structure
@@ -4271,6 +4306,50 @@ const computeAndStoreLexicographicProduct = (nodes: TestNode[], edges: TestEdge[
     node.data = node.data || {};
     node.data.targetLexicographicProductLeft = leftFactors;
     node.data.targetLexicographicProductRight = rightFactors;
+  });
+};
+
+/**
+ * Compute and store minor-free graph classification.
+ * Minor-free graphs exclude specific graph minors (Kuratowski-Wagner theorem).
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param spec - Graph specification
+ * @param rng - Random number generator
+ */
+const computeAndStoreMinorFree = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
+  if (spec.minorFree?.kind !== "minor_free") {
+    throw new Error("Minor-free computation requires minor_free spec");
+  }
+
+  const { forbiddenMinors } = spec.minorFree;
+
+  // Store minor-free parameters for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetForbiddenMinors = forbiddenMinors;
+  });
+};
+
+/**
+ * Compute and store topological minor-free classification.
+ * Topological minor-free graphs exclude specific subdivisions.
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param spec - Graph specification
+ * @param rng - Random number generator
+ */
+const computeAndStoreTopologicalMinorFree = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
+  if (spec.topologicalMinorFree?.kind !== "topological_minor_free") {
+    throw new Error("Topological minor-free computation requires topological_minor_free spec");
+  }
+
+  const { forbiddenMinors } = spec.topologicalMinorFree;
+
+  // Store topological minor-free parameters for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetTopologicalForbiddenMinors = forbiddenMinors;
   });
 };
 
