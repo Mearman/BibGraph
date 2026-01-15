@@ -302,8 +302,9 @@ export const analyzeGraphSpecConstraints = (spec: GraphSpec): GraphSpecImpossibi
   // This is just a note for documentation purposes
 
   // 24. Binary trees are trees
-  if (spec.binaryTree?.kind !== "not_binary_tree" &&
-      spec.binaryTree?.kind !== "unconstrained" &&
+  if ((spec.binaryTree?.kind === "binary_tree" ||
+       spec.binaryTree?.kind === "full_binary" ||
+       spec.binaryTree?.kind === "complete_binary") &&
       spec.cycles.kind === "cycles_allowed") {
     impossibilities.push({
       property: "binaryTree/cycles",
