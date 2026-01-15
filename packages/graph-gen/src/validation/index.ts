@@ -47,7 +47,14 @@ export {
   validateHamiltonian,
   validateTraceable,
   validateStronglyRegular,
-  validateVertexTransitive
+  validateVertexTransitive,
+  validateEdgeTransitive,
+  validateArcTransitive,
+  validateDiameter,
+  validateRadius,
+  validateGirth,
+  validateCircumference,
+  validateHereditaryClass
 } from './structural-validators';
 
 // Export degree validators
