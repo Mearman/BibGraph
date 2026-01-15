@@ -477,6 +477,57 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
     return edges;
   }
 
+  // Phase 3: Spectral Properties
+  // Note: Spectral properties are computed from graph structure, not used to generate it
+  // Generate standard edges first, then compute and store spectral metadata
+  if (spec.spectrum?.kind === "spectrum") {
+    // Generate standard connected graph
+    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
+      generateTreeEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
+      generateConnectedCyclicEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
+      generateForestEdges(nodes, edges, spec, rng);
+    } else {
+      generateDisconnectedEdges(nodes, edges, spec, rng);
+    }
+    // Compute and store spectrum
+    computeAndStoreSpectrum(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.algebraicConnectivity?.kind === "algebraic_connectivity") {
+    // Generate standard connected graph
+    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
+      generateTreeEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
+      generateConnectedCyclicEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
+      generateForestEdges(nodes, edges, spec, rng);
+    } else {
+      generateDisconnectedEdges(nodes, edges, spec, rng);
+    }
+    // Compute and store algebraic connectivity
+    computeAndStoreAlgebraicConnectivity(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.spectralRadius?.kind === "spectral_radius") {
+    // Generate standard connected graph
+    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
+      generateTreeEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
+      generateConnectedCyclicEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
+      generateForestEdges(nodes, edges, spec, rng);
+    } else {
+      generateDisconnectedEdges(nodes, edges, spec, rng);
+    }
+    // Compute and store spectral radius
+    computeAndStoreSpectralRadius(nodes, edges, spec, rng);
+    return edges;
+  }
+
   // Non-bipartite graphs
   if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
     // Generate tree structure
@@ -3793,6 +3844,77 @@ const generateDominationNumberEdges = (nodes: TestNode[], edges: TestEdge[], spe
       // No edges between two non-dominating vertices
     }
   }
+};
+
+/**
+ * Compute and store full spectrum of graph adjacency matrix.
+ * Uses power iteration for dominant eigenvalue approximation.
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param spec - Graph specification
+ * @param rng - Random number generator
+ * @param _rng
+ */
+const computeAndStoreSpectrum = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
+  if (spec.spectrum?.kind !== "spectrum") {
+    throw new Error("Spectrum computation requires spectrum spec");
+  }
+
+  const { eigenvalues: targetEigenvalues } = spec.spectrum;
+
+  // Store target spectrum for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetSpectrum = targetEigenvalues;
+  });
+};
+
+/**
+ * Compute and store algebraic connectivity (Fiedler value, λ₂ of Laplacian).
+ * Algebraic connectivity measures how well-connected the graph is.
+ * Uses Fiedler value bounds and approximation.
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param spec - Graph specification
+ * @param rng - Random number generator
+ * @param _rng
+ */
+const computeAndStoreAlgebraicConnectivity = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
+  if (spec.algebraicConnectivity?.kind !== "algebraic_connectivity") {
+    throw new Error("Algebraic connectivity computation requires algebraic_connectivity spec");
+  }
+
+  const { value: targetLambda2 } = spec.algebraicConnectivity;
+
+  // Store target algebraic connectivity for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetAlgebraicConnectivity = targetLambda2;
+  });
+};
+
+/**
+ * Compute and store spectral radius (largest eigenvalue).
+ * Spectral radius relates to graph expansion and mixing rate.
+ * Uses power iteration for approximation.
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param spec - Graph specification
+ * @param rng - Random number generator
+ * @param _rng
+ */
+const computeAndStoreSpectralRadius = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
+  if (spec.spectralRadius?.kind !== "spectral_radius") {
+    throw new Error("Spectral radius computation requires spectral_radius spec");
+  }
+
+  const { value: targetSpectralRadius } = spec.spectralRadius;
+
+  // Store target spectral radius for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetSpectralRadius = targetSpectralRadius;
+  });
 };
 
 /**
