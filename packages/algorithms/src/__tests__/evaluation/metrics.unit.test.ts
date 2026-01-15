@@ -5,14 +5,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  spearmanCorrelation,
   kendallTau,
-  ndcg,
   meanAveragePrecision,
   meanReciprocalRank,
+  ndcg,
   precisionAtK,
-  recallAtK
-} from '../../evaluation';
+  recallAtK,
+  spearmanCorrelation} from '../../evaluation';
 
 describe('Rank Correlation Metrics', () => {
   describe('spearmanCorrelation', () => {
