@@ -43,15 +43,15 @@ import {
   validateSmallWorld,
   validateSpectralRadius,
   validateSpectrum,
-  validateSplit,
   validateStronglyRegular,
   validateThreshold,
-  validateTournament,
+  validateToughness,
   validateTraceable,
   validateTreewidth,
   validateUnitDisk,
   validateVertexCover,
   validateVertexTransitive,
+  validateIntegrity,
   validateWeighting} from './validation';
 
 /**
@@ -118,6 +118,8 @@ export const validateGraphProperties = (graph: TestGraph): GraphValidationResult
   results.push(validateSpectrum(graph));
   results.push(validateAlgebraicConnectivity(graph));
   results.push(validateSpectralRadius(graph));
+  results.push(validateToughness(graph));
+  results.push(validateIntegrity(graph));
   results.push(validateRegularGraph(graph));
   results.push(validateEulerian(graph));
   results.push(validateKVertexConnected(graph));

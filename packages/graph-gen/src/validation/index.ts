@@ -60,7 +60,9 @@ export {
   validateDominationNumber,
   validateSpectrum,
   validateAlgebraicConnectivity,
-  validateSpectralRadius
+  validateSpectralRadius,
+  validateToughness,
+  validateIntegrity
 } from './structural-validators';
 
 // Export degree validators
