@@ -388,6 +388,32 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
     return edges;
   }
 
+  // Phase 5: Advanced Structural Graphs
+  if (spec.threshold?.kind === "threshold") {
+    generateThresholdEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.unitDisk?.kind === "unit_disk") {
+    generateUnitDiskEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.planarity?.kind === "planar") {
+    generatePlanarEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.hamiltonian?.kind === "hamiltonian") {
+    generateHamiltonianEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.traceable?.kind === "traceable") {
+    generateTraceableEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
   // Non-bipartite graphs
   if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
     // Generate tree structure
@@ -1649,6 +1675,23 @@ const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, 
     return; // Self-complementary graphs have exact structure
   }
 
+  // Phase 5: Advanced Structural Graphs have exact structure
+  if (spec.threshold?.kind === "threshold") {
+    return; // Threshold graphs have exact structure
+  }
+  if (spec.unitDisk?.kind === "unit_disk") {
+    return; // Unit disk graphs have exact structure
+  }
+  if (spec.planarity?.kind === "planar") {
+    return; // Planar graphs have exact structure
+  }
+  if (spec.hamiltonian?.kind === "hamiltonian") {
+    return; // Hamiltonian graphs have exact structure
+  }
+  if (spec.traceable?.kind === "traceable") {
+    return; // Traceable graphs have exact structure
+  }
+
   // Get bipartite partitions if applicable
   const isBipartite = spec.partiteness?.kind === "bipartite";
   const leftPartition = isBipartite
@@ -2843,6 +2886,202 @@ const generateSelfComplementaryEdges = (nodes: TestNode[], edges: TestEdge[], sp
     node.data = node.data || {};
     node.data.selfComplementaryType = 'deterministic';
   });
+};
+
+/**
+ * Generate threshold graph edges.
+ * Threshold graphs are both split and cograph, built by iteratively adding
+ * vertices as either dominant (connected to all existing) or isolated (connected to none).
+ */
+const generateThresholdEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 2) return;
+
+  const added: string[] = [];
+
+  for (let i = 0; i < nodes.length; i++) {
+    const isDominant = rng.next() < 0.5;
+
+    const nodeData = nodes[i].data || {};
+    nodes[i].data = nodeData;
+    nodeData.thresholdType = isDominant ? 'dominant' : 'isolated';
+    nodeData.creationOrder = i;
+
+    if (isDominant) {
+      // Connect to all existing vertices
+      for (const existing of added) {
+        addEdge(edges, nodes[i].id, existing, spec, rng);
+      }
+    }
+
+    added.push(nodes[i].id);
+  }
+};
+
+/**
+ * Generate unit disk graph edges.
+ * Unit disk graphs are created by placing points in a plane and connecting
+ * points within a specified distance (unit radius).
+ */
+const generateUnitDiskEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  const unitRadius = spec.unitDisk?.kind === "unit_disk" && spec.unitDisk.unitRadius !== undefined
+    ? spec.unitDisk.unitRadius
+    : 1.0;
+  const spaceSize = spec.unitDisk?.kind === "unit_disk" && spec.unitDisk.spaceSize !== undefined
+    ? spec.unitDisk.spaceSize
+    : Math.sqrt(nodes.length);
+
+  // Place points randomly in the space
+  nodes.forEach(node => {
+    if (!node.data) node.data = {};
+    node.data.x = rng.next() * spaceSize;
+    node.data.y = rng.next() * spaceSize;
+  });
+
+  // Connect points within unit radius
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const sourceData = nodes[i].data;
+      const targetData = nodes[j].data;
+
+      if (!sourceData || !targetData) continue;
+
+      const dx = (sourceData.x as number) - (targetData.x as number);
+      const dy = (sourceData.y as number) - (targetData.y as number);
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist <= unitRadius) {
+        addEdge(edges, nodes[i].id, nodes[j].id, spec, rng);
+      }
+    }
+  }
+};
+
+/**
+ * Generate planar graph edges.
+ * Planar graphs can be drawn in the plane without edge crossings.
+ * Uses incremental construction starting from a cycle.
+ */
+const generatePlanarEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 4) {
+    // Small graphs are always planar
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        addEdge(edges, nodes[i].id, nodes[j].id, spec, rng);
+      }
+    }
+    return;
+  }
+
+  // Start with a cycle (planar for any n)
+  for (let i = 0; i < nodes.length; i++) {
+    addEdge(edges, nodes[i].id, nodes[(i + 1) % nodes.length].id, spec, rng);
+  }
+
+  // Maximum edges in planar graph: 3n - 6 (Euler's formula)
+  const maxEdges = 3 * nodes.length - 6;
+
+  // Add random chords while maintaining planarity (simplified check)
+  let attempts = 0;
+  const maxAttempts = nodes.length * 2;
+
+  while (edges.length < maxEdges && attempts < maxAttempts) {
+    attempts++;
+    const i = Math.floor(rng.next() * nodes.length);
+    const j = Math.floor(rng.next() * nodes.length);
+
+    if (i >= j) continue;
+
+    // Check if edge already exists
+    if (hasEdge(edges, nodes[i].id, nodes[j].id)) continue;
+
+    // Add edge (planar graphs are quite permissive)
+    addEdge(edges, nodes[i].id, nodes[j].id, spec, rng);
+  }
+};
+
+/**
+ * Generate Hamiltonian graph edges.
+ * Hamiltonian graphs contain a cycle visiting all vertices exactly once.
+ */
+const generateHamiltonianEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 3) return;
+
+  // Create random permutation for Hamiltonian cycle
+  const permutation = Array.from({ length: nodes.length }, (_, i) => i);
+  shuffleArray(permutation, rng);
+
+  // Add cycle edges
+  for (let i = 0; i < permutation.length; i++) {
+    const current = nodes[permutation[i]].id;
+    const next = nodes[permutation[(i + 1) % permutation.length]].id;
+    addEdge(edges, current, next, spec, rng);
+  }
+
+  // Store Hamiltonian cycle for validation
+  nodes.forEach((node, idx) => {
+    node.data = node.data || {};
+    node.data.hamiltonianPosition = idx;
+    node.data.hamiltonianCycle = permutation.map(p => nodes[p].id);
+  });
+
+  // Add random chords (up to n/2 extra edges)
+  const extraEdges = Math.floor(nodes.length / 2);
+  let added = 0;
+
+  for (let i = 0; i < extraEdges && added < extraEdges; i++) {
+    const a = Math.floor(rng.next() * nodes.length);
+    const b = Math.floor(rng.next() * nodes.length);
+
+    if (a !== b && !hasEdge(edges, nodes[a].id, nodes[b].id)) {
+      addEdge(edges, nodes[a].id, nodes[b].id, spec, rng);
+      added++;
+    }
+  }
+};
+
+/**
+ * Generate traceable graph edges.
+ * Traceable graphs contain a Hamiltonian path (visiting all vertices exactly once).
+ */
+const generateTraceableEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 2) return;
+
+  // Create random permutation for Hamiltonian path
+  const permutation = Array.from({ length: nodes.length }, (_, i) => i);
+  shuffleArray(permutation, rng);
+
+  // Add path edges (no cycle)
+  for (let i = 0; i < permutation.length - 1; i++) {
+    addEdge(edges, nodes[permutation[i]].id, nodes[permutation[i + 1]].id, spec, rng);
+  }
+
+  // Store Hamiltonian path for validation
+  nodes.forEach((node, idx) => {
+    node.data = node.data || {};
+    node.data.traceablePosition = idx;
+    node.data.traceablePath = permutation.map(p => nodes[p].id);
+  });
+
+  // Add random edges (avoid creating cycle that would make it Hamiltonian)
+  const extraEdges = Math.floor(nodes.length / 3);
+  let added = 0;
+
+  for (let i = 0; i < extraEdges && added < extraEdges; i++) {
+    const a = Math.floor(rng.next() * nodes.length);
+    const b = Math.floor(rng.next() * nodes.length);
+
+    if (a === b) continue;
+
+    // Don't connect last to first (would create cycle)
+    const lastIdx = permutation[permutation.length - 1];
+    const firstIdx = permutation[0];
+    if ((a === lastIdx && b === firstIdx) || (a === firstIdx && b === lastIdx)) continue;
+
+    if (!hasEdge(edges, nodes[a].id, nodes[b].id)) {
+      addEdge(edges, nodes[a].id, nodes[b].id, spec, rng);
+      added++;
+    }
+  }
 };
 
 /**

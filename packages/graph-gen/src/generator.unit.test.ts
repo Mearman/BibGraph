@@ -1538,3 +1538,278 @@ describe('Phase 4: Derived Graph Generators', () => {
     });
   });
 });
+
+describe('Phase 5: Advanced Structural Graph Generators', () => {
+  describe('Threshold graphs', () => {
+    it('should generate threshold graph with dominant and isolated vertices', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        threshold: { kind: 'threshold' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 10, seed: 42 });
+      expect(result.nodes).toHaveLength(10);
+      expect(result.edges.length).toBeGreaterThan(0);
+
+      // Verify all vertices marked as dominant or isolated
+      result.nodes.forEach(node => {
+        expect(node.data?.thresholdType).toMatch(/^(dominant|isolated)$/);
+      });
+    });
+
+    it('should handle minimal threshold graph (n=2)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        threshold: { kind: 'threshold' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 2, seed: 42 });
+      expect(result.nodes).toHaveLength(2);
+      expect(result.edges.length).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('Unit disk graphs', () => {
+    it('should generate unit disk graph with geometric constraints', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        unitDisk: { kind: 'unit_disk', unitRadius: 1.0, spaceSize: 3.0 },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 20, seed: 42 });
+      expect(result.nodes).toHaveLength(20);
+      expect(result.edges.length).toBeGreaterThan(0);
+
+      // Verify all nodes have coordinates
+      result.nodes.forEach(node => {
+        expect(node.data?.x).toBeDefined();
+        expect(node.data?.y).toBeDefined();
+        if (node.data) {
+          expect(typeof node.data.x).toBe('number');
+          expect(typeof node.data.y).toBe('number');
+        }
+      });
+    });
+
+    it('should verify distance constraint for all edges', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        unitDisk: { kind: 'unit_disk', unitRadius: 1.0, spaceSize: 2.0 },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 10, seed: 42 });
+      const unitRadius = 1.0;
+
+      // Verify all edges satisfy distance constraint
+      result.edges.forEach(edge => {
+        const sourceNode = result.nodes.find(n => n.id === edge.source);
+        const targetNode = result.nodes.find(n => n.id === edge.target);
+        expect(sourceNode).toBeDefined();
+        expect(targetNode).toBeDefined();
+
+        if (sourceNode?.data && targetNode?.data) {
+          const dx = (sourceNode.data.x as number) - (targetNode.data.x as number);
+          const dy = (sourceNode.data.y as number) - (targetNode.data.y as number);
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          expect(dist).toBeLessThanOrEqual(unitRadius);
+        }
+      });
+    });
+  });
+
+  describe('Planar graphs', () => {
+    it('should generate planar graph with edge count constraint', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'connected' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'moderate' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        planarity: { kind: 'planar' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 10, seed: 42 });
+      expect(result.nodes).toHaveLength(10);
+
+      // Verify planar constraint: m ≤ 3n - 6
+      const maxEdges = 3 * result.nodes.length - 6;
+      expect(result.edges.length).toBeLessThanOrEqual(maxEdges);
+    });
+
+    it('should handle small planar graph (n=3)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'connected' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        planarity: { kind: 'planar' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 3, seed: 42 });
+      expect(result.nodes).toHaveLength(3);
+      // All graphs with < 4 vertices are planar
+    });
+  });
+
+  describe('Hamiltonian graphs', () => {
+    it('should generate Hamiltonian graph with cycle', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'connected' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'moderate' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        hamiltonian: { kind: 'hamiltonian' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 10, seed: 42 });
+      expect(result.nodes).toHaveLength(10);
+      expect(result.edges.length).toBeGreaterThanOrEqual(10); // m ≥ n
+
+      // Verify Hamiltonian cycle metadata exists
+      const hasCycle = result.nodes.some(n => n.data?.hamiltonianCycle !== undefined);
+      expect(hasCycle).toBe(true);
+    });
+
+    it('should verify Hamiltonian cycle visits all vertices', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'connected' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'moderate' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        hamiltonian: { kind: 'hamiltonian' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 8, seed: 42 });
+      const nodeData = result.nodes[0].data;
+      expect(nodeData).toBeDefined();
+      const cycle = nodeData!.hamiltonianCycle as string[];
+
+      expect(cycle).toBeDefined();
+      expect(cycle.length).toBe(8);
+
+      // Verify all consecutive pairs in cycle are edges
+      for (let i = 0; i < 8; i++) {
+        const current = cycle[i];
+        const next = cycle[(i + 1) % 8];
+
+        const hasEdge = result.edges.some(
+          e => (e.source === current && e.target === next) ||
+               (e.source === next && e.target === current)
+        );
+        expect(hasEdge).toBe(true);
+      }
+    });
+  });
+
+  describe('Traceable graphs', () => {
+    it('should generate traceable graph with Hamiltonian path', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'connected' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'moderate' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        traceable: { kind: 'traceable' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 10, seed: 42 });
+      expect(result.nodes).toHaveLength(10);
+      expect(result.edges.length).toBeGreaterThanOrEqual(9); // m ≥ n-1
+
+      // Verify Hamiltonian path metadata exists
+      const hasPath = result.nodes.some(n => n.data?.traceablePath !== undefined);
+      expect(hasPath).toBe(true);
+    });
+
+    it('should verify Hamiltonian path visits all vertices', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'connected' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'moderate' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        traceable: { kind: 'traceable' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 8, seed: 42 });
+      const nodeData = result.nodes[0].data;
+      expect(nodeData).toBeDefined();
+      const path = nodeData!.traceablePath as string[];
+
+      expect(path).toBeDefined();
+      expect(path.length).toBe(8);
+
+      // Verify all consecutive pairs in path are edges
+      for (let i = 0; i < 7; i++) {
+        const current = path[i];
+        const next = path[i + 1];
+
+        const hasEdge = result.edges.some(
+          e => (e.source === current && e.target === next) ||
+               (e.source === next && e.target === current)
+        );
+        expect(hasEdge).toBe(true);
+      }
+    });
+  });
+});
+

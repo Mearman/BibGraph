@@ -32,7 +32,12 @@ import {
   validateSmallWorld,
   validateModular,
   validateLine,
-  validateSelfComplementary} from './validation';
+  validateSelfComplementary,
+  validateThreshold,
+  validateUnitDisk,
+  validatePlanar,
+  validateHamiltonian,
+  validateTraceable} from './validation';
 
 /**
  * Validate that a generated graph actually has its claimed properties.
@@ -78,6 +83,11 @@ export const validateGraphProperties = (graph: TestGraph): GraphValidationResult
   results.push(validateModular(graph));
   results.push(validateLine(graph));
   results.push(validateSelfComplementary(graph));
+  results.push(validateThreshold(graph));
+  results.push(validateUnitDisk(graph));
+  results.push(validatePlanar(graph));
+  results.push(validateHamiltonian(graph));
+  results.push(validateTraceable(graph));
   results.push(validateRegularGraph(graph));
   results.push(validateEulerian(graph));
   results.push(validateKVertexConnected(graph));

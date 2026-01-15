@@ -40,7 +40,12 @@ export {
   validateSmallWorld,
   validateModular,
   validateLine,
-  validateSelfComplementary
+  validateSelfComplementary,
+  validateThreshold,
+  validateUnitDisk,
+  validatePlanar,
+  validateHamiltonian,
+  validateTraceable
 } from './structural-validators';
 
 // Export degree validators
