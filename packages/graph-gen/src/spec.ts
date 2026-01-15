@@ -414,6 +414,28 @@ export type Integrity =
   | { kind: "unconstrained" };
 
 // ============================================================================
+// EXTREMAL GRAPHS
+// ============================================================================
+
+/** Cage graph: (girth, degree) combination with minimal vertices */
+export type Cage =
+  | { kind: "cage"; girth: number; degree: number }
+  | { kind: "not_cage" }
+  | { kind: "unconstrained" };
+
+/** Moore graph: maximum vertices for given (diameter, degree) bound */
+export type MooreGraph =
+  | { kind: "moore"; diameter: number; degree: number }
+  | { kind: "not_moore" }
+  | { kind: "unconstrained" };
+
+/** Ramanujan graph: optimal expander with spectral gap property */
+export type Ramanujan =
+  | { kind: "ramanujan"; degree: number }
+  | { kind: "not_ramanujan" }
+  | { kind: "unconstrained" };
+
+// ============================================================================
 // SPECIAL BIPARTITE PROPERTIES
 // ============================================================================
 
@@ -680,6 +702,11 @@ export type GraphSpec = Readonly<{
   toughness?: Toughness;
   integrity?: Integrity;
 
+  // Extremal graphs
+  cage?: Cage;
+  moore?: MooreGraph;
+  ramanujan?: Ramanujan;
+
   // Special bipartite properties
   completeBipartite?: CompleteBipartite;
 
@@ -754,6 +781,7 @@ export type GraphSpecPatch = Partial<Omit<GraphSpec,
   "independenceNumber" | "vertexCover" | "dominationNumber" |
   "spectrum" | "algebraicConnectivity" | "spectralRadius" |
   "toughness" | "integrity" |
+  "cage" | "moore" | "ramanujan" |
   "completeBipartite"
 >>;
 
