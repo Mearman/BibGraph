@@ -743,10 +743,8 @@ const generateFlowNetworkEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gr
   for (const targetId of intermediateLayer) {
     if (rng.next() < sourceConnectivity) {
       edges.push({
-        id: `edge-${source}-${targetId}`,
         source,
         target: targetId,
-        directed: true,
         weight: Math.floor(rng.next() * 10) + 1, // Capacity 1-10
       });
     }
@@ -768,10 +766,8 @@ const generateFlowNetworkEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gr
         // Avoid backward edges (maintain general flow direction)
         if (rng.next() < 0.7) {
           edges.push({
-            id: `edge-${fromId}-${toId}`,
             source: fromId,
             target: toId,
-            directed: true,
             weight: Math.floor(rng.next() * 10) + 1,
           });
         }
@@ -784,10 +780,8 @@ const generateFlowNetworkEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gr
   for (const sourceId of intermediateLayer) {
     if (rng.next() < sinkConnectivity) {
       edges.push({
-        id: `edge-${sourceId}-${sink}`,
         source: sourceId,
         target: sink,
-        directed: true,
         weight: Math.floor(rng.next() * 10) + 1,
       });
     }
@@ -796,10 +790,8 @@ const generateFlowNetworkEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gr
   // Also add a direct source→sink edge sometimes (higher capacity)
   if (rng.next() < 0.3) {
     edges.push({
-      id: `edge-${source}-${sink}`,
       source,
       target: sink,
-      directed: true,
       weight: Math.floor(rng.next() * 20) + 10, // Higher capacity 10-30
     });
   }
@@ -811,10 +803,8 @@ const generateFlowNetworkEdges = (nodes: TestNode[], edges: TestEdge[], spec: Gr
       const hasEdge = edges.some(e => e.source === source && e.target === targetId);
       if (!hasEdge) {
         edges.push({
-          id: `edge-${source}-${targetId}`,
           source,
           target: targetId,
-          directed: true,
           weight: Math.floor(rng.next() * 10) + 1,
         });
         if (edges.length >= n - 1) break;
