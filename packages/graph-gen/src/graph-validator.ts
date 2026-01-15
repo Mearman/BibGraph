@@ -15,6 +15,7 @@ import {
   validateDensityAndCompleteness,
   validateDiameter,
   validateDirectionality,
+  validateDominationNumber,
   validateEdgeMultiplicity,
   validateEdgeTransitive,
   validateEulerian,
@@ -22,6 +23,7 @@ import {
   validateGirth,
   validateHamiltonian,
   validateHereditaryClass,
+  validateIndependenceNumber,
   validateInterval,
   validateKColorable,
   validateKEdgeConnected,
@@ -45,6 +47,7 @@ import {
   validateTraceable,
   validateTreewidth,
   validateUnitDisk,
+  validateVertexCover,
   validateVertexTransitive,
   validateWeighting} from './validation';
 
@@ -106,6 +109,9 @@ export const validateGraphProperties = (graph: TestGraph): GraphValidationResult
   results.push(validateGirth(graph));
   results.push(validateCircumference(graph));
   results.push(validateHereditaryClass(graph));
+  results.push(validateIndependenceNumber(graph));
+  results.push(validateVertexCover(graph));
+  results.push(validateDominationNumber(graph));
   results.push(validateRegularGraph(graph));
   results.push(validateEulerian(graph));
   results.push(validateKVertexConnected(graph));
