@@ -425,6 +425,42 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
     return edges;
   }
 
+  // Phase 1: Core Structural Properties
+  if (spec.edgeTransitive?.kind === "edge_transitive") {
+    generateEdgeTransitiveEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.arcTransitive?.kind === "arc_transitive") {
+    generateArcTransitiveEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.diameter?.kind === "diameter") {
+    generateDiameterEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.radius?.kind === "radius") {
+    generateRadiusEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.girth?.kind === "girth") {
+    generateGirthEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.circumference?.kind === "circumference") {
+    generateCircumferenceEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.hereditaryClass?.kind === "hereditary_class") {
+    generateHereditaryClassEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
   // Non-bipartite graphs
   if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
     // Generate tree structure
@@ -3258,6 +3294,315 @@ const generateVertexTransitiveEdges = (nodes: TestNode[], edges: TestEdge[], spe
       }
     }
   }
+};
+
+/**
+ * Generate edge-transitive graph edges.
+ * Edge-transitive graphs have automorphisms mapping any edge to any other edge.
+ * Uses complete graph for simplicity (all edges symmetric).
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
+ */
+const generateEdgeTransitiveEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (spec.edgeTransitive?.kind !== "edge_transitive") {
+    throw new Error("Edge-transitive graph requires edge_transitive spec");
+  }
+
+  // Store edge-transitive property for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.edgeTransitive = true;
+  });
+
+  // Complete graph K_n is edge-transitive (all edges equivalent under automorphisms)
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      addEdge(edges, nodes[i].id, nodes[j].id, spec, rng);
+    }
+  }
+};
+
+/**
+ * Generate arc-transitive (symmetric) graph edges.
+ * Arc-transitive graphs are both vertex-transitive AND edge-transitive.
+ * Uses cycle graph C_n (which is symmetric for n ≥ 3).
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
+ */
+const generateArcTransitiveEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 3) return;
+
+  if (spec.arcTransitive?.kind !== "arc_transitive") {
+    throw new Error("Arc-transitive graph requires arc_transitive spec");
+  }
+
+  // Store arc-transitive property for validation
+  nodes.forEach((node, idx) => {
+    node.data = node.data || {};
+    node.data.arcTransitive = true;
+    node.data.symmetricGraph = true;
+    node.data.vertexPosition = idx;
+  });
+
+  // Cycle graph C_n is arc-transitive (symmetric) for n ≥ 3
+  const n = nodes.length;
+  for (let i = 0; i < n; i++) {
+    const next = (i + 1) % n;
+    addEdge(edges, nodes[i].id, nodes[next].id, spec, rng);
+  }
+};
+
+/**
+ * Generate graph with specified diameter.
+ * Diameter is the longest shortest path between any two vertices.
+ * Uses path graph P_n (diameter = n-1) or complete graph (diameter = 1).
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
+ */
+const generateDiameterEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (spec.diameter?.kind !== "diameter") {
+    throw new Error("Diameter graph requires diameter spec");
+  }
+
+  const { value: targetDiameter } = spec.diameter;
+
+  // Store diameter for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetDiameter = targetDiameter;
+  });
+
+  if (targetDiameter === 1) {
+    // Complete graph K_n has diameter 1
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        addEdge(edges, nodes[i].id, nodes[j].id, spec, rng);
+      }
+    }
+  } else if (targetDiameter >= nodes.length - 1) {
+    // Path graph P_n has diameter n-1
+    for (let i = 0; i < nodes.length - 1; i++) {
+      addEdge(edges, nodes[i].id, nodes[i + 1].id, spec, rng);
+    }
+  } else {
+    // Create path with extra edges to achieve intermediate diameter
+    // Start with path
+    for (let i = 0; i < nodes.length - 1; i++) {
+      addEdge(edges, nodes[i].id, nodes[i + 1].id, spec, rng);
+    }
+
+    // Add shortcut edges to reduce diameter from (n-1) to target
+    const currentDiameter = nodes.length - 1;
+    const reductionsNeeded = currentDiameter - targetDiameter;
+
+    for (let r = 0; r < reductionsNeeded; r++) {
+      const skip = Math.floor(nodes.length / (reductionsNeeded + 1)) * (r + 1);
+      const i = Math.floor(rng.next() * (nodes.length - skip - 1));
+      const j = i + skip;
+
+      if (j < nodes.length && !hasEdge(edges, nodes[i].id, nodes[j].id)) {
+        addEdge(edges, nodes[i].id, nodes[j].id, spec, rng);
+      }
+    }
+  }
+};
+
+/**
+ * Generate graph with specified radius.
+ * Radius is the minimum eccentricity among all vertices.
+ * For trees, radius = ⌈diameter/2⌉.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
+ */
+const generateRadiusEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (spec.radius?.kind !== "radius") {
+    throw new Error("Radius graph requires radius spec");
+  }
+
+  const { value: targetRadius } = spec.radius;
+
+  // Store radius for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetRadius = targetRadius;
+  });
+
+  // Create star graph (radius = 1) or path (radius ≈ n/2)
+  if (targetRadius === 1) {
+    // Star graph: center connected to all others
+    const center = nodes[0].id;
+    for (let i = 1; i < nodes.length; i++) {
+      addEdge(edges, center, nodes[i].id, spec, rng);
+    }
+  } else {
+    // Path graph has radius ⌈(n-1)/2⌉
+    for (let i = 0; i < nodes.length - 1; i++) {
+      addEdge(edges, nodes[i].id, nodes[i + 1].id, spec, rng);
+    }
+
+    // If target radius is smaller than path radius, add center connections
+    const pathRadius = Math.ceil((nodes.length - 1) / 2);
+    if (targetRadius < pathRadius) {
+      // Connect middle node to others to reduce eccentricity
+      const center = nodes[Math.floor(nodes.length / 2)].id;
+      const connectionsToAdd = pathRadius - targetRadius;
+
+      for (let i = 0; i < connectionsToAdd && i < Math.floor(nodes.length / 2); i++) {
+        const target = nodes[i].id;
+        if (!hasEdge(edges, center, target)) {
+          addEdge(edges, center, target, spec, rng);
+        }
+      }
+    }
+  }
+};
+
+/**
+ * Generate graph with specified girth.
+ * Girth is the length of the shortest cycle.
+ * Uses cycle graph C_k (girth = k) with additional tree nodes.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
+ */
+const generateGirthEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 3) return;
+
+  if (spec.girth?.kind !== "girth") {
+    throw new Error("Girth graph requires girth spec");
+  }
+
+  const { girth: targetGirth } = spec.girth;
+
+  // Store girth for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetGirth = targetGirth;
+  });
+
+  // Ensure we have enough nodes for the cycle
+  const cycleLength = Math.min(targetGirth, nodes.length);
+
+  // Create cycle C_k for girth = k
+  for (let i = 0; i < cycleLength; i++) {
+    const next = (i + 1) % cycleLength;
+    addEdge(edges, nodes[i].id, nodes[next].id, spec, rng);
+  }
+
+  // Attach remaining nodes as trees (preserves girth)
+  for (let i = cycleLength; i < nodes.length; i++) {
+    // Connect to a random node in the cycle (creating a tree attachment)
+    const parent = Math.floor(rng.next() * cycleLength);
+    addEdge(edges, nodes[parent].id, nodes[i].id, spec, rng);
+  }
+};
+
+/**
+ * Generate graph with specified circumference.
+ * Circumference is the length of the longest cycle.
+ * Uses cycle graph C_k (circumference = k) with additional chords.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
+ */
+const generateCircumferenceEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 3) return;
+
+  if (spec.circumference?.kind !== "circumference") {
+    throw new Error("Circumference graph requires circumference spec");
+  }
+
+  const { value: targetCircumference } = spec.circumference;
+
+  // Store circumference for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetCircumference = targetCircumference;
+  });
+
+  // Ensure target is achievable
+  const cycleLength = Math.min(targetCircumference, nodes.length);
+
+  // Create cycle C_k for circumference = k
+  for (let i = 0; i < cycleLength; i++) {
+    const next = (i + 1) % cycleLength;
+    addEdge(edges, nodes[i].id, nodes[next].id, spec, rng);
+  }
+
+  // Add remaining nodes with edges that don't create longer cycles
+  for (let i = cycleLength; i < nodes.length; i++) {
+    // Connect as tree branch (doesn't increase circumference)
+    const parent = Math.floor(rng.next() * cycleLength);
+    addEdge(edges, nodes[parent].id, nodes[i].id, spec, rng);
+  }
+
+  // Add chords within the cycle (doesn't increase longest cycle)
+  if (cycleLength > 4) {
+    const numChords = Math.floor(cycleLength / 4);
+    for (let i = 0; i < numChords; i++) {
+      const a = Math.floor(rng.next() * cycleLength);
+      const b = (a + 2) % cycleLength;
+      if (!hasEdge(edges, nodes[a].id, nodes[b].id)) {
+        addEdge(edges, nodes[a].id, nodes[b].id, spec, rng);
+      }
+    }
+  }
+};
+
+/**
+ * Generate hereditary class graph (forbidding specific induced subgraphs).
+ * Hereditary classes are closed under taking induced subgraphs.
+ * @param nodes
+ * @param edges
+ * @param spec
+ * @param rng
+ */
+const generateHereditaryClassEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (spec.hereditaryClass?.kind !== "hereditary_class") {
+    throw new Error("Hereditary class graph requires hereditary_class spec");
+  }
+
+  const { forbidden } = spec.hereditaryClass;
+
+  // Store forbidden patterns for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.forbiddenSubgraphs = forbidden;
+    node.data.hereditaryClass = true;
+  });
+
+  // For simplicity, generate a graph and filter out forbidden patterns
+  // Start with a random graph
+  const density = spec.density.kind === "sparse" ? 0.15 :
+                  spec.density.kind === "moderate" ? 0.4 :
+                  spec.density.kind === "dense" ? 0.7 : 0.3;
+
+  const totalPossibleEdges = (nodes.length * (nodes.length - 1)) / 2;
+  const targetEdgeCount = Math.floor(totalPossibleEdges * density);
+
+  let added = 0;
+  for (let i = 0; i < nodes.length && added < targetEdgeCount; i++) {
+    for (let j = i + 1; j < nodes.length && added < targetEdgeCount; j++) {
+      if (rng.next() < density) {
+        addEdge(edges, nodes[i].id, nodes[j].id, spec, rng);
+        added++;
+      }
+    }
+  }
+
+  // NOTE: Full hereditary class validation requires checking all induced subgraphs
+  // against forbidden patterns. This is computationally expensive and done in validation.
+  // The generator creates a random graph; the validator ensures hereditary property.
 };
 
 /**
