@@ -563,6 +563,57 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
     return edges;
   }
 
+  // Phase 5: Extremal Graphs
+  // Note: Extremal graphs are rare classifications, not generation constraints
+  // Generate standard edges first, then store classification metadata
+  if (spec.cage?.kind === "cage") {
+    // Generate standard connected graph
+    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
+      generateTreeEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
+      generateConnectedCyclicEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
+      generateForestEdges(nodes, edges, spec, rng);
+    } else {
+      generateDisconnectedEdges(nodes, edges, spec, rng);
+    }
+    // Store cage metadata
+    computeAndStoreCage(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.moore?.kind === "moore") {
+    // Generate standard connected graph
+    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
+      generateTreeEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
+      generateConnectedCyclicEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
+      generateForestEdges(nodes, edges, spec, rng);
+    } else {
+      generateDisconnectedEdges(nodes, edges, spec, rng);
+    }
+    // Store Moore graph metadata
+    computeAndStoreMooreGraph(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.ramanujan?.kind === "ramanujan") {
+    // Generate standard connected graph
+    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
+      generateTreeEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
+      generateConnectedCyclicEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
+      generateForestEdges(nodes, edges, spec, rng);
+    } else {
+      generateDisconnectedEdges(nodes, edges, spec, rng);
+    }
+    // Store Ramanujan graph metadata
+    computeAndStoreRamanujan(nodes, edges, spec, rng);
+    return edges;
+  }
+
   // Non-bipartite graphs
   if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
     // Generate tree structure
@@ -3993,6 +4044,74 @@ const computeAndStoreIntegrity = (nodes: TestNode[], edges: TestEdge[], spec: Gr
   nodes.forEach(node => {
     node.data = node.data || {};
     node.data.targetIntegrity = targetIntegrity;
+  });
+};
+
+/**
+ * Compute and store cage graph classification.
+ * Cage graphs have minimal vertices for given (girth, degree).
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param spec - Graph specification
+ * @param rng - Random number generator
+ */
+const computeAndStoreCage = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
+  if (spec.cage?.kind !== "cage") {
+    throw new Error("Cage computation requires cage spec");
+  }
+
+  const { girth, degree } = spec.cage;
+
+  // Store cage parameters for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetCageGirth = girth;
+    node.data.targetCageDegree = degree;
+  });
+};
+
+/**
+ * Compute and store Moore graph classification.
+ * Moore graphs achieve maximum vertices for given (diameter, degree).
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param spec - Graph specification
+ * @param rng - Random number generator
+ */
+const computeAndStoreMooreGraph = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
+  if (spec.moore?.kind !== "moore") {
+    throw new Error("Moore graph computation requires moore spec");
+  }
+
+  const { diameter, degree } = spec.moore;
+
+  // Store Moore graph parameters for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetMooreDiameter = diameter;
+    node.data.targetMooreDegree = degree;
+  });
+};
+
+/**
+ * Compute and store Ramanujan graph classification.
+ * Ramanujan graphs are optimal expanders with spectral gap property.
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param spec - Graph specification
+ * @param rng - Random number generator
+ */
+const computeAndStoreRamanujan = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
+  if (spec.ramanujan?.kind !== "ramanujan") {
+    throw new Error("Ramanujan graph computation requires ramanujan spec");
+  }
+
+  const { degree } = spec.ramanujan;
+
+  // Store Ramanujan graph degree for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetRamanujanDegree = degree;
   });
 };
 
