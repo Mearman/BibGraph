@@ -41,6 +41,7 @@ import {
   validateSelfComplementary,
   validateSelfLoops,
   validateSmallWorld,
+  validateSplit,
   validateSpectralRadius,
   validateSpectrum,
   validateStronglyRegular,
@@ -48,10 +49,14 @@ import {
   validateToughness,
   validateTraceable,
   validateTreewidth,
+  validateTournament,
   validateUnitDisk,
   validateVertexCover,
   validateVertexTransitive,
   validateIntegrity,
+  validateCage,
+  validateMooreGraph,
+  validateRamanujan,
   validateWeighting} from './validation';
 
 /**
@@ -120,6 +125,9 @@ export const validateGraphProperties = (graph: TestGraph): GraphValidationResult
   results.push(validateSpectralRadius(graph));
   results.push(validateToughness(graph));
   results.push(validateIntegrity(graph));
+  results.push(validateCage(graph));
+  results.push(validateMooreGraph(graph));
+  results.push(validateRamanujan(graph));
   results.push(validateRegularGraph(graph));
   results.push(validateEulerian(graph));
   results.push(validateKVertexConnected(graph));
