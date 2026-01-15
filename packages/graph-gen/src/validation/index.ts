@@ -30,7 +30,12 @@ export {
   validateTournament,
   validateSplit,
   validateCograph,
-  validateClawFree
+  validateClawFree,
+  validateChordal,
+  validateInterval,
+  validatePermutation,
+  validateComparability,
+  validatePerfect
 } from './structural-validators';
 
 // Export degree validators

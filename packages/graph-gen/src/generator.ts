@@ -321,6 +321,40 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
     return edges;
   }
 
+  // ============================================================================
+  // PHASE 2: CHORDAL-BASED GRAPH CLASSES (high priority)
+  // ============================================================================
+
+  // Handle chordal graphs (no induced cycles > 3)
+  if (spec.chordal?.kind === "chordal") {
+    generateChordalEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  // Handle interval graphs (intersection of intervals on real line)
+  if (spec.interval?.kind === "interval") {
+    generateIntervalEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  // Handle permutation graphs (from permutation π)
+  if (spec.permutation?.kind === "permutation") {
+    generatePermutationEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  // Handle comparability graphs (transitively orientable)
+  if (spec.comparability?.kind === "comparability") {
+    generateComparabilityEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  // Handle perfect graphs (ω(H) = χ(H) for all induced subgraphs H)
+  if (spec.perfect?.kind === "perfect") {
+    generatePerfectEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
   // Non-bipartite graphs
   if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
     // Generate tree structure
@@ -1544,6 +1578,25 @@ const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, 
     return; // Claw-free graphs have exact structure
   }
 
+  // ============================================================================
+  // PHASE 2: CHORDAL-BASED GRAPH CLASSES (exact structure)
+  // ============================================================================
+  if (spec.chordal?.kind === "chordal") {
+    return; // Chordal graphs have exact structure
+  }
+  if (spec.interval?.kind === "interval") {
+    return; // Interval graphs have exact structure
+  }
+  if (spec.permutation?.kind === "permutation") {
+    return; // Permutation graphs have exact structure
+  }
+  if (spec.comparability?.kind === "comparability") {
+    return; // Comparability graphs have exact structure
+  }
+  if (spec.perfect?.kind === "perfect") {
+    return; // Perfect graphs have exact structure
+  }
+
   // Get bipartite partitions if applicable
   const isBipartite = spec.partiteness?.kind === "bipartite";
   const leftPartition = isBipartite
@@ -2276,6 +2329,182 @@ const generateClawFreeEdges = (nodes: TestNode[], edges: TestEdge[], spec: Graph
   }
 };
 
+// ============================================================================
+// PHASE 2: CHORDAL-BASED GRAPH CLASSES
+// ============================================================================
+
+/**
+ * Generate chordal graph edges.
+ * Chordal graphs have no induced cycles > 3 (all cycles have chords).
+ * Algorithm: Use k-tree construction (simplified treewidth).
+ */
+const generateChordalEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 3) {
+    // Complete graph for small n
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        addEdge(edges, nodes[i].id, nodes[j].id, spec, rng);
+      }
+    }
+    return;
+  }
+
+  // k-tree construction: start with (k+1)-clique, iteratively add vertices
+  // connected to all vertices in a k-clique
+  const k = Math.min(Math.floor(rng.next() * 3) + 1, nodes.length - 1);
+
+  // Create initial (k+1)-clique
+  const initialClique = nodes.slice(0, k + 1);
+  for (let i = 0; i < initialClique.length; i++) {
+    for (let j = i + 1; j < initialClique.length; j++) {
+      addEdge(edges, initialClique[i].id, initialClique[j].id, spec, rng);
+    }
+  }
+
+  // Add remaining vertices, each connecting to a k-clique
+  for (let i = k + 1; i < nodes.length; i++) {
+    // Select k random nodes from existing to form k-clique
+    const existingNodes = nodes.slice(0, i);
+    const cliqueSize = Math.min(k, existingNodes.length);
+
+    // Simple approach: connect to first k nodes (forms valid k-tree)
+    for (let j = 0; j < cliqueSize; j++) {
+      addEdge(edges, nodes[i].id, existingNodes[j].id, spec, rng);
+    }
+  }
+};
+
+/**
+ * Generate interval graph edges.
+ * Interval graphs = intersection graphs of intervals on real line.
+ * Algorithm: Generate random intervals, connect if they intersect.
+ */
+const generateIntervalEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 2) return;
+
+  // Generate random intervals: [start, start + length]
+  const intervals = nodes.map(node => {
+    const start = rng.next() * 100;
+    const length = 1 + rng.next() * 20;
+    const end = start + length;
+
+    // Store interval metadata in node data
+    node.data = node.data || {};
+    node.data.interval = { start, end, length };
+
+    return { node, start, end };
+  });
+
+  // Create intersection graph: edge if intervals intersect
+  for (let i = 0; i < intervals.length; i++) {
+    for (let j = i + 1; j < intervals.length; j++) {
+      const a = intervals[i];
+      const b = intervals[j];
+
+      // Intervals intersect if: a.start < b.end && b.start < a.end
+      if (a.start < b.end && b.start < a.end) {
+        addEdge(edges, a.node.id, b.node.id, spec, rng);
+      }
+    }
+  }
+};
+
+/**
+ * Generate permutation graph edges.
+ * Permutation graphs = intersection graphs of line segments between parallel lines.
+ * Algorithm: Generate permutation π, create edge (i, j) iff (i - j)(π(i) - π(j)) < 0.
+ */
+const generatePermutationEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  const n = nodes.length;
+
+  if (n < 2) return;
+
+  // Generate random permutation
+  const permutation = Array.from({ length: n }, (_, i) => i);
+  shuffleArray(permutation, rng);
+
+  // Store permutation value in node data for validation
+  nodes.forEach((node, i) => {
+    node.data = node.data || {};
+    node.data.permutationValue = permutation[i];
+  });
+
+  // Create edge (i, j) iff (i - j)(π(i) - π(j)) < 0 (inversions in permutation)
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const diff1 = i - j;
+      const diff2 = permutation[i] - permutation[j];
+
+      // Edge if signs differ (one negative, one positive)
+      if (diff1 * diff2 < 0) {
+        addEdge(edges, nodes[i].id, nodes[j].id, spec, rng);
+      }
+    }
+  }
+};
+
+/**
+ * Generate comparability graph edges.
+ * Comparability graphs = transitively orientable graphs (from partial orders).
+ * Algorithm: Generate random DAG, create undirected graph from transitive reduction.
+ */
+const generateComparabilityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 2) return;
+
+  // Generate random topological ordering (DAG constraint)
+  const ordering = Array.from({ length: nodes.length }, (_, i) => i);
+  shuffleArray(ordering, rng);
+
+  // Store order in node data for validation
+  nodes.forEach((node, i) => {
+    node.data = node.data || {};
+    node.data.topologicalOrder = ordering[i];
+  });
+
+  // Create edges respecting topological order (only forward in ordering)
+  // This creates a DAG, which is transitively orientable
+  const edgeProbability = 0.3;
+
+  for (let i = 0; i < ordering.length; i++) {
+    for (let j = i + 1; j < ordering.length; j++) {
+      if (rng.next() < edgeProbability) {
+        const u = nodes[ordering[i]];
+        const v = nodes[ordering[j]];
+        addEdge(edges, u.id, v.id, spec, rng);
+      }
+    }
+  }
+};
+
+/**
+ * Generate perfect graph edges.
+ * Perfect graphs = ω(H) = χ(H) for all induced subgraphs H.
+ * Algorithm: Generate graphs known to be perfect (chordal, bipartite, cograph).
+ */
+const generatePerfectEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 2) return;
+
+  // Randomly choose a perfect graph class
+  const choice = rng.next();
+
+  if (choice < 0.4) {
+    // 40%: Generate chordal graph (perfect by Strong Perfect Graph Theorem)
+    generateChordalEdges(nodes, edges, spec, rng);
+  } else if (choice < 0.7) {
+    // 30%: Generate bipartite graph (perfect)
+    generateCompleteBipartiteEdges(nodes, edges, spec, rng);
+  } else {
+    // 30%: Generate cograph (perfect)
+    generateCographEdges(nodes, edges, spec, rng);
+  }
+
+  // Mark as perfect for validator
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.perfectClass = choice < 0.4 ? 'chordal' : choice < 0.7 ? 'bipartite' : 'cograph';
+  });
+};
+
 /**
  * Add edge to edge list.
  * NOTE: For undirected graphs, only store one direction - the validator's
@@ -2295,4 +2524,16 @@ const addEdge = (edges: TestEdge[], source: string, target: string, spec: GraphS
   }
 
   edges.push(edge);
+};
+
+/**
+ * Shuffle array in-place using Fisher-Yates algorithm with seeded RNG.
+ * @param array - Array to shuffle
+ * @param rng - Seeded random number generator
+ */
+const shuffleArray = <T>(array: T[], rng: SeededRandom): void => {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = rng.integer(0, i);
+    [array[i], array[j]] = [array[j], array[i]];
+  }
 };

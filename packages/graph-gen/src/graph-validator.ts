@@ -22,7 +22,12 @@ import {
   validateSplit,
   validateTournament,
   validateTreewidth,
-  validateWeighting} from './validation';
+  validateWeighting,
+  validateChordal,
+  validateInterval,
+  validatePermutation,
+  validateComparability,
+  validatePerfect} from './validation';
 
 /**
  * Validate that a generated graph actually has its claimed properties.
@@ -58,6 +63,11 @@ export const validateGraphProperties = (graph: TestGraph): GraphValidationResult
   results.push(validateSplit(graph));
   results.push(validateCograph(graph));
   results.push(validateClawFree(graph));
+  results.push(validateChordal(graph));
+  results.push(validateInterval(graph));
+  results.push(validatePermutation(graph));
+  results.push(validateComparability(graph));
+  results.push(validatePerfect(graph));
   results.push(validateRegularGraph(graph));
   results.push(validateEulerian(graph));
   results.push(validateKVertexConnected(graph));

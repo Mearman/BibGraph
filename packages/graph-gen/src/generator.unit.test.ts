@@ -883,3 +883,338 @@ describe('generateGraph', () => {
     });
   });
 });
+
+describe('Phase 2: Chordal-Based Graph Classes', () => {
+  describe('Chordal graphs', () => {
+    it('should generate chordal graph (no induced cycles > 3)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        chordal: { kind: 'chordal' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 10, seed: 42 });
+
+      expect(result.nodes).toHaveLength(10);
+      expect(result.edges.length).toBeGreaterThan(0);
+
+      // Build adjacency list for cycle checking
+      const adjacency = new Map<string, Set<string>>();
+      for (const node of result.nodes) {
+        adjacency.set(node.id, new Set());
+      }
+      for (const edge of result.edges) {
+        adjacency.get(edge.source)?.add(edge.target);
+        adjacency.get(edge.target)?.add(edge.source);
+      }
+
+      // For chordal graphs, we can't easily verify absence of chordless cycles
+      // But we can verify the graph is connected and has reasonable density
+      const visited = new Set<string>();
+      const stack = [result.nodes[0].id];
+
+      while (stack.length > 0) {
+        const current = stack.pop()!;
+        if (visited.has(current)) continue;
+        visited.add(current);
+
+        for (const neighbor of adjacency.get(current) || []) {
+          if (!visited.has(neighbor)) {
+            stack.push(neighbor);
+          }
+        }
+      }
+
+      expect(visited.size).toBe(10); // Graph should be connected
+    });
+
+    it('should handle trivial chordal graph (n<4)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        chordal: { kind: 'chordal' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 3, seed: 42 });
+
+      expect(result.nodes).toHaveLength(3);
+      // Any graph with < 4 vertices is automatically chordal
+    });
+  });
+
+  describe('Interval graphs', () => {
+    it('should generate interval graph from intervals', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        interval: { kind: 'interval' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 10, seed: 42 });
+
+      expect(result.nodes).toHaveLength(10);
+      expect(result.edges.length).toBeGreaterThan(0);
+
+      // Verify all nodes have interval metadata
+      result.nodes.forEach(node => {
+        expect(node.data?.interval).toBeDefined();
+        const interval = node.data!.interval as { start: number; end: number; length: number };
+        expect(interval.start).toBeGreaterThanOrEqual(0);
+        expect(interval.end).toBeGreaterThan(interval.start);
+      });
+
+      // Verify edges match interval intersections
+      const adjacency = new Map<string, Set<string>>();
+      for (const node of result.nodes) {
+        adjacency.set(node.id, new Set());
+      }
+      for (const edge of result.edges) {
+        adjacency.get(edge.source)?.add(edge.target);
+        adjacency.get(edge.target)?.add(edge.source);
+      }
+
+      // Check all pairs
+      for (let i = 0; i < result.nodes.length; i++) {
+        for (let j = i + 1; j < result.nodes.length; j++) {
+          const a = result.nodes[i];
+          const b = result.nodes[j];
+          const aInterval = a.data!.interval as { start: number; end: number; length: number };
+          const bInterval = b.data!.interval as { start: number; end: number; length: number };
+
+          const intersect = aInterval.start < bInterval.end && bInterval.start < aInterval.end;
+          const hasEdge = adjacency.get(a.id)?.has(b.id);
+
+          expect(hasEdge).toBe(intersect);
+        }
+      }
+    });
+
+    it('should handle minimal interval graph (n=2)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        interval: { kind: 'interval' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 2, seed: 42 });
+
+      expect(result.nodes).toHaveLength(2);
+      result.nodes.forEach(node => {
+        expect(node.data?.interval).toBeDefined();
+      });
+    });
+  });
+
+  describe('Permutation graphs', () => {
+    it('should generate permutation graph from permutation π', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        permutation: { kind: 'permutation' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 10, seed: 42 });
+
+      expect(result.nodes).toHaveLength(10);
+
+      // Verify all nodes have permutation metadata
+      result.nodes.forEach(node => {
+        expect(node.data?.permutationValue).toBeDefined();
+        expect(node.data!.permutationValue).toBeGreaterThanOrEqual(0);
+        expect(node.data!.permutationValue).toBeLessThan(10);
+      });
+
+      // Verify edges match permutation pattern
+      const permutation = result.nodes.map(n => n.data!.permutationValue);
+      const adjacency = new Map<string, Set<string>>();
+      for (const node of result.nodes) {
+        adjacency.set(node.id, new Set());
+      }
+      for (const edge of result.edges) {
+        adjacency.get(edge.source)?.add(edge.target);
+        adjacency.get(edge.target)?.add(edge.source);
+      }
+
+      // Check all pairs
+      for (let i = 0; i < result.nodes.length; i++) {
+        for (let j = i + 1; j < result.nodes.length; j++) {
+          const diff1 = i - j;
+          const diff2 = (permutation[i] as number) - (permutation[j] as number);
+          const shouldHaveEdge = diff1 * diff2 < 0;
+          const hasEdge = adjacency.get(result.nodes[i].id)?.has(result.nodes[j].id);
+
+          expect(hasEdge).toBe(shouldHaveEdge);
+        }
+      }
+    });
+
+    it('should handle trivial permutation graph (n=2)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        permutation: { kind: 'permutation' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 2, seed: 42 });
+
+      expect(result.nodes).toHaveLength(2);
+      result.nodes.forEach(node => {
+        expect(node.data?.permutationValue).toBeDefined();
+      });
+    });
+  });
+
+  describe('Comparability graphs', () => {
+    it('should generate comparability graph (transitively orientable)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        comparability: { kind: 'comparability' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 10, seed: 42 });
+
+      expect(result.nodes).toHaveLength(10);
+      expect(result.edges.length).toBeGreaterThan(0);
+
+      // Verify all nodes have topological order metadata
+      result.nodes.forEach(node => {
+        expect(node.data?.topologicalOrder).toBeDefined();
+        expect(node.data!.topologicalOrder).toBeGreaterThanOrEqual(0);
+        expect(node.data!.topologicalOrder).toBeLessThan(10);
+      });
+
+      // Verify topological orders are unique (permutation of 0..n-1)
+      const orders = result.nodes.map(n => n.data!.topologicalOrder);
+      const uniqueOrders = new Set(orders);
+      expect(uniqueOrders.size).toBe(10);
+    });
+
+    it('should handle trivial comparability graph (n=2)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        comparability: { kind: 'comparability' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 2, seed: 42 });
+
+      expect(result.nodes).toHaveLength(2);
+      result.nodes.forEach(node => {
+        expect(node.data?.topologicalOrder).toBeDefined();
+      });
+    });
+  });
+
+  describe('Perfect graphs', () => {
+    it('should generate perfect graph (ω(H) = χ(H) for all induced H)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        perfect: { kind: 'perfect' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 10, seed: 42 });
+
+      expect(result.nodes).toHaveLength(10);
+      expect(result.edges.length).toBeGreaterThan(0);
+
+      // Verify all nodes have perfect class metadata
+      result.nodes.forEach(node => {
+        expect(node.data?.perfectClass).toBeDefined();
+        expect(['chordal', 'bipartite', 'cograph']).toContain(node.data!.perfectClass);
+      });
+
+      // Verify all nodes have the same perfect class
+      const perfectClass = result.nodes[0].data!.perfectClass;
+      result.nodes.forEach(node => {
+        expect(node.data!.perfectClass).toBe(perfectClass);
+      });
+    });
+
+    it('should handle trivial perfect graph (n=2)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        perfect: { kind: 'perfect' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 2, seed: 42 });
+
+      expect(result.nodes).toHaveLength(2);
+      result.nodes.forEach(node => {
+        expect(node.data?.perfectClass).toBeDefined();
+      });
+    });
+  });
+});
