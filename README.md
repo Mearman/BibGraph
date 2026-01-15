@@ -132,6 +132,12 @@ flowchart LR
         client_typecheck{{"typecheck"}}
     end
 
+    subgraph graph_core["graph-core"]
+        graph_core_build[["build"]]
+        graph_core_lint{{"lint"}}
+        graph_core_typecheck{{"typecheck"}}
+    end
+
     subgraph graph_expansion["graph-expansion"]
         graph_expansion_build[["build"]]
         graph_expansion_lint{{"lint"}}
@@ -180,9 +186,11 @@ flowchart LR
 
     %% Task dependencies
     algorithms_typecheck --> algorithms_build
+    graph_expansion_build --> algorithms_build
     graph_gen_build --> algorithms_build
     types_build --> algorithms_build
     algorithms_typecheck --> algorithms_test
+    graph_expansion_build --> algorithms_typecheck
     graph_gen_build --> algorithms_typecheck
     types_build --> algorithms_typecheck
     client_build --> cli_test
@@ -198,7 +206,12 @@ flowchart LR
     utils_build --> client_test
     types_build --> client_typecheck
     utils_build --> client_typecheck
+    graph_core_typecheck --> graph_core_build
+    algorithms_build --> graph_core_build
+    graph_expansion_build --> graph_core_build
     graph_expansion_typecheck --> graph_expansion_build
+    graph_gen_build --> graph_expansion_build
+    graph_gen_build --> graph_expansion_test
     graph_gen_typecheck --> graph_gen_build
     graph_gen_typecheck --> graph_gen_test
     web_build --> tools_typecheck
@@ -218,16 +231,22 @@ flowchart LR
     types_build --> web_build
     algorithms_build --> web_build
     client_build --> web_build
+    graph_core_build --> web_build
+    graph_expansion_build --> web_build
     ui_build --> web_build
     utils_build --> web_build
     types_build --> web_test
     algorithms_build --> web_test
     client_build --> web_test
+    graph_core_build --> web_test
+    graph_expansion_build --> web_test
     ui_build --> web_test
     utils_build --> web_test
     types_build --> web_typecheck
     algorithms_build --> web_typecheck
     client_build --> web_typecheck
+    graph_core_build --> web_typecheck
+    graph_expansion_build --> web_typecheck
     ui_build --> web_typecheck
     utils_build --> web_typecheck
 ```
