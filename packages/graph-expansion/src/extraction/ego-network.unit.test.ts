@@ -468,10 +468,14 @@ describe('extractEgoNetwork', () => {
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.nodes).toHaveLength(2);
-        expect(result.value.edges).toHaveLength(1);
-        expect(result.value.edges[0].source).toBe('A');
-        expect(result.value.edges[0].target).toBe('B');
+        // Induced subgraph includes A, B, C (all nodes within 1 hop of A)
+        // and all edges between them (A->B, A->C, B->C)
+        expect(result.value.nodes).toHaveLength(3);
+        expect(result.value.edges).toHaveLength(3);
+        const ids = result.value.nodes.map(n => n.id);
+        expect(ids).toContain('A');
+        expect(ids).toContain('B');
+        expect(ids).toContain('C');
       }
     });
 
@@ -496,6 +500,11 @@ describe('extractEgoNetwork', () => {
   describe('extractMultiSourceEgoNetwork', () => {
     it('should extract union of multiple seed node neighborhoods', () => {
       // Create graph: A -> B, C -> D, B -> E
+      // With radius 1 from A and C:
+      // - A's neighborhood: {A, B}
+      // - C's neighborhood: {C, D}
+      // - Union: {A, B, C, D}
+      // Note: E is at distance 2 from A (A->B->E), so NOT included with radius 1
       graph.addNode({ id: 'A', label: 'Node A' });
       graph.addNode({ id: 'B', label: 'Node B' });
       graph.addNode({ id: 'C', label: 'Node C' });
@@ -509,13 +518,13 @@ describe('extractEgoNetwork', () => {
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.nodes).toHaveLength(5);
+        expect(result.value.nodes).toHaveLength(4);
         const ids = result.value.nodes.map(n => n.id);
         expect(ids).toContain('A');
         expect(ids).toContain('B');
         expect(ids).toContain('C');
         expect(ids).toContain('D');
-        expect(ids).toContain('E');
+        expect(ids).not.toContain('E'); // E is at distance 2 from A
       }
     });
 

@@ -18,6 +18,9 @@ coverage-reports
 # But allow source files in apps/*/coverage/ directories (test infrastructure utilities)
 !apps/web/coverage/
 
+# Runtime cache directories
+/cache
+
 # Test results and artifacts
 test-results
 playwright-report*
