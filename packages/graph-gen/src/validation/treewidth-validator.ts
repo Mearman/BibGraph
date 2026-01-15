@@ -167,9 +167,17 @@ const findMaxCliqueSizeInSet = (vertices: Set<string>, adjacency: Map<string, st
   }
 
   let maxSize = 0;
+  const MAX_DEPTH = 100; // Prevent stack overflow on large graphs
 
   // Bron-Kerbosch with pivot
-  const bronKerbosch = (R: Set<string>, P: Set<string>, X: Set<string>): void => {
+  const bronKerbosch = (R: Set<string>, P: Set<string>, X: Set<string>, depth: number = 0): void => {
+    if (depth > MAX_DEPTH) {
+      // Depth limit exceeded, return conservative estimate
+      // For dense graphs with many vertices, max clique is likely all vertices
+      maxSize = Math.max(maxSize, Math.min(vertices.size, R.size + P.size));
+      return;
+    }
+
     if (P.size === 0 && X.size === 0) {
       // R is a maximal clique
       maxSize = Math.max(maxSize, R.size);
@@ -206,7 +214,7 @@ const findMaxCliqueSizeInSet = (vertices: Set<string>, adjacency: Map<string, st
       const newP = new Set([...P].filter(n => vNeighbors.has(n)));
       const newX = new Set([...X].filter(n => vNeighbors.has(n)));
 
-      bronKerbosch(newR, newP, newX);
+      bronKerbosch(newR, newP, newX, depth + 1);
 
       P.delete(v);
       X.add(v);
@@ -245,9 +253,16 @@ export const findMaxCliqueSize = (nodes: TestNode[], edges: TestEdge[], directed
   const adjacency = buildAdjacencyList(nodes, edges, false);
 
   let maxSize = 0;
+  const MAX_DEPTH = 100; // Prevent stack overflow on large graphs
 
   // Bron-Kerbosch with pivot
-  const bronKerbosch = (R: Set<string>, P: Set<string>, X: Set<string>): void => {
+  const bronKerbosch = (R: Set<string>, P: Set<string>, X: Set<string>, depth: number = 0): void => {
+    if (depth > MAX_DEPTH) {
+      // Depth limit exceeded, return conservative estimate
+      maxSize = Math.max(maxSize, Math.min(nodes.length, R.size + P.size));
+      return;
+    }
+
     if (P.size === 0 && X.size === 0) {
       // R is a maximal clique
       maxSize = Math.max(maxSize, R.size);
@@ -284,7 +299,7 @@ export const findMaxCliqueSize = (nodes: TestNode[], edges: TestEdge[], directed
       const newP = new Set([...P].filter(n => vNeighbors.has(n)));
       const newX = new Set([...X].filter(n => vNeighbors.has(n)));
 
-      bronKerbosch(newR, newP, newX);
+      bronKerbosch(newR, newP, newX, depth + 1);
 
       P.delete(v);
       X.add(v);
