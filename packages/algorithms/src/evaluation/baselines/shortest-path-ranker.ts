@@ -2,9 +2,9 @@
  * Shortest path ranking baseline
  */
 
-import type { Edge, Node } from '../../types/graph';
-import type { Path } from '../../types/algorithm-results';
 import type { RankedPath } from '../../pathfinding/path-ranking';
+import type { Path } from '../../types/algorithm-results';
+import type { Edge, Node } from '../../types/graph';
 
 /**
  * Rank paths by length (shortest first).
@@ -13,9 +13,7 @@ import type { RankedPath } from '../../pathfinding/path-ranking';
  * @param paths - Paths to rank
  * @returns Paths sorted by length (ascending)
  */
-export function shortestPathRanker<N extends Node, E extends Edge>(
-  paths: Path<N, E>[]
-): RankedPath<N, E>[] {
+export const shortestPathRanker = <N extends Node, E extends Edge>(paths: Path<N, E>[]): RankedPath<N, E>[] => {
   // Calculate scores (inverse of length so shorter paths have higher scores)
   const pathScores = paths.map((path) => {
     const length = path.edges.length;
@@ -36,4 +34,4 @@ export function shortestPathRanker<N extends Node, E extends Edge>(
   pathScores.sort((a, b) => b.score - a.score);
 
   return pathScores;
-}
+};

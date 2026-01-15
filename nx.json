@@ -16,7 +16,7 @@
       "heartbeatIntervalMs": 60000,
       "processExitTimeoutMs": 15000,
       "cleanupOnProcessExit": true,
-      "maxMemoryUsage": "512MB"
+      "maxMemoryUsage": "2048MB"
     }
   },
   "workspaceLayout": {
@@ -371,9 +371,6 @@
         "command": "tsc --noEmit",
         "cwd": "{projectRoot}"
       },
-      "dependsOn": [
-        "^build"
-      ],
       "inputs": [
         "source",
         "configs",

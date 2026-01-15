@@ -11,13 +11,13 @@ export default {
 
   // TypeScript and JavaScript files in packages and apps
   '{packages,apps}/**/*.{ts,tsx,js,jsx}': [
-    // Run cached lint:fix for affected projects using Nx
-    'nx affected --target=lint:fix'
+    // Run cached lint:fix for affected projects using Nx (no daemon for pre-commit)
+    () => 'NX_DAEMON=false nx affected --target=lint:fix'
   ],
 
-  // Type check all affected projects
+  // Type check all affected projects (no daemon for pre-commit)
   '*.{ts,tsx}': [
-    () => 'nx affected --target=typecheck'
+    () => 'NX_DAEMON=false nx affected --target=typecheck'
   ],
 
   // GitHub workflow files (actionlint only validates workflow files in .github/workflows/)

@@ -16,7 +16,7 @@ interface ItemWithRelevance {
  * @param k - Cutoff position
  * @returns DCG@k score
  */
-function dcgAtK(items: ItemWithRelevance[], k: number): number {
+const dcgAtK = (items: ItemWithRelevance[], k: number): number => {
   const discounted = items.slice(0, k);
   let sum = 0;
 
@@ -30,7 +30,7 @@ function dcgAtK(items: ItemWithRelevance[], k: number): number {
   }
 
   return sum;
-}
+};
 
 /**
  * Normalized Discounted Cumulative Gain.
@@ -41,11 +41,7 @@ function dcgAtK(items: ItemWithRelevance[], k: number): number {
  * @param k - Cutoff position (default: all items)
  * @returns NDCG@k ∈ [0, 1], where 1 = perfect ranking
  */
-export function ndcg(
-  predicted: Array<{ id: string; relevance: number }>,
-  groundTruth: Array<{ id: string; relevance: number }>,
-  k?: number
-): number {
+export const ndcg = (predicted: Array<{ id: string; relevance: number }>, groundTruth: Array<{ id: string; relevance: number }>, k?: number): number => {
   if (predicted.length === 0 || groundTruth.length === 0) {
     return 0;
   }
@@ -59,7 +55,7 @@ export function ndcg(
   }
 
   return predictedDCG / idealDCG;
-}
+};
 
 /**
  * Mean Average Precision.
@@ -69,10 +65,7 @@ export function ndcg(
  * @param relevantItems - Set of relevant item IDs
  * @returns MAP ∈ [0, 1]
  */
-export function meanAveragePrecision(
-  predicted: string[],
-  relevantItems: Set<string>
-): number {
+export const meanAveragePrecision = (predicted: string[], relevantItems: Set<string>): number => {
   if (predicted.length === 0 || relevantItems.size === 0) {
     return 0;
   }
@@ -95,7 +88,7 @@ export function meanAveragePrecision(
   }
 
   return precisionSum / relevantCount;
-}
+};
 
 /**
  * Mean Reciprocal Rank.
@@ -105,10 +98,7 @@ export function meanAveragePrecision(
  * @param relevantItems - Set of relevant item IDs
  * @returns MRR ∈ [0, 1]
  */
-export function meanReciprocalRank(
-  predicted: string[],
-  relevantItems: Set<string>
-): number {
+export const meanReciprocalRank = (predicted: string[], relevantItems: Set<string>): number => {
   if (predicted.length === 0 || relevantItems.size === 0) {
     return 0;
   }
@@ -122,7 +112,7 @@ export function meanReciprocalRank(
   }
 
   return 0; // No relevant items found
-}
+};
 
 /**
  * Precision at K.
@@ -133,11 +123,7 @@ export function meanReciprocalRank(
  * @param k - Cutoff position
  * @returns P@K ∈ [0, 1]
  */
-export function precisionAtK(
-  predicted: string[],
-  relevantItems: Set<string>,
-  k: number
-): number {
+export const precisionAtK = (predicted: string[], relevantItems: Set<string>, k: number): number => {
   if (predicted.length === 0 || relevantItems.size === 0 || k <= 0) {
     return 0;
   }
@@ -146,7 +132,7 @@ export function precisionAtK(
   const relevantInTopK = topK.filter(item => relevantItems.has(item)).length;
 
   return relevantInTopK / k;
-}
+};
 
 /**
  * Recall at K.
@@ -157,11 +143,7 @@ export function precisionAtK(
  * @param k - Cutoff position
  * @returns R@K ∈ [0, 1]
  */
-export function recallAtK(
-  predicted: string[],
-  relevantItems: Set<string>,
-  k: number
-): number {
+export const recallAtK = (predicted: string[], relevantItems: Set<string>, k: number): number => {
   if (predicted.length === 0 || relevantItems.size === 0 || k <= 0) {
     return 0;
   }
@@ -170,4 +152,4 @@ export function recallAtK(
   const relevantInTopK = topK.filter(item => relevantItems.has(item)).length;
 
   return relevantInTopK / relevantItems.size;
-}
+};

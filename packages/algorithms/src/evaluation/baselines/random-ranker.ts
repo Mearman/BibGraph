@@ -2,9 +2,9 @@
  * Random path ranking baseline
  */
 
-import type { Edge, Node } from '../../types/graph';
-import type { Path } from '../../types/algorithm-results';
 import type { RankedPath } from '../../pathfinding/path-ranking';
+import type { Path } from '../../types/algorithm-results';
+import type { Edge, Node } from '../../types/graph';
 
 /**
  * Seeded random number generator for reproducibility.
@@ -26,6 +26,7 @@ class SeededRandom {
 
   /**
    * Shuffle array using Fisher-Yates algorithm with seeded random.
+   * @param array
    */
   shuffle<T>(array: T[]): T[] {
     const result = [...array];
@@ -45,10 +46,7 @@ class SeededRandom {
  * @param seed - Random seed for reproducibility
  * @returns Randomly ordered paths with scores
  */
-export function randomRanker<N extends Node, E extends Edge>(
-  paths: Path<N, E>[],
-  seed?: number
-): RankedPath<N, E>[] {
+export const randomRanker = <N extends Node, E extends Edge>(paths: Path<N, E>[], seed?: number): RankedPath<N, E>[] => {
   const rng = new SeededRandom(seed ?? Date.now());
 
   // Shuffle paths randomly
@@ -61,4 +59,4 @@ export function randomRanker<N extends Node, E extends Edge>(
     geometricMeanMI: 0, // No MI computation for random baseline
     edgeMIValues: [],
   }));
-}
+};

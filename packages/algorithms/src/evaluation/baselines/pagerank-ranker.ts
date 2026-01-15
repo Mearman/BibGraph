@@ -3,9 +3,9 @@
  */
 
 import type { Graph } from '../../graph/graph';
-import type { Edge, Node } from '../../types/graph';
-import type { Path } from '../../types/algorithm-results';
 import type { RankedPath } from '../../pathfinding/path-ranking';
+import type { Path } from '../../types/algorithm-results';
+import type { Edge, Node } from '../../types/graph';
 
 /**
  * Compute PageRank scores for all nodes in the graph.
@@ -19,12 +19,7 @@ import type { RankedPath } from '../../pathfinding/path-ranking';
  * @param tolerance - Convergence tolerance (default: 1e-6)
  * @returns Map of node ID to PageRank score
  */
-function computePageRank<N extends Node, E extends Edge>(
-  graph: Graph<N, E>,
-  dampingFactor: number = 0.85,
-  maxIterations: number = 100,
-  tolerance: number = 1e-6
-): Map<string, number> {
+const computePageRank = <N extends Node, E extends Edge>(graph: Graph<N, E>, dampingFactor: number = 0.85, maxIterations: number = 100, tolerance: number = 1e-6): Map<string, number> => {
   const nodes = graph.getAllNodes();
   const n = nodes.length;
 
@@ -98,7 +93,7 @@ function computePageRank<N extends Node, E extends Edge>(
   }
 
   return pageRank;
-}
+};
 
 /**
  * Rank paths by sum of PageRank scores along path.
@@ -109,11 +104,7 @@ function computePageRank<N extends Node, E extends Edge>(
  * @param dampingFactor - PageRank damping (default: 0.85)
  * @returns Paths sorted by total PageRank (descending)
  */
-export function pageRankRanker<N extends Node, E extends Edge>(
-  graph: Graph<N, E>,
-  paths: Path<N, E>[],
-  dampingFactor?: number
-): RankedPath<N, E>[] {
+export const pageRankRanker = <N extends Node, E extends Edge>(graph: Graph<N, E>, paths: Path<N, E>[], dampingFactor?: number): RankedPath<N, E>[] => {
   // Compute PageRank for all nodes
   const pageRank = computePageRank(graph, dampingFactor);
 
@@ -141,4 +132,4 @@ export function pageRankRanker<N extends Node, E extends Edge>(
   pathScores.sort((a, b) => b.score - a.score);
 
   return pathScores;
-}
+};

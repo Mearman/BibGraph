@@ -3,9 +3,9 @@
  */
 
 import type { Graph } from '../../graph/graph';
-import type { Edge, Node } from '../../types/graph';
-import type { Path } from '../../types/algorithm-results';
 import type { RankedPath } from '../../pathfinding/path-ranking';
+import type { Path } from '../../types/algorithm-results';
+import type { Edge, Node } from '../../types/graph';
 
 /**
  * Rank paths by sum of node degrees along path.
@@ -15,10 +15,7 @@ import type { RankedPath } from '../../pathfinding/path-ranking';
  * @param paths - Paths to rank
  * @returns Paths sorted by total degree (descending)
  */
-export function degreeBasedRanker<N extends Node, E extends Edge>(
-  graph: Graph<N, E>,
-  paths: Path<N, E>[]
-): RankedPath<N, E>[] {
+export const degreeBasedRanker = <N extends Node, E extends Edge>(graph: Graph<N, E>, paths: Path<N, E>[]): RankedPath<N, E>[] => {
   // Calculate total degree for each path
   const pathScores = paths.map((path) => {
     let totalDegree = 0;
@@ -44,4 +41,4 @@ export function degreeBasedRanker<N extends Node, E extends Edge>(
   pathScores.sort((a, b) => b.score - a.score);
 
   return pathScores;
-}
+};

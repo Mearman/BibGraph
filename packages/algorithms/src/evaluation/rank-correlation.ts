@@ -10,10 +10,7 @@
  * @param groundTruth - Ground truth ranking (array of item IDs in rank order)
  * @returns ρ ∈ [-1, 1], where 1 = perfect agreement, -1 = perfect disagreement
  */
-export function spearmanCorrelation(
-  predicted: string[],
-  groundTruth: string[]
-): number {
+export const spearmanCorrelation = (predicted: string[], groundTruth: string[]): number => {
   if (predicted.length === 0 || groundTruth.length === 0) {
     return 0;
   }
@@ -34,8 +31,13 @@ export function spearmanCorrelation(
   // Calculate rank differences
   let sumSquaredDifferences = 0;
   for (const item of commonItems) {
-    const predictedRank = predictedRanks.get(item)!;
-    const groundTruthRank = groundTruthRanks.get(item)!;
+    const predictedRank = predictedRanks.get(item);
+    const groundTruthRank = groundTruthRanks.get(item);
+
+    if (predictedRank === undefined || groundTruthRank === undefined) {
+      continue;
+    }
+
     const difference = predictedRank - groundTruthRank;
     sumSquaredDifferences += difference * difference;
   }
@@ -47,7 +49,7 @@ export function spearmanCorrelation(
   }
 
   return 1 - (6 * sumSquaredDifferences) / denominator;
-}
+};
 
 /**
  * Kendall's tau rank correlation.
@@ -57,10 +59,7 @@ export function spearmanCorrelation(
  * @param groundTruth - Ground truth ranking
  * @returns τ ∈ [-1, 1]
  */
-export function kendallTau(
-  predicted: string[],
-  groundTruth: string[]
-): number {
+export const kendallTau = (predicted: string[], groundTruth: string[]): number => {
   // Empty rankings are trivially perfectly correlated
   if ((predicted.length === 0 && groundTruth.length === 0)) {
     return 1;
@@ -90,10 +89,23 @@ export function kendallTau(
       const item1 = commonItems[i];
       const item2 = commonItems[j];
 
-      const predictedRank1 = predictedRanks.get(item1)!;
-      const predictedRank2 = predictedRanks.get(item2)!;
-      const groundTruthRank1 = groundTruthRanks.get(item1)!;
-      const groundTruthRank2 = groundTruthRanks.get(item2)!;
+      if (item1 === undefined || item2 === undefined) {
+        continue;
+      }
+
+      const predictedRank1 = predictedRanks.get(item1);
+      const predictedRank2 = predictedRanks.get(item2);
+      const groundTruthRank1 = groundTruthRanks.get(item1);
+      const groundTruthRank2 = groundTruthRanks.get(item2);
+
+      if (
+        predictedRank1 === undefined ||
+        predictedRank2 === undefined ||
+        groundTruthRank1 === undefined ||
+        groundTruthRank2 === undefined
+      ) {
+        continue;
+      }
 
       const predictedOrder = predictedRank1 < predictedRank2 ? -1 : 1;
       const groundTruthOrder = groundTruthRank1 < groundTruthRank2 ? -1 : 1;
@@ -113,4 +125,4 @@ export function kendallTau(
 
   // Kendall's τ = (concordant - discordant) / total
   return (concordant - discordant) / total;
-}
+};

@@ -2,9 +2,9 @@
  * Weight-based path ranking baseline
  */
 
-import type { Edge, Node } from '../../types/graph';
-import type { Path } from '../../types/algorithm-results';
 import type { RankedPath } from '../../pathfinding/path-ranking';
+import type { Path } from '../../types/algorithm-results';
+import type { Edge, Node } from '../../types/graph';
 
 /**
  * Rank paths by sum of edge weights.
@@ -14,10 +14,7 @@ import type { RankedPath } from '../../pathfinding/path-ranking';
  * @param weightFn - Function to extract weight from edge
  * @returns Paths sorted by total weight (descending)
  */
-export function weightBasedRanker<N extends Node, E extends Edge>(
-  paths: Path<N, E>[],
-  weightFn: (edge: E) => number
-): RankedPath<N, E>[] {
+export const weightBasedRanker = <N extends Node, E extends Edge>(paths: Path<N, E>[], weightFn: (edge: E) => number): RankedPath<N, E>[] => {
   // Calculate total weight for each path
   const pathScores = paths.map((path) => {
     let totalWeight = 0;
@@ -42,4 +39,4 @@ export function weightBasedRanker<N extends Node, E extends Edge>(
   pathScores.sort((a, b) => b.score - a.score);
 
   return pathScores;
-}
+};
