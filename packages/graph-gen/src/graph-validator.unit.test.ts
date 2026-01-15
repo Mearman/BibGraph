@@ -28,7 +28,7 @@ describe('validateGraphProperties', () => {
 
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
-      expect(result.properties).toHaveLength(55); // All 55 validation functions (52 + 3 Phase 5 extremal graphs)
+      expect(result.properties).toHaveLength(59); // All 59 validation functions (55 + 4 Phase 6 graph products)
     });
 
     it('should validate a complete graph', () => {
