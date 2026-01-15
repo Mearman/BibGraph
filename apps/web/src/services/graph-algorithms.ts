@@ -5,8 +5,6 @@
  */
 
 import {
-  // Traversal
-  bfs,
   biconnectedComponents,
   calculateConductance,
   calculateCoverageRatio,
@@ -25,16 +23,13 @@ import {
   detectStarPatterns,
   // Motif Detection
   detectTriangles,
-  dfs,
   // Pathfinding
   dijkstra,
   type Edge as AlgorithmEdge,
   // Extraction
-  extractEgoNetwork,
   extractInducedSubgraph,
   extractKTruss,
   filterGraph,
-  Graph,
   // Hierarchical
   hierarchicalClustering,
   infomap,
@@ -48,7 +43,10 @@ import {
   spectralPartition,
   stronglyConnectedComponents,
   topologicalSort,
+  Graph,
 } from '@bibgraph/algorithms';
+import { bfs, dfs, extractEgoNetwork } from '@bibgraph/graph-expansion';
+import { GraphAdapter } from '@bibgraph/graph-core';
 import type {
   AuthorPosition,
   EntityType,
@@ -871,7 +869,8 @@ export const getKCore = (nodes: GraphNode[], edges: GraphEdge[], k: number): KCo
  */
 export const getEgoNetwork = (nodes: GraphNode[], edges: GraphEdge[], centerId: string, radius: number = 1, directed: boolean = true): EgoNetworkResult => {
   const graph = createGraph(nodes, edges, directed);
-  const result = extractEgoNetwork(graph, {
+  const adapter = new GraphAdapter(graph);
+  const result = extractEgoNetwork(adapter, {
     seedNodes: [centerId],
     radius,
   });
@@ -886,7 +885,7 @@ export const getEgoNetwork = (nodes: GraphNode[], edges: GraphEdge[], centerId: 
   }
 
   const egoGraph = result.value;
-  const egoNodeIds = new Set(egoGraph.getAllNodes().map((n) => n.id));
+  const egoNodeIds = new Set(egoGraph.nodes.map((n) => n.id));
 
   // Filter original nodes and edges to those in the ego network
   const egoNodes = nodes.filter((n) => egoNodeIds.has(n.id));
@@ -970,7 +969,8 @@ export const getSubgraph = (nodes: GraphNode[], edges: GraphEdge[], nodeIds: str
  */
 export const performBFS = (nodes: GraphNode[], edges: GraphEdge[], startId: string, directed: boolean = true): TraversalResult | null => {
   const graph = createGraph(nodes, edges, directed);
-  const result = bfs(graph, startId);
+  const adapter = new GraphAdapter(graph);
+  const result = bfs(adapter, startId);
 
   if (!result.ok) {
     return null;
@@ -991,7 +991,8 @@ export const performBFS = (nodes: GraphNode[], edges: GraphEdge[], startId: stri
  */
 export const performDFS = (nodes: GraphNode[], edges: GraphEdge[], startId: string, directed: boolean = true): TraversalResult | null => {
   const graph = createGraph(nodes, edges, directed);
-  const result = dfs(graph, startId);
+  const adapter = new GraphAdapter(graph);
+  const result = dfs(adapter, startId);
 
   if (!result.ok) {
     return null;

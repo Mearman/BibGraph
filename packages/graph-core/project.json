@@ -1,0 +1,21 @@
+{
+  "name": "graph-core",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/graph-core/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["tsc -p packages/graph-core/tsconfig.json"]
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["tsc --noEmit -p packages/graph-core/tsconfig.json"]
+      }
+    }
+  },
+  "tags": []
+}
