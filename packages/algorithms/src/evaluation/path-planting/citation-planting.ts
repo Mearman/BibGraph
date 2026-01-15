@@ -4,10 +4,10 @@
  * Models real citation patterns for academic graph evaluation
  */
 
-import type { Edge, Node } from '../../types/graph';
 import { Graph } from '../../graph/graph';
 import type { Path } from '../../types/algorithm-results';
-import { plantGroundTruthPaths, type PlantedPathConfig } from './path-generator';
+import type { Edge, Node } from '../../types/graph';
+import { type PlantedPathConfig, type PlantedPathResult, plantGroundTruthPaths } from './path-generator';
 
 /**
  * Citation path types based on real scholarly communication patterns.
@@ -42,13 +42,13 @@ export interface CitationPathConfig<N extends Node, E extends Edge> extends Plan
  * @param graph - Citation network graph
  * @param pathType - Type of citation path to plant
  * @param config - Planting configuration
- * @returns Graph with planted citation paths
+ * @returns PlantedPathResult with graph and ground truth paths
  */
-export function plantCitationPaths<N extends Node, E extends Edge>(
+export const plantCitationPaths = <N extends Node, E extends Edge>(
   graph: Graph<N, E>,
   pathType: CitationPathType,
   config: CitationPathConfig<N, E>
-) {
+): PlantedPathResult<N, E> => {
   const rng = new SeededRandom(config.seed);
 
   // Get work nodes (filter by type if available)
@@ -78,18 +78,22 @@ export function plantCitationPaths<N extends Node, E extends Edge>(
     case 'venue-mediated':
       return plantVenueMediatedPaths(graph, allNodes, selectedNodes, config, rng);
   }
-}
+};
 
 /**
  * Plant direct citation chains (W1 → W2 → W3).
  */
-function plantDirectCitationChains<N extends Node, E extends Edge>(
+const plantDirectCitationChains = <N extends Node, E extends Edge>(
   graph: Graph<N, E>,
   nodes: N[],
   config: PlantedPathConfig<N, E>,
   rng: SeededRandom
-) {
+): PlantedPathResult<N, E> => {
   const chainLength = 3; // W1 → W2 → W3
+  const plantedPaths: Path<N, E>[] = [];
+  const relevanceScores = new Map<string, number>();
+  let edgesAdded = 0;
+  let totalMI = 0;
 
   for (let i = 0; i < config.numPaths; i++) {
     const startIdx = i * chainLength;
@@ -101,23 +105,61 @@ function plantDirectCitationChains<N extends Node, E extends Edge>(
     const w2 = nodes[startIdx + 1]!;
     const w3 = nodes[startIdx + 2]!;
 
-    // Add citation edges
-    addCitationEdge(graph, w1.id, w2.id, rng);
-    addCitationEdge(graph, w2.id, w3.id, rng);
+    // Add citation edges and track them
+    const edge1Result = addCitationEdge(graph, w1.id, w2.id, rng);
+    if (edge1Result) {
+      edgesAdded++;
+      totalMI += edge1Result.weight;
+    }
+
+    const edge2Result = addCitationEdge(graph, w2.id, w3.id, rng);
+    if (edge2Result) {
+      edgesAdded++;
+      totalMI += edge2Result.weight;
+    }
+
+    // Build path object
+    if (edge1Result && edge2Result) {
+      const path: Path<N, E> = {
+        nodes: [w1, w2, w3],
+        edges: [edge1Result.edge, edge2Result.edge],
+        totalWeight: edge1Result.weight + edge2Result.weight,
+      };
+      plantedPaths.push(path);
+
+      // Calculate relevance score as average edge weight
+      const avgMI = (edge1Result.weight + edge2Result.weight) / 2;
+      const pathId = path.nodes.map(n => n.id).join('→');
+      relevanceScores.set(pathId, avgMI);
+    }
   }
 
-  return graph;
-}
+  return {
+    graph,
+    groundTruthPaths: plantedPaths,
+    relevanceScores,
+    metadata: {
+      nodesAdded: 0, // Citation paths use existing nodes
+      edgesAdded,
+      avgPathMI: plantedPaths.length > 0 ? totalMI / plantedPaths.length : 0,
+    },
+  };
+};
 
 /**
  * Plant co-citation bridges (W1 ← W2 → W3).
  */
-function plantCoCitationBridges<N extends Node, E extends Edge>(
+const plantCoCitationBridges = <N extends Node, E extends Edge>(
   graph: Graph<N, E>,
   nodes: N[],
   config: PlantedPathConfig<N, E>,
   rng: SeededRandom
-) {
+): PlantedPathResult<N, E> => {
+  const plantedPaths: Path<N, E>[] = [];
+  const relevanceScores = new Map<string, number>();
+  let edgesAdded = 0;
+  let totalMI = 0;
+
   for (let i = 0; i < config.numPaths; i++) {
     const idx = i * 3;
     if (idx + 3 > nodes.length) {
@@ -129,22 +171,60 @@ function plantCoCitationBridges<N extends Node, E extends Edge>(
     const w3 = nodes[idx + 2]!;
 
     // W2 cites both W1 and W3 (co-citation)
-    addCitationEdge(graph, w2.id, w1.id, rng);
-    addCitationEdge(graph, w2.id, w3.id, rng);
+    const edge1Result = addCitationEdge(graph, w2.id, w1.id, rng);
+    const edge2Result = addCitationEdge(graph, w2.id, w3.id, rng);
+
+    if (edge1Result) {
+      edgesAdded++;
+      totalMI += edge1Result.weight;
+    }
+
+    if (edge2Result) {
+      edgesAdded++;
+      totalMI += edge2Result.weight;
+    }
+
+    // Build path object
+    if (edge1Result && edge2Result) {
+      const path: Path<N, E> = {
+        nodes: [w1, w2, w3],
+        edges: [edge1Result.edge, edge2Result.edge],
+        totalWeight: edge1Result.weight + edge2Result.weight,
+      };
+      plantedPaths.push(path);
+
+      const avgMI = (edge1Result.weight + edge2Result.weight) / 2;
+      const pathId = path.nodes.map(n => n.id).join('→');
+      relevanceScores.set(pathId, avgMI);
+    }
   }
 
-  return graph;
-}
+  return {
+    graph,
+    groundTruthPaths: plantedPaths,
+    relevanceScores,
+    metadata: {
+      nodesAdded: 0,
+      edgesAdded,
+      avgPathMI: plantedPaths.length > 0 ? totalMI / plantedPaths.length : 0,
+    },
+  };
+};
 
 /**
  * Plant bibliographic coupling (W1 → W2 ← W3).
  */
-function plantBibliographicCoupling<N extends Node, E extends Edge>(
+const plantBibliographicCoupling = <N extends Node, E extends Edge>(
   graph: Graph<N, E>,
   nodes: N[],
   config: PlantedPathConfig<N, E>,
   rng: SeededRandom
-) {
+): PlantedPathResult<N, E> => {
+  const plantedPaths: Path<N, E>[] = [];
+  const relevanceScores = new Map<string, number>();
+  let edgesAdded = 0;
+  let totalMI = 0;
+
   for (let i = 0; i < config.numPaths; i++) {
     const idx = i * 3;
     if (idx + 3 > nodes.length) {
@@ -156,23 +236,56 @@ function plantBibliographicCoupling<N extends Node, E extends Edge>(
     const w3 = nodes[idx + 2]!;
 
     // Both W1 and W3 cite W2 (bibliographic coupling)
-    addCitationEdge(graph, w1.id, w2.id, rng);
-    addCitationEdge(graph, w3.id, w2.id, rng);
+    const edge1Result = addCitationEdge(graph, w1.id, w2.id, rng);
+    const edge2Result = addCitationEdge(graph, w3.id, w2.id, rng);
+
+    if (edge1Result) {
+      edgesAdded++;
+      totalMI += edge1Result.weight;
+    }
+
+    if (edge2Result) {
+      edgesAdded++;
+      totalMI += edge2Result.weight;
+    }
+
+    // Build path object
+    if (edge1Result && edge2Result) {
+      const path: Path<N, E> = {
+        nodes: [w1, w2, w3],
+        edges: [edge1Result.edge, edge2Result.edge],
+        totalWeight: edge1Result.weight + edge2Result.weight,
+      };
+      plantedPaths.push(path);
+
+      const avgMI = (edge1Result.weight + edge2Result.weight) / 2;
+      const pathId = path.nodes.map(n => n.id).join('→');
+      relevanceScores.set(pathId, avgMI);
+    }
   }
 
-  return graph;
-}
+  return {
+    graph,
+    groundTruthPaths: plantedPaths,
+    relevanceScores,
+    metadata: {
+      nodesAdded: 0,
+      edgesAdded,
+      avgPathMI: plantedPaths.length > 0 ? totalMI / plantedPaths.length : 0,
+    },
+  };
+};
 
 /**
  * Plant author-mediated paths (W1 → A → W2).
  */
-function plantAuthorMediatedPaths<N extends Node, E extends Edge>(
+const plantAuthorMediatedPaths = <N extends Node, E extends Edge>(
   graph: Graph<N, E>,
   allNodes: N[],
   workNodes: N[],
   config: PlantedPathConfig<N, E>,
   rng: SeededRandom
-) {
+): PlantedPathResult<N, E> => {
   // Find author nodes
   const authorNodes = filterNodesByType(allNodes, 'Author');
 
@@ -180,6 +293,11 @@ function plantAuthorMediatedPaths<N extends Node, E extends Edge>(
     // Fall back to treating as regular paths
     return plantGroundTruthPaths(graph, config);
   }
+
+  const plantedPaths: Path<N, E>[] = [];
+  const relevanceScores = new Map<string, number>();
+  let edgesAdded = 0;
+  let totalMI = 0;
 
   for (let i = 0; i < config.numPaths; i++) {
     if (i + 2 > workNodes.length) {
@@ -191,23 +309,56 @@ function plantAuthorMediatedPaths<N extends Node, E extends Edge>(
     const author = authorNodes[i % authorNodes.length]!;
 
     // W1 → A (authored) → W2 (authored)
-    addAuthorshipEdge(graph, w1.id, author.id, rng);
-    addAuthorshipEdge(graph, w2.id, author.id, rng);
+    const edge1Result = addAuthorshipEdge(graph, w1.id, author.id, rng);
+    const edge2Result = addAuthorshipEdge(graph, w2.id, author.id, rng);
+
+    if (edge1Result) {
+      edgesAdded++;
+      totalMI += edge1Result.weight;
+    }
+
+    if (edge2Result) {
+      edgesAdded++;
+      totalMI += edge2Result.weight;
+    }
+
+    // Build path object
+    if (edge1Result && edge2Result) {
+      const path: Path<N, E> = {
+        nodes: [w1, author, w2],
+        edges: [edge1Result.edge, edge2Result.edge],
+        totalWeight: edge1Result.weight + edge2Result.weight,
+      };
+      plantedPaths.push(path);
+
+      const avgMI = (edge1Result.weight + edge2Result.weight) / 2;
+      const pathId = path.nodes.map(n => n.id).join('→');
+      relevanceScores.set(pathId, avgMI);
+    }
   }
 
-  return graph;
-}
+  return {
+    graph,
+    groundTruthPaths: plantedPaths,
+    relevanceScores,
+    metadata: {
+      nodesAdded: 0,
+      edgesAdded,
+      avgPathMI: plantedPaths.length > 0 ? totalMI / plantedPaths.length : 0,
+    },
+  };
+};
 
 /**
  * Plant venue-mediated paths (W1 → S → W2).
  */
-function plantVenueMediatedPaths<N extends Node, E extends Edge>(
+const plantVenueMediatedPaths = <N extends Node, E extends Edge>(
   graph: Graph<N, E>,
   allNodes: N[],
   workNodes: N[],
   config: PlantedPathConfig<N, E>,
   rng: SeededRandom
-) {
+): PlantedPathResult<N, E> => {
   // Find source/venue nodes
   const venueNodes = filterNodesByType(allNodes, 'Source');
 
@@ -215,6 +366,11 @@ function plantVenueMediatedPaths<N extends Node, E extends Edge>(
     // Fall back to treating as regular paths
     return plantGroundTruthPaths(graph, config);
   }
+
+  const plantedPaths: Path<N, E>[] = [];
+  const relevanceScores = new Map<string, number>();
+  let edgesAdded = 0;
+  let totalMI = 0;
 
   for (let i = 0; i < config.numPaths; i++) {
     if (i + 2 > workNodes.length) {
@@ -226,91 +382,148 @@ function plantVenueMediatedPaths<N extends Node, E extends Edge>(
     const venue = venueNodes[i % venueNodes.length]!;
 
     // W1 → S (published in) → W2 (published in)
-    addPublicationEdge(graph, w1.id, venue.id, rng);
-    addPublicationEdge(graph, w2.id, venue.id, rng);
+    const edge1Result = addPublicationEdge(graph, w1.id, venue.id, rng);
+    const edge2Result = addPublicationEdge(graph, w2.id, venue.id, rng);
+
+    if (edge1Result) {
+      edgesAdded++;
+      totalMI += edge1Result.weight;
+    }
+
+    if (edge2Result) {
+      edgesAdded++;
+      totalMI += edge2Result.weight;
+    }
+
+    // Build path object
+    if (edge1Result && edge2Result) {
+      const path: Path<N, E> = {
+        nodes: [w1, venue, w2],
+        edges: [edge1Result.edge, edge2Result.edge],
+        totalWeight: edge1Result.weight + edge2Result.weight,
+      };
+      plantedPaths.push(path);
+
+      const avgMI = (edge1Result.weight + edge2Result.weight) / 2;
+      const pathId = path.nodes.map(n => n.id).join('→');
+      relevanceScores.set(pathId, avgMI);
+    }
   }
 
-  return graph;
-}
+  return {
+    graph,
+    groundTruthPaths: plantedPaths,
+    relevanceScores,
+    metadata: {
+      nodesAdded: 0,
+      edgesAdded,
+      avgPathMI: plantedPaths.length > 0 ? totalMI / plantedPaths.length : 0,
+    },
+  };
+};
 
 /**
  * Add citation edge with MI-based weight.
+ * Returns the edge and weight if added, null if already existed.
  */
-function addCitationEdge<N extends Node, E extends Edge>(graph: Graph<N, E>, source: string, target: string, rng: SeededRandom) {
+const addCitationEdge = <N extends Node, E extends Edge>(
+  graph: Graph<N, E>,
+  source: string,
+  target: string,
+  rng: SeededRandom
+): { edge: E; weight: number } | null => {
   const edgeId = `citation_${source}_${target}`;
 
   // Check if edge exists by trying to get it
   const existing = graph.getEdge(edgeId);
   if (existing.some) {
-    return; // Edge already exists
+    return null; // Edge already exists
   }
 
+  const weight = 0.5 + rng.nextDouble() * 0.5; // High MI for citations
   const edge: E = {
     id: edgeId,
     source,
     target,
-    weight: 0.5 + rng.nextDouble() * 0.5, // High MI for citations
+    weight,
   } as E;
 
   graph.addEdge(edge);
-}
+  return { edge, weight };
+};
 
 /**
  * Add authorship edge with MI-based weight.
+ * Returns the edge and weight if added, null if already existed.
  */
-function addAuthorshipEdge<N extends Node, E extends Edge>(graph: Graph<N, E>, workId: string, authorId: string, rng: SeededRandom) {
+const addAuthorshipEdge = <N extends Node, E extends Edge>(
+  graph: Graph<N, E>,
+  workId: string,
+  authorId: string,
+  rng: SeededRandom
+): { edge: E; weight: number } | null => {
   const edgeId = `authorship_${workId}_${authorId}`;
 
   // Check if edge exists
   const existing = graph.getEdge(edgeId);
   if (existing.some) {
-    return;
+    return null;
   }
 
+  const weight = 0.6 + rng.nextDouble() * 0.4; // High MI for authorship
   const edge: E = {
     id: edgeId,
     source: workId,
     target: authorId,
-    weight: 0.6 + rng.nextDouble() * 0.4, // High MI for authorship
+    weight,
   } as E;
 
   graph.addEdge(edge);
-}
+  return { edge, weight };
+};
 
 /**
  * Add publication edge with MI-based weight.
+ * Returns the edge and weight if added, null if already existed.
  */
-function addPublicationEdge<N extends Node, E extends Edge>(graph: Graph<N, E>, workId: string, sourceId: string, rng: SeededRandom) {
+const addPublicationEdge = <N extends Node, E extends Edge>(
+  graph: Graph<N, E>,
+  workId: string,
+  sourceId: string,
+  rng: SeededRandom
+): { edge: E; weight: number } | null => {
   const edgeId = `publication_${workId}_${sourceId}`;
 
   // Check if edge exists
   const existing = graph.getEdge(edgeId);
   if (existing.some) {
-    return;
+    return null;
   }
 
+  const weight = 0.4 + rng.nextDouble() * 0.6; // Moderate MI for venue association
   const edge: E = {
     id: edgeId,
     source: workId,
     target: sourceId,
-    weight: 0.4 + rng.nextDouble() * 0.6, // Moderate MI for venue association
+    weight,
   } as E;
 
   graph.addEdge(edge);
-}
+  return { edge, weight };
+};
 
 /**
  * Filter nodes to work/authorship type.
+ * @param nodes
  */
-function filterWorkNodes<N extends Node>(nodes: N[]): N[] {
-  return filterNodesByType(nodes, 'Work');
-}
+const filterWorkNodes = <N extends Node>(nodes: N[]): N[] => filterNodesByType(nodes, 'Work');
 
 /**
  * Filter nodes by entity type.
+ * @param nodes
+ * @param entityType
  */
-function filterNodesByType<N extends Node>(nodes: N[], entityType: string): N[] {
-  return nodes.filter(node => {
+const filterNodesByType = <N extends Node>(nodes: N[], entityType: string): N[] => nodes.filter(node => {
     if ('type' in node && typeof node.type === 'string') {
       return node.type === entityType;
     }
@@ -319,7 +532,6 @@ function filterNodesByType<N extends Node>(nodes: N[], entityType: string): N[] 
     }
     return false;
   });
-}
 
 /**
  * Seeded random number generator.
@@ -341,6 +553,7 @@ class SeededRandom {
 
   /**
    * Shuffle array in place using Fisher-Yates algorithm.
+   * @param array
    */
   shuffle<T>(array: T[]): T[] {
     const result = [...array];
