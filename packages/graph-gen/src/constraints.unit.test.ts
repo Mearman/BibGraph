@@ -1,6 +1,7 @@
 /**
  * Unit tests for graph spec constraints analyzer
  */
+// eslint-disable-next-line n/no-extraneous-import
 import { describe, expect,it } from 'vitest';
 
 import {

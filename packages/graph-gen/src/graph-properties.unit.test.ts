@@ -1,3 +1,4 @@
+// eslint-disable-next-line n/no-extraneous-import
 import { describe, expect,test } from 'vitest';
 
 import { analyzeGraphSpecConstraints,isGraphSpecImpossible } from './constraints';

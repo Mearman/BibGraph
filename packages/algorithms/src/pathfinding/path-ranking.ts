@@ -610,6 +610,9 @@ export const createPathRanker = <N extends Node, E extends Edge>(
   return {
     /**
      * Rank paths between two nodes.
+     * @param startId
+     * @param endId
+     * @param overrides
      */
     rank: (
       startId: string,
@@ -619,6 +622,9 @@ export const createPathRanker = <N extends Node, E extends Edge>(
 
     /**
      * Get the best path between two nodes.
+     * @param startId
+     * @param endId
+     * @param overrides
      */
     getBest: (
       startId: string,

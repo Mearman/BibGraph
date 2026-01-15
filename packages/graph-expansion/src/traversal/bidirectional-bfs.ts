@@ -1,4 +1,4 @@
-import { GraphExpander, type Neighbor } from '../interfaces/graph-expander';
+import { GraphExpander } from '../interfaces/graph-expander';
 import { PriorityQueue } from './priority-queue';
 
 /**
@@ -83,8 +83,6 @@ export class BidirectionalBFS<T> {
     private readonly seedB: string,
     private readonly options: BidirectionalBFSOptions
   ) {
-    const minIterations = options.minIterations ?? 2;
-
     // Initialize frontier A
     const frontierA = new PriorityQueue<string>();
     frontierA.push(seedA, 0); // Seed has priority 0
@@ -187,9 +185,11 @@ export class BidirectionalBFS<T> {
 
   /**
    * Expand frontier by getting neighbors from expander and adding to priority queue.
+   * @param state - BFS state to expand
+   * @param _label - Direction label (unused, for debugging)
    * @internal
    */
-  private async expandFrontier(state: BFSState, label: string): Promise<void> {
+  private async expandFrontier(state: BFSState, _label: string): Promise<void> {
     // Pop all nodes from priority queue for this iteration
     const nodesToProcess: string[] = [];
     while (state.frontier.length > 0) {
@@ -247,9 +247,11 @@ export class BidirectionalBFS<T> {
 
   /**
    * Reconstruct path from meeting point.
+   * @param meetingNode - Node where the two searches met
+   * @param _fromA - Whether path started from A (unused, for symmetry)
    * @internal
    */
-  private reconstructPath(meetingNode: string, fromA: boolean): string[] {
+  private reconstructPath(meetingNode: string, _fromA: boolean): string[] {
     const pathFromA: string[] = [];
     const pathFromB: string[] = [];
 
@@ -279,6 +281,7 @@ export class BidirectionalBFS<T> {
 
   /**
    * Check if path already exists in foundPaths.
+   * @param path
    * @internal
    */
   private pathExists(path: string[]): boolean {
@@ -291,6 +294,7 @@ export class BidirectionalBFS<T> {
 
   /**
    * Add nodes from newly discovered paths to frontiers for focused exploration.
+   * @param pathCountBefore
    * @internal
    */
   private addPathNodesToFrontiers(pathCountBefore: number): void {

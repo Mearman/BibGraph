@@ -436,6 +436,8 @@ const computeHyperedgeMI = (
 
 /**
  * Get the set of neighbour IDs for a node.
+ * @param graph
+ * @param nodeId
  * @internal
  */
 const getNeighbourSet = <N extends Node, E extends Edge>(

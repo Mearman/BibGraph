@@ -2,9 +2,10 @@
  * Citation path analysis utilities for graph extraction.
  * Provides shortest path finding and reachability subgraph extraction.
  */
+import { bfs } from '@bibgraph/graph-expansion';
+
 import { Graph } from '../graph/graph';
 import { GraphAdapter } from '../graph-adapter';
-import { bfs } from '@bibgraph/graph-expansion';
 import { dijkstra } from '../pathfinding/dijkstra';
 import type { Path } from '../types/algorithm-results';
 import type { ExtractionError } from '../types/errors';

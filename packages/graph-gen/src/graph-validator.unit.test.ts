@@ -1,6 +1,7 @@
 /**
  * Unit tests for graph validator
  */
+// eslint-disable-next-line n/no-extraneous-import
 import { describe, expect, it } from 'vitest';
 
 import { generateGraph } from './generator';
@@ -242,7 +243,7 @@ describe('validateGraphProperties', () => {
       };
 
       const graph = generateGraph(spec, { nodeCount: 5, seed: 42 });
-      const result = validateGraphProperties(graph);
+      validateGraphProperties(graph);
 
       // Verify spec is preserved
       expect(graph.spec).toEqual(spec);

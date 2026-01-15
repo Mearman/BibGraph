@@ -1,6 +1,7 @@
 /**
  * Unit tests for graph generator
  */
+// eslint-disable-next-line n/no-extraneous-import
 import { describe, expect, it } from 'vitest';
 
 import { generateGraph } from './generator';
@@ -609,7 +610,7 @@ describe('generateGraph', () => {
       }
 
       // All vertices should have even degree for Eulerian
-      for (const [_nodeId, degree] of degrees) {
+      for (const [, degree] of degrees) {
         expect(degree % 2).toBe(0);
       }
     });

@@ -60,6 +60,8 @@ export type Result<T, E> = Ok<T> | Err<E>;
 
 /**
  * Validate ego network extraction options.
+ * @param graph
+ * @param options
  */
 const validateEgoNetworkOptions = <N extends NodeBase, E extends EdgeBase>(
   graph: ReadableGraph<N, E>,
@@ -190,6 +192,9 @@ export const extractEgoNetwork = <N extends NodeBase, E extends EdgeBase>(
 
 /**
  * Discovers all nodes within a given radius using BFS with distance tracking.
+ * @param graph
+ * @param startId
+ * @param maxRadius
  */
 const discoverNodesWithinRadius = <N extends NodeBase, E extends EdgeBase>(
   graph: ReadableGraph<N, E>,
@@ -233,6 +238,8 @@ const discoverNodesWithinRadius = <N extends NodeBase, E extends EdgeBase>(
 
 /**
  * Extracts an induced subgraph containing only the specified nodes and edges between them.
+ * @param graph
+ * @param nodeIds
  */
 const extractInducedSubgraph = <N extends NodeBase, E extends EdgeBase>(
   graph: ReadableGraph<N, E>,

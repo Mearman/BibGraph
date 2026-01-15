@@ -1,5 +1,4 @@
 import type { TestEdge,TestGraph, TestNode } from '../generator';
-import type { GraphSpec } from '../spec';
 import { buildAdjacencyList } from './helper-functions';
 import type { PropertyValidationResult } from './types';
 
@@ -188,7 +187,8 @@ const isBipartite = (nodes: TestNode[], edges: TestEdge[], directed: boolean): b
     visited.add(startNode);
 
     while (queue.length > 0) {
-      const current = queue.shift()!;
+      const current = queue.shift();
+      if (!current) break;
 
       const neighbors = adjacency.get(current) ?? [];
       for (const neighbor of neighbors) {

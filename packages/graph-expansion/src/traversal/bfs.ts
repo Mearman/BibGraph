@@ -71,6 +71,8 @@ export type Result<T, E> = Ok<T> | Err<E>;
 
 /**
  * Breadth-First Search traversal.
+ * @param graph
+ * @param startId
  */
 export const bfs = <N extends NodeBase, E extends EdgeBase>(
   graph: ReadableGraph<N, E>,

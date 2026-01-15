@@ -1,9 +1,9 @@
 /**
  * Unit tests for validation functions
  */
+// eslint-disable-next-line n/no-extraneous-import
 import { describe, expect, it } from 'vitest';
 
-import type { TestGraph } from '../generator';
 import { generateGraph } from '../generator';
 import type { GraphSpec } from '../spec';
 import { buildAdjacencyList } from './helper-functions';
@@ -435,8 +435,8 @@ describe('Validation functions', () => {
           degrees.set(edge.source, (degrees.get(edge.source) || 0) + 1);
           degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
         }
-        const degreeValues = [...degrees.values()];
-        console.log('Cubic graph degree distribution:', degreeValues.sort((a, b) => a - b));
+        const degreeValues = [...degrees.values()].sort((a, b) => a - b);
+        console.log('Cubic graph degree distribution:', degreeValues);
         console.log('Expected: all 3s, Got:', degreeValues);
 
         expect(result.valid).toBe(true);
@@ -617,7 +617,7 @@ describe('Validation functions', () => {
         const adjacency = buildAdjacencyList(graph.nodes, graph.edges, false);
 
         expect(adjacency.size).toBe(5);
-        for (const [nodeId, neighbors] of adjacency) {
+        for (const [, neighbors] of adjacency) {
           expect(Array.isArray(neighbors)).toBe(true);
         }
       });

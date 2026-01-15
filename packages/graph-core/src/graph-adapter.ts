@@ -8,8 +8,8 @@
  * @module adapters/graph-adapter
  */
 
-import type { ReadableGraph, NodeBase, EdgeBase } from '@bibgraph/graph-expansion';
-import { type Graph, type Node, type Edge } from '@bibgraph/algorithms';
+import { type Edge,type Graph, type Node } from '@bibgraph/algorithms';
+import type { ReadableGraph } from '@bibgraph/graph-expansion';
 
 /**
  * Adapts the algorithms Graph class to the ReadableGraph interface.

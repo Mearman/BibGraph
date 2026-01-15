@@ -49,17 +49,23 @@ export class PriorityQueue<T> {
   pop(): T | undefined {
     if (this.heap.length === 0) return undefined;
     if (this.heap.length === 1) {
-      const result = this.heap.pop()!;
-      this.itemSet.delete(result.item);
-      return result.item;
+      const result = this.heap.pop();
+      if (result) {
+        this.itemSet.delete(result.item);
+        return result.item;
+      }
+      return undefined;
     }
 
     const result = this.heap[0];
-    const last = this.heap.pop()!;
-    this.heap[0] = last;
-    this.bubbleDown(0);
-    this.itemSet.delete(result.item);
-    return result.item;
+    const last = this.heap.pop();
+    if (last && result) {
+      this.heap[0] = last;
+      this.bubbleDown(0);
+      this.itemSet.delete(result.item);
+      return result.item;
+    }
+    return undefined;
   }
 
   /**
@@ -89,6 +95,7 @@ export class PriorityQueue<T> {
 
   /**
    * Bubble up an element to maintain min-heap property.
+   * @param index
    * @internal
    */
   private bubbleUp(index: number): void {
@@ -102,6 +109,7 @@ export class PriorityQueue<T> {
 
   /**
    * Bubble down an element to maintain min-heap property.
+   * @param index
    * @internal
    */
   private bubbleDown(index: number): void {

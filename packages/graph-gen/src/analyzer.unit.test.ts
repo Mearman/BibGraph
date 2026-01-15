@@ -20,6 +20,7 @@ import {
   isTree,
   isUnitDisk,
 } from "@bibgraph/graph-gen";
+// eslint-disable-next-line n/no-extraneous-import
 import { describe, expect,test } from "vitest";
 
 describe("Graph Spec Analyzer", () => {

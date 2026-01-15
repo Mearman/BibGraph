@@ -1,6 +1,5 @@
-import type { TestEdge,TestGraph, TestNode } from '../generator';
-import type { GraphSpec } from '../spec';
-import { buildAdjacencyList,checkBipartiteWithBFS, findComponentsForDensity } from './helper-functions';
+import type { TestGraph } from '../generator';
+import { checkBipartiteWithBFS, findComponentsForDensity } from './helper-functions';
 import type { PropertyValidationResult } from './types';
 
 /**

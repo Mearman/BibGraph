@@ -1,5 +1,5 @@
 import type { GraphExpander, Neighbor } from '@bibgraph/graph-expansion';
-import type { TestGraph, TestNode, TestEdge } from '@bibgraph/graph-gen';
+import type { TestEdge,TestGraph, TestNode } from '@bibgraph/graph-gen';
 
 /**
  * Mock implementation of GraphExpander for testing bidirectional BFS.

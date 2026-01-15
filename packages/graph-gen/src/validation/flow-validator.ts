@@ -115,14 +115,18 @@ export const validateFlowNetwork = (graph: TestGraph): PropertyValidationResult 
       adjacency.set(node.id, []);
     }
     for (const edge of edges) {
-      adjacency.get(edge.source)!.push(edge.target);
+      const neighbors = adjacency.get(edge.source);
+      if (neighbors) {
+        neighbors.push(edge.target);
+      }
     }
 
     // Find nodes reachable from source
     const reachableFromSource = new Set<string>();
     const queue: string[] = [source];
     while (queue.length > 0) {
-      const current = queue.shift()!;
+      const current = queue.shift();
+      if (!current) break;
       if (reachableFromSource.has(current)) continue;
       reachableFromSource.add(current);
       const neighbors = adjacency.get(current) ?? [];
@@ -135,14 +139,18 @@ export const validateFlowNetwork = (graph: TestGraph): PropertyValidationResult 
       reverseAdjacency.set(node.id, []);
     }
     for (const edge of edges) {
-      reverseAdjacency.get(edge.target)!.push(edge.source);
+      const neighbors = reverseAdjacency.get(edge.target);
+      if (neighbors) {
+        neighbors.push(edge.source);
+      }
     }
 
     // Find nodes that can reach sink
     const canReachSink = new Set<string>();
     const reverseQueue: string[] = [sink];
     while (reverseQueue.length > 0) {
-      const current = reverseQueue.shift()!;
+      const current = reverseQueue.shift();
+      if (!current) break;
       if (canReachSink.has(current)) continue;
       canReachSink.add(current);
       const predecessors = reverseAdjacency.get(current) ?? [];

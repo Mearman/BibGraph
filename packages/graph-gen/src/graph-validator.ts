@@ -1,6 +1,5 @@
 import { analyzeGraphSpecConstraints, getAdjustedValidationExpectations } from './constraints';
 import type { TestGraph } from './generator';
-import type { GraphSpec } from './spec';
 import {
   type GraphValidationResult,
   type PropertyValidationResult,

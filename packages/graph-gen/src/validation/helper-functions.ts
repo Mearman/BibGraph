@@ -14,8 +14,8 @@ export const isConnected = (nodes: TestNode[], edges: TestEdge[], directed: bool
   const queue: string[] = [nodes[0].id];
 
   while (queue.length > 0) {
-    const current = queue.shift()!;
-    if (visited.has(current)) continue;
+    const current = queue.shift();
+    if (!current || visited.has(current)) continue;
 
     visited.add(current);
     const neighbors = adjacency.get(current) ?? [];
@@ -41,9 +41,15 @@ export const buildAdjacencyList = (nodes: TestNode[], edges: TestEdge[], directe
 
   // Add edges
   for (const edge of edges) {
-    adjacency.get(edge.source)!.push(edge.target);
+    const sourceNeighbors = adjacency.get(edge.source);
+    if (sourceNeighbors) {
+      sourceNeighbors.push(edge.target);
+    }
     if (!directed) {
-      adjacency.get(edge.target)!.push(edge.source);
+      const targetNeighbors = adjacency.get(edge.target);
+      if (targetNeighbors) {
+        targetNeighbors.push(edge.source);
+      }
     }
   }
 
@@ -72,8 +78,8 @@ export const findComponentsForDensity = (nodes: TestNode[], edges: TestEdge[], d
     const queue: string[] = [node.id];
 
     while (queue.length > 0) {
-      const current = queue.shift()!;
-      if (visited.has(current)) continue;
+      const current = queue.shift();
+      if (!current || visited.has(current)) continue;
 
       visited.add(current);
       component.push(current);
@@ -108,7 +114,8 @@ export const checkBipartiteWithBFS = (nodes: TestNode[], edges: TestEdge[], dire
     visited.add(startNode);
 
     while (queue.length > 0) {
-      const current = queue.shift()!;
+      const current = queue.shift();
+      if (!current) break;
 
       const neighbors = adjacency.get(current) ?? [];
       for (const neighbor of neighbors) {

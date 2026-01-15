@@ -1,7 +1,8 @@
-import { describe, test, expect } from 'vitest';
-import { BidirectionalBFS } from './bidirectional-bfs';
+import { generateGraph, makeGraphSpec } from '@bibgraph/graph-gen';
+import { describe, expect,test } from 'vitest';
+
 import { MockGraphExpander } from '../fixtures/mock-graph-expander';
-import { generateGraph, makeGraphSpec, type GraphSpec } from '@bibgraph/graph-gen';
+import { BidirectionalBFS } from './bidirectional-bfs';
 
 describe('BidirectionalBFS with Test Fixtures', () => {
   describe('Simple canonical graphs', () => {

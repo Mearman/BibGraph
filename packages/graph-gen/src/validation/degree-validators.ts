@@ -1,5 +1,4 @@
-import type { TestEdge,TestGraph, TestNode } from '../generator';
-import type { GraphSpec } from '../spec';
+import type { TestGraph } from '../generator';
 
 /**
  * Validate regular graph properties (cubic or k-regular).

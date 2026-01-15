@@ -1,6 +1,5 @@
 import type { TestEdge,TestGraph, TestNode } from "../generator";
-import type { GraphSpec } from "../spec";
-import { buildAdjacencyList,isConnected } from "./helper-functions";
+import { buildAdjacencyList, isConnected } from "./helper-functions";
 import type { PropertyValidationResult } from "./types";
 
 // ============================================================================
@@ -15,19 +14,19 @@ import type { PropertyValidationResult } from "./types";
  * @returns Validation result for directionality property
  */
 export const validateDirectionality = (graph: TestGraph): PropertyValidationResult => {
-  const { spec, edges } = graph;
+  const { spec } = graph;
   const expected = spec.directionality.kind;
 
   // For undirected graphs, we check if edges are stored in a canonical form
   // (i.e., edges are stored with source < target to avoid duplicates)
-  const actual = expected; // In our implementation, directionality is structural
+  // In our implementation, directionality is structural
 
   const valid = true; // Directionality is enforced during generation
 
   return {
     property: "directionality",
     expected,
-    actual,
+    actual: expected,
     valid,
     message: valid
       ? undefined
@@ -84,10 +83,10 @@ export const validateWeighting = (graph: TestGraph): PropertyValidationResult =>
  * Uses DFS to detect cycles in directed graphs.
  *
  * @param graph - Test graph to validate
- * @param adjustments - Optional validation adjustments for constrained graphs
+ * @param _adjustments - Optional validation adjustments for constrained graphs
  * @returns Validation result for cycles property
  */
-export const validateCycles = (graph: TestGraph, adjustments: Partial<Record<string, boolean>> = {}): PropertyValidationResult => {
+export const validateCycles = (graph: TestGraph, _adjustments: Partial<Record<string, boolean>> = {}): PropertyValidationResult => {
   const { spec, nodes, edges } = graph;
   const expected = spec.cycles.kind;
   const directed = spec.directionality.kind === "directed";
@@ -97,7 +96,7 @@ export const validateCycles = (graph: TestGraph, adjustments: Partial<Record<str
 
   // "cycles_allowed" means cycles are permitted, not required
   // So both cyclic and acyclic graphs are valid when spec says "cycles_allowed"
-  const valid = expected === "cycles_allowed" ? true : expected === actual;
+  const valid = expected === "cycles_allowed" || expected === actual;
 
   return {
     property: "cycles",
@@ -208,7 +207,6 @@ export const validateEdgeMultiplicity = (graph: TestGraph): PropertyValidationRe
   const expected = spec.edgeMultiplicity.kind;
   const directed = spec.directionality.kind === "directed";
 
-  let actual: string;
   let valid: boolean;
   let message: string | undefined;
 
@@ -225,7 +223,7 @@ export const validateEdgeMultiplicity = (graph: TestGraph): PropertyValidationRe
   const hasParallelEdges = [...edgeCounts.values()].some(
     (count) => count > 1,
   );
-  actual = hasParallelEdges ? "multi" : "simple";
+  const actual = hasParallelEdges ? "multi" : "simple";
 
   if (expected === "simple") {
     valid = !hasParallelEdges;

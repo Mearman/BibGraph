@@ -1,12 +1,13 @@
 /**
  * Unit tests for ego-network extraction algorithm
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach,describe, expect, it } from 'vitest';
+
+import type { EdgeBase,NodeBase, ReadableGraph } from '../interfaces/readable-graph';
 import {
   extractEgoNetwork,
   extractMultiSourceEgoNetwork,
 } from './ego-network';
-import type { ReadableGraph, NodeBase, EdgeBase } from '../interfaces/readable-graph';
 
 interface TestNode extends NodeBase {
   id: string;
@@ -55,11 +56,11 @@ class TestGraph implements ReadableGraph<TestNode, TestEdge> {
   }
 
   getNeighbors(id: string): string[] {
-    return Array.from(this.adjacency.get(id) || []);
+    return [...this.adjacency.get(id) || []];
   }
 
   getAllNodes(): TestNode[] {
-    return Array.from(this.nodes.values());
+    return [...this.nodes.values()];
   }
 
   isDirected(): boolean {
@@ -67,7 +68,7 @@ class TestGraph implements ReadableGraph<TestNode, TestEdge> {
   }
 
   getOutgoingEdges(id: string): TestEdge[] {
-    return Array.from(this.edges.values()).filter(
+    return [...this.edges.values()].filter(
       e => e.source === id || (!this.directed && e.target === id)
     );
   }
