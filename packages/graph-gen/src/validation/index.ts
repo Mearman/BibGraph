@@ -69,7 +69,9 @@ export {
   validateCartesianProduct,
   validateTensorProduct,
   validateStrongProduct,
-  validateLexicographicProduct
+  validateLexicographicProduct,
+  validateMinorFree,
+  validateTopologicalMinorFree
 } from './structural-validators';
 
 // Export degree validators
