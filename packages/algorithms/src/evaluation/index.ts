@@ -44,6 +44,7 @@ export {
   addNoisePaths,
   plantHeterogeneousPaths,
   plantCitationPaths,
+  pathFollowsTemplate,
   type PlantedPathConfig,
   type PlantedPathResult,
   type HeterogeneousPathConfig,

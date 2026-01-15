@@ -37,7 +37,8 @@ describe('Path Planting - Ground Truth Generator', () => {
 
     // Add 10 nodes for testing
     for (let i = 0; i < 10; i++) {
-      graph.addNode(`node${i}`, { id: `node${i}`, type: 'TestNode' });
+      const node: TestNode = { id: `node${i}`, type: 'TestNode' };
+      graph.addNode(node);
     }
   });
 
@@ -89,7 +90,8 @@ describe('Path Planting - Ground Truth Generator', () => {
     const result1 = plantGroundTruthPaths(graph, config);
     const graph2 = new Graph<TestNode, TestEdge>();
     for (let i = 0; i < 10; i++) {
-      graph2.addNode(`node${i}`, { id: `node${i}`, type: 'TestNode' });
+      const node: TestNode = { id: `node${i}`, type: 'TestNode' };
+      graph2.addNode(node);
     }
     const result2 = plantGroundTruthPaths(graph2, config);
 
@@ -173,7 +175,8 @@ describe('Path Planting - Noise Generator', () => {
 
     // Add nodes
     for (let i = 0; i < 10; i++) {
-      graph.addNode(`node${i}`, { id: `node${i}`, type: 'TestNode' });
+      const node: TestNode = { id: `node${i}`, type: 'TestNode' };
+      graph.addNode(node);
     }
   });
 

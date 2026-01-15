@@ -158,6 +158,18 @@ export function plantGroundTruthPaths<N extends Node, E extends Edge>(
     const source = sources[i % sources.length]!;
     const target = targets[i % targets.length]!;
 
+    // Validate source and target exist
+    const sourceNode = baseGraph.getNode(source);
+    const targetNode = baseGraph.getNode(target);
+
+    if (!sourceNode.some) {
+      throw new Error(`Source node '${source}' not found in graph`);
+    }
+
+    if (!targetNode.some) {
+      throw new Error(`Target node '${target}' not found in graph`);
+    }
+
     // Generate path with random length
     const pathLength = rng.nextInt(config.pathLength.min, config.pathLength.max);
     const pathNodes: N[] = [];
@@ -167,10 +179,8 @@ export function plantGroundTruthPaths<N extends Node, E extends Edge>(
     let currentNodeId = source;
     let currentMI = rng.nextDouble() * (miRange.max - miRange.min) + miRange.min;
 
-    const sourceNode = baseGraph.getNode(currentNodeId);
-    if (sourceNode.some) {
-      pathNodes.push(sourceNode.value);
-    }
+    // Start with source node
+    pathNodes.push(sourceNode.value);
 
     for (let j = 0; j < pathLength; j++) {
       // Generate intermediate node ID
@@ -212,10 +222,8 @@ export function plantGroundTruthPaths<N extends Node, E extends Edge>(
     pathEdges.push(finalEdge);
     totalMI += currentMI;
 
-    const targetNode = baseGraph.getNode(target);
-    if (targetNode.some) {
-      pathNodes.push(targetNode.value);
-    }
+    // End with target node
+    pathNodes.push(targetNode.value);
 
     // Create path object
     const path: Path<N, E> = {
