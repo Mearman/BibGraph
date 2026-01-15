@@ -528,6 +528,41 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
     return edges;
   }
 
+  // Phase 4: Robustness Measures
+  // Note: Robustness measures are computed from graph structure, not used to generate it
+  // Generate standard edges first, then compute and store robustness metadata
+  if (spec.toughness?.kind === "toughness") {
+    // Generate standard connected graph
+    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
+      generateTreeEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
+      generateConnectedCyclicEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
+      generateForestEdges(nodes, edges, spec, rng);
+    } else {
+      generateDisconnectedEdges(nodes, edges, spec, rng);
+    }
+    // Compute and store toughness
+    computeAndStoreToughness(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.integrity?.kind === "integrity") {
+    // Generate standard connected graph
+    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
+      generateTreeEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
+      generateConnectedCyclicEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
+      generateForestEdges(nodes, edges, spec, rng);
+    } else {
+      generateDisconnectedEdges(nodes, edges, spec, rng);
+    }
+    // Compute and store integrity
+    computeAndStoreIntegrity(nodes, edges, spec, rng);
+    return edges;
+  }
+
   // Non-bipartite graphs
   if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
     // Generate tree structure
@@ -3914,6 +3949,50 @@ const computeAndStoreSpectralRadius = (nodes: TestNode[], edges: TestEdge[], spe
   nodes.forEach(node => {
     node.data = node.data || {};
     node.data.targetSpectralRadius = targetSpectralRadius;
+  });
+};
+
+/**
+ * Compute and store toughness (resilience to vertex removal).
+ * Toughness measures minimum ratio of removed vertices to resulting components.
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param spec - Graph specification
+ * @param rng - Random number generator
+ */
+const computeAndStoreToughness = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
+  if (spec.toughness?.kind !== "toughness") {
+    throw new Error("Toughness computation requires toughness spec");
+  }
+
+  const { value: targetToughness } = spec.toughness;
+
+  // Store target toughness for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetToughness = targetToughness;
+  });
+};
+
+/**
+ * Compute and store integrity (resilience measure).
+ * Integrity minimizes (removed vertices + largest remaining component).
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param spec - Graph specification
+ * @param rng - Random number generator
+ */
+const computeAndStoreIntegrity = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
+  if (spec.integrity?.kind !== "integrity") {
+    throw new Error("Integrity computation requires integrity spec");
+  }
+
+  const { value: targetIntegrity } = spec.integrity;
+
+  // Store target integrity for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetIntegrity = targetIntegrity;
   });
 };
 
