@@ -61,6 +61,8 @@ import {
   validateTensorProduct,
   validateStrongProduct,
   validateLexicographicProduct,
+  validateMinorFree,
+  validateTopologicalMinorFree,
   validateWeighting} from './validation';
 
 /**
@@ -136,6 +138,8 @@ export const validateGraphProperties = (graph: TestGraph): GraphValidationResult
   results.push(validateTensorProduct(graph));
   results.push(validateStrongProduct(graph));
   results.push(validateLexicographicProduct(graph));
+  results.push(validateMinorFree(graph));
+  results.push(validateTopologicalMinorFree(graph));
   results.push(validateRegularGraph(graph));
   results.push(validateEulerian(graph));
   results.push(validateKVertexConnected(graph));
