@@ -400,6 +400,20 @@ export type SpectralRadius =
   | { kind: "unconstrained" };
 
 // ============================================================================
+// ROBUSTNESS MEASURES
+// ============================================================================
+
+/** Toughness: minimum k such that removing k vertices disconnects */
+export type Toughness =
+  | { kind: "toughness"; value: number }
+  | { kind: "unconstrained" };
+
+/** Integrity: resilience measure based on vertex removal */
+export type Integrity =
+  | { kind: "integrity"; value: number }
+  | { kind: "unconstrained" };
+
+// ============================================================================
 // SPECIAL BIPARTITE PROPERTIES
 // ============================================================================
 
@@ -662,6 +676,10 @@ export type GraphSpec = Readonly<{
   algebraicConnectivity?: AlgebraicConnectivity;
   spectralRadius?: SpectralRadius;
 
+  // Robustness measures
+  toughness?: Toughness;
+  integrity?: Integrity;
+
   // Special bipartite properties
   completeBipartite?: CompleteBipartite;
 
@@ -735,6 +753,7 @@ export type GraphSpecPatch = Partial<Omit<GraphSpec,
   "diameter" | "radius" | "girth" | "circumference" | "hereditaryClass" |
   "independenceNumber" | "vertexCover" | "dominationNumber" |
   "spectrum" | "algebraicConnectivity" | "spectralRadius" |
+  "toughness" | "integrity" |
   "completeBipartite"
 >>;
 
