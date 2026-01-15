@@ -3,19 +3,25 @@ import type { TestGraph } from './generator';
 import {
   type GraphValidationResult,
   type PropertyValidationResult,
+  validateArcTransitive,
   validateBipartite,
   validateChordal,
+  validateCircumference,
   validateClawFree,
   validateCograph,
   validateComparability,
   validateConnectivity,
   validateCycles,
   validateDensityAndCompleteness,
+  validateDiameter,
   validateDirectionality,
   validateEdgeMultiplicity,
+  validateEdgeTransitive,
   validateEulerian,
   validateFlowNetwork,
+  validateGirth,
   validateHamiltonian,
+  validateHereditaryClass,
   validateInterval,
   validateKColorable,
   validateKEdgeConnected,
@@ -25,6 +31,7 @@ import {
   validatePerfect,
   validatePermutation,
   validatePlanar,
+  validateRadius,
   validateRegularGraph,
   validateScaleFree,
   validateSchema,
@@ -38,7 +45,8 @@ import {
   validateTraceable,
   validateTreewidth,
   validateUnitDisk,
-  validateVertexTransitive,  validateWeighting} from './validation';
+  validateVertexTransitive,
+  validateWeighting} from './validation';
 
 /**
  * Validate that a generated graph actually has its claimed properties.
@@ -91,6 +99,13 @@ export const validateGraphProperties = (graph: TestGraph): GraphValidationResult
   results.push(validateTraceable(graph));
   results.push(validateStronglyRegular(graph));
   results.push(validateVertexTransitive(graph));
+  results.push(validateEdgeTransitive(graph));
+  results.push(validateArcTransitive(graph));
+  results.push(validateDiameter(graph));
+  results.push(validateRadius(graph));
+  results.push(validateGirth(graph));
+  results.push(validateCircumference(graph));
+  results.push(validateHereditaryClass(graph));
   results.push(validateRegularGraph(graph));
   results.push(validateEulerian(graph));
   results.push(validateKVertexConnected(graph));
