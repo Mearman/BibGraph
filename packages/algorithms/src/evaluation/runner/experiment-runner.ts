@@ -75,6 +75,7 @@ export async function runExperiment<N extends Node, E extends Edge>(
   // Plant ground truth paths
   const plantedResult = plantGroundTruthPaths(baseGraph, config.pathPlanting);
   const groundTruthPaths = plantedResult.groundTruthPaths;
+  const relevanceScores = plantedResult.relevanceScores;
 
   // Add noise paths if configured
   let graph = plantedResult.graph;
@@ -98,6 +99,7 @@ export async function runExperiment<N extends Node, E extends Edge>(
       const metrics = computeMetrics(
         rankedPaths,
         groundTruthPaths,
+        relevanceScores,
         config.metrics
       );
 
@@ -200,6 +202,7 @@ export async function runCrossValidation<N extends Node, E extends Edge>(
 function computeMetrics<N extends Node, E extends Edge>(
   rankedPaths: Array<{ path: Path<N, E>; score: number }>,
   groundTruthPaths: Path<N, E>[],
+  relevanceScores: Map<string, number>,
   metricTypes: MetricType[]
 ): Map<string, number> {
   const metrics = new Map<string, number>();
@@ -210,14 +213,10 @@ function computeMetrics<N extends Node, E extends Edge>(
     return rp.path.nodes[0]?.id ?? 'unknown';
   });
 
-  // Extract ground truth ranking (by relevance score)
+  // Extract ground truth ranking (by relevance score from map)
   const groundTruth = groundTruthPaths
-    .map((path, i) => ({ path, index: i }))
-    .sort((a, b) => {
-      const scoreA = a.path.totalWeight ?? 0;
-      const scoreB = b.path.totalWeight ?? 0;
-      return scoreB - scoreA; // Descending by MI
-    })
+    .map((path, i) => ({ path, index: i, relevance: relevanceScores.get(path.nodes[0]?.id ?? 'unknown') ?? 0 }))
+    .sort((a, b) => b.relevance - a.relevance) // Descending by relevance
     .map((item) => item.path.nodes[0]?.id ?? 'unknown');
 
   // Compute rank correlation metrics
@@ -239,7 +238,7 @@ function computeMetrics<N extends Node, E extends Edge>(
         }));
         const truthWithRel = groundTruthPaths.map((path) => ({
           id: path.nodes[0]?.id ?? 'unknown',
-          relevance: path.totalWeight ?? 0,
+          relevance: relevanceScores.get(path.nodes[0]?.id ?? 'unknown') ?? 0,
         }));
         // Sort ground truth by relevance for ideal DCG
         truthWithRel.sort((a, b) => b.relevance - a.relevance);
