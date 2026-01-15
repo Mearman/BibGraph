@@ -9,9 +9,9 @@
     "directory": "packages/graph-core"
   },
   "scripts": {
+    "lint": "eslint .",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit --skipLibCheck",
-    "lint": "eslint ."
+    "typecheck": "tsc --noEmit --skipLibCheck"
   },
   "dependencies": {
     "@bibgraph/algorithms": "workspace:*",
