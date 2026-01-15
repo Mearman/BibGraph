@@ -65,7 +65,11 @@ export {
   validateIntegrity,
   validateCage,
   validateMooreGraph,
-  validateRamanujan
+  validateRamanujan,
+  validateCartesianProduct,
+  validateTensorProduct,
+  validateStrongProduct,
+  validateLexicographicProduct
 } from './structural-validators';
 
 // Export degree validators
