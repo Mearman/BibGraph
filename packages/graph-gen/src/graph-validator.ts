@@ -4,7 +4,9 @@ import {
   type GraphValidationResult,
   type PropertyValidationResult,
   validateBipartite,
+  validateClawFree,
   validateConnectivity,
+  validateCograph,
   validateCycles,
   validateDensityAndCompleteness,
   validateDirectionality,
@@ -17,6 +19,7 @@ import {
   validateRegularGraph,
   validateSchema,
   validateSelfLoops,
+  validateSplit,
   validateTournament,
   validateTreewidth,
   validateWeighting} from './validation';
@@ -52,6 +55,9 @@ export const validateGraphProperties = (graph: TestGraph): GraphValidationResult
   results.push(validateDensityAndCompleteness(graph, adjustments));
   results.push(validateBipartite(graph));
   results.push(validateTournament(graph));
+  results.push(validateSplit(graph));
+  results.push(validateCograph(graph));
+  results.push(validateClawFree(graph));
   results.push(validateRegularGraph(graph));
   results.push(validateEulerian(graph));
   results.push(validateKVertexConnected(graph));

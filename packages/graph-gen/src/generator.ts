@@ -299,6 +299,28 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
     return edges;
   }
 
+  // ============================================================================
+  // PHASE 1: SIMPLE STRUCTURAL VARIANTS (high priority)
+  // ============================================================================
+
+  // Handle split graphs (clique + independent set partition)
+  if (spec.split?.kind === "split") {
+    generateSplitEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  // Handle cographs (P4-free graphs)
+  if (spec.cograph?.kind === "cograph") {
+    generateCographEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  // Handle claw-free graphs (no K_{1,3} induced subgraph)
+  if (spec.clawFree?.kind === "claw_free") {
+    generateClawFreeEdges(nodes, edges, spec, rng);
+    return edges;
+  }
+
   // Non-bipartite graphs
   if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
     // Generate tree structure
@@ -2103,6 +2125,197 @@ const generateBipartiteDisconnectedEdges = (nodes: TestNode[], edges: TestEdge[]
       }
 
       addEdge(edges, source.id, target.id, spec, rng);
+    }
+  }
+};
+
+// ============================================================================
+// PHASE 1: SIMPLE STRUCTURAL VARIANTS
+// ============================================================================
+
+/**
+ * Generate split graph edges.
+ * Split graph = vertices partition into clique K + independent set I.
+ * Algorithm: Partition nodes ~1/3 clique + ~2/3 independent, add all clique edges,
+ * add random cross edges with ~50% density.
+ *
+ * @param nodes - Graph nodes
+ * @param edges - Edge list to populate
+ * @param spec - Graph specification
+ * @param rng - Seeded random number generator
+ */
+const generateSplitEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 2) return;
+
+  // Partition: ~1/3 clique, ~2/3 independent set
+  const cliqueSize = Math.max(1, Math.floor(nodes.length / 3));
+  const clique = nodes.slice(0, cliqueSize);
+  const independent = nodes.slice(cliqueSize);
+
+  // Add all edges within clique (complete subgraph)
+  for (let i = 0; i < clique.length; i++) {
+    for (let j = i + 1; j < clique.length; j++) {
+      addEdge(edges, clique[i].id, clique[j].id, spec, rng);
+    }
+  }
+
+  // Add random edges between clique and independent set (~50% density)
+  for (const cliqueNode of clique) {
+    for (const indepNode of independent) {
+      if (rng.next() < 0.5) {
+        addEdge(edges, cliqueNode.id, indepNode.id, spec, rng);
+      }
+    }
+  }
+
+  // Store partition metadata for validation
+  for (const node of clique) {
+    node.data = node.data || {};
+    node.data.splitPartition = 'clique';
+  }
+  for (const node of independent) {
+    node.data = node.data || {};
+    node.data.splitPartition = 'independent';
+  }
+};
+
+/**
+ * Generate cograph edges (P4-free graphs).
+ * Cographs can be constructed from single vertices by disjoint union and complement operations.
+ * Algorithm: Build cotree via union/complement operations, convert to graph.
+ *
+ * @param nodes - Graph nodes
+ * @param edges - Edge list to populate
+ * @param spec - Graph specification
+ * @param rng - Seeded random number generator
+ */
+const generateCographEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 2) return;
+
+  // Build cotree: start with single vertices, iteratively combine via union/complement
+  // For simplicity, use recursive construction: randomly choose union or complement
+  const buildCograph = (nodeList: TestNode[], useUnion: boolean): void => {
+    if (nodeList.length <= 1) return;
+
+    if (useUnion) {
+      // Union: no edges between components, recursively build each
+      const mid = Math.floor(nodeList.length / 2);
+      const left = nodeList.slice(0, mid);
+      const right = nodeList.slice(mid);
+
+      // Recursively build each component as complete graph
+      buildComplete(left);
+      buildComplete(right);
+      // No edges between left and right (union operation)
+    } else {
+      // Complement: all edges between components, recursively build each
+      const mid = Math.floor(nodeList.length / 2);
+      const left = nodeList.slice(0, mid);
+      const right = nodeList.slice(mid);
+
+      // Recursively build each component as independent
+      buildIndependent(left);
+      buildIndependent(right);
+      // Add all edges between left and right (complement of union)
+      for (const l of left) {
+        for (const r of right) {
+          addEdge(edges, l.id, r.id, spec, rng);
+        }
+      }
+    }
+  };
+
+  const buildComplete = (nodeList: TestNode[]): void => {
+    for (let i = 0; i < nodeList.length; i++) {
+      for (let j = i + 1; j < nodeList.length; j++) {
+        addEdge(edges, nodeList[i].id, nodeList[j].id, spec, rng);
+      }
+    }
+  };
+
+  const buildIndependent = (_nodeList: TestNode[]): void => {
+    // Independent set: no edges
+  };
+
+  // Randomly choose union or complement construction
+  const useUnion = rng.next() < 0.5;
+  buildCograph(nodes, useUnion);
+};
+
+/**
+ * Generate claw-free graph edges.
+ * Claw-free = no induced K_{1,3} (star with 3 leaves).
+ * Algorithm: Start with k-regular graph (k >= 4 prevents claws), remove edges that create claws.
+ *
+ * @param nodes - Graph nodes
+ * @param edges - Edge list to populate
+ * @param spec - Graph specification
+ * @param rng - Seeded random number generator
+ */
+const generateClawFreeEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
+  if (nodes.length < 2) return;
+
+  // Start with 4-regular graph (or max possible if n < 5)
+  const k = Math.min(4, nodes.length - 1);
+  generateRegularEdges(nodes, edges, spec, k, rng);
+
+  // Helper to get neighbors of a node
+  const getNeighbors = (nodeId: string): string[] => {
+    const neighbors: string[] = [];
+    for (const edge of edges) {
+      if (edge.source === nodeId) neighbors.push(edge.target);
+      if (spec.directionality.kind === "undirected" && edge.target === nodeId) neighbors.push(edge.source);
+    }
+    return neighbors;
+  };
+
+  // Helper to check if three neighbors form an independent set (no edges between them)
+  const areIndependent = (neighbors: string[]): boolean => {
+    for (let i = 0; i < neighbors.length; i++) {
+      for (let j = i + 1; j < neighbors.length; j++) {
+        const hasEdge = edges.some(e =>
+          (e.source === neighbors[i] && e.target === neighbors[j]) ||
+          (spec.directionality.kind === "undirected" && e.source === neighbors[j] && e.target === neighbors[i])
+        );
+        if (hasEdge) return false;
+      }
+    }
+    return true;
+  };
+
+  // Iteratively remove edges that create claws
+  let hasClaw = true;
+  let iterations = 0;
+  const maxIterations = 100;
+
+  while (hasClaw && iterations < maxIterations) {
+    hasClaw = false;
+    iterations++;
+
+    for (const node of nodes) {
+      const neighbors = getNeighbors(node.id);
+      if (neighbors.length < 3) continue;
+
+      // Check all combinations of 3 neighbors
+      for (let i = 0; i < neighbors.length - 2; i++) {
+        for (let j = i + 1; j < neighbors.length - 1; j++) {
+          for (let k = j + 1; k < neighbors.length; k++) {
+            const triple = [neighbors[i], neighbors[j], neighbors[k]];
+            if (areIndependent(triple)) {
+              // Found claw! Remove one edge
+              const edgeToRemove = edges.findIndex(e => e.source === node.id && e.target === triple[0]);
+              if (edgeToRemove !== -1) {
+                edges.splice(edgeToRemove, 1);
+                hasClaw = true;
+                break;
+              }
+            }
+          }
+          if (hasClaw) break;
+        }
+        if (hasClaw) break;
+      }
+      if (hasClaw) break;
     }
   }
 };

@@ -27,7 +27,10 @@ export {
 export {
   validateDensityAndCompleteness,
   validateBipartite,
-  validateTournament
+  validateTournament,
+  validateSplit,
+  validateCograph,
+  validateClawFree
 } from './structural-validators';
 
 // Export degree validators
