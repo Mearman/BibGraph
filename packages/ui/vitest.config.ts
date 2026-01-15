@@ -49,6 +49,7 @@ export default defineConfig(
 			},
 
 		test: {
+			globals: true,
 			watch: false,
 			environment: "jsdom",
 			setupFiles: ["./src/test/setup.ts"],
@@ -66,6 +67,7 @@ export default defineConfig(
 			projects: [
 				{
 					test: {
+						globals: true,
 						name: "unit",
 						include: ["src/**/*.unit.test.{ts,tsx}"],
 						environment: "jsdom",
@@ -74,6 +76,7 @@ export default defineConfig(
 				},
 				{
 					test: {
+						globals: true,
 						name: "component",
 						include: ["src/**/*.component.test.{ts,tsx}"],
 						environment: "jsdom",
@@ -82,6 +85,7 @@ export default defineConfig(
 				},
 				{
 					test: {
+						globals: true,
 						name: "integration",
 						include: ["src/**/*.integration.test.{ts,tsx}"],
 						environment: "jsdom",
