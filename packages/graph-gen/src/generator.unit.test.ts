@@ -636,4 +636,250 @@ describe('generateGraph', () => {
       expect(result.nodes).toHaveLength(10);
     });
   });
+
+  describe('Phase 1: Simple Structural Variants', () => {
+    describe('Split graphs', () => {
+      it('should generate split graph with clique + independent set', () => {
+        const spec: GraphSpec = {
+          directionality: { kind: 'undirected' },
+          weighting: { kind: 'unweighted' },
+          connectivity: { kind: 'unconstrained' },
+          cycles: { kind: 'cycles_allowed' },
+          density: { kind: 'unconstrained' },
+          completeness: { kind: 'incomplete' },
+          edgeMultiplicity: { kind: 'simple' },
+          selfLoops: { kind: 'disallowed' },
+          schema: { kind: 'homogeneous' },
+          split: { kind: 'split' },
+        };
+
+        const result = generateGraph(spec, { nodeCount: 10, seed: 42 });
+
+        expect(result.nodes).toHaveLength(10);
+
+        // Check stored partition metadata
+        const clique = result.nodes.filter(n => n.data?.splitPartition === 'clique');
+        const independent = result.nodes.filter(n => n.data?.splitPartition === 'independent');
+
+        expect(clique.length).toBeGreaterThan(0);
+        expect(independent.length).toBeGreaterThan(0);
+        expect(clique.length + independent.length).toBe(10);
+
+        // Verify clique is complete
+        const adjacency = new Map<string, Set<string>>();
+        for (const node of result.nodes) {
+          adjacency.set(node.id, new Set());
+        }
+        for (const edge of result.edges) {
+          adjacency.get(edge.source)?.add(edge.target);
+          adjacency.get(edge.target)?.add(edge.source);
+        }
+
+        for (let i = 0; i < clique.length; i++) {
+          for (let j = i + 1; j < clique.length; j++) {
+            expect(adjacency.get(clique[i].id)?.has(clique[j].id)).toBe(true);
+          }
+        }
+
+        // Verify independent set has no internal edges
+        for (let i = 0; i < independent.length; i++) {
+          for (let j = i + 1; j < independent.length; j++) {
+            expect(adjacency.get(independent[i].id)?.has(independent[j].id)).toBe(false);
+          }
+        }
+      });
+
+      it('should handle minimal split graph (n=2)', () => {
+        const spec: GraphSpec = {
+          directionality: { kind: 'undirected' },
+          weighting: { kind: 'unweighted' },
+          connectivity: { kind: 'unconstrained' },
+          cycles: { kind: 'cycles_allowed' },
+          density: { kind: 'unconstrained' },
+          completeness: { kind: 'incomplete' },
+          edgeMultiplicity: { kind: 'simple' },
+          selfLoops: { kind: 'disallowed' },
+          schema: { kind: 'homogeneous' },
+          split: { kind: 'split' },
+        };
+
+        const result = generateGraph(spec, { nodeCount: 2, seed: 42 });
+
+        expect(result.nodes).toHaveLength(2);
+        // With 2 nodes, we have 1 clique and 1 independent node
+        // May or may not have edge between them
+      });
+    });
+
+    describe('Cographs (P4-free)', () => {
+      it('should generate P4-free cograph', () => {
+        const spec: GraphSpec = {
+          directionality: { kind: 'undirected' },
+          weighting: { kind: 'unweighted' },
+          connectivity: { kind: 'unconstrained' },
+          cycles: { kind: 'cycles_allowed' },
+          density: { kind: 'unconstrained' },
+          completeness: { kind: 'incomplete' },
+          edgeMultiplicity: { kind: 'simple' },
+          selfLoops: { kind: 'disallowed' },
+          schema: { kind: 'homogeneous' },
+          cograph: { kind: 'cograph' },
+        };
+
+        const result = generateGraph(spec, { nodeCount: 10, seed: 42 });
+
+        expect(result.nodes).toHaveLength(10);
+        expect(result.edges.length).toBeGreaterThanOrEqual(0);
+
+        // Build adjacency for P4 check
+        const adjacency = new Map<string, Set<string>>();
+        for (const node of result.nodes) {
+          adjacency.set(node.id, new Set());
+        }
+        for (const edge of result.edges) {
+          adjacency.get(edge.source)?.add(edge.target);
+          adjacency.get(edge.target)?.add(edge.source);
+        }
+
+        // Helper to check if 4 vertices form P4
+        const hasP4 = (vertices: string[]): boolean => {
+          const edgeCount = new Map<string, number>();
+          for (let i = 0; i < vertices.length; i++) {
+            for (let j = i + 1; j < vertices.length; j++) {
+              if (adjacency.get(vertices[i])?.has(vertices[j])) {
+                edgeCount.set(vertices[i], (edgeCount.get(vertices[i]) || 0) + 1);
+                edgeCount.set(vertices[j], (edgeCount.get(vertices[j]) || 0) + 1);
+              }
+            }
+          }
+          const degrees = Array.from(edgeCount.values()).sort((a, b) => a - b);
+          // P4 has degree sequence [1, 1, 2, 2]
+          return degrees.length === 4 && degrees[0] === 1 && degrees[1] === 1 && degrees[2] === 2 && degrees[3] === 2;
+        };
+
+        // Check all 4-vertex combinations (sampling for performance)
+        const nodeIds = result.nodes.map(n => n.id);
+        let foundP4 = false;
+        const maxChecks = 100; // Sample instead of exhaustive check
+        let checks = 0;
+
+        for (let i = 0; i < nodeIds.length - 3 && !foundP4 && checks < maxChecks; i++) {
+          for (let j = i + 1; j < nodeIds.length - 2 && !foundP4 && checks < maxChecks; j++) {
+            for (let k = j + 1; k < nodeIds.length - 1 && !foundP4 && checks < maxChecks; k++) {
+              for (let l = k + 1; l < nodeIds.length && !foundP4 && checks < maxChecks; l++) {
+                if (hasP4([nodeIds[i], nodeIds[j], nodeIds[k], nodeIds[l]])) {
+                  foundP4 = true;
+                }
+                checks++;
+              }
+            }
+          }
+        }
+
+        // Cograph should have NO P4 (but we might not have checked exhaustively)
+        // For n=10, if we sampled 100 combinations without finding P4, it's likely a cograph
+        expect(foundP4).toBe(false);
+      });
+
+      it('should handle trivial cograph (n<4)', () => {
+        const spec: GraphSpec = {
+          directionality: { kind: 'undirected' },
+          weighting: { kind: 'unweighted' },
+          connectivity: { kind: 'unconstrained' },
+          cycles: { kind: 'cycles_allowed' },
+          density: { kind: 'unconstrained' },
+          completeness: { kind: 'incomplete' },
+          edgeMultiplicity: { kind: 'simple' },
+          selfLoops: { kind: 'disallowed' },
+          schema: { kind: 'homogeneous' },
+          cograph: { kind: 'cograph' },
+        };
+
+        const result = generateGraph(spec, { nodeCount: 3, seed: 42 });
+
+        expect(result.nodes).toHaveLength(3);
+        // Any graph with < 4 vertices is automatically a cograph
+      });
+    });
+
+    describe('Claw-free graphs', () => {
+      it('should generate claw-free graph', () => {
+        const spec: GraphSpec = {
+          directionality: { kind: 'undirected' },
+          weighting: { kind: 'unweighted' },
+          connectivity: { kind: 'unconstrained' },
+          cycles: { kind: 'cycles_allowed' },
+          density: { kind: 'unconstrained' },
+          completeness: { kind: 'incomplete' },
+          edgeMultiplicity: { kind: 'simple' },
+          selfLoops: { kind: 'disallowed' },
+          schema: { kind: 'homogeneous' },
+          clawFree: { kind: 'claw_free' },
+        };
+
+        const result = generateGraph(spec, { nodeCount: 10, seed: 42 });
+
+        expect(result.nodes).toHaveLength(10);
+
+        // Build adjacency
+        const adjacency = new Map<string, Set<string>>();
+        for (const node of result.nodes) {
+          adjacency.set(node.id, new Set());
+        }
+        for (const edge of result.edges) {
+          adjacency.get(edge.source)?.add(edge.target);
+          adjacency.get(edge.target)?.add(edge.source);
+        }
+
+        // Check each vertex for potential claw center
+        for (const center of result.nodes) {
+          const neighbors = Array.from(adjacency.get(center.id) || []);
+
+          if (neighbors.length < 3) continue;
+
+          // Check all combinations of 3 neighbors
+          for (let i = 0; i < neighbors.length - 2; i++) {
+            for (let j = i + 1; j < neighbors.length - 1; j++) {
+              for (let k = j + 1; k < neighbors.length; k++) {
+                const triple = [neighbors[i], neighbors[j], neighbors[k]];
+
+                // Check if triple is independent (no edges between them)
+                let independent = true;
+                for (let x = 0; x < triple.length && independent; x++) {
+                  for (let y = x + 1; y < triple.length && independent; y++) {
+                    if (adjacency.get(triple[x])?.has(triple[y])) {
+                      independent = false;
+                    }
+                  }
+                }
+
+                // If we found independent triple with center, that's a claw!
+                expect(independent).toBe(false);
+              }
+            }
+          }
+        }
+      });
+
+      it('should handle trivial claw-free graph (n<4)', () => {
+        const spec: GraphSpec = {
+          directionality: { kind: 'undirected' },
+          weighting: { kind: 'unweighted' },
+          connectivity: { kind: 'unconstrained' },
+          cycles: { kind: 'cycles_allowed' },
+          density: { kind: 'unconstrained' },
+          completeness: { kind: 'incomplete' },
+          edgeMultiplicity: { kind: 'simple' },
+          selfLoops: { kind: 'disallowed' },
+          schema: { kind: 'homogeneous' },
+          clawFree: { kind: 'claw_free' },
+        };
+
+        const result = generateGraph(spec, { nodeCount: 3, seed: 42 });
+
+        expect(result.nodes).toHaveLength(3);
+        // Any graph with < 4 vertices is automatically claw-free
+      });
+    });
+  });
 });

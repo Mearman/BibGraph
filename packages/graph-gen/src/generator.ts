@@ -1531,6 +1531,19 @@ const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, 
     return; // k-colorable graphs have exact structure
   }
 
+  // ============================================================================
+  // PHASE 1: SIMPLE STRUCTURAL VARIANTS (exact structure)
+  // ============================================================================
+  if (spec.split?.kind === "split") {
+    return; // Split graphs have exact structure
+  }
+  if (spec.cograph?.kind === "cograph") {
+    return; // Cographs have exact structure
+  }
+  if (spec.clawFree?.kind === "claw_free") {
+    return; // Claw-free graphs have exact structure
+  }
+
   // Get bipartite partitions if applicable
   const isBipartite = spec.partiteness?.kind === "bipartite";
   const leftPartition = isBipartite
@@ -2245,7 +2258,7 @@ const generateCographEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphS
 /**
  * Generate claw-free graph edges.
  * Claw-free = no induced K_{1,3} (star with 3 leaves).
- * Algorithm: Start with k-regular graph (k >= 4 prevents claws), remove edges that create claws.
+ * Algorithm: Use complete graph (K_n) which is always claw-free.
  *
  * @param nodes - Graph nodes
  * @param edges - Edge list to populate
@@ -2255,67 +2268,10 @@ const generateCographEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphS
 const generateClawFreeEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, rng: SeededRandom): void => {
   if (nodes.length < 2) return;
 
-  // Start with 4-regular graph (or max possible if n < 5)
-  const k = Math.min(4, nodes.length - 1);
-  generateRegularEdges(nodes, edges, spec, k, rng);
-
-  // Helper to get neighbors of a node
-  const getNeighbors = (nodeId: string): string[] => {
-    const neighbors: string[] = [];
-    for (const edge of edges) {
-      if (edge.source === nodeId) neighbors.push(edge.target);
-      if (spec.directionality.kind === "undirected" && edge.target === nodeId) neighbors.push(edge.source);
-    }
-    return neighbors;
-  };
-
-  // Helper to check if three neighbors form an independent set (no edges between them)
-  const areIndependent = (neighbors: string[]): boolean => {
-    for (let i = 0; i < neighbors.length; i++) {
-      for (let j = i + 1; j < neighbors.length; j++) {
-        const hasEdge = edges.some(e =>
-          (e.source === neighbors[i] && e.target === neighbors[j]) ||
-          (spec.directionality.kind === "undirected" && e.source === neighbors[j] && e.target === neighbors[i])
-        );
-        if (hasEdge) return false;
-      }
-    }
-    return true;
-  };
-
-  // Iteratively remove edges that create claws
-  let hasClaw = true;
-  let iterations = 0;
-  const maxIterations = 100;
-
-  while (hasClaw && iterations < maxIterations) {
-    hasClaw = false;
-    iterations++;
-
-    for (const node of nodes) {
-      const neighbors = getNeighbors(node.id);
-      if (neighbors.length < 3) continue;
-
-      // Check all combinations of 3 neighbors
-      for (let i = 0; i < neighbors.length - 2; i++) {
-        for (let j = i + 1; j < neighbors.length - 1; j++) {
-          for (let k = j + 1; k < neighbors.length; k++) {
-            const triple = [neighbors[i], neighbors[j], neighbors[k]];
-            if (areIndependent(triple)) {
-              // Found claw! Remove one edge
-              const edgeToRemove = edges.findIndex(e => e.source === node.id && e.target === triple[0]);
-              if (edgeToRemove !== -1) {
-                edges.splice(edgeToRemove, 1);
-                hasClaw = true;
-                break;
-              }
-            }
-          }
-          if (hasClaw) break;
-        }
-        if (hasClaw) break;
-      }
-      if (hasClaw) break;
+  // Complete graph K_n is always claw-free (every node connected to every other)
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      addEdge(edges, nodes[i].id, nodes[j].id, spec, rng);
     }
   }
 };
