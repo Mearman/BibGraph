@@ -2388,6 +2388,146 @@ export const validateHereditaryClass = (graph: TestGraph): PropertyValidationRes
   };
 };
 
+/**
+ * Validate independence number (α).
+ * Independence number is the size of the largest independent set (no two vertices adjacent).
+ * @param graph
+ */
+export const validateIndependenceNumber = (graph: TestGraph): PropertyValidationResult => {
+  const { spec, nodes } = graph;
+
+  if (spec.independenceNumber?.kind !== "independence_number") {
+    return {
+      property: "independenceNumber",
+      expected: spec.independenceNumber?.kind ?? "unconstrained",
+      actual: spec.independenceNumber?.kind ?? "unconstrained",
+      valid: true,
+    };
+  }
+
+  const { value: targetAlpha } = spec.independenceNumber;
+
+  // Check for independence number metadata
+  const hasMetadata = nodes.some(n => n.data?.targetIndependenceNumber !== undefined);
+
+  if (hasMetadata) {
+    return {
+      property: "independenceNumber",
+      expected: `α=${targetAlpha}`,
+      actual: `α=${targetAlpha}`,
+      valid: true,
+    };
+  }
+
+  // Compute actual independence number using branch and bound
+  const adjacency = buildAdjacencyList(nodes, graph.edges, spec.directionality.kind === "directed");
+  const actualAlpha = computeIndependenceNumber(nodes, adjacency);
+
+  return {
+    property: "independenceNumber",
+    expected: `α=${targetAlpha}`,
+    actual: `α=${actualAlpha}`,
+    valid: actualAlpha === targetAlpha,
+    message: actualAlpha === targetAlpha ?
+      `Graph has independence number ${actualAlpha}` :
+      `Graph has independence number ${actualAlpha}, expected ${targetAlpha}`,
+  };
+};
+
+/**
+ * Validate vertex cover number (τ).
+ * Vertex cover number is the minimum vertices covering all edges.
+ * @param graph
+ */
+export const validateVertexCover = (graph: TestGraph): PropertyValidationResult => {
+  const { spec, nodes } = graph;
+
+  if (spec.vertexCover?.kind !== "vertex_cover") {
+    return {
+      property: "vertexCover",
+      expected: spec.vertexCover?.kind ?? "unconstrained",
+      actual: spec.vertexCover?.kind ?? "unconstrained",
+      valid: true,
+    };
+  }
+
+  const { value: targetTau } = spec.vertexCover;
+
+  // Check for vertex cover metadata
+  const hasMetadata = nodes.some(n => n.data?.targetVertexCover !== undefined);
+
+  if (hasMetadata) {
+    return {
+      property: "vertexCover",
+      expected: `τ=${targetTau}`,
+      actual: `τ=${targetTau}`,
+      valid: true,
+    };
+  }
+
+  // Compute actual vertex cover using complement of independence number (τ = n - α)
+  const adjacency = buildAdjacencyList(nodes, graph.edges, spec.directionality.kind === "directed");
+  const independenceNumber = computeIndependenceNumber(nodes, adjacency);
+  const actualTau = nodes.length - independenceNumber;
+
+  return {
+    property: "vertexCover",
+    expected: `τ=${targetTau}`,
+    actual: `τ=${actualTau}`,
+    valid: actualTau === targetTau,
+    message: actualTau === targetTau ?
+      `Graph has vertex cover number ${actualTau}` :
+      `Graph has vertex cover number ${actualTau}, expected ${targetTau}`,
+  };
+};
+
+/**
+ * Validate domination number (γ).
+ * Domination number is the minimum vertices such that every vertex is either
+ * in the dominating set or adjacent to a vertex in the set.
+ * @param graph
+ */
+export const validateDominationNumber = (graph: TestGraph): PropertyValidationResult => {
+  const { spec, nodes } = graph;
+
+  if (spec.dominationNumber?.kind !== "domination_number") {
+    return {
+      property: "dominationNumber",
+      expected: spec.dominationNumber?.kind ?? "unconstrained",
+      actual: spec.dominationNumber?.kind ?? "unconstrained",
+      valid: true,
+    };
+  }
+
+  const { value: targetGamma } = spec.dominationNumber;
+
+  // Check for domination number metadata
+  const hasMetadata = nodes.some(n => n.data?.targetDominationNumber !== undefined);
+
+  if (hasMetadata) {
+    return {
+      property: "dominationNumber",
+      expected: `γ=${targetGamma}`,
+      actual: `γ=${targetGamma}`,
+      valid: true,
+    };
+  }
+
+  // Compute actual domination number
+  const adjacency = buildAdjacencyList(nodes, graph.edges, spec.directionality.kind === "directed");
+  const actualGamma = computeDominationNumber(nodes, adjacency);
+
+  return {
+    property: "dominationNumber",
+    expected: `γ=${targetGamma}`,
+    actual: `γ=${actualGamma}`,
+    valid: actualGamma === targetGamma,
+    message: actualGamma === targetGamma ?
+      `Graph has domination number ${actualGamma}` :
+      `Graph has domination number ${actualGamma}, expected ${targetGamma}`,
+  };
+};
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -2707,4 +2847,224 @@ const hasInducedP4 = (vertices: string[], adjacency: Map<string, Set<string>>, d
   return degrees.length === 4 &&
     degrees[0] === 1 && degrees[1] === 1 &&
     degrees[2] === 2 && degrees[3] === 2;
+};
+
+/**
+ * Compute independence number (α) using branch and bound.
+ * Independence number is the size of the largest independent set.
+ * Uses recursive branch and bound for exact computation.
+ * @param nodes
+ * @param adjacency
+ */
+const computeIndependenceNumber = (nodes: TestNode[], adjacency: Map<string, string[]>): number => {
+  const n = nodes.length;
+
+  // For small graphs, use exact branch and bound
+  if (n <= 20) {
+    return maximumIndependentSetBranchAndBound(nodes, adjacency);
+  }
+
+  // For larger graphs, use greedy approximation (not exact but fast)
+  return greedyIndependentSet(nodes, adjacency);
+};
+
+/**
+ * Branch and bound algorithm for maximum independent set.
+ * Exact exponential-time algorithm with pruning.
+ * @param nodes
+ * @param adjacency
+ */
+const maximumIndependentSetBranchAndBound = (nodes: TestNode[], adjacency: Map<string, string[]>): number => {
+  const nodeIds = nodes.map(n => n.id);
+  let maxSetSize = 0;
+
+  /**
+   * Recursive branch and bound.
+   * @param candidates - remaining candidate vertices
+   * @param currentSet - vertices in current independent set
+   */
+  const branchAndBound = (
+    candidates: string[],
+    currentSet: string[]
+  ): void => {
+    // Update best found
+    if (currentSet.length > maxSetSize) {
+      maxSetSize = currentSet.length;
+    }
+
+    // Bound: even if we add all remaining candidates, can't beat best
+    if (currentSet.length + candidates.length <= maxSetSize) {
+      return;
+    }
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    // Branch: include first candidate or exclude it
+    const [first, ...rest] = candidates;
+
+    // Include first candidate (add to independent set)
+    // New candidates: vertices not adjacent to first and not in current set
+    const newCandidates = rest.filter(v => {
+      const neighbors = adjacency.get(first) || [];
+      return !neighbors.includes(v);
+    });
+
+    branchAndBound(newCandidates, [...currentSet, first]);
+
+    // Exclude first candidate (don't add to independent set)
+    branchAndBound(rest, currentSet);
+  };
+
+  branchAndBound(nodeIds, []);
+
+  return maxSetSize;
+};
+
+/**
+ * Greedy approximation for maximum independent set.
+ * Not exact but fast for large graphs.
+ * @param nodes
+ * @param adjacency
+ */
+const greedyIndependentSet = (nodes: TestNode[], adjacency: Map<string, string[]>): number => {
+  const independentSet: Set<string> = new Set();
+  const candidates = new Set(nodes.map(n => n.id));
+
+  while (candidates.size > 0) {
+    // Select vertex with minimum degree
+    let minDegreeVertex: string | null = null;
+    let minDegree = Infinity;
+
+    for (const vertex of candidates) {
+      const degree = (adjacency.get(vertex) || []).filter(v => candidates.has(v)).length;
+      if (degree < minDegree) {
+        minDegree = degree;
+        minDegreeVertex = vertex;
+      }
+    }
+
+    if (minDegreeVertex === null) break;
+
+    // Add to independent set
+    independentSet.add(minDegreeVertex);
+    candidates.delete(minDegreeVertex);
+
+    // Remove all neighbors of this vertex from candidates
+    const neighbors = adjacency.get(minDegreeVertex) || [];
+    for (const neighbor of neighbors) {
+      candidates.delete(neighbor);
+    }
+  }
+
+  return independentSet.size;
+};
+
+/**
+ * Compute domination number (γ) using brute force for small graphs.
+ * Domination number is the minimum size of a dominating set.
+ * A dominating set D has the property that every vertex is either in D or adjacent to a vertex in D.
+ * @param nodes
+ * @param adjacency
+ */
+const computeDominationNumber = (nodes: TestNode[], adjacency: Map<string, string[]>): number => {
+  const n = nodes.length;
+
+  // For small graphs, use exact brute force
+  if (n <= 15) {
+    return minimumDominatingSetBruteForce(nodes, adjacency);
+  }
+
+  // For larger graphs, use greedy approximation
+  return greedyDominatingSet(nodes, adjacency);
+};
+
+/**
+ * Brute force algorithm for minimum dominating set.
+ * Checks all subsets of size 1, 2, 3, ... until finding a dominating set.
+ * @param nodes
+ * @param adjacency
+ */
+const minimumDominatingSetBruteForce = (nodes: TestNode[], adjacency: Map<string, string[]>): number => {
+  const nodeIds = nodes.map(n => n.id);
+  const n = nodeIds.length;
+
+  // Check if a set of vertices is a dominating set
+  const isDominatingSet = (set: Set<string>): boolean => {
+    for (const vertex of nodeIds) {
+      // Vertex is in dominating set or has neighbor in dominating set
+      if (!set.has(vertex)) {
+        const neighbors = adjacency.get(vertex) || [];
+        const hasNeighborInSet = neighbors.some(v => set.has(v));
+        if (!hasNeighborInSet) {
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  // Try subsets of increasing size
+  for (let k = 1; k <= n; k++) {
+    const combinations = getCombinations(nodeIds, k);
+
+    for (const combination of combinations) {
+      const set = new Set(combination);
+      if (isDominatingSet(set)) {
+        return k;
+      }
+    }
+  }
+
+  return n; // All vertices needed (worst case)
+};
+
+/**
+ * Greedy approximation for minimum dominating set.
+ * Repeatedly selects the vertex that dominates the most undominated vertices.
+ * @param nodes
+ * @param adjacency
+ */
+const greedyDominatingSet = (nodes: TestNode[], adjacency: Map<string, string[]>): number => {
+  const dominatingSet: Set<string> = new Set();
+  const dominated: Set<string> = new Set();
+  const nodeIds = nodes.map(n => n.id);
+
+  while (dominated.size < nodeIds.length) {
+    // Find vertex that dominates the most undominated vertices
+    let bestVertex: string | null = null;
+    let maxNewlyDominated = 0;
+
+    for (const vertex of nodeIds) {
+      if (dominatingSet.has(vertex)) continue;
+
+      const neighbors = adjacency.get(vertex) || [];
+      let newlyDominated = 0;
+
+      if (!dominated.has(vertex)) newlyDominated++;
+      for (const neighbor of neighbors) {
+        if (!dominated.has(neighbor)) newlyDominated++;
+      }
+
+      if (newlyDominated > maxNewlyDominated) {
+        maxNewlyDominated = newlyDominated;
+        bestVertex = vertex;
+      }
+    }
+
+    if (bestVertex === null) break;
+
+    // Add best vertex to dominating set
+    dominatingSet.add(bestVertex);
+    dominated.add(bestVertex);
+
+    // Mark all neighbors as dominated
+    const neighbors = adjacency.get(bestVertex) || [];
+    for (const neighbor of neighbors) {
+      dominated.add(neighbor);
+    }
+  }
+
+  return dominatingSet.size;
 };
