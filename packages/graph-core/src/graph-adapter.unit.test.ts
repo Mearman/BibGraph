@@ -2,11 +2,11 @@
  * Unit tests for GraphAdapter
  */
 
-// eslint-disable-next-line n/no-extraneous-import
+ 
+import type { Edge, Graph, Node } from '@bibgraph/algorithms';
 import { describe, expect, it, vi } from 'vitest';
 
 import { GraphAdapter } from './graph-adapter';
-import type { Edge, Graph, Node } from '@bibgraph/algorithms';
 
 describe('GraphAdapter', () => {
   interface TestNode extends Node {
@@ -25,6 +25,7 @@ describe('GraphAdapter', () => {
 
   /**
    * Create a mock Graph instance with Option/Result monad behavior
+   * @param overrides
    */
   const createMockGraph = (overrides?: Partial<Graph<TestNode, TestEdge>>): Graph<TestNode, TestEdge> => {
     const mockGraph = {
