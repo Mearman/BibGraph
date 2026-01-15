@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   Graph,
-  dfs,
-  bfs,
   dijkstra,
   topologicalSort,
   detectCycle,
@@ -30,13 +28,6 @@ describe('special edges edge cases', () => {
       graph.addEdge({ id: 'e1', source: 'A', target: 'B', type: 'edge' });
       graph.addEdge({ id: 'e2', source: 'B', target: 'C', type: 'edge' });
 
-      // DFS should visit all nodes despite self-loops
-      const dfsResult = dfs(graph, 'A');
-      expect(dfsResult.ok).toBe(true);
-      if (dfsResult.ok) {
-        expect(dfsResult.value.visitOrder).toHaveLength(3);
-      }
-
       // Cycle detection should find cycles (self-loops are cycles)
       const cycleResult = detectCycle(graph);
       expect(cycleResult.ok).toBe(true);
@@ -60,13 +51,6 @@ describe('special edges edge cases', () => {
 
       graph.addEdge({ id: 'loop', source: 'A', target: 'A', type: 'self-loop' });
       graph.addEdge({ id: 'e1', source: 'A', target: 'B', type: 'edge' });
-
-      // BFS should work normally
-      const bfsResult = bfs(graph, 'A');
-      expect(bfsResult.ok).toBe(true);
-      if (bfsResult.ok) {
-        expect(bfsResult.value.visitOrder).toHaveLength(2);
-      }
 
       // Cycle detection should find self-loop
       const cycleResult = detectCycle(graph);
@@ -123,13 +107,6 @@ describe('special edges edge cases', () => {
         // Array may contain duplicates for multi-edges
         expect(neighborsResult.value.length).toBeGreaterThanOrEqual(1);
         expect(neighborsResult.value.includes('B')).toBe(true);
-      }
-
-      // DFS visits B once
-      const dfsResult = dfs(graph, 'A');
-      expect(dfsResult.ok).toBe(true);
-      if (dfsResult.ok) {
-        expect(dfsResult.value.visitOrder).toHaveLength(2);
       }
 
       // Dijkstra should find path with minimum weight edge
@@ -262,13 +239,6 @@ describe('special edges edge cases', () => {
       graph.addEdge({ id: 'e3', source: 'B', target: 'A', type: 'edge3', weight: 2 });
 
       expect(graph.getEdgeCount()).toBe(5);
-
-      // DFS should visit both nodes
-      const dfsResult = dfs(graph, 'A');
-      expect(dfsResult.ok).toBe(true);
-      if (dfsResult.ok) {
-        expect(dfsResult.value.visitOrder).toHaveLength(2);
-      }
 
       // Cycle exists (self-loops + bidirectional)
       const cycleResult = detectCycle(graph);

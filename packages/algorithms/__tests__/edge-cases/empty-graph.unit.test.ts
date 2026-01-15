@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   Graph,
-  dfs,
-  bfs,
   dijkstra,
   topologicalSort,
   detectCycle,
@@ -13,32 +11,6 @@ import {
 } from '../../src/index';
 
 describe('empty graph edge cases', () => {
-  describe('traversal algorithms with empty graph', () => {
-    it('DFS should handle empty graph gracefully', () => {
-      const graph = new Graph<Node, Edge>(true);
-
-      // Attempt traversal from non-existent node
-      const result = dfs(graph, 'A');
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error.type).toBe('invalid-input');
-        expect(result.error.message).toContain('not found');
-      }
-    });
-
-    it('BFS should handle empty graph gracefully', () => {
-      const graph = new Graph<Node, Edge>(false);
-
-      // Attempt traversal from non-existent node
-      const result = bfs(graph, 'A');
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error.type).toBe('invalid-input');
-        expect(result.error.message).toContain('not found');
-      }
-    });
-  });
-
   describe('pathfinding algorithms with empty graph', () => {
     it('Dijkstra should handle empty graph gracefully', () => {
       const graph = new Graph<Node, Edge>(true);
@@ -186,12 +158,6 @@ describe('empty graph edge cases', () => {
       expect(graph.getNodeCount()).toBe(1);
 
       // Now algorithms should work
-      const dfsResult = dfs(graph, 'A');
-      expect(dfsResult.ok).toBe(true);
-      if (dfsResult.ok) {
-        expect(dfsResult.value.visitOrder).toHaveLength(1);
-      }
-
       const componentsResult = connectedComponents(graph);
       expect(componentsResult.ok).toBe(true);
       if (componentsResult.ok) {

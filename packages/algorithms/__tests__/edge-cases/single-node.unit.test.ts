@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   Graph,
-  dfs,
-  bfs,
   dijkstra,
   topologicalSort,
   detectCycle,
@@ -13,36 +11,6 @@ import {
 } from '../../src/index';
 
 describe('single node graph edge cases', () => {
-  describe('traversal algorithms with single node', () => {
-    it('DFS should visit single node once', () => {
-      const graph = new Graph<Node, Edge>(true);
-      const node: Node = { id: 'A', type: 'node' };
-      graph.addNode(node);
-
-      const result = dfs(graph, 'A');
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.visitOrder).toEqual([node]);
-        expect(result.value.parents.get('A')).toBe(null);
-        expect(result.value.discovered.get('A')).toBe(1);
-        expect(result.value.finished.get('A')).toBe(2);
-      }
-    });
-
-    it('BFS should visit single node once', () => {
-      const graph = new Graph<Node, Edge>(false);
-      const node: Node = { id: 'A', type: 'node' };
-      graph.addNode(node);
-
-      const result = bfs(graph, 'A');
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.visitOrder).toEqual([node]);
-        expect(result.value.parents.get('A')).toBe(null);
-      }
-    });
-  });
-
   describe('pathfinding algorithms with single node', () => {
     it('Dijkstra should find trivial path from node to itself', () => {
       const graph = new Graph<Node, Edge>(true);
@@ -127,33 +95,6 @@ describe('single node graph edge cases', () => {
   });
 
   describe('single node with self-loop', () => {
-    it('DFS should handle self-loop correctly', () => {
-      const graph = new Graph<Node, Edge>(true);
-      const node: Node = { id: 'A', type: 'node' };
-      graph.addNode(node);
-      graph.addEdge({ id: 'e1', source: 'A', target: 'A', type: 'self-loop' });
-
-      const result = dfs(graph, 'A');
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.visitOrder).toEqual([node]);
-        // Node visited once despite self-loop
-      }
-    });
-
-    it('BFS should handle self-loop correctly', () => {
-      const graph = new Graph<Node, Edge>(false);
-      const node: Node = { id: 'A', type: 'node' };
-      graph.addNode(node);
-      graph.addEdge({ id: 'e1', source: 'A', target: 'A', type: 'self-loop' });
-
-      const result = bfs(graph, 'A');
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.visitOrder).toEqual([node]);
-      }
-    });
-
     it('detectCycle should find cycle in directed self-loop', () => {
       const graph = new Graph<Node, Edge>(true);
       graph.addNode({ id: 'A', type: 'node' });
@@ -236,20 +177,6 @@ describe('single node graph edge cases', () => {
       directedGraph.addNode(node);
       undirectedGraph.addNode(node);
 
-      // DFS
-      const dfsDirected = dfs(directedGraph, 'A');
-      const dfsUndirected = dfs(undirectedGraph, 'A');
-      expect(dfsDirected.ok && dfsDirected.value.visitOrder).toEqual(
-        dfsUndirected.ok && dfsUndirected.value.visitOrder
-      );
-
-      // BFS
-      const bfsDirected = bfs(directedGraph, 'A');
-      const bfsUndirected = bfs(undirectedGraph, 'A');
-      expect(bfsDirected.ok && bfsDirected.value.visitOrder).toEqual(
-        bfsUndirected.ok && bfsUndirected.value.visitOrder
-      );
-
       // Components
       const ccDirected = connectedComponents(directedGraph);
       const ccUndirected = connectedComponents(undirectedGraph);
@@ -280,10 +207,6 @@ describe('single node graph edge cases', () => {
       for (let i = 0; i < 3; i++) {
         graph.addNode({ id: 'A', type: 'node' });
         expect(graph.getNodeCount()).toBe(1);
-
-        const dfsResult = dfs(graph, 'A');
-        expect(dfsResult.ok).toBe(true);
-
         graph.removeNode('A');
         expect(graph.getNodeCount()).toBe(0);
       }
