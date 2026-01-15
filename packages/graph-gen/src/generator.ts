@@ -614,6 +614,73 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
     return edges;
   }
 
+  // Phase 6: Graph Products
+  // Note: Graph products are structural classifications, not generation constraints
+  // Generate standard edges first, then store product classification metadata
+  if (spec.cartesianProduct?.kind === "cartesian_product") {
+    // Generate standard connected graph
+    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
+      generateTreeEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
+      generateConnectedCyclicEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
+      generateForestEdges(nodes, edges, spec, rng);
+    } else {
+      generateDisconnectedEdges(nodes, edges, spec, rng);
+    }
+    // Store Cartesian product metadata
+    computeAndStoreCartesianProduct(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.tensorProduct?.kind === "tensor_product") {
+    // Generate standard connected graph
+    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
+      generateTreeEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
+      generateConnectedCyclicEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
+      generateForestEdges(nodes, edges, spec, rng);
+    } else {
+      generateDisconnectedEdges(nodes, edges, spec, rng);
+    }
+    // Store tensor product metadata
+    computeAndStoreTensorProduct(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.strongProduct?.kind === "strong_product") {
+    // Generate standard connected graph
+    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
+      generateTreeEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
+      generateConnectedCyclicEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
+      generateForestEdges(nodes, edges, spec, rng);
+    } else {
+      generateDisconnectedEdges(nodes, edges, spec, rng);
+    }
+    // Store strong product metadata
+    computeAndStoreStrongProduct(nodes, edges, spec, rng);
+    return edges;
+  }
+
+  if (spec.lexicographicProduct?.kind === "lexicographic_product") {
+    // Generate standard connected graph
+    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
+      generateTreeEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
+      generateConnectedCyclicEdges(nodes, edges, spec, rng);
+    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
+      generateForestEdges(nodes, edges, spec, rng);
+    } else {
+      generateDisconnectedEdges(nodes, edges, spec, rng);
+    }
+    // Store lexicographic product metadata
+    computeAndStoreLexicographicProduct(nodes, edges, spec, rng);
+    return edges;
+  }
+
   // Non-bipartite graphs
   if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
     // Generate tree structure
@@ -4112,6 +4179,98 @@ const computeAndStoreRamanujan = (nodes: TestNode[], edges: TestEdge[], spec: Gr
   nodes.forEach(node => {
     node.data = node.data || {};
     node.data.targetRamanujanDegree = degree;
+  });
+};
+
+/**
+ * Compute and store Cartesian product classification.
+ * Cartesian product G □ H combines two graphs.
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param spec - Graph specification
+ * @param rng - Random number generator
+ */
+const computeAndStoreCartesianProduct = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
+  if (spec.cartesianProduct?.kind !== "cartesian_product") {
+    throw new Error("Cartesian product computation requires cartesian_product spec");
+  }
+
+  const { leftFactors, rightFactors } = spec.cartesianProduct;
+
+  // Store Cartesian product parameters for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetCartesianProductLeft = leftFactors;
+    node.data.targetCartesianProductRight = rightFactors;
+  });
+};
+
+/**
+ * Compute and store tensor (direct) product classification.
+ * Tensor product G × H combines two graphs.
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param spec - Graph specification
+ * @param rng - Random number generator
+ */
+const computeAndStoreTensorProduct = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
+  if (spec.tensorProduct?.kind !== "tensor_product") {
+    throw new Error("Tensor product computation requires tensor_product spec");
+  }
+
+  const { leftFactors, rightFactors } = spec.tensorProduct;
+
+  // Store tensor product parameters for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetTensorProductLeft = leftFactors;
+    node.data.targetTensorProductRight = rightFactors;
+  });
+};
+
+/**
+ * Compute and store strong product classification.
+ * Strong product G ⊠ H combines two graphs.
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param spec - Graph specification
+ * @param rng - Random number generator
+ */
+const computeAndStoreStrongProduct = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
+  if (spec.strongProduct?.kind !== "strong_product") {
+    throw new Error("Strong product computation requires strong_product spec");
+  }
+
+  const { leftFactors, rightFactors } = spec.strongProduct;
+
+  // Store strong product parameters for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetStrongProductLeft = leftFactors;
+    node.data.targetStrongProductRight = rightFactors;
+  });
+};
+
+/**
+ * Compute and store lexicographic product classification.
+ * Lexicographic product G ∘ H combines two graphs.
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param spec - Graph specification
+ * @param rng - Random number generator
+ */
+const computeAndStoreLexicographicProduct = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
+  if (spec.lexicographicProduct?.kind !== "lexicographic_product") {
+    throw new Error("Lexicographic product computation requires lexicographic_product spec");
+  }
+
+  const { leftFactors, rightFactors } = spec.lexicographicProduct;
+
+  // Store lexicographic product parameters for validation
+  nodes.forEach(node => {
+    node.data = node.data || {};
+    node.data.targetLexicographicProductLeft = leftFactors;
+    node.data.targetLexicographicProductRight = rightFactors;
   });
 };
 
