@@ -1218,3 +1218,196 @@ describe('Phase 2: Chordal-Based Graph Classes', () => {
     });
   });
 });
+
+describe('Phase 3: Network Science Generators', () => {
+  describe('Scale-free graphs', () => {
+    it('should generate scale-free graph with power-law degree distribution', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        scaleFree: { kind: 'scale_free', exponent: 2.1 },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 50, seed: 42 });
+
+      expect(result.nodes).toHaveLength(50);
+      expect(result.edges.length).toBeGreaterThan(0);
+
+      // Verify all nodes have exponent metadata
+      result.nodes.forEach(node => {
+        expect(node.data?.scaleFreeExponent).toBeDefined();
+        expect(node.data!.scaleFreeExponent).toBe(2.1);
+      });
+
+      // Build degree distribution
+      const degreeCounts = new Map<number, number>();
+      for (const node of result.nodes) {
+        const degree = result.edges.filter(e =>
+          e.source === node.id || e.target === node.id
+        ).length;
+        degreeCounts.set(degree, (degreeCounts.get(degree) || 0) + 1);
+      }
+
+      // Scale-free networks should have hubs (high-degree nodes)
+      const degrees = Array.from(degreeCounts.keys());
+      const maxDegree = Math.max(...degrees);
+      expect(maxDegree).toBeGreaterThan(3); // Should have at least one hub
+    });
+
+    it('should handle small scale-free graph (n<10)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        scaleFree: { kind: 'scale_free', exponent: 2.1 },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 5, seed: 42 });
+
+      expect(result.nodes).toHaveLength(5);
+      result.nodes.forEach(node => {
+        expect(node.data?.scaleFreeExponent).toBeDefined();
+      });
+    });
+  });
+
+  describe('Small-world graphs', () => {
+    it('should generate small-world graph (Watts-Strogatz model)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        smallWorld: { kind: 'small_world', rewireProbability: 0.1, meanDegree: 4 },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 20, seed: 42 });
+
+      expect(result.nodes).toHaveLength(20);
+      expect(result.edges.length).toBeGreaterThan(0);
+
+      // Verify all nodes have small-world metadata
+      result.nodes.forEach(node => {
+        expect(node.data?.smallWorldRewireProb).toBeDefined();
+        expect(node.data!.smallWorldRewireProb).toBe(0.1);
+        expect(node.data!.smallWorldMeanDegree).toBe(4);
+      });
+
+      // Build degree distribution (should be roughly regular)
+      const degrees = result.nodes.map(node =>
+        result.edges.filter(e => e.source === node.id || e.target === node.id).length
+      );
+
+      const avgDegree = degrees.reduce((a, b) => a + b, 0) / degrees.length;
+      expect(avgDegree).toBeGreaterThan(2); // Should be connected
+    });
+
+    it('should handle minimal small-world graph (n=4)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        smallWorld: { kind: 'small_world' },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 4, seed: 42 });
+
+      expect(result.nodes).toHaveLength(4);
+      result.nodes.forEach(node => {
+        expect(node.data?.smallWorldRewireProb).toBeDefined();
+      });
+    });
+  });
+
+  describe('Modular graphs', () => {
+    it('should generate modular graph with community structure', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        communityStructure: {
+          kind: 'modular',
+          numCommunities: 3,
+          intraCommunityDensity: 0.7,
+          interCommunityDensity: 0.05,
+        },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 30, seed: 42 });
+
+      expect(result.nodes).toHaveLength(30);
+      expect(result.edges.length).toBeGreaterThan(0);
+
+      // Verify all nodes have community metadata
+      result.nodes.forEach(node => {
+        expect(node.data?.community).toBeDefined();
+        expect(node.data!.community).toBeGreaterThanOrEqual(0);
+        expect(node.data!.community).toBeLessThan(3);
+      });
+
+      // Verify community distribution (should be ~10 nodes per community)
+      const communityCounts = new Map<number, number>();
+      result.nodes.forEach(node => {
+        const comm = node.data!.community as number;
+        communityCounts.set(comm, (communityCounts.get(comm) || 0) + 1);
+      });
+
+      expect(communityCounts.size).toBe(3);
+      communityCounts.forEach((count, comm) => {
+        expect(count).toBeGreaterThan(0);
+      });
+    });
+
+    it('should handle minimal modular graph (n=3)', () => {
+      const spec: GraphSpec = {
+        directionality: { kind: 'undirected' },
+        weighting: { kind: 'unweighted' },
+        connectivity: { kind: 'unconstrained' },
+        cycles: { kind: 'cycles_allowed' },
+        density: { kind: 'unconstrained' },
+        completeness: { kind: 'incomplete' },
+        edgeMultiplicity: { kind: 'simple' },
+        selfLoops: { kind: 'disallowed' },
+        schema: { kind: 'homogeneous' },
+        communityStructure: { kind: 'modular', numCommunities: 3 },
+      };
+
+      const result = generateGraph(spec, { nodeCount: 3, seed: 42 });
+
+      expect(result.nodes).toHaveLength(3);
+      result.nodes.forEach(node => {
+        expect(node.data?.community).toBeDefined();
+      });
+    });
+  });
+});

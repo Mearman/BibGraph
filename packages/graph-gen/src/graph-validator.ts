@@ -27,7 +27,10 @@ import {
   validateInterval,
   validatePermutation,
   validateComparability,
-  validatePerfect} from './validation';
+  validatePerfect,
+  validateScaleFree,
+  validateSmallWorld,
+  validateModular} from './validation';
 
 /**
  * Validate that a generated graph actually has its claimed properties.
@@ -68,6 +71,9 @@ export const validateGraphProperties = (graph: TestGraph): GraphValidationResult
   results.push(validatePermutation(graph));
   results.push(validateComparability(graph));
   results.push(validatePerfect(graph));
+  results.push(validateScaleFree(graph));
+  results.push(validateSmallWorld(graph));
+  results.push(validateModular(graph));
   results.push(validateRegularGraph(graph));
   results.push(validateEulerian(graph));
   results.push(validateKVertexConnected(graph));

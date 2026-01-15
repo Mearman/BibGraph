@@ -35,7 +35,10 @@ export {
   validateInterval,
   validatePermutation,
   validateComparability,
-  validatePerfect
+  validatePerfect,
+  validateScaleFree,
+  validateSmallWorld,
+  validateModular
 } from './structural-validators';
 
 // Export degree validators
