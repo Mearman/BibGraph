@@ -95,7 +95,9 @@ export const validateCycles = (graph: TestGraph, adjustments: Partial<Record<str
   const hasCycle = detectCycle(nodes, edges, directed);
   const actual = hasCycle ? "cycles_allowed" : "acyclic";
 
-  const valid = expected === actual;
+  // "cycles_allowed" means cycles are permitted, not required
+  // So both cyclic and acyclic graphs are valid when spec says "cycles_allowed"
+  const valid = expected === "cycles_allowed" ? true : expected === actual;
 
   return {
     property: "cycles",

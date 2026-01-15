@@ -267,6 +267,11 @@ describe('validateGraphProperties', () => {
       const graph = generateGraph(spec, { nodeCount: 5, seed: 42 });
       const result = validateGraphProperties(graph);
 
+      const failures = result.properties.filter(p => !p.valid);
+      if (failures.length > 0) {
+        throw new Error(`Tournament validation failed: ${failures.map(f => `${f.property} (${f.message})`).join(', ')}`);
+      }
+
       expect(result.valid).toBe(true);
     });
 

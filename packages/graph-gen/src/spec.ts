@@ -868,40 +868,40 @@ export const createSpec = (overrides: GraphSpecPatch = {}): GraphSpec => makeGra
  * Type guard for directed graphs
  * @param spec
  */
-export const isDirected = (spec: GraphSpec): spec is GraphSpec & { directionality: { kind: "directed" } } => spec.directionality.kind === "directed";
+const isDirected = (spec: GraphSpec): spec is GraphSpec & { directionality: { kind: "directed" } } => spec.directionality.kind === "directed";
 
 /**
  * Type guard for weighted graphs
  * @param spec
  */
-export const isWeighted = (spec: GraphSpec): spec is GraphSpec & { weighting: { kind: "weighted_numeric" } } => spec.weighting.kind === "weighted_numeric";
+const isWeighted = (spec: GraphSpec): spec is GraphSpec & { weighting: { kind: "weighted_numeric" } } => spec.weighting.kind === "weighted_numeric";
 
 /**
  * Type guard for acyclic graphs
  * @param spec
  */
-export const isAcyclic = (spec: GraphSpec): spec is GraphSpec & { cycles: { kind: "acyclic" } } => spec.cycles.kind === "acyclic";
+const isAcyclic = (spec: GraphSpec): spec is GraphSpec & { cycles: { kind: "acyclic" } } => spec.cycles.kind === "acyclic";
 
 /**
  * Type guard for connected graphs
  * @param spec
  */
-export const isConnected = (spec: GraphSpec): spec is GraphSpec & { connectivity: { kind: "connected" } } => spec.connectivity.kind === "connected";
+const isConnected = (spec: GraphSpec): spec is GraphSpec & { connectivity: { kind: "connected" } } => spec.connectivity.kind === "connected";
 
 /**
  * Type guard for heterogeneous graphs
  * @param spec
  */
-export const isHeterogeneous = (spec: GraphSpec): spec is GraphSpec & { schema: { kind: "heterogeneous" } } => spec.schema.kind === "heterogeneous";
+const isHeterogeneous = (spec: GraphSpec): spec is GraphSpec & { schema: { kind: "heterogeneous" } } => spec.schema.kind === "heterogeneous";
 
 /**
  * Type guard for multigraphs
  * @param spec
  */
-export const isMultigraph = (spec: GraphSpec): spec is GraphSpec & { edgeMultiplicity: { kind: "multi" } } => spec.edgeMultiplicity.kind === "multi";
+const isMultigraph = (spec: GraphSpec): spec is GraphSpec & { edgeMultiplicity: { kind: "multi" } } => spec.edgeMultiplicity.kind === "multi";
 
 /**
  * Type guard for graphs allowing self-loops
  * @param spec
  */
-export const allowsSelfLoops = (spec: GraphSpec): spec is GraphSpec & { selfLoops: { kind: "allowed" } } => spec.selfLoops.kind === "allowed";
+const allowsSelfLoops = (spec: GraphSpec): spec is GraphSpec & { selfLoops: { kind: "allowed" } } => spec.selfLoops.kind === "allowed";

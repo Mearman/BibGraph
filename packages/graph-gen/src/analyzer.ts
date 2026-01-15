@@ -2047,6 +2047,9 @@ export const isRegular = (g: AnalyzerGraph): boolean => axisKindIs("degreeConstr
  */
 export const isGraphConnected = (g: AnalyzerGraph): boolean => axisKindIs("connectivity", "connected")(g);
 
+// Alias for backward compatibility with tests
+export { isGraphConnected as isConnected };
+
 /**
  * Check if graph is Eulerian (all vertices have even degree).
  * For undirected graphs, this means an Eulerian circuit exists.
