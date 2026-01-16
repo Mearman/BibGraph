@@ -1,5 +1,4 @@
-import type { TestNode } from '../generators/types'
-import type { TestGraph } from '../generators/types'
+import type { TestGraph,TestNode  } from '../generators/types'
 import { buildAdjacencyList } from './helper-functions';
 import type { PropertyValidationResult } from './types';
 
@@ -204,6 +203,8 @@ export const validateDominationNumber = (graph: TestGraph): PropertyValidationRe
 /**
  * Computes the independence number (α) using branch and bound.
  * Time complexity: O(1.4422^n) in worst case, but much faster in practice.
+ * @param nodes
+ * @param adjacency
  */
 const computeIndependenceNumber = (nodes: TestNode[], adjacency: Map<string, string[]>): number => {
   const n = nodes.length;
@@ -279,6 +280,8 @@ const computeIndependenceNumber = (nodes: TestNode[], adjacency: Map<string, str
  * Computes the domination number (γ) using branch and bound.
  * A dominating set D has the property that every vertex is either in D
  * or adjacent to a vertex in D.
+ * @param nodes
+ * @param adjacency
  */
 const computeDominationNumber = (nodes: TestNode[], adjacency: Map<string, string[]>): number => {
   const n = nodes.length;

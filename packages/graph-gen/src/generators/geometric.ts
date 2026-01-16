@@ -1,5 +1,5 @@
-import type { TestNode, TestEdge, SeededRandom } from './types';
 import type { GraphSpec } from '../spec';
+import type { SeededRandom,TestEdge, TestNode } from './types';
 
 /**
  * Generate unit disk graph edges.

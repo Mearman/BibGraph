@@ -11,8 +11,7 @@
  */
 
 import type { GraphSpec } from '../spec';
-import type { TestNode, TestEdge } from './types';
-import type { SeededRandom } from './types';
+import type { SeededRandom,TestEdge,TestNode  } from './types';
 
 /**
  * Compute and store full spectrum of graph adjacency matrix.

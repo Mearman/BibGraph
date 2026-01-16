@@ -1,80 +1,70 @@
-import type { GraphSpec } from './spec';
 import {
-  generateCompleteBipartiteEdges,
-  generateBipartiteTreeEdges,
   generateBipartiteConnectedEdges,
+  generateBipartiteDisconnectedEdges,
   generateBipartiteForestEdges,
-  generateBipartiteDisconnectedEdges
-} from './generators/bipartite';
+  generateBipartiteTreeEdges,
+  generateCompleteBipartiteEdges} from './generators/bipartite';
 import {
-  generateTreeEdges,
-  generateStarEdges,
-  generateWheelEdges,
-  generateGridEdges,
-  generateToroidalEdges,
-  generateBinaryTreeEdges,
-  generateTournamentEdges,
-  generateRegularEdges
-} from './generators/core-structures';
-import {
-  generateFlowNetworkEdges,
-  generateEulerianEdges,
-  generateKVertexConnectedEdges,
-  generateKEdgeConnectedEdges,
-  generateTreewidthBoundedEdges,
-  generateKColorableEdges,
   generateConnectedCyclicEdges,
+  generateDisconnectedEdges,
+  generateEulerianEdges,
+  generateFlowNetworkEdges,
   generateForestEdges,
-  generateDisconnectedEdges
-} from './generators/connectivity';
+  generateKColorableEdges,
+  generateKEdgeConnectedEdges,
+  generateKVertexConnectedEdges,
+  generateTreewidthBoundedEdges} from './generators/connectivity';
 import {
-  generateSplitEdges,
-  generateCographEdges,
-  generateClawFreeEdges,
-  generateChordalEdges,
-  generateIntervalEdges,
-  generatePermutationEdges,
-  generateComparabilityEdges,
-  generatePerfectEdges
-} from './generators/structural-classes';
+  generateBinaryTreeEdges,
+  generateGridEdges,
+  generateRegularEdges,
+  generateStarEdges,
+  generateToroidalEdges,
+  generateTournamentEdges,
+  generateTreeEdges,
+  generateWheelEdges} from './generators/core-structures';
 import {
-  generateStronglyRegularEdges,
-  generateVertexTransitiveEdges,
-  generateEdgeTransitiveEdges,
-  generateArcTransitiveEdges,
-  generateSelfComplementaryEdges,
-  generateThresholdEdges,
-  generateLineGraphEdges
-} from './generators/symmetry';
-import { SeededRandom, type TestNode, type TestEdge } from './generators/types';
+  generatePlanarEdges,
+  generateUnitDiskEdges} from './generators/geometric';
 import {
-  generateHamiltonianEdges,
-  generateTraceableEdges,
-  generateDiameterEdges,
-  generateRadiusEdges,
-  generateGirthEdges,
-  generateCircumferenceEdges
-} from './generators/path-cycle';
-import {
-  generateScaleFreeEdges,
-  generateSmallWorldEdges,
-  generateModularEdges
-} from './generators/network-structures';
-import {
-  generateUnitDiskEdges,
-  generatePlanarEdges
-} from './generators/geometric';
-import {
-  computeAndStoreSpectrum,
-  computeAndStoreAlgebraicConnectivity,
-  computeAndStoreSpectralRadius
-} from './generators/spectral';
-import {
+  generateDominationNumberEdges,
   generateHereditaryClassEdges,
   generateIndependenceNumberEdges,
-  generateVertexCoverEdges,
-  generateDominationNumberEdges
-} from './generators/invariants';
+  generateVertexCoverEdges} from './generators/invariants';
+import {
+  generateModularEdges,
+  generateScaleFreeEdges,
+  generateSmallWorldEdges} from './generators/network-structures';
+import {
+  generateCircumferenceEdges,
+  generateDiameterEdges,
+  generateGirthEdges,
+  generateHamiltonianEdges,
+  generateRadiusEdges,
+  generateTraceableEdges} from './generators/path-cycle';
+import {
+  computeAndStoreAlgebraicConnectivity,
+  computeAndStoreSpectralRadius,
+  computeAndStoreSpectrum} from './generators/spectral';
+import {
+  generateChordalEdges,
+  generateClawFreeEdges,
+  generateCographEdges,
+  generateComparabilityEdges,
+  generateIntervalEdges,
+  generatePerfectEdges,
+  generatePermutationEdges,
+  generateSplitEdges} from './generators/structural-classes';
+import {
+  generateArcTransitiveEdges,
+  generateEdgeTransitiveEdges,
+  generateLineGraphEdges,
+  generateSelfComplementaryEdges,
+  generateStronglyRegularEdges,
+  generateThresholdEdges,
+  generateVertexTransitiveEdges} from './generators/symmetry';
+import { SeededRandom, type TestEdge,type TestNode } from './generators/types';
+import type { GraphSpec } from './spec';
 
 /**
  * Node in a generated test graph.
@@ -1383,6 +1373,7 @@ const computeAndStoreToughness = (nodes: TestNode[], edges: TestEdge[], spec: Gr
  * @param edges - Graph edges
  * @param spec - Graph specification
  * @param rng - Random number generator
+ * @param _rng
  */
 const computeAndStoreIntegrity = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
   if (spec.integrity?.kind !== "integrity") {
@@ -1405,6 +1396,7 @@ const computeAndStoreIntegrity = (nodes: TestNode[], edges: TestEdge[], spec: Gr
  * @param edges - Graph edges
  * @param spec - Graph specification
  * @param rng - Random number generator
+ * @param _rng
  */
 const computeAndStoreCage = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
   if (spec.cage?.kind !== "cage") {
@@ -1428,6 +1420,7 @@ const computeAndStoreCage = (nodes: TestNode[], edges: TestEdge[], spec: GraphSp
  * @param edges - Graph edges
  * @param spec - Graph specification
  * @param rng - Random number generator
+ * @param _rng
  */
 const computeAndStoreMooreGraph = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
   if (spec.moore?.kind !== "moore") {
@@ -1451,6 +1444,7 @@ const computeAndStoreMooreGraph = (nodes: TestNode[], edges: TestEdge[], spec: G
  * @param edges - Graph edges
  * @param spec - Graph specification
  * @param rng - Random number generator
+ * @param _rng
  */
 const computeAndStoreRamanujan = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
   if (spec.ramanujan?.kind !== "ramanujan") {
@@ -1473,6 +1467,7 @@ const computeAndStoreRamanujan = (nodes: TestNode[], edges: TestEdge[], spec: Gr
  * @param edges - Graph edges
  * @param spec - Graph specification
  * @param rng - Random number generator
+ * @param _rng
  */
 const computeAndStoreCartesianProduct = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
   if (spec.cartesianProduct?.kind !== "cartesian_product") {
@@ -1496,6 +1491,7 @@ const computeAndStoreCartesianProduct = (nodes: TestNode[], edges: TestEdge[], s
  * @param edges - Graph edges
  * @param spec - Graph specification
  * @param rng - Random number generator
+ * @param _rng
  */
 const computeAndStoreTensorProduct = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
   if (spec.tensorProduct?.kind !== "tensor_product") {
@@ -1519,6 +1515,7 @@ const computeAndStoreTensorProduct = (nodes: TestNode[], edges: TestEdge[], spec
  * @param edges - Graph edges
  * @param spec - Graph specification
  * @param rng - Random number generator
+ * @param _rng
  */
 const computeAndStoreStrongProduct = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
   if (spec.strongProduct?.kind !== "strong_product") {
@@ -1542,6 +1539,7 @@ const computeAndStoreStrongProduct = (nodes: TestNode[], edges: TestEdge[], spec
  * @param edges - Graph edges
  * @param spec - Graph specification
  * @param rng - Random number generator
+ * @param _rng
  */
 const computeAndStoreLexicographicProduct = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
   if (spec.lexicographicProduct?.kind !== "lexicographic_product") {
@@ -1565,6 +1563,7 @@ const computeAndStoreLexicographicProduct = (nodes: TestNode[], edges: TestEdge[
  * @param edges - Graph edges
  * @param spec - Graph specification
  * @param rng - Random number generator
+ * @param _rng
  */
 const computeAndStoreMinorFree = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
   if (spec.minorFree?.kind !== "minor_free") {
@@ -1587,6 +1586,7 @@ const computeAndStoreMinorFree = (nodes: TestNode[], edges: TestEdge[], spec: Gr
  * @param edges - Graph edges
  * @param spec - Graph specification
  * @param rng - Random number generator
+ * @param _rng
  */
 const computeAndStoreTopologicalMinorFree = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _rng: SeededRandom): void => {
   if (spec.topologicalMinorFree?.kind !== "topological_minor_free") {

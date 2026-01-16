@@ -1,14 +1,12 @@
-import type { TestEdge, TestNode } from '../generators/types'
-import type { TestGraph } from '../generators/types'
-import type { PropertyValidationResult } from './types';
-
+import type { TestEdge, TestGraph,TestNode  } from '../generators/types'
 import {
-  getCombinations,
-  hasInducedP4,
-  hasChord,
-  findInducedCycles,
   checkTransitiveOrientation,
+  findInducedCycles,
+  getCombinations,
+  hasChord,
+  hasInducedP4,
 } from "./helper-functions";
+import type { PropertyValidationResult } from './types';
 
 // ============================================================================
 // STRUCTURAL CLASS VALIDATORS

@@ -12,7 +12,7 @@
  */
 
 import type { GraphSpec } from '../spec';
-import type { TestNode, TestEdge } from './types';
+import type { TestEdge,TestNode } from './types';
 import { SeededRandom } from './types';
 
 /**

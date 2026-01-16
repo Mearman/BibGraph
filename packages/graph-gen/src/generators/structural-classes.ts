@@ -1,5 +1,5 @@
-import type { TestNode, TestEdge } from './types';
 import type { GraphSpec } from '../spec';
+import type { TestEdge,TestNode } from './types';
 
 // Local type definition to avoid circular dependencies with generator.ts
 interface SeededRandom {
