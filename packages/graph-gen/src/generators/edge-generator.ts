@@ -43,21 +43,6 @@ import {
   generateRadiusEdges,
   generateTraceableEdges} from './path-cycle';
 import {
-  computeAndStoreAlgebraicConnectivity,
-  computeAndStoreCartesianProduct,
-  computeAndStoreIntegrity,
-  computeAndStoreCage,
-  computeAndStoreLexicographicProduct,
-  computeAndStoreMinorFree,
-  computeAndStoreMooreGraph,
-  computeAndStoreRamanujan,
-  computeAndStoreSpectralRadius,
-  computeAndStoreSpectrum,
-  computeAndStoreStrongProduct,
-  computeAndStoreTensorProduct,
-  computeAndStoreToughness,
-  computeAndStoreTopologicalMinorFree} from './property-computers';
-import {
   generateChordalEdges,
   generateClawFreeEdges,
   generateCographEdges,
@@ -75,9 +60,32 @@ import {
   generateThresholdEdges,
   generateVertexTransitiveEdges} from './symmetry';
 import { SeededRandom, type TestEdge, type TestNode } from './types';
-import { detectCycleInGraph, findComponents, addEdge } from './validation-helpers';
+import { detectCycleInGraph, addEdge, findComponents } from './validation-helpers';
 import type { GraphSpec } from '../spec';
 import type { GraphGenerationConfig } from '../generator';
+import {
+  handleSpectrum,
+  handleAlgebraicConnectivity,
+  handleSpectralRadius,
+  handleToughness,
+  handleIntegrity,
+  handleCage,
+  handleMoore,
+  handleRamanujan,
+  handleCartesianProduct,
+  handleTensorProduct,
+  handleStrongProduct,
+  handleLexicographicProduct,
+  handleMinorFree,
+  handleTopologicalMinorFree,
+} from './structure-handlers';
+import {
+  hasExactStructure,
+  calculateMaxPossibleEdges,
+  getTargetEdgeCount,
+  needsSelfLoop,
+  getMaxAttempts,
+} from './density-helpers';
 
 /**
  * Generate base graph structure based on spec properties.
@@ -397,243 +405,75 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
     return edges;
   }
 
-  // Phase 3: Spectral Properties
-  // Note: Spectral properties are computed from graph structure, not used to generate it
-  // Generate standard edges first, then compute and store spectral metadata
+  // ============================================================================
+  // SPECTRAL PROPERTIES (computed from structure)
+  // ============================================================================
   if (spec.spectrum?.kind === "spectrum") {
-    // Generate standard connected graph
-    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
-      generateTreeEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
-      generateConnectedCyclicEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
-      generateForestEdges(nodes, edges, spec, rng);
-    } else {
-      generateDisconnectedEdges(nodes, edges, spec, rng);
-    }
-    // Compute and store spectrum
-    computeAndStoreSpectrum(nodes, edges, spec, rng);
-    return edges;
+    return handleSpectrum(nodes, edges, spec, rng);
   }
 
   if (spec.algebraicConnectivity?.kind === "algebraic_connectivity") {
-    // Generate standard connected graph
-    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
-      generateTreeEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
-      generateConnectedCyclicEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
-      generateForestEdges(nodes, edges, spec, rng);
-    } else {
-      generateDisconnectedEdges(nodes, edges, spec, rng);
-    }
-    // Compute and store algebraic connectivity
-    computeAndStoreAlgebraicConnectivity(nodes, edges, spec, rng);
-    return edges;
+    return handleAlgebraicConnectivity(nodes, edges, spec, rng);
   }
 
   if (spec.spectralRadius?.kind === "spectral_radius") {
-    // Generate standard connected graph
-    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
-      generateTreeEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
-      generateConnectedCyclicEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
-      generateForestEdges(nodes, edges, spec, rng);
-    } else {
-      generateDisconnectedEdges(nodes, edges, spec, rng);
-    }
-    // Compute and store spectral radius
-    computeAndStoreSpectralRadius(nodes, edges, spec, rng);
-    return edges;
+    return handleSpectralRadius(nodes, edges, spec, rng);
   }
 
-  // Phase 4: Robustness Measures
-  // Note: Robustness measures are computed from graph structure, not used to generate it
-  // Generate standard edges first, then compute and store robustness metadata
+  // ============================================================================
+  // ROBUSTNESS MEASURES (computed from structure)
+  // ============================================================================
   if (spec.toughness?.kind === "toughness") {
-    // Generate standard connected graph
-    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
-      generateTreeEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
-      generateConnectedCyclicEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
-      generateForestEdges(nodes, edges, spec, rng);
-    } else {
-      generateDisconnectedEdges(nodes, edges, spec, rng);
-    }
-    // Compute and store toughness
-    computeAndStoreToughness(nodes, edges, spec, rng);
-    return edges;
+    return handleToughness(nodes, edges, spec, rng);
   }
 
   if (spec.integrity?.kind === "integrity") {
-    // Generate standard connected graph
-    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
-      generateTreeEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
-      generateConnectedCyclicEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
-      generateForestEdges(nodes, edges, spec, rng);
-    } else {
-      generateDisconnectedEdges(nodes, edges, spec, rng);
-    }
-    // Compute and store integrity
-    computeAndStoreIntegrity(nodes, edges, spec, rng);
-    return edges;
+    return handleIntegrity(nodes, edges, spec, rng);
   }
 
-  // Phase 5: Extremal Graphs
-  // Note: Extremal graphs are rare classifications, not generation constraints
-  // Generate standard edges first, then store classification metadata
+  // ============================================================================
+  // EXTREMAL GRAPHS (computed classifications)
+  // ============================================================================
   if (spec.cage?.kind === "cage") {
-    // Generate standard connected graph
-    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
-      generateTreeEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
-      generateConnectedCyclicEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
-      generateForestEdges(nodes, edges, spec, rng);
-    } else {
-      generateDisconnectedEdges(nodes, edges, spec, rng);
-    }
-    // Store cage metadata
-    computeAndStoreCage(nodes, edges, spec, rng);
-    return edges;
+    return handleCage(nodes, edges, spec, rng);
   }
 
   if (spec.moore?.kind === "moore") {
-    // Generate standard connected graph
-    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
-      generateTreeEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
-      generateConnectedCyclicEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
-      generateForestEdges(nodes, edges, spec, rng);
-    } else {
-      generateDisconnectedEdges(nodes, edges, spec, rng);
-    }
-    // Store Moore graph metadata
-    computeAndStoreMooreGraph(nodes, edges, spec, rng);
-    return edges;
+    return handleMoore(nodes, edges, spec, rng);
   }
 
   if (spec.ramanujan?.kind === "ramanujan") {
-    // Generate standard connected graph
-    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
-      generateTreeEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
-      generateConnectedCyclicEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
-      generateForestEdges(nodes, edges, spec, rng);
-    } else {
-      generateDisconnectedEdges(nodes, edges, spec, rng);
-    }
-    // Store Ramanujan graph metadata
-    computeAndStoreRamanujan(nodes, edges, spec, rng);
-    return edges;
+    return handleRamanujan(nodes, edges, spec, rng);
   }
 
-  // Phase 6: Graph Products
-  // Note: Graph products are structural classifications, not generation constraints
-  // Generate standard edges first, then store product classification metadata
+  // ============================================================================
+  // GRAPH PRODUCTS (computed classifications)
+  // ============================================================================
   if (spec.cartesianProduct?.kind === "cartesian_product") {
-    // Generate standard connected graph
-    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
-      generateTreeEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
-      generateConnectedCyclicEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
-      generateForestEdges(nodes, edges, spec, rng);
-    } else {
-      generateDisconnectedEdges(nodes, edges, spec, rng);
-    }
-    // Store Cartesian product metadata
-    computeAndStoreCartesianProduct(nodes, edges, spec, rng);
-    return edges;
+    return handleCartesianProduct(nodes, edges, spec, rng);
   }
 
   if (spec.tensorProduct?.kind === "tensor_product") {
-    // Generate standard connected graph
-    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
-      generateTreeEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
-      generateConnectedCyclicEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
-      generateForestEdges(nodes, edges, spec, rng);
-    } else {
-      generateDisconnectedEdges(nodes, edges, spec, rng);
-    }
-    // Store tensor product metadata
-    computeAndStoreTensorProduct(nodes, edges, spec, rng);
-    return edges;
+    return handleTensorProduct(nodes, edges, spec, rng);
   }
 
   if (spec.strongProduct?.kind === "strong_product") {
-    // Generate standard connected graph
-    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
-      generateTreeEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
-      generateConnectedCyclicEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
-      generateForestEdges(nodes, edges, spec, rng);
-    } else {
-      generateDisconnectedEdges(nodes, edges, spec, rng);
-    }
-    // Store strong product metadata
-    computeAndStoreStrongProduct(nodes, edges, spec, rng);
-    return edges;
+    return handleStrongProduct(nodes, edges, spec, rng);
   }
 
   if (spec.lexicographicProduct?.kind === "lexicographic_product") {
-    // Generate standard connected graph
-    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
-      generateTreeEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
-      generateConnectedCyclicEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
-      generateForestEdges(nodes, edges, spec, rng);
-    } else {
-      generateDisconnectedEdges(nodes, edges, spec, rng);
-    }
-    // Store lexicographic product metadata
-    computeAndStoreLexicographicProduct(nodes, edges, spec, rng);
-    return edges;
+    return handleLexicographicProduct(nodes, edges, spec, rng);
   }
 
-  // Phase 7: Minor-Free Graphs
-  // Note: Minor-free graphs are structural classifications, not generation constraints
-  // Generate standard edges first, then store classification metadata
+  // ============================================================================
+  // MINOR-FREE GRAPHS (computed classifications)
+  // ============================================================================
   if (spec.minorFree?.kind === "minor_free") {
-    // Generate standard connected graph
-    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
-      generateTreeEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
-      generateConnectedCyclicEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
-      generateForestEdges(nodes, edges, spec, rng);
-    } else {
-      generateDisconnectedEdges(nodes, edges, spec, rng);
-    }
-    // Store minor-free metadata
-    computeAndStoreMinorFree(nodes, edges, spec, rng);
-    return edges;
+    return handleMinorFree(nodes, edges, spec, rng);
   }
 
   if (spec.topologicalMinorFree?.kind === "topological_minor_free") {
-    // Generate standard connected graph
-    if (spec.connectivity.kind === 'connected' && spec.cycles.kind === 'acyclic') {
-      generateTreeEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === 'connected' && spec.cycles.kind === "cycles_allowed") {
-      generateConnectedCyclicEdges(nodes, edges, spec, rng);
-    } else if (spec.connectivity.kind === "unconstrained" && spec.cycles.kind === 'acyclic') {
-      generateForestEdges(nodes, edges, spec, rng);
-    } else {
-      generateDisconnectedEdges(nodes, edges, spec, rng);
-    }
-    // Store topological minor-free metadata
-    computeAndStoreTopologicalMinorFree(nodes, edges, spec, rng);
-    return edges;
+    return handleTopologicalMinorFree(nodes, edges, spec, rng);
   }
 
   // Non-bipartite graphs
@@ -664,200 +504,27 @@ const generateBaseStructure = (nodes: TestNode[], spec: GraphSpec, _config: Grap
  * @param rng - Seeded random number generator
  */
 const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, _config: GraphGenerationConfig, rng: SeededRandom): void => {
-  const n = nodes.length;
-
   // Early exit for graphs with exact structures that shouldn't be modified
-  if (spec.completeBipartite?.kind === "complete_bipartite") {
+  if (hasExactStructure(spec)) {
     return;
   }
-  if (spec.grid?.kind === "grid") {
-    return; // Grid graphs have exact structure
-  }
-  if (spec.toroidal?.kind === "toroidal") {
-    return; // Toroidal graphs have exact structure
-  }
-  if (spec.star?.kind === "star") {
-    return; // Star graphs have exact structure
-  }
-  if (spec.wheel?.kind === "wheel") {
-    return; // Wheel graphs have exact structure
-  }
-  if (spec.binaryTree?.kind === "binary_tree" ||
-      spec.binaryTree?.kind === "full_binary" ||
-      spec.binaryTree?.kind === "complete_binary") {
-    return; // Binary trees have exact structure
-  }
-  if (spec.tournament?.kind === "tournament") {
-    return; // Tournament graphs have exact structure
-  }
-  if (spec.cubic?.kind === "cubic") {
-    return; // Cubic graphs have exact structure (3-regular)
-  }
-  if (spec.specificRegular?.kind === "k_regular") {
-    return; // k-regular graphs have exact structure
-  }
-  if (spec.flowNetwork?.kind === "flow_network") {
-    return; // Flow networks have exact structure
-  }
-  if (spec.eulerian?.kind === "eulerian" || spec.eulerian?.kind === "semi_eulerian") {
-    return; // Eulerian graphs have exact structure
-  }
-  if (spec.kVertexConnected?.kind === "k_vertex_connected") {
-    return; // k-vertex-connected graphs have exact structure
-  }
-  if (spec.kEdgeConnected?.kind === "k_edge_connected") {
-    return; // k-edge-connected graphs have exact structure
-  }
-  if (spec.treewidth?.kind === "treewidth") {
-    return; // treewidth-bounded graphs have exact structure
-  }
-  if (spec.kColorable?.kind === "k_colorable" || spec.kColorable?.kind === "bipartite_colorable") {
-    return; // k-colorable graphs have exact structure
-  }
 
-  // ============================================================================
-  // PHASE 1: SIMPLE STRUCTURAL VARIANTS (exact structure)
-  // ============================================================================
-  if (spec.split?.kind === "split") {
-    return; // Split graphs have exact structure
-  }
-  if (spec.cograph?.kind === "cograph") {
-    return; // Cographs have exact structure
-  }
-  if (spec.clawFree?.kind === "claw_free") {
-    return; // Claw-free graphs have exact structure
-  }
+  const n = nodes.length;
+  const maxPossibleEdges = calculateMaxPossibleEdges(nodes, edges, spec);
+  const targetEdgeCount = getTargetEdgeCount(nodes, edges, spec, maxPossibleEdges);
 
-  // ============================================================================
-  // PHASE 2: CHORDAL-BASED GRAPH CLASSES (exact structure)
-  // ============================================================================
-  if (spec.chordal?.kind === "chordal") {
-    return; // Chordal graphs have exact structure
-  }
-  if (spec.interval?.kind === "interval") {
-    return; // Interval graphs have exact structure
-  }
-  if (spec.permutation?.kind === "permutation") {
-    return; // Permutation graphs have exact structure
-  }
-  if (spec.comparability?.kind === "comparability") {
-    return; // Comparability graphs have exact structure
-  }
-  if (spec.perfect?.kind === "perfect") {
-    return; // Perfect graphs have exact structure
-  }
-
-  // ============================================================================
-  // PHASE 3: NETWORK SCIENCE GENERATORS (exact structure)
-  // ============================================================================
-  if (spec.scaleFree?.kind === "scale_free") {
-    return; // Scale-free graphs have exact structure
-  }
-  if (spec.smallWorld?.kind === "small_world") {
-    return; // Small-world graphs have exact structure
-  }
-  if (spec.communityStructure?.kind === "modular") {
-    return; // Modular graphs have exact structure
-  }
-  if (spec.line?.kind === "line_graph") {
-    return; // Line graphs have exact structure
-  }
-  if (spec.selfComplementary?.kind === "self_complementary") {
-    return; // Self-complementary graphs have exact structure
-  }
-
-  // Phase 5: Advanced Structural Graphs have exact structure
-  if (spec.threshold?.kind === "threshold") {
-    return; // Threshold graphs have exact structure
-  }
-  if (spec.unitDisk?.kind === "unit_disk") {
-    return; // Unit disk graphs have exact structure
-  }
-  if (spec.planarity?.kind === "planar") {
-    return; // Planar graphs have exact structure
-  }
-  if (spec.hamiltonian?.kind === "hamiltonian") {
-    return; // Hamiltonian graphs have exact structure
-  }
-  if (spec.traceable?.kind === "traceable") {
-    return; // Traceable graphs have exact structure
-  }
-
-  // Phase 6: Symmetry Graphs have exact structure
-  if (spec.stronglyRegular?.kind === "strongly_regular") {
-    return; // Strongly regular graphs have exact structure
-  }
-  if (spec.vertexTransitive?.kind === "vertex_transitive") {
-    return; // Vertex-transitive graphs have exact structure
-  }
-
-  // Get bipartite partitions if applicable
-  const isBipartite = spec.partiteness?.kind === "bipartite";
-  const leftPartition = isBipartite
-    ? nodes.filter((node): node is TestNode & { partition: 'left' } => node.partition === "left")
-    : [];
-  const rightPartition = isBipartite
-    ? nodes.filter((node): node is TestNode & { partition: 'right' } => node.partition === "right")
-    : [];
-
-  // For disconnected graphs, find components to calculate true maxPossibleEdges
-  let components: string[][] = [];
-  if (spec.connectivity.kind === "unconstrained") {
-    components = findComponents(nodes, edges, spec.directionality.kind === 'directed');
-  }
-
-  // Calculate max possible edges accounting for self-loops, bipartite structure, and component structure
-  const selfLoopEdges = spec.selfLoops.kind === "allowed" ? n : 0;
-  let maxPossibleEdges: number;
-
-  if (isBipartite) {
-    // Bipartite graphs: max edges = leftSize * rightSize (or 2x for directed)
-    maxPossibleEdges = spec.directionality.kind === 'directed'
-      ? (2 * leftPartition.length * rightPartition.length) + selfLoopEdges
-      : (leftPartition.length * rightPartition.length);
-  } else if (spec.connectivity.kind === "unconstrained" && components.length > 1) {
-    // For disconnected graphs, calculate max edges within each component
-    maxPossibleEdges = components.reduce((total, comp) => {
-      const compSize = comp.length;
-      if (spec.directionality.kind === 'directed') {
-        return total + (compSize * (compSize - 1));
-      } else {
-        return total + ((compSize * (compSize - 1)) / 2);
-      }
-    }, 0) + selfLoopEdges;
-  } else {
-    // For connected graphs, use standard formula
-    maxPossibleEdges = spec.directionality.kind === 'directed'
-      ? (n * (n - 1)) + selfLoopEdges  // n*(n-1) directed edges + n self-loops
-      : ((n * (n - 1)) / 2); // Undirected: self-loops don't count in traditional edges
-  }
-
-  // Map density to percentage of max edges
-  const edgePercentage: Record<string, number> = {
-    sparse: 0.15,     // 10-20% (use 15% as midpoint)
-    moderate: 0.4,    // 30-50% (use 40% as midpoint)
-    dense: 0.7,       // 60-80% (use 70% as midpoint)
-    unconstrained: 0.4, // Default to moderate for unconstrained
-  };
-
-  // Handle completeness and trees with exact edge counts
-  let targetEdgeCount: number;
+  // Handle trees (already have exactly n-1 edges)
   const isUndirectedTree = spec.directionality.kind === "undirected" &&
     spec.cycles.kind === "acyclic" &&
     spec.connectivity.kind === "connected";
 
-  if (spec.completeness.kind === "complete") {
-    targetEdgeCount = maxPossibleEdges;
-  } else if (isUndirectedTree) {
-    // Trees are already generated with exactly n-1 edges in generateBaseStructure
-    // Add parallel edges for multigraphs before returning
+  if (isUndirectedTree) {
+    // Add parallel edges for multigraphs
     if (spec.edgeMultiplicity.kind === "multi" && edges.length > 0) {
       const edgeToDouble = rng.choice(edges);
       addEdge(edges, edgeToDouble.source, edgeToDouble.target, spec, rng);
     }
     return;
-  } else {
-    targetEdgeCount = Math.floor(maxPossibleEdges * edgePercentage[spec.density.kind]);
   }
 
   // For complete graphs, use deterministic edge generation instead of random
@@ -886,17 +553,31 @@ const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, 
   }
 
   // For self-loops (when not complete), add them as part of density edges
-  // Track whether we still need to add a self-loop
-  const needsSelfLoop = spec.selfLoops.kind === "allowed" && spec.completeness.kind !== "complete" && nodes.length > 0;
+  const needsSelfLoopEdge = needsSelfLoop(nodes, spec);
 
   // Recalculate edges to add
   const finalEdgesToAdd = targetEdgeCount - edges.length;
+
+  // Get bipartite partitions if applicable
+  const isBipartite = spec.partiteness?.kind === "bipartite";
+  const leftPartition = isBipartite
+    ? nodes.filter((node): node is TestNode & { partition: 'left' } => node.partition === "left")
+    : [];
+  const rightPartition = isBipartite
+    ? nodes.filter((node): node is TestNode & { partition: 'right' } => node.partition === "right")
+    : [];
+
+  // For disconnected graphs, find components
+  const components = spec.connectivity.kind === "unconstrained"
+    ? findComponents(nodes, edges, spec.directionality.kind === 'directed')
+    : [];
+
   if (finalEdgesToAdd <= 0) {
     // Even if we have enough edges, still add:
     // - Self-loop if needed
     // - Cycle for cycles_allowed
     // - Parallel edge for multigraphs
-    if (needsSelfLoop && edges.length > 0) {
+    if (needsSelfLoopEdge && edges.length > 0) {
       const node = rng.choice(nodes).id;
       addEdge(edges, node, node, spec, rng);
     }
@@ -937,10 +618,7 @@ const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, 
   );
 
   let attempts = 0;
-  // Increase maxAttempts multiplier to allow reaching dense targets
-  // For dense graphs, need many more attempts due to high collision rate with existing edges
-  const maxAttemptsMultiplier = spec.density.kind === "dense" ? 100 : 10;
-  const maxAttempts = finalEdgesToAdd * maxAttemptsMultiplier;
+  const maxAttempts = getMaxAttempts(finalEdgesToAdd, spec.density.kind);
 
   while (edges.length < targetEdgeCount && attempts < maxAttempts) {
     attempts++;
@@ -949,7 +627,7 @@ const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, 
     let target: string;
 
     // Occasionally add self-loop when needed (10% of attempts)
-    if (needsSelfLoop && attempts % 10 === 0) {
+    if (needsSelfLoopEdge && attempts % 10 === 0) {
       const node = rng.choice(nodes).id;
       const selfLoopKey = spec.directionality.kind === 'directed' ? `${node}→${node}` : [node, node].sort().join('-');
       if (spec.edgeMultiplicity.kind === 'multi' || !existingEdges.has(selfLoopKey)) {
@@ -1023,7 +701,7 @@ const addDensityEdges = (nodes: TestNode[], edges: TestEdge[], spec: GraphSpec, 
 
   // After the loop, ensure we have required features
   // Add self-loop if still needed
-  if (needsSelfLoop && edges.length > 0 && !edges.some(e => e.source === e.target)) {
+  if (needsSelfLoopEdge && edges.length > 0 && !edges.some(e => e.source === e.target)) {
     const node = rng.choice(nodes).id;
     addEdge(edges, node, node, spec, rng);
   }
