@@ -14,8 +14,8 @@ import {
   generateMarkdownReport,
   generateLatexTable,
   generateJSONSummary,
-} from '@bibgraph/graph-expansion';
-import { randomRanker } from '@bibgraph/graph-expansion';
+} from '../src/runner';
+import { randomRanker } from '../src/baselines';
 import {
   createSmallCitationNetwork,
   createMediumCitationNetwork,
@@ -27,7 +27,7 @@ import {
   validateGraphTypePerformance,
   getEffectSizeCategory,
 } from './fixtures/expected-results';
-import type { ExperimentConfig, MetricType, StatisticalTestType } from '@bibgraph/graph-expansion';
+import type { ExperimentConfig, MetricType, StatisticalTestType } from '../src/runner';
 
 /**
  * Simple MI ranker for testing (ranks by total path weight)

@@ -632,6 +632,9 @@ importers:
       '@bibgraph/algorithms':
         specifier: workspace:*
         version: link:../algorithms
+      '@bibgraph/graph-expansion':
+        specifier: workspace:*
+        version: link:../graph-expansion
       vite:
         specifier: 7.3.1
         version: 7.3.1(@types/node@25.0.6)(jiti@2.6.1)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
