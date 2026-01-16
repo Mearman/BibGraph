@@ -159,3 +159,6 @@ fixtures/connection-graph.json
 fixtures/works-sample.json
 scripts/fixtures/*.json
 !scripts/fixtures/.gitkeep
+
+# Benchmark datasets (downloaded via scripts/download-benchmarks.sh)
+data/benchmarks/

@@ -87,3 +87,28 @@ export {
   generateJSONSummary,
   generateHTMLReport,
 } from './runner';
+
+// Export graph loaders
+export {
+  loadEdgeList,
+  loadTriples,
+  loadGraph,
+  loadGraphFromUrl,
+  type LoadedNode,
+  type LoadedEdge,
+  type EdgeListConfig,
+  type TripleConfig,
+  type LoadResult,
+} from './loaders';
+
+// Export ground truth computation
+export {
+  computeGroundTruth,
+  computeAllGroundTruths,
+  createAttributeImportance,
+  precomputeImportance,
+  type GroundTruthType,
+  type GroundTruthConfig,
+  type GroundTruthPath,
+  type PrecomputedImportance,
+} from './ground-truth';
