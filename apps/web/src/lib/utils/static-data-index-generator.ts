@@ -200,25 +200,7 @@ export const generateIndexForEntityType = async (entityDir: string, entityType: 
       );
     }
 
-    // Process each file to extract metadata
-    const files = await processJsonFiles({ entityDir, jsonFiles, entityType });
-
-    // Process subdirectories if recursive
-    let directories: Record<string, DirectoryEntry> = {};
-    let maxLastUpdated = new Date().toISOString();
-
-    if (recursive) {
-      const { directories: subDirs, maxLastUpdated: subMaxUpdated } =
-        await processSubdirectories({ entityDir, entityType, recursive });
-      directories = subDirs;
-      maxLastUpdated = subMaxUpdated;
-    }
-
-    const currentIsoString = new Date().toISOString();
-    // ISO strings are lexicographically comparable - use string comparison
-    const overallLastUpdated = maxLastUpdated > currentIsoString ? maxLastUpdated : currentIsoString;
-
-    // Read existing index to check if content has changed
+    // Read existing index to preserve unchanged entries
     const indexPath = path.join(entityDir, INDEX_FILENAME);
     let existingIndex: DirectoryIndex | null = null;
 
@@ -230,6 +212,24 @@ export const generateIndexForEntityType = async (entityDir: string, entityType: 
     } catch (error) {
       console.warn(`⚠️  Failed to read existing index: ${error}`);
     }
+
+    // Process each file to extract metadata, preserving unchanged entries
+    const files = await processJsonFiles({ entityDir, jsonFiles, entityType, existingIndex });
+
+    // Process subdirectories if recursive
+    let directories: Record<string, DirectoryEntry> = {};
+    let maxLastUpdated = new Date().toISOString();
+
+    if (recursive) {
+      const { directories: subDirs, maxLastUpdated: subMaxUpdated } =
+        await processSubdirectories({ entityDir, entityType, recursive, existingIndex });
+      directories = subDirs;
+      maxLastUpdated = subMaxUpdated;
+    }
+
+    const currentIsoString = new Date().toISOString();
+    // ISO strings are lexicographically comparable - use string comparison
+    const overallLastUpdated = maxLastUpdated > currentIsoString ? maxLastUpdated : currentIsoString;
 
     // Check if content has actually changed (excluding lastUpdated field)
     const contentChanged = hasIndexContentChanged({
@@ -354,21 +354,26 @@ const ensureDirectoryExists = async (dirPath: string): Promise<void> => {
 
 /**
  * Process JSON files in a directory and extract metadata
+ * Preserves existing FileEntry objects for unchanged files to prevent unnecessary timestamp updates
  * @param root0
  * @param root0.entityDir
  * @param root0.jsonFiles
  * @param root0.entityType
+ * @param root0.existingIndex
  */
 const processJsonFiles = async ({
   entityDir,
   jsonFiles,
   entityType,
+  existingIndex,
 }: {
   entityDir: string;
   jsonFiles: string[];
   entityType: StaticEntityType;
+  existingIndex?: DirectoryIndex | null;
 }): Promise<Record<string, FileEntry>> => {
   const files: Record<string, FileEntry> = {};
+  const existingFiles = existingIndex?.files || {};
 
   for (const fileName of jsonFiles) {
     const filePath = path.join(entityDir, fileName);
@@ -386,15 +391,22 @@ const processJsonFiles = async ({
         );
       }
 
-      // Create FileEntry with reconstructed URL
-      const reconstructedUrl = `https://api.openalex.org/${entityType}/${entityId}`;
+      const currentHash = await generateContentHash(data);
+      const existingEntry = existingFiles[entityId];
 
-      files[entityId] = {
-        $ref: `./${fileName}`,
-        contentHash: await generateContentHash(data),
-        lastRetrieved: fileStats.mtime.toISOString(),
-        url: reconstructedUrl,
-      };
+      // Preserve existing entry if content hash unchanged (prevents timestamp cascade)
+      if (existingEntry && existingEntry.contentHash === currentHash) {
+        files[entityId] = existingEntry;
+      } else {
+        // New or changed file - create fresh entry with current timestamp
+        const reconstructedUrl = `https://api.openalex.org/${entityType}/${entityId}`;
+        files[entityId] = {
+          $ref: `./${fileName}`,
+          contentHash: currentHash,
+          lastRetrieved: fileStats.mtime.toISOString(),
+          url: reconstructedUrl,
+        };
+      }
     } catch (error) {
       console.warn(`⚠️  Failed to validate file ${fileName}:`, error);
       // Skip invalid files rather than adding them
@@ -406,23 +418,28 @@ const processJsonFiles = async ({
 
 /**
  * Process subdirectories and generate their indexes
+ * Preserves existing DirectoryEntry objects for unchanged subdirectories to prevent unnecessary timestamp updates
  * @param root0
  * @param root0.entityDir
  * @param root0.entityType
  * @param root0.recursive
+ * @param root0.existingIndex
  */
 const processSubdirectories = async ({
   entityDir,
   entityType,
+  existingIndex,
 }: {
   entityDir: string;
   entityType: StaticEntityType;
   recursive?: boolean;
+  existingIndex?: DirectoryIndex | null;
 }): Promise<{
   directories: Record<string, DirectoryEntry>;
   maxLastUpdated: string;
 }> => {
   const directories: Record<string, DirectoryEntry> = {};
+  const existingDirs = existingIndex?.directories || {};
   let maxLastUpdated = new Date().toISOString();
 
   try {
@@ -451,17 +468,23 @@ const processSubdirectories = async ({
         if (await fileExists(subIndexPath)) {
           const subContent = await fs.readFile(subIndexPath, "utf8");
           const subIndex: DirectoryIndex = JSON.parse(subContent);
+          const existingEntry = existingDirs[subdir];
 
           // Track the maximum lastUpdated timestamp
           if (subIndex.lastUpdated > maxLastUpdated) {
             maxLastUpdated = subIndex.lastUpdated;
           }
 
-          // Build directory entry
-          directories[subdir] = {
-            $ref: `./${subdir}`,
-            lastModified: subIndex.lastUpdated,
-          };
+          // Preserve existing directory entry if subdirectory's lastUpdated unchanged
+          if (existingEntry && existingEntry.lastModified === subIndex.lastUpdated) {
+            directories[subdir] = existingEntry;
+          } else {
+            // Subdirectory changed - create fresh directory entry
+            directories[subdir] = {
+              $ref: `./${subdir}`,
+              lastModified: subIndex.lastUpdated,
+            };
+          }
         } else {
           console.warn(`⚠️  No index found for subdirectory: ${subPath}`);
         }
