@@ -7,7 +7,7 @@
 
 import { EntityDetectionService } from "./entity-detection-service.js"
 import { logger } from "./logger.js"
-import type { CatalogueService } from "./storage/catalogue-db/service.js"
+import type { DexieStorageProvider } from "./storage/dexie-storage-provider.js"
 
 /**
  * Migration result containing statistics and any errors encountered
@@ -45,7 +45,7 @@ export interface MigrationOptions {
  * @param options - Migration configuration options
  * @returns Migration result with statistics
  */
-export const migrateBookmarkUrls = async (catalogueService: CatalogueService, options: MigrationOptions = {}): Promise<MigrationResult> => {
+export const migrateBookmarkUrls = async (storageProvider: DexieStorageProvider, options: MigrationOptions = {}): Promise<MigrationResult> => {
 	const { dryRun = false, deleteMigrated = false } = options
 
 	logger.info("bookmark-migration", "Starting bookmark migration", { dryRun, deleteMigrated })
@@ -59,7 +59,7 @@ export const migrateBookmarkUrls = async (catalogueService: CatalogueService, op
 
 	try {
 		// Get all existing bookmarks
-		const bookmarks = await catalogueService.getBookmarks()
+		const bookmarks = await storageProvider.getBookmarks()
 		result.totalBookmarks = bookmarks.length
 
 		logger.info("bookmark-migration", `Processing ${bookmarks.length} bookmarks`)
@@ -106,7 +106,7 @@ export const migrateBookmarkUrls = async (catalogueService: CatalogueService, op
 					}
 
 					// Update the bookmark with entity data using direct database access
-					const db = catalogueService['db']
+					const db = (storageProvider as any)['db']
 					if (bookmark.id != null) {
 						await db.catalogueEntities.update(bookmark.id, {
 							entityType: detection.entityType,
@@ -163,7 +163,7 @@ export const migrateBookmarkUrls = async (catalogueService: CatalogueService, op
  * @param catalogueService - The catalogue service instance
  * @returns Validation result with issues found
  */
-export const validateMigration = async (catalogueService: CatalogueService): Promise<{
+export const validateMigration = async (storageProvider: DexieStorageProvider): Promise<{
 	totalBookmarks: number
 	withEntityData: number
 	withLegacyUrls: number
@@ -179,7 +179,7 @@ export const validateMigration = async (catalogueService: CatalogueService): Pro
 	}
 
 	try {
-		const bookmarks = await catalogueService.getBookmarks()
+		const bookmarks = await storageProvider.getBookmarks()
 		result.totalBookmarks = bookmarks.length
 
 		for (const bookmark of bookmarks) {
@@ -217,7 +217,7 @@ export const validateMigration = async (catalogueService: CatalogueService): Pro
  * @param catalogueService - The catalogue service instance
  * @returns Statistics about bookmarks that need migration
  */
-export const getMigrationStats = async (catalogueService: CatalogueService): Promise<{
+export const getMigrationStats = async (storageProvider: DexieStorageProvider): Promise<{
 	totalBookmarks: number
 	needMigration: number
 	alreadyMigrated: number
@@ -229,7 +229,7 @@ export const getMigrationStats = async (catalogueService: CatalogueService): Pro
 	}
 
 	try {
-		const bookmarks = await catalogueService.getBookmarks()
+		const bookmarks = await storageProvider.getBookmarks()
 		result.totalBookmarks = bookmarks.length
 
 		for (const bookmark of bookmarks) {
@@ -254,27 +254,27 @@ export const getMigrationStats = async (catalogueService: CatalogueService): Pro
  * @param options - Migration options
  * @returns Complete migration result
  */
-export const performMigration = async (catalogueService: CatalogueService, options: MigrationOptions = {}): Promise<{
+export const performMigration = async (storageProvider: DexieStorageProvider, options: MigrationOptions = {}): Promise<{
 	migration: MigrationResult
 	validation: Awaited<ReturnType<typeof validateMigration>>
 	stats: Awaited<ReturnType<typeof getMigrationStats>>
 }> => {
 	// Get before stats
-	const beforeStats = await getMigrationStats(catalogueService)
+	const beforeStats = await getMigrationStats(storageProvider)
 	logger.info("bookmark-migration", "Migration stats before", beforeStats)
 
 	// Perform migration
-	const migrationResult = await migrateBookmarkUrls(catalogueService, options)
+	const migrationResult = await migrateBookmarkUrls(storageProvider, options)
 
 	// Validate after migration (only if not dry run)
 	const validationResult = await (options.dryRun
 		? { totalBookmarks: 0, withEntityData: 0, withLegacyUrls: 0, withInvalidData: 0, issues: [] }
-		: validateMigration(catalogueService))
+		: validateMigration(storageProvider))
 
 	// Get after stats
 	const afterStats = options.dryRun
 		? beforeStats
-		: await getMigrationStats(catalogueService)
+		: await getMigrationStats(storageProvider)
 
 	logger.info("bookmark-migration", "Migration stats after", afterStats)
 
