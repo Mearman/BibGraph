@@ -147,3 +147,24 @@ export {
   aggregateRepresentativenessResults,
   type StructuralRepresentativenessResult,
 } from './metrics';
+
+// Export benchmark dataset fixtures
+export {
+  // Dataset metadata constants
+  CORA,
+  CITESEER,
+  FACEBOOK,
+  BENCHMARK_DATASETS,
+  DATASETS_BY_ID,
+  // Types
+  type BenchmarkDatasetMeta,
+  type LoadedBenchmark,
+  // Loaders
+  loadBenchmark,
+  loadBenchmarkById,
+  loadAllBenchmarks,
+  resolveBenchmarkPath,
+  // Utilities
+  getBenchmarkSummary,
+  validateBenchmark,
+} from './fixtures';
