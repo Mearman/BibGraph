@@ -63,6 +63,11 @@ export { dfs } from './traversal/dfs';
 export type { DFSTraversalResult } from './traversal/dfs';
 export { BidirectionalBFS } from './traversal/bidirectional-bfs';
 export type { BidirectionalBFSOptions, BidirectionalBFSResult } from './traversal/bidirectional-bfs';
+export { DegreePrioritisedExpansion } from './traversal/degree-prioritised-expansion';
+export type {
+  DegreePrioritisedExpansionResult,
+  ExpansionStats,
+} from './traversal/degree-prioritised-expansion';
 export { PriorityQueue } from './traversal/priority-queue';
 
 // Extraction algorithms
