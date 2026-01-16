@@ -64,18 +64,27 @@ interface UnifiedIndex {
   [key: string]: UnifiedIndexEntry;
 }
 
+// Extended index entry with metadata for build plugin
+interface ExtendedIndexEntry extends UnifiedIndexEntry {
+  lastModified?: string;
+  contentHash?: string;
+}
+
 // Zod schemas for type validation
 const IndexEntrySchema = z.object({
   lastModified: z.string().optional(),
   contentHash: z.string().optional(),
 });
 
-// Helper function to convert IndexEntry to UnifiedIndexEntry
-const indexEntryToUnified = (indexEntry: IndexEntry, $ref?: string): UnifiedIndexEntry => ({
-    $ref: $ref || "",
-    lastModified: indexEntry.lastModified || "",
-    contentHash: indexEntry.contentHash || "",
-  });
+// Helper function to convert IndexEntry to ExtendedIndexEntry
+const indexEntryToUnified = (indexEntry: IndexEntry, $ref?: string): ExtendedIndexEntry => {
+  const result: ExtendedIndexEntry = {
+    type: "file",
+    lastModified: indexEntry.lastModified,
+    contentHash: indexEntry.contentHash,
+  };
+  return result;
+};
 
 const QueryParamsSchema = z.record(z.string(), z.unknown());
 
@@ -680,7 +689,7 @@ export const openalexDataPlugin = (): Plugin => ({
               });
 
               // Create new index without removed keys and with updated redirected keys
-              const updatedIndex: UnifiedIndex = {};
+              const updatedIndex: Record<string, ExtendedIndexEntry> = {};
 
               for (const [key, metadata] of Object.entries(index)) {
                 // Skip keys marked for removal
@@ -695,15 +704,7 @@ export const openalexDataPlugin = (): Plugin => ({
                 if (redirectUpdate) {
                   // Use new key with updated metadata
                   const fixedMetadata = { ...redirectUpdate.metadata };
-                  // Fix $ref if it exists and needs updating
-                  let $ref: string | undefined;
-                  if (
-                    "$ref" in fixedMetadata &&
-                    typeof fixedMetadata.$ref === "string"
-                  ) {
-                    $ref = `./${urlToEncodedKey(redirectUpdate.newKey)}.json`;
-                  }
-                  updatedIndex[redirectUpdate.newKey] = indexEntryToUnified(fixedMetadata, $ref);
+                  updatedIndex[redirectUpdate.newKey] = indexEntryToUnified(fixedMetadata);
                 } else {
                   // Keep existing key
                   updatedIndex[key] = indexEntryToUnified(metadata);
@@ -766,7 +767,7 @@ export const openalexDataPlugin = (): Plugin => ({
  * @param dataPath
  * @param entityType
  */
-const loadUnifiedIndex = async (dataPath: string, entityType: string): Promise<UnifiedIndex> => {
+const loadUnifiedIndex = async (dataPath: string, entityType: string): Promise<Record<string, ExtendedIndexEntry>> => {
   const indexPath = join(dataPath, entityType, "index.json");
 
   try {
@@ -777,7 +778,7 @@ const loadUnifiedIndex = async (dataPath: string, entityType: string): Promise<U
     const requestsWrapper = RequestsWrapperSchema.safeParse(parsed);
     if (requestsWrapper.success) {
       // Clean and normalize existing unified format from requests
-      const cleaned: UnifiedIndex = {};
+      const cleaned: Record<string, ExtendedIndexEntry> = {};
       for (const [key, entry] of Object.entries(
         requestsWrapper.data.requests,
       )) {
@@ -810,10 +811,10 @@ const loadUnifiedIndex = async (dataPath: string, entityType: string): Promise<U
                 cleanEntry.lastModified >
                   (cleaned[canonicalKey].lastModified ?? ""))
             ) {
-              cleaned[canonicalKey] = indexEntryToUnified(cleanEntry, `./${urlToEncodedKey(key)}.json`);
+              cleaned[canonicalKey] = indexEntryToUnified(cleanEntry);
             }
           } else {
-            cleaned[canonicalKey] = indexEntryToUnified(cleanEntry, `./${urlToEncodedKey(key)}.json`);
+            cleaned[canonicalKey] = indexEntryToUnified(cleanEntry);
           }
         }
         // Skip query entries - they will be handled by the separate query index
@@ -829,7 +830,7 @@ const loadUnifiedIndex = async (dataPath: string, entityType: string): Promise<U
         "Converting flat index format to requests wrapper format",
       );
       // Clean and normalize existing unified format from flat structure
-      const cleaned: UnifiedIndex = {};
+      const cleaned: Record<string, ExtendedIndexEntry> = {};
       for (const [key, entry] of Object.entries(flatIndex.data)) {
         // Parse the key and get its canonical form
         const parsedKey = parseIndexKey(key);
@@ -855,10 +856,10 @@ const loadUnifiedIndex = async (dataPath: string, entityType: string): Promise<U
                 cleanEntry.lastModified >
                   (cleaned[canonicalKey].lastModified ?? ""))
             ) {
-              cleaned[canonicalKey] = indexEntryToUnified(cleanEntry, `./${urlToEncodedKey(key)}.json`);
+              cleaned[canonicalKey] = indexEntryToUnified(cleanEntry);
             }
           } else {
-            cleaned[canonicalKey] = indexEntryToUnified(cleanEntry, `./${urlToEncodedKey(key)}.json`);
+            cleaned[canonicalKey] = indexEntryToUnified(cleanEntry);
           }
         }
       }
@@ -1021,7 +1022,7 @@ const generateCanonicalQueryKeyFromEntry = (entry: unknown, entityType: string):
  * @param entityType
  * @param index
  */
-const seedMissingData = async (dataPath: string, entityType: string, index: UnifiedIndex): Promise<{
+const seedMissingData = async (dataPath: string, entityType: string, index: Record<string, ExtendedIndexEntry>): Promise<{
   keysToRemove: Set<string>;
   redirectUpdates: Array<{
     oldKey: string;
@@ -1341,7 +1342,7 @@ const generateFilenameFromParsedKey = (parsed: ParsedKey): string | null => {
  * @param entityType
  * @param index
  */
-const updateUnifiedIndex = async (dataPath: string, entityType: string, index: UnifiedIndex): Promise<UnifiedIndex> => {
+const updateUnifiedIndex = async (dataPath: string, entityType: string, index: Record<string, ExtendedIndexEntry>): Promise<Record<string, ExtendedIndexEntry>> => {
   // Scan entity files
   const entityDir = join(dataPath, entityType);
   try {
@@ -1401,8 +1402,8 @@ const updateUnifiedIndex = async (dataPath: string, entityType: string, index: U
             // If we can't parse, assume it's an entity file
           }
 
-          const metadata: UnifiedIndexEntry = {
-            $ref: `file://${filePath}`,
+          const metadata: ExtendedIndexEntry = {
+            type: "file",
             lastModified: fileStat.mtime.toISOString(),
             contentHash,
           };
@@ -1786,7 +1787,7 @@ const deduplicateIndexEntries = (index: UnifiedIndex, entityType: string): Unifi
  * @param entityType
  * @param index
  */
-const saveUnifiedIndex = async (dataPath: string, entityType: string, index: UnifiedIndex) => {
+const saveUnifiedIndex = async (dataPath: string, entityType: string, index: Record<string, ExtendedIndexEntry>) => {
   const indexPath = join(dataPath, entityType, "index.json");
 
   try {
