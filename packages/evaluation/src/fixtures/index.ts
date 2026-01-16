@@ -9,6 +9,9 @@ export {
   CORA,
   CITESEER,
   FACEBOOK,
+  KARATE,
+  LESMIS,
+  DBLP,
   BENCHMARK_DATASETS,
   DATASETS_BY_ID,
   // Types

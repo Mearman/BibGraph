@@ -126,9 +126,64 @@ export const FACEBOOK: BenchmarkDatasetMeta = {
 };
 
 /**
+ * Zachary's Karate Club network.
+ *
+ * Classic social network of a university karate club.
+ * Nodes are members, edges represent friendships outside the club.
+ */
+export const KARATE: BenchmarkDatasetMeta = {
+  name: 'Karate Club',
+  id: 'karate',
+  description: "Zachary's Karate Club social network",
+  directed: false,
+  expectedNodes: 34,
+  expectedEdges: 78,
+  relativePath: 'karate/karate.edges',
+  delimiter: /\s+/,
+  source: 'Zachary, An Information Flow Model for Conflict and Fission in Small Groups, 1977',
+};
+
+/**
+ * Les Misérables character co-appearance network.
+ *
+ * Characters from Victor Hugo's novel connected by co-appearance.
+ * Nodes are characters, edges weighted by number of co-appearances.
+ */
+export const LESMIS: BenchmarkDatasetMeta = {
+  name: 'Les Misérables',
+  id: 'lesmis',
+  description: 'Character co-appearance network from Les Misérables',
+  directed: false,
+  expectedNodes: 69,
+  expectedEdges: 279,
+  relativePath: 'lesmis/lesmis.edges',
+  delimiter: /\s+/,
+  source: 'Knuth, The Stanford GraphBase: A Platform for Combinatorial Computing, 1993',
+};
+
+/**
+ * DBLP co-authorship network.
+ *
+ * Large-scale collaboration network from computer science bibliography.
+ * Nodes are authors, edges represent co-authorship on publications.
+ * Note: This is a large dataset (300K+ nodes) and may take time to load.
+ */
+export const DBLP: BenchmarkDatasetMeta = {
+  name: 'DBLP',
+  id: 'dblp',
+  description: 'DBLP computer science co-authorship network',
+  directed: false,
+  expectedNodes: 317080,
+  expectedEdges: 1049866,
+  relativePath: 'dblp/com-dblp.ungraph.txt',
+  delimiter: /\t/,
+  source: 'Yang & Leskovec, Defining and Evaluating Network Communities based on Ground-truth, ICDM 2012',
+};
+
+/**
  * All available benchmark datasets.
  */
-export const BENCHMARK_DATASETS: BenchmarkDatasetMeta[] = [CORA, CITESEER, FACEBOOK];
+export const BENCHMARK_DATASETS: BenchmarkDatasetMeta[] = [CORA, CITESEER, FACEBOOK, KARATE, LESMIS, DBLP];
 
 /**
  * Map of dataset IDs to metadata.

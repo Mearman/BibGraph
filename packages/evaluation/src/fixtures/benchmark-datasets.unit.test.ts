@@ -7,6 +7,9 @@ import {
   CORA,
   CITESEER,
   FACEBOOK,
+  KARATE,
+  LESMIS,
+  DBLP,
   BENCHMARK_DATASETS,
   DATASETS_BY_ID,
   loadBenchmark,
@@ -17,8 +20,8 @@ import {
 
 describe('Benchmark Dataset Metadata', () => {
   it('should have all expected datasets', () => {
-    expect(BENCHMARK_DATASETS).toHaveLength(3);
-    expect(DATASETS_BY_ID.size).toBe(3);
+    expect(BENCHMARK_DATASETS).toHaveLength(6);
+    expect(DATASETS_BY_ID.size).toBe(6);
   });
 
   it('should have consistent IDs in map', () => {
@@ -56,6 +59,36 @@ describe('Benchmark Dataset Metadata', () => {
       expect(FACEBOOK.expectedEdges).toBe(88234);
     });
   });
+
+  describe('KARATE', () => {
+    it('should have correct metadata', () => {
+      expect(KARATE.name).toBe('Karate Club');
+      expect(KARATE.id).toBe('karate');
+      expect(KARATE.directed).toBe(false);
+      expect(KARATE.expectedNodes).toBe(34);
+      expect(KARATE.expectedEdges).toBe(78);
+    });
+  });
+
+  describe('LESMIS', () => {
+    it('should have correct metadata', () => {
+      expect(LESMIS.name).toBe('Les Misérables');
+      expect(LESMIS.id).toBe('lesmis');
+      expect(LESMIS.directed).toBe(false);
+      expect(LESMIS.expectedNodes).toBe(69);
+      expect(LESMIS.expectedEdges).toBe(279);
+    });
+  });
+
+  describe('DBLP', () => {
+    it('should have correct metadata', () => {
+      expect(DBLP.name).toBe('DBLP');
+      expect(DBLP.id).toBe('dblp');
+      expect(DBLP.directed).toBe(false);
+      expect(DBLP.expectedNodes).toBe(317080);
+      expect(DBLP.expectedEdges).toBe(1049866);
+    });
+  });
 });
 
 describe('Benchmark Loading', () => {
@@ -83,6 +116,24 @@ describe('Benchmark Loading', () => {
     expect(benchmark.nodeCount).toBeGreaterThan(0);
     expect(benchmark.edgeCount).toBeGreaterThan(0);
   });
+
+  it('should load Karate Club dataset', async () => {
+    const benchmark = await loadBenchmark(KARATE);
+
+    expect(benchmark.meta).toBe(KARATE);
+    expect(benchmark.nodeCount).toBe(34);
+    expect(benchmark.edgeCount).toBe(78);
+  });
+
+  it('should load Les Misérables dataset', async () => {
+    const benchmark = await loadBenchmark(LESMIS);
+
+    expect(benchmark.meta).toBe(LESMIS);
+    expect(benchmark.nodeCount).toBe(69);
+    expect(benchmark.edgeCount).toBe(279);
+  });
+
+  // Note: DBLP loading test skipped as it's 300K+ nodes and slow to load
 
   it('should load by ID (case insensitive)', async () => {
     const benchmark1 = await loadBenchmarkById('cora');
