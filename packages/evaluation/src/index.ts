@@ -107,10 +107,15 @@ export {
   computeAllGroundTruths,
   createAttributeImportance,
   precomputeImportance,
+  enumerateBetweenGraph,
+  enumerateMultiSeedBetweenGraph,
+  computeEgoNetwork,
   type GroundTruthType,
   type GroundTruthConfig,
   type GroundTruthPath,
   type PrecomputedImportance,
+  type BetweenGraphResult,
+  type BetweenGraphOptions,
 } from './ground-truth';
 
 // Export expansion comparison metrics
@@ -133,4 +138,12 @@ export {
   degreeDistributionFromMap,
   computeDegreeHistogram,
   type DegreeDistributionMetrics,
+  // Structural representativeness
+  computeSetOverlap,
+  spearmanRankCorrelation,
+  degreeToRanking,
+  computeCommunityCoverage,
+  computeStructuralRepresentativeness,
+  aggregateRepresentativenessResults,
+  type StructuralRepresentativenessResult,
 } from './metrics';

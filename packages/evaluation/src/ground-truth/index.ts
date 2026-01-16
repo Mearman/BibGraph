@@ -12,3 +12,11 @@ export {
   type GroundTruthPath,
   type PrecomputedImportance,
 } from './importance-based';
+
+export {
+  enumerateBetweenGraph,
+  enumerateMultiSeedBetweenGraph,
+  computeEgoNetwork,
+  type BetweenGraphResult,
+  type BetweenGraphOptions,
+} from './between-graph';

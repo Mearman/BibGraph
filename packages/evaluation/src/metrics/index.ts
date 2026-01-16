@@ -27,3 +27,14 @@ export {
   computeDegreeHistogram,
   type DegreeDistributionMetrics,
 } from './degree-distribution';
+
+// Structural representativeness metrics
+export {
+  computeSetOverlap,
+  spearmanRankCorrelation,
+  degreeToRanking,
+  computeCommunityCoverage,
+  computeStructuralRepresentativeness,
+  aggregateRepresentativenessResults,
+  type StructuralRepresentativenessResult,
+} from './structural-representativeness';
