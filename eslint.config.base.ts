@@ -177,6 +177,7 @@ export default tseslint.config([
             "custom/no-duplicate-reexports": "error",
             "custom/no-reexport-from-non-barrel": "error", // Keep - prevents re-exports from non-barrels
             "custom/no-redundant-assignment": "off", // Turned off - less critical
+            "custom/max-file-length": ["error", { max: 750 }], // Enforce maximum file length
 
             // Import rules (from recommended + custom)
             ...importPlugin.configs.recommended.rules,
@@ -314,6 +315,8 @@ export default tseslint.config([
             "no-console": "off",
             "custom/no-deprecated": "off",
             "jsdoc/require-jsdoc": "off",
+            // File length limit relaxed for test files
+            "custom/max-file-length": ["warn", { max: 1000 }],
             // Disable overly strict rules that conflict with test patterns
             "sonarjs/no-nested-functions": "off", // Test helpers often nest functions deeply
             "vitest/no-conditional-expect": "off", // Conditional expects are valid in parameterized tests
@@ -354,6 +357,13 @@ export default tseslint.config([
         files: ["**/*.ts", "**/*.tsx"],
         rules: {
             "@tanstack/query/no-rest-destructuring": "off", // Rest destructuring is acceptable for non-reactive query properties
+        },
+    },
+    // Theme files and generated files - exclude from file length limit
+    {
+        files: ["**/*theme.ts", "**/*.gen.ts", "**/*.generated.ts"],
+        rules: {
+            "custom/max-file-length": "off", // Theme and generated files are legitimately long
         },
     },
     // React rules using @eslint-react (using recommended-typescript)
