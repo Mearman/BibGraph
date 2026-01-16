@@ -2,8 +2,8 @@
  * Experiment configuration types
  */
 
-import { Graph } from '../..';
-import type { Path } from '../..';
+import { Graph } from '@bibgraph/algorithms';
+import type { Path } from '@bibgraph/algorithms';
 import type { Edge, Node } from '@bibgraph/types';
 import type { PlantedPathConfig } from '../path-planting/path-generator';
 

@@ -2,9 +2,9 @@
  * Degree-based path ranking baseline
  */
 
-import type { Graph } from '../..';
-import type { RankedPath } from '../..';
-import type { Path } from '../..';
+import type { Graph } from '@bibgraph/algorithms';
+import type { RankedPath } from '@bibgraph/algorithms';
+import type { Path } from '@bibgraph/algorithms';
 import type { Edge, Node } from '@bibgraph/types';
 
 /**

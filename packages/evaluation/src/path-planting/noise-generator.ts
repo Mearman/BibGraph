@@ -2,8 +2,8 @@
  * Noise path generation for evaluation
  */
 
-import { Graph } from '../..';
-import type { Path } from '../..';
+import { Graph } from '@bibgraph/algorithms';
+import type { Path } from '@bibgraph/algorithms';
 import type { Edge, Node } from '@bibgraph/types';
 
 /**

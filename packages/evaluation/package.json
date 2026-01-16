@@ -1,0 +1,33 @@
+{
+  "name": "@bibgraph/evaluation",
+  "description": "Graph evaluation framework for MI experiments and benchmarking",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bibgraph/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@bibgraph/algorithms": "workspace:*",
+    "vite": "7.3.1",
+    "vitest": "4.0.16"
+  },
+  "peerDependencies": {
+    "@bibgraph/algorithms": "workspace:*",
+    "typescript": "5.9.3"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT"
+}

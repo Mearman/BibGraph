@@ -4,8 +4,8 @@
  * For graphs with multiple node types (e.g., OpenAlex with Works, Authors, Institutions)
  */
 
-import { Graph } from '../..';
-import type { Path } from '../..';
+import { Graph } from '@bibgraph/algorithms';
+import type { Path } from '@bibgraph/algorithms';
 import type { Edge, Node } from '@bibgraph/types';
 import { type PlantedPathConfig,plantGroundTruthPaths } from './path-generator';
 
