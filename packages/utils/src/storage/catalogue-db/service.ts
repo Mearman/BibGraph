@@ -16,7 +16,6 @@ import * as AnnotationOps from "./annotation-operations.js";
 import * as BookmarkOps from "./bookmark-operations.js";
 import * as EntityOps from "./entity-operations.js";
 import * as GraphListOps from "./graph-list-operations.js";
-import * as HistoryOps from "./history-operations.js";
 import * as ListOps from "./list-operations.js";
 import type {
   CatalogueEntity,
