@@ -19,6 +19,8 @@ import type { GenericLogger } from '../logger.js';
 import type {
   CatalogueEntity,
   CatalogueList,
+  GraphAnnotationStorage,
+  GraphSnapshotStorage,
   ListType,
 } from './catalogue-db/index.js';
 
@@ -712,6 +714,147 @@ export interface CatalogueStorageProvider {
    * ```
    */
   batchAddToGraphList(nodes: AddToGraphListParams[]): Promise<string[]>;
+
+  // ========================================
+  // Graph Annotation Operations
+  // ========================================
+
+  /**
+   * Add a new annotation
+   * @param annotation - Annotation data (without id, timestamps, graphId)
+   * @returns Promise resolving to annotation ID
+   * @throws {Error} If addition fails
+   */
+  addAnnotation(annotation: Omit<GraphAnnotationStorage, 'id' | 'createdAt' | 'updatedAt' | 'graphId'> & { graphId?: string }): Promise<string>;
+
+  /**
+   * Get all annotations, optionally filtered by graph ID
+   * @param graphId - Optional graph ID to filter annotations
+   * @returns Promise resolving to array of annotations
+   * @throws {Error} If retrieval fails
+   */
+  getAnnotations(graphId?: string): Promise<GraphAnnotationStorage[]>;
+
+  /**
+   * Update an existing annotation
+   * @param annotationId - ID of the annotation to update
+   * @param updates - Partial annotation data to update
+   * @returns Promise resolving when update completes
+   * @throws {Error} If annotation not found or update fails
+   */
+  updateAnnotation(annotationId: string, updates: Partial<Omit<GraphAnnotationStorage, 'id' | 'createdAt' | 'updatedAt' | 'graphId'>>): Promise<void>;
+
+  /**
+   * Delete an annotation
+   * @param annotationId - ID of the annotation to delete
+   * @returns Promise resolving when deletion completes
+   * @throws {Error} If deletion fails
+   */
+  deleteAnnotation(annotationId: string): Promise<void>;
+
+  /**
+   * Toggle annotation visibility
+   * @param annotationId - ID of the annotation
+   * @param visible - New visibility state
+   * @returns Promise resolving when toggle completes
+   * @throws {Error} If toggle fails
+   */
+  toggleAnnotationVisibility(annotationId: string, visible: boolean): Promise<void>;
+
+  /**
+   * Delete all annotations for a specific graph
+   * @param graphId - ID of the graph
+   * @returns Promise resolving when deletion completes
+   * @throws {Error} If deletion fails
+   */
+  deleteAnnotationsByGraph(graphId: string): Promise<void>;
+
+  // ========================================
+  // Graph Snapshot Operations
+  // ========================================
+
+  /**
+   * Add a new graph snapshot
+   * @param snapshot - Snapshot data
+   * @returns Promise resolving to snapshot ID
+   * @throws {Error} If addition fails
+   */
+  addSnapshot(snapshot: Omit<GraphSnapshotStorage, 'id' | 'createdAt' | 'updatedAt'>): Promise<string>;
+
+  /**
+   * Get all snapshots
+   * @returns Promise resolving to array of snapshots
+   * @throws {Error} If retrieval fails
+   */
+  getSnapshots(): Promise<GraphSnapshotStorage[]>;
+
+  /**
+   * Get a specific snapshot by ID
+   * @param snapshotId - ID of the snapshot
+   * @returns Promise resolving to snapshot or null if not found
+   * @throws {Error} If retrieval fails
+   */
+  getSnapshot(snapshotId: string): Promise<GraphSnapshotStorage | null>;
+
+  /**
+   * Delete a snapshot
+   * @param snapshotId - ID of the snapshot to delete
+   * @returns Promise resolving when deletion completes
+   * @throws {Error} If deletion fails
+   */
+  deleteSnapshot(snapshotId: string): Promise<void>;
+
+  /**
+   * Update a snapshot
+   * @param snapshotId - ID of the snapshot to update
+   * @param updates - Partial snapshot data to update
+   * @returns Promise resolving when update completes
+   * @throws {Error} If snapshot not found or update fails
+   */
+  updateSnapshot(snapshotId: string, updates: Partial<Omit<GraphSnapshotStorage, 'id' | 'createdAt' | 'updatedAt'>>): Promise<void>;
+
+  /**
+   * Prune old auto-save snapshots, keeping only the most recent N
+   * @param maxCount - Maximum number of auto-save snapshots to keep
+   * @returns Promise resolving when pruning completes
+   * @throws {Error} If pruning fails
+   */
+  pruneAutoSaveSnapshots(maxCount: number): Promise<void>;
+
+  // ========================================
+  // Search History Operations
+  // ========================================
+
+  /**
+   * Add a search query to history
+   * @param query - Search query string
+   * @param maxHistory - Maximum number of queries to keep (defaults to 50)
+   * @returns Promise resolving when addition completes
+   * @throws {Error} If addition fails
+   */
+  addSearchQuery(query: string, maxHistory?: number): Promise<void>;
+
+  /**
+   * Get all search history entries
+   * @returns Promise resolving to array of search history entries
+   * @throws {Error} If retrieval fails
+   */
+  getSearchHistory(): Promise<Array<{ query: string; timestamp: Date }>>;
+
+  /**
+   * Remove a specific search query from history
+   * @param queryId - ID of the query to remove
+   * @returns Promise resolving when removal completes
+   * @throws {Error} If removal fails
+   */
+  removeSearchQuery(queryId: string): Promise<void>;
+
+  /**
+   * Clear all search history
+   * @returns Promise resolving when clear completes
+   * @throws {Error} If clear fails
+   */
+  clearSearchHistory(): Promise<void>;
 }
 
 /**
@@ -734,3 +877,6 @@ export interface CatalogueStorageProvider {
  * ```
  */
 export type StorageProviderFactory = (logger?: GenericLogger) => CatalogueStorageProvider;
+
+// Re-export types for convenience
+export type { GraphAnnotationStorage, GraphSnapshotStorage } from './catalogue-db/index.js';
