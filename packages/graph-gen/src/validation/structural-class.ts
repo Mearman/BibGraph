@@ -1,5 +1,5 @@
-import type { TestEdge, TestNode } from '../generators/types';
-import type { TestGraph } from '../generator';
+import type { TestEdge, TestNode } from '../generators/types'
+import type { TestGraph } from '../generators/types'
 import type { PropertyValidationResult } from './types';
 
 import {

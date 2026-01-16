@@ -4,7 +4,7 @@
 // eslint-disable-next-line n/no-extraneous-import
 import { describe, expect, it } from 'vitest';
 
-import { generateGraph } from '../generator';
+import { generateGraph } from '../generator'
 import type { GraphSpec } from '../spec';
 import { buildAdjacencyList } from './helper-functions';
 import {

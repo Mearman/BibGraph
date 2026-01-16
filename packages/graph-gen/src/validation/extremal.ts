@@ -2,7 +2,7 @@
 // EXTREMAL GRAPH VALIDATORS
 // ============================================================================
 
-import type { TestGraph } from '../generator';
+import type { TestGraph } from '../generators/types'
 import type { PropertyValidationResult } from './types';
 
 /**

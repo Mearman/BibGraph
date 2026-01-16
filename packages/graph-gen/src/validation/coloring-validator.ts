@@ -1,4 +1,4 @@
-import type { TestEdge,TestGraph, TestNode } from '../generator';
+import type { TestEdge,TestGraph, TestNode } from '../generators/types'
 import { buildAdjacencyList } from './helper-functions';
 import type { PropertyValidationResult } from './types';
 

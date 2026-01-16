@@ -1647,4 +1647,4 @@ const hasEdge = (edges: TestEdge[], source: string, target: string): boolean => 
     (e.source === source && e.target === target) ||
     (e.source === target && e.target === source)
   );
-};
+}

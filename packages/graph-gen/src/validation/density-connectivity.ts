@@ -1,4 +1,4 @@
-import type { TestGraph } from '../generator';
+import type { TestGraph } from '../generators/types'
 import { checkBipartiteWithBFS, findComponentsForDensity } from './helper-functions';
 import type { PropertyValidationResult } from './types';
 

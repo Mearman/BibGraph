@@ -1,4 +1,4 @@
-import type { TestGraph } from '../generator';
+import type { TestGraph } from '../generators/types'
 
 /**
  * Validate regular graph properties (cubic or k-regular).
