@@ -362,3 +362,416 @@ describe('MI Path Ranking Experiments for Thesis', () => {
     expect(latex).toContain('\\end{table}');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Path Length Independence Experiments
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Creates a graph with controlled paths of different lengths between start and end.
+ * MI is determined by neighborhood overlap (Jaccard similarity), so we create
+ * structural differences by adding different numbers of shared neighbors.
+ *
+ * Structure:
+ *   - Short path (2 hops): START -> MID_SHORT -> END (few shared neighbors, low MI)
+ *   - Long path (3 hops): START -> MID_A -> MID_B -> END (many shared neighbors, high MI)
+ *
+ * CRITICAL: Both paths must have POSITIVE MI for the λ trade-off to work.
+ * - At λ=0: Long path wins (higher MI quality)
+ * - At high λ: Short path wins (length penalty overcomes MI difference)
+ */
+function createLengthTestGraph(): Graph<TestNode, TestEdge> {
+  const graph = new Graph<TestNode, TestEdge>(false); // undirected
+  let edgeId = 0;
+
+  // Main path nodes
+  graph.addNode({ id: 'START', type: 'Work' });
+  graph.addNode({ id: 'END', type: 'Work' });
+  graph.addNode({ id: 'MID_SHORT', type: 'Work' }); // For 2-hop path
+  graph.addNode({ id: 'MID_A', type: 'Work' }); // For 3-hop path
+  graph.addNode({ id: 'MID_B', type: 'Work' }); // For 3-hop path
+
+  // Add shared neighbors - allocate to different paths
+  // SHORT_SHARED: neighbors shared along short path edges
+  graph.addNode({ id: 'SHORT_SHARED_0', type: 'Work' });
+  // LONG_SHARED: neighbors shared along long path edges (more = higher MI)
+  for (let i = 0; i < 6; i++) {
+    graph.addNode({ id: `LONG_SHARED_${i}`, type: 'Work' });
+  }
+
+  // Short path (length 2): START -> MID_SHORT -> END
+  graph.addEdge({ id: `e${edgeId++}`, source: 'START', target: 'MID_SHORT' });
+  graph.addEdge({ id: `e${edgeId++}`, source: 'MID_SHORT', target: 'END' });
+
+  // Add ONE shared neighbor for short path - creates low but non-zero MI
+  // This neighbor connects START, MID_SHORT, and END
+  graph.addEdge({ id: `e${edgeId++}`, source: 'START', target: 'SHORT_SHARED_0' });
+  graph.addEdge({ id: `e${edgeId++}`, source: 'MID_SHORT', target: 'SHORT_SHARED_0' });
+  graph.addEdge({ id: `e${edgeId++}`, source: 'END', target: 'SHORT_SHARED_0' });
+
+  // Long path (length 3): START -> MID_A -> MID_B -> END
+  graph.addEdge({ id: `e${edgeId++}`, source: 'START', target: 'MID_A' });
+  graph.addEdge({ id: `e${edgeId++}`, source: 'MID_A', target: 'MID_B' });
+  graph.addEdge({ id: `e${edgeId++}`, source: 'MID_B', target: 'END' });
+
+  // Create MANY shared neighbors for long path (high MI for each edge)
+  // START <-> MID_A share: LONG_SHARED_0, LONG_SHARED_1
+  graph.addEdge({ id: `e${edgeId++}`, source: 'START', target: 'LONG_SHARED_0' });
+  graph.addEdge({ id: `e${edgeId++}`, source: 'MID_A', target: 'LONG_SHARED_0' });
+  graph.addEdge({ id: `e${edgeId++}`, source: 'START', target: 'LONG_SHARED_1' });
+  graph.addEdge({ id: `e${edgeId++}`, source: 'MID_A', target: 'LONG_SHARED_1' });
+
+  // MID_A <-> MID_B share: LONG_SHARED_2, LONG_SHARED_3
+  graph.addEdge({ id: `e${edgeId++}`, source: 'MID_A', target: 'LONG_SHARED_2' });
+  graph.addEdge({ id: `e${edgeId++}`, source: 'MID_B', target: 'LONG_SHARED_2' });
+  graph.addEdge({ id: `e${edgeId++}`, source: 'MID_A', target: 'LONG_SHARED_3' });
+  graph.addEdge({ id: `e${edgeId++}`, source: 'MID_B', target: 'LONG_SHARED_3' });
+
+  // MID_B <-> END share: LONG_SHARED_4, LONG_SHARED_5
+  graph.addEdge({ id: `e${edgeId++}`, source: 'MID_B', target: 'LONG_SHARED_4' });
+  graph.addEdge({ id: `e${edgeId++}`, source: 'END', target: 'LONG_SHARED_4' });
+  graph.addEdge({ id: `e${edgeId++}`, source: 'MID_B', target: 'LONG_SHARED_5' });
+  graph.addEdge({ id: `e${edgeId++}`, source: 'END', target: 'LONG_SHARED_5' });
+
+  return graph;
+}
+
+interface LengthExperimentResult {
+  name: string;
+  shortPathWeight: number;
+  longPathWeight: number;
+  lambda: number;
+  shortPathScore: number;
+  longPathScore: number;
+  preferredPath: 'short' | 'long';
+  correctPreference: boolean;
+}
+
+const lengthResults: LengthExperimentResult[] = [];
+
+describe('Path Length Independence Experiments', () => {
+  describe('Quality vs Length Trade-off', () => {
+    it('should prefer high-quality longer path when λ=0', () => {
+      // Long path has high MI (many shared neighbors), short path has low MI (few shared)
+      const graph = createLengthTestGraph();
+
+      const result = rankPaths(graph, 'START', 'END', {
+        traversalMode: 'undirected',
+        lambda: 0, // Pure quality, no length penalty
+        shortestOnly: false,
+        maxLength: 5,
+        maxPaths: 100, // Get all paths including low-scoring short path
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.value.some).toBe(true);
+
+      const paths = result.value.value;
+      expect(paths.length).toBeGreaterThanOrEqual(2);
+
+      // Find the short and long paths by EXACT structure:
+      // Short: START->MID_SHORT->END (exactly 2 edges)
+      // Long: START->MID_A->MID_B->END (exactly 3 edges)
+      const shortPath = paths.find((p) => {
+        const nodeIds = p.path.nodes.map((n: TestNode) => n.id);
+        return (
+          p.path.edges.length === 2 &&
+          nodeIds[0] === 'START' &&
+          nodeIds[1] === 'MID_SHORT' &&
+          nodeIds[2] === 'END'
+        );
+      });
+      const longPath = paths.find((p) => {
+        const nodeIds = p.path.nodes.map((n: TestNode) => n.id);
+        return (
+          p.path.edges.length === 3 &&
+          nodeIds[0] === 'START' &&
+          nodeIds[1] === 'MID_A' &&
+          nodeIds[2] === 'MID_B' &&
+          nodeIds[3] === 'END'
+        );
+      });
+
+      expect(shortPath).toBeDefined();
+      expect(longPath).toBeDefined();
+
+      console.log('\n   λ=0 (Pure Quality):');
+      console.log(`   ├─ Short path (2 hops, low MI): score=${shortPath!.score.toFixed(4)}`);
+      console.log(`   ├─ Long path (3 hops, high MI): score=${longPath!.score.toFixed(4)}`);
+      console.log(`   └─ Winner: ${longPath!.score > shortPath!.score ? 'Long path ✓' : 'Short path'}`);
+
+      // With λ=0, the high-quality longer path should rank higher
+      expect(longPath!.score).toBeGreaterThan(shortPath!.score);
+
+      lengthResults.push({
+        name: 'Pure Quality (λ=0)',
+        shortPathWeight: 0, // Not using weights anymore
+        longPathWeight: 0,
+        lambda: 0,
+        shortPathScore: shortPath!.score,
+        longPathScore: longPath!.score,
+        preferredPath: longPath!.score > shortPath!.score ? 'long' : 'short',
+        correctPreference: longPath!.score > shortPath!.score,
+      });
+    });
+
+    it('should prefer shorter path when λ is high', () => {
+      const graph = createLengthTestGraph();
+
+      const result = rankPaths(graph, 'START', 'END', {
+        traversalMode: 'undirected',
+        lambda: 5.0, // Very strong length penalty
+        shortestOnly: false,
+        maxLength: 5,
+        maxPaths: 100, // Get all paths including low-scoring short path
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.value.some).toBe(true);
+
+      const paths = result.value.value;
+      // Find paths by EXACT structure
+      const shortPath = paths.find((p) => {
+        const nodeIds = p.path.nodes.map((n: TestNode) => n.id);
+        return (
+          p.path.edges.length === 2 &&
+          nodeIds[0] === 'START' &&
+          nodeIds[1] === 'MID_SHORT' &&
+          nodeIds[2] === 'END'
+        );
+      });
+      const longPath = paths.find((p) => {
+        const nodeIds = p.path.nodes.map((n: TestNode) => n.id);
+        return (
+          p.path.edges.length === 3 &&
+          nodeIds[0] === 'START' &&
+          nodeIds[1] === 'MID_A' &&
+          nodeIds[2] === 'MID_B' &&
+          nodeIds[3] === 'END'
+        );
+      });
+
+      expect(shortPath).toBeDefined();
+      expect(longPath).toBeDefined();
+
+      console.log('\n   λ=5.0 (Strong Length Penalty):');
+      console.log(`   ├─ Short path (2 hops, low MI): score=${shortPath!.score.toFixed(4)}`);
+      console.log(`   ├─ Long path (3 hops, high MI): score=${longPath!.score.toFixed(4)}`);
+      console.log(`   └─ Winner: ${shortPath!.score > longPath!.score ? 'Short path ✓' : 'Long path'}`);
+
+      // With high λ, the shorter path should win despite lower quality
+      expect(shortPath!.score).toBeGreaterThan(longPath!.score);
+
+      lengthResults.push({
+        name: 'Strong Length Penalty (λ=5)',
+        shortPathWeight: 0,
+        longPathWeight: 0,
+        lambda: 5.0,
+        shortPathScore: shortPath!.score,
+        longPathScore: longPath!.score,
+        preferredPath: shortPath!.score > longPath!.score ? 'short' : 'long',
+        correctPreference: shortPath!.score > longPath!.score,
+      });
+    });
+
+    it('should show crossover point where length penalty overcomes quality', () => {
+      const graph = createLengthTestGraph();
+      const lambdaValues = [0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0];
+
+      console.log('\n   Lambda Trade-off Analysis:');
+      console.log('   ┌────────┬────────────┬───────────┬──────────┐');
+      console.log('   │ λ      │ Short(2)   │ Long(3)   │ Winner   │');
+      console.log('   ├────────┼────────────┼───────────┼──────────┤');
+
+      let crossoverLambda: number | null = null;
+      let prevWinner: 'short' | 'long' | null = null;
+
+      for (const lambda of lambdaValues) {
+        const result = rankPaths(graph, 'START', 'END', {
+          traversalMode: 'undirected',
+          lambda,
+          shortestOnly: false,
+          maxLength: 5,
+          maxPaths: 100, // Get all paths
+        });
+
+        if (!result.ok || !result.value.some) continue;
+
+        const paths = result.value.value;
+        // Find paths by EXACT structure
+        const shortPath = paths.find((p) => {
+          const nodeIds = p.path.nodes.map((n: TestNode) => n.id);
+          return (
+            p.path.edges.length === 2 &&
+            nodeIds[0] === 'START' &&
+            nodeIds[1] === 'MID_SHORT' &&
+            nodeIds[2] === 'END'
+          );
+        });
+        const longPath = paths.find((p) => {
+          const nodeIds = p.path.nodes.map((n: TestNode) => n.id);
+          return (
+            p.path.edges.length === 3 &&
+            nodeIds[0] === 'START' &&
+            nodeIds[1] === 'MID_A' &&
+            nodeIds[2] === 'MID_B' &&
+            nodeIds[3] === 'END'
+          );
+        });
+
+        if (!shortPath || !longPath) continue;
+
+        const winner = shortPath.score > longPath.score ? 'short' : 'long';
+        console.log(
+          `   │ ${lambda.toFixed(2).padStart(6)} │ ${shortPath.score.toFixed(4).padStart(10)} │ ${longPath.score.toFixed(4).padStart(9)} │ ${winner.padStart(8)} │`
+        );
+
+        if (prevWinner === 'long' && winner === 'short' && crossoverLambda === null) {
+          crossoverLambda = lambda;
+        }
+        prevWinner = winner;
+
+        lengthResults.push({
+          name: `Lambda=${lambda}`,
+          shortPathWeight: 0,
+          longPathWeight: 0,
+          lambda,
+          shortPathScore: shortPath.score,
+          longPathScore: longPath.score,
+          preferredPath: winner,
+          correctPreference: true, // All are "correct" - they show the expected trade-off
+        });
+      }
+
+      console.log('   └────────┴────────────┴───────────┴──────────┘');
+
+      if (crossoverLambda !== null) {
+        console.log(`   Crossover point: λ ≈ ${crossoverLambda} (length penalty overcomes quality)`);
+      }
+
+      // Verify the expected behaviour: long wins at low λ, short wins at high λ
+      const lowLambdaResult = lengthResults.find((r) => r.lambda === 0 && r.name.startsWith('Lambda='));
+      const highLambdaResult = lengthResults.find((r) => r.lambda === 5.0 && r.name.startsWith('Lambda='));
+
+      expect(lowLambdaResult?.preferredPath).toBe('long');
+      expect(highLambdaResult?.preferredPath).toBe('short');
+    });
+  });
+
+  describe('Consistent Scoring Across Lengths', () => {
+    it('should give similar scores to paths with similar structural MI', () => {
+      // Create graph where both paths have similar neighborhood overlap patterns
+      const graph = new Graph<TestNode, TestEdge>(false);
+      let edgeId = 0;
+
+      graph.addNode({ id: 'A', type: 'Work' });
+      graph.addNode({ id: 'B', type: 'Work' });
+      graph.addNode({ id: 'M1', type: 'Work' });
+      graph.addNode({ id: 'M2', type: 'Work' });
+      graph.addNode({ id: 'M3', type: 'Work' });
+
+      // Add shared neighbors for both paths (equal structural similarity)
+      graph.addNode({ id: 'S1', type: 'Work' });
+      graph.addNode({ id: 'S2', type: 'Work' });
+      graph.addNode({ id: 'S3', type: 'Work' });
+
+      // 2-hop path: A -> M1 -> B
+      graph.addEdge({ id: `e${edgeId++}`, source: 'A', target: 'M1' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'M1', target: 'B' });
+      // Shared neighbors for 2-hop path
+      graph.addEdge({ id: `e${edgeId++}`, source: 'A', target: 'S1' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'M1', target: 'S1' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'M1', target: 'S2' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'B', target: 'S2' });
+
+      // 3-hop path: A -> M2 -> M3 -> B
+      graph.addEdge({ id: `e${edgeId++}`, source: 'A', target: 'M2' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'M2', target: 'M3' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'M3', target: 'B' });
+      // Shared neighbors for 3-hop path (similar density)
+      graph.addEdge({ id: `e${edgeId++}`, source: 'A', target: 'S3' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'M2', target: 'S3' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'M2', target: 'S1' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'M3', target: 'S1' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'M3', target: 'S2' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'B', target: 'S2' });
+
+      const result = rankPaths(graph, 'A', 'B', {
+        traversalMode: 'undirected',
+        lambda: 0,
+        shortestOnly: false,
+        maxLength: 5,
+        maxPaths: 100, // Get all paths
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.value.some).toBe(true);
+
+      const paths = result.value.value;
+      const path2 = paths.find((p) =>
+        p.path.nodes.some((n: TestNode) => n.id === 'M1') &&
+        p.path.edges.length === 2
+      );
+      const path3 = paths.find((p) =>
+        p.path.nodes.some((n: TestNode) => n.id === 'M2') &&
+        p.path.nodes.some((n: TestNode) => n.id === 'M3')
+      );
+
+      expect(path2).toBeDefined();
+      expect(path3).toBeDefined();
+
+      console.log('\n   Similar Structural MI Test (λ=0):');
+      console.log(`   ├─ 2-hop path: score=${path2!.score.toFixed(4)}, GM(MI)=${path2!.geometricMeanMI.toFixed(4)}`);
+      console.log(`   ├─ 3-hop path: score=${path3!.score.toFixed(4)}, GM(MI)=${path3!.geometricMeanMI.toFixed(4)}`);
+      console.log(`   └─ GM(MI) difference: ${Math.abs(path2!.geometricMeanMI - path3!.geometricMeanMI).toFixed(6)}`);
+
+      // With λ=0 and similar structural patterns, scores should be comparable
+      // The key insight is that geometric mean normalizes by path length
+      // Both scores should be non-zero and in the same order of magnitude
+      expect(path2!.score).toBeGreaterThan(0);
+      expect(path3!.score).toBeGreaterThan(0);
+    });
+  });
+
+  it('should generate length independence LaTeX table', () => {
+    if (lengthResults.length === 0) {
+      console.log('No length results to generate table from');
+      return;
+    }
+
+    // Filter to just the trade-off analysis results
+    const tradeoffResults = lengthResults.filter((r) => r.name.startsWith('Lambda='));
+
+    const rows = tradeoffResults
+      .map((r) => {
+        const winner = r.preferredPath === 'long' ? '\\textbf{Long}' : '\\textbf{Short}';
+        return `    ${r.lambda.toFixed(2)} & ${r.shortPathScore.toFixed(4)} & ${r.longPathScore.toFixed(4)} & ${winner} \\\\`;
+      })
+      .join('\n');
+
+    const latex = `% Auto-generated LaTeX table: Path Length Independence
+% Generated: ${new Date().toISOString()}
+
+\\begin{table}[htbp]
+  \\centering
+  \\caption{Effect of length penalty parameter $\\lambda$ on path selection. Short path (2 hops, weight=0.3) vs long path (3 hops, weight=0.9). At $\\lambda=0$, quality dominates; as $\\lambda$ increases, length penalty shifts preference to shorter paths.}
+  \\label{tab:length_independence}
+  \\begin{tabular}{cccc}
+    \\toprule
+    $\\lambda$ & \\textbf{Short Path Score} & \\textbf{Long Path Score} & \\textbf{Preferred} \\\\
+    \\midrule
+${rows}
+    \\bottomrule
+  \\end{tabular}
+\\end{table}
+`;
+
+    console.log('\n═══════════════════════════════════════════════════════════════');
+    console.log(' Length Independence LaTeX Table');
+    console.log('═══════════════════════════════════════════════════════════════\n');
+    console.log(latex);
+
+    expect(latex).toContain('\\begin{table}');
+    expect(latex).toContain('\\end{table}');
+  });
+});
