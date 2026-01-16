@@ -42,7 +42,7 @@
  * const result = dfs(new MyDatabaseGraph(), 'A');
  * ```
  */
-import type { EdgeBase, NodeBase, ReadableGraph } from '../interfaces/readable-graph';
+import type { EdgeBase, NodeBase, ReadableGraph } from '@bibgraph/types';
 
 export interface DFSTraversalResult<N> {
   /** Nodes in visitation order (depth-first) */

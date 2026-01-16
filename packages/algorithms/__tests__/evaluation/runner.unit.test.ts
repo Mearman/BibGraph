@@ -9,19 +9,19 @@ import type { Path } from '@bibgraph/algorithms';
 import {
   runExperiment,
   runCrossValidation,
-} from '@bibgraph/algorithms';
+} from '@bibgraph/graph-expansion';
 import {
   generateMarkdownReport,
   generateLatexTable,
   generateJSONSummary,
   generateHTMLReport,
-} from '@bibgraph/algorithms';
+} from '@bibgraph/graph-expansion';
 import type {
   ExperimentConfig,
   MethodConfig,
   MetricType,
-} from '@bibgraph/algorithms';
-import type { ExperimentReport } from '@bibgraph/algorithms';
+} from '@bibgraph/graph-expansion';
+import type { ExperimentReport } from '@bibgraph/graph-expansion';
 
 describe('Experiment Runner', () => {
   let testGraph: Graph<Node & { type: string }, Edge & { source: string; target: string }>;

@@ -4,9 +4,9 @@
  * Models real citation patterns for academic graph evaluation
  */
 
-import { Graph } from '../../graph/graph';
-import type { Path } from '../../types/algorithm-results';
-import type { Edge, Node } from '../../types/graph';
+import { Graph } from '../..';
+import type { Path } from '../..';
+import type { Edge, Node } from '@bibgraph/types';
 import { type PlantedPathConfig, type PlantedPathResult, plantGroundTruthPaths } from './path-generator';
 
 /**

@@ -42,7 +42,7 @@
  * const result = bfs(new MyDatabaseGraph(), 'A');
  * ```
  */
-import type { EdgeBase, NodeBase, ReadableGraph } from '../interfaces/readable-graph';
+import type { EdgeBase, NodeBase, ReadableGraph } from '@bibgraph/types';
 
 export interface TraversalResult<N> {
   /** Nodes in visitation order (level-by-level for BFS) */

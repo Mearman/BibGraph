@@ -1,9 +1,3 @@
-import { type Graph } from '../graph/graph';
-import { type TraversalResult } from '../types/algorithm-results';
-import { type InvalidInputError } from '../types/errors';
-import { type Edge,type Node } from '../types/graph';
-import { Err,Ok, type Result } from '../types/result';
-
 /**
  * Breadth-First Search (BFS) traversal algorithm.
  *
@@ -11,40 +5,99 @@ import { Err,Ok, type Result } from '../types/result';
  * Visits all nodes at distance k before visiting nodes at distance k+1.
  * Uses a queue for level-order traversal.
  *
+ * **Generic Implementation**: Works with any graph implementing ReadableGraph.
+ * Supports in-memory graphs, database-backed graphs, and lazy-loading graphs.
+ *
  * Time Complexity: O(V + E) where V = vertices, E = edges
  * Space Complexity: O(V) for visited set and queue
- * @param graph - The graph to traverse
+ *
+ * @template N - Node type (extends NodeBase with id field)
+ * @template E - Edge type (extends EdgeBase with source, target fields)
+ * @param graph - The graph to traverse (any ReadableGraph implementation)
  * @param startId - ID of the starting node
- * @returns Result containing traversal information or error
+ * @returns Traversal result with visit order and parent mapping, or error
  * @example
  * ```typescript
+ * // Using algorithms Graph class (via adapter)
  * const graph = new Graph<MyNode, MyEdge>(true);
  * graph.addNode({ id: 'A', type: 'test' });
  * graph.addNode({ id: 'B', type: 'test' });
  * graph.addEdge({ id: 'E1', source: 'A', target: 'B', type: 'edge' });
  *
- * const result = bfs(graph, 'A');
+ * const adapter = new GraphAdapter(graph);
+ * const result = bfs(adapter, 'A');
  * if (result.ok) {
  *   console.log('Visit order (level-by-level):', result.value.visitOrder);
  *   console.log('Parents:', result.value.parents);
  * }
+ *
+ * // Using custom graph implementation
+ * class MyDatabaseGraph implements ReadableGraph<MyNode, MyEdge> {
+ *   async getNode(id: string): Promise<MyNode | null> {
+ *     return await db.query('SELECT * FROM nodes WHERE id = ?', [id]);
+ *   }
+ *   // ... other methods
+ * }
+ *
+ * const result = bfs(new MyDatabaseGraph(), 'A');
  * ```
  */
-export const bfs = <N extends Node, E extends Edge = Edge>(graph: Graph<N, E>, startId: string): Result<TraversalResult<N>, InvalidInputError> => {
+import type { EdgeBase, NodeBase, ReadableGraph } from '@bibgraph/types';
+
+export interface TraversalResult<N> {
+  /** Nodes in visitation order (level-by-level for BFS) */
+  visitOrder: N[];
+
+  /** Parent mapping for path reconstruction (child → parent) */
+  parents: Map<string, string | null>;
+}
+
+export interface InvalidInputError {
+  type: 'invalid-input';
+  message: string;
+}
+
+export interface Ok<T> {
+  ok: true;
+  value: T;
+}
+
+export interface Err<E> {
+  ok: false;
+  error: E;
+}
+
+export type Result<T, E> = Ok<T> | Err<E>;
+
+/**
+ * Breadth-First Search traversal.
+ * @param graph
+ * @param startId
+ */
+export const bfs = <N extends NodeBase, E extends EdgeBase>(
+  graph: ReadableGraph<N, E>,
+  startId: string
+): Result<TraversalResult<N>, InvalidInputError> => {
   // Validate inputs
   if (!graph) {
-    return Err({
-      type: 'invalid-input',
-      message: 'Graph cannot be null or undefined',
-    });
+    return {
+      ok: false,
+      error: {
+        type: 'invalid-input',
+        message: 'Graph cannot be null or undefined',
+      },
+    };
   }
 
   const startNode = graph.getNode(startId);
-  if (!startNode.some) {
-    return Err({
-      type: 'invalid-input',
-      message: `Start node '${startId}' not found in graph`,
-    });
+  if (!startNode) {
+    return {
+      ok: false,
+      error: {
+        type: 'invalid-input',
+        message: `Start node '${startId}' not found in graph`,
+      },
+    };
   }
 
   // Initialize tracking structures
@@ -64,33 +117,32 @@ export const bfs = <N extends Node, E extends Edge = Edge>(graph: Graph<N, E>, s
 
     // Add current node to visit order
     const currentNode = graph.getNode(currentId);
-    if (currentNode.some) {
-      visitOrder.push(currentNode.value);
+    if (currentNode) {
+      visitOrder.push(currentNode);
     }
 
     // Get neighbors and enqueue unvisited ones
-    const neighborsResult = graph.getNeighbors(currentId);
-    if (neighborsResult.ok) {
-      for (const neighborId of neighborsResult.value) {
-        // Skip if already visited
-        if (visited.has(neighborId)) {
-          continue;
-        }
-
-        // Mark as visited and set parent
-        visited.add(neighborId);
-        parents.set(neighborId, currentId);
-
-        // Enqueue for later processing
-        queue.push(neighborId);
+    const neighbors = graph.getNeighbors(currentId);
+    for (const neighborId of neighbors) {
+      // Skip if already visited
+      if (visited.has(neighborId)) {
+        continue;
       }
+
+      // Mark as visited and set parent
+      visited.add(neighborId);
+      parents.set(neighborId, currentId);
+
+      // Enqueue for later processing
+      queue.push(neighborId);
     }
   }
 
-  return Ok({
-    visitOrder,
-    parents,
-    // Note: BFS does not track discovery/finish times
-    // These are DFS-specific properties
-  });
+  return {
+    ok: true,
+    value: {
+      visitOrder,
+      parents,
+    },
+  };
 };

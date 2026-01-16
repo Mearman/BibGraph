@@ -2,10 +2,10 @@
  * Degree-based path ranking baseline
  */
 
-import type { Graph } from '../../graph/graph';
-import type { RankedPath } from '../../pathfinding/path-ranking';
-import type { Path } from '../../types/algorithm-results';
-import type { Edge, Node } from '../../types/graph';
+import type { Graph } from '../..';
+import type { RankedPath } from '../..';
+import type { Path } from '../..';
+import type { Edge, Node } from '@bibgraph/types';
 
 /**
  * Rank paths by sum of node degrees along path.

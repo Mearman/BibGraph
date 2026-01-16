@@ -2,6 +2,13 @@
  * Evaluation types for MI experiment framework
  */
 
+// Re-export types from experiment-config
+export type { PathRanker, MetricType, StatisticalTestType, MethodConfig, ExperimentConfig, GraphSpec } from './runner/experiment-config';
+
+// Re-export types from path-planting
+export type { PlantedPathConfig, PlantedPathResult } from './path-planting/path-generator';
+export type { CitationPathType } from './path-planting/citation-planting';
+
 /**
  * Result of a single property validation.
  */

@@ -2,9 +2,9 @@
  * Shortest path ranking baseline
  */
 
-import type { RankedPath } from '../../pathfinding/path-ranking';
-import type { Path } from '../../types/algorithm-results';
-import type { Edge, Node } from '../../types/graph';
+import type { RankedPath } from '../..';
+import type { Path } from '../..';
+import type { Edge, Node } from '@bibgraph/types';
 
 /**
  * Rank paths by length (shortest first).

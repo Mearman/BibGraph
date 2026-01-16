@@ -20,7 +20,7 @@
  * @template N - Node type (extends NodeBase with id field)
  * @template E - Edge type (extends EdgeBase with source, target fields)
  */
-import type { EdgeBase, NodeBase, ReadableGraph } from '../interfaces/readable-graph';
+import type { EdgeBase, NodeBase, ReadableGraph } from '@bibgraph/types';
 
 export interface EgoNetworkOptions {
   /** Number of hops to include (0 = seed nodes only, 1 = immediate neighbors) */

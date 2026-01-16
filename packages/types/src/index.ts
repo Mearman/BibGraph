@@ -234,3 +234,12 @@ export type {
   OpenAlexId
 } from "./entities/base";
 
+// Export core graph algorithm types
+export type {
+  Node,
+  Edge,
+  NodeBase,
+  EdgeBase,
+  ReadableGraph
+} from "./graph-algorithms";
+

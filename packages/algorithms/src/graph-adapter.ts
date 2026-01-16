@@ -12,7 +12,7 @@
 
 import type { Edge, Node } from '@bibgraph/algorithms';
 import { Graph } from '@bibgraph/algorithms';
-import type { ReadableGraph } from '@bibgraph/graph-expansion';
+import type { ReadableGraph } from '@bibgraph/types';
 
 /**
  * Adapter for algorithms Graph<N, E> class to ReadableGraph interface.

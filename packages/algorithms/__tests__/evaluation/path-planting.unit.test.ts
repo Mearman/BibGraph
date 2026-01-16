@@ -13,7 +13,7 @@ import {
   pathFollowsTemplate,
   type PlantedPathConfig,
   type CitationPathType,
-} from '@bibgraph/algorithms';
+} from '@bibgraph/graph-expansion';
 
 /** Simple graph node */
 interface TestNode extends Node {

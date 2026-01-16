@@ -1,12 +1,15 @@
 {
   "name": "@bibgraph/graph-expansion",
-  "description": "Generic graph expansion and neighborhood traversal system",
+  "description": "Generic graph expansion, evaluation framework, and neighborhood traversal system",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "build": "vite build",
     "test": "vitest",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bibgraph/types": "workspace:*"
   },
   "devDependencies": {
     "@bibgraph/graph-gen": "workspace:*",

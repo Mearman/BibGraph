@@ -120,9 +120,24 @@ export interface PathRankingConfig<N extends Node, E extends Edge = Edge> {
   /**
    * Maximum path length to consider.
    * Prevents exponential blowup in dense graphs.
-   * @default Infinity (only shortest paths)
+   * Only used when shortestOnly is false.
+   * @default Infinity
    */
   maxLength?: number;
+
+  /**
+   * Whether to only consider shortest paths.
+   * - true (default): Only enumerate paths of minimum length (backwards compatible)
+   * - false: Enumerate all paths up to maxLength, letting MI + λ determine ranking
+   *
+   * When false, the λ (lambda) parameter becomes meaningful:
+   * - λ = 0: Pure MI quality, length irrelevant (may prefer longer paths)
+   * - λ > 0: Trade-off between MI quality and path efficiency
+   * - λ → ∞: Effectively reduces to shortest path selection
+   *
+   * @default true
+   */
+  shortestOnly?: boolean;
 
   /**
    * Pre-computed MI cache. If not provided, MI will be computed on-demand.
@@ -317,6 +332,153 @@ const findAllShortestPaths = <N extends Node, E extends Edge>(
 };
 
 /**
+ * Find all paths up to a maximum length using depth-limited search.
+ *
+ * Unlike findAllShortestPaths, this explores paths beyond the minimum length,
+ * enabling MI-quality vs path-length trade-offs.
+ *
+ * Uses iterative deepening DFS with early termination to prevent exponential blowup.
+ *
+ * @template N - Node type
+ * @template E - Edge type
+ * @param graph - The graph to search
+ * @param startId - Source node ID
+ * @param endId - Target node ID
+ * @param maxLength - Maximum path length (number of edges)
+ * @param traversalMode - How to traverse edges
+ * @param maxPaths - Maximum number of paths to enumerate (prevents OOM)
+ * @returns Array of all paths up to maxLength, sorted by length (shortest first)
+ * @internal
+ */
+const findAllPathsUpToLength = <N extends Node, E extends Edge>(
+  graph: Graph<N, E>,
+  startId: string,
+  endId: string,
+  maxLength: number,
+  traversalMode: TraversalMode = 'undirected',
+  maxPaths: number = 10000,
+): Path<N, E>[] => {
+  if (startId === endId) {
+    const node = graph.getNode(startId);
+    if (node.some) {
+      return [{ nodes: [node.value], edges: [], totalWeight: 0 }];
+    }
+    return [];
+  }
+
+  const allPaths: Path<N, E>[] = [];
+
+  // For undirected traversal, pre-compute all edges where node is target
+  const incomingEdgesByNode = new Map<string, E[]>();
+  if (traversalMode === 'undirected') {
+    for (const edge of graph.getAllEdges()) {
+      const targetEdges = incomingEdgesByNode.get(edge.target) ?? [];
+      targetEdges.push(edge);
+      incomingEdgesByNode.set(edge.target, targetEdges);
+    }
+  }
+
+  // Helper to get traversable neighbours based on traversal mode
+  const getTraversableNeighbours = (current: string): Array<{ neighbour: string; edge: E }> => {
+    const result: Array<{ neighbour: string; edge: E }> = [];
+    const seenEdges = new Set<string>();
+
+    // Get outgoing edges (always valid)
+    const outgoing = graph.getOutgoingEdges(current);
+    if (outgoing.ok) {
+      for (const edge of outgoing.value) {
+        const neighbour = edge.source === current ? edge.target : edge.source;
+        result.push({ neighbour, edge });
+        seenEdges.add(edge.id);
+      }
+    }
+
+    // For undirected traversal, also include edges where current is the target
+    if (traversalMode === 'undirected') {
+      const incoming = incomingEdgesByNode.get(current) ?? [];
+      for (const edge of incoming) {
+        if (!seenEdges.has(edge.id)) {
+          const neighbour = edge.source;
+          result.push({ neighbour, edge });
+          seenEdges.add(edge.id);
+        }
+      }
+    }
+
+    return result;
+  };
+
+  // DFS with path tracking and cycle detection
+  // Track visited nodes per path (not globally) to allow revisiting via different routes
+  const dfs = (
+    currentId: string,
+    visited: Set<string>,
+    currentNodes: N[],
+    currentEdges: E[],
+    currentDepth: number,
+  ): void => {
+    // Early termination if we've found enough paths
+    if (allPaths.length >= maxPaths) {
+      return;
+    }
+
+    // Check if we've reached the target
+    if (currentId === endId && currentDepth > 0) {
+      const startNode = graph.getNode(startId);
+      if (startNode.some) {
+        allPaths.push({
+          nodes: [startNode.value, ...currentNodes],
+          edges: [...currentEdges],
+          totalWeight: currentEdges.length,
+        });
+      }
+      return;
+    }
+
+    // Stop if we've reached max depth
+    if (currentDepth >= maxLength) {
+      return;
+    }
+
+    // Explore neighbours
+    const neighbours = getTraversableNeighbours(currentId);
+
+    for (const { neighbour, edge } of neighbours) {
+      // Skip if already visited in this path (avoid cycles)
+      if (visited.has(neighbour)) {
+        continue;
+      }
+
+      const neighbourNode = graph.getNode(neighbour);
+      if (!neighbourNode.some) {
+        continue;
+      }
+
+      // Continue DFS
+      const newVisited = new Set(visited);
+      newVisited.add(neighbour);
+
+      dfs(
+        neighbour,
+        newVisited,
+        [...currentNodes, neighbourNode.value],
+        [...currentEdges, edge],
+        currentDepth + 1,
+      );
+    }
+  };
+
+  // Start DFS from startId
+  const startVisited = new Set<string>([startId]);
+  dfs(startId, startVisited, [], [], 0);
+
+  // Sort by length (shortest first) before returning
+  allPaths.sort((a, b) => a.edges.length - b.edges.length);
+
+  return allPaths;
+};
+
+/**
  * Score result from path computation.
  * @internal
  */
@@ -465,6 +627,8 @@ export const rankPaths = <N extends Node, E extends Edge>(
     weightMode = 'none',
     weightExtractor,
     maxPaths = 10,
+    maxLength = Infinity,
+    shortestOnly = true,
     miCache: providedCache,
     miConfig = {},
     epsilon = 1e-10,
@@ -497,8 +661,10 @@ export const rankPaths = <N extends Node, E extends Edge>(
   // Get or compute MI cache
   const miCache = providedCache ?? precomputeMutualInformation(graph, miConfig);
 
-  // Find all shortest paths with specified traversal mode
-  const paths = findAllShortestPaths(graph, startId, endId, traversalMode);
+  // Choose path enumeration strategy based on shortestOnly flag
+  const paths = shortestOnly || maxLength === Infinity
+    ? findAllShortestPaths(graph, startId, endId, traversalMode)
+    : findAllPathsUpToLength(graph, startId, endId, maxLength, traversalMode);
 
   if (paths.length === 0) {
     return Ok(None()); // No path exists
