@@ -6,7 +6,7 @@
 
 import { afterEach,beforeEach, describe, expect, it } from 'vitest';
 
-import { SPECIAL_LIST_IDS } from './catalogue-db.js';
+import { SPECIAL_LIST_IDS } from './catalogue-db/index.js';
 import { InMemoryStorageProvider } from './in-memory-storage-provider.js';
 
 describe('InMemoryStorageProvider Graph List Operations (T028)', () => {

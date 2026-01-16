@@ -5,7 +5,7 @@
  * @package
  */
 
-import type { CatalogueEntity } from './storage/catalogue-db.js';
+import type { CatalogueEntity } from './storage/catalogue-db/index.js';
 
 /**
  * Key function for identifying duplicates

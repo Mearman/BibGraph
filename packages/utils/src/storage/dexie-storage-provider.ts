@@ -11,8 +11,8 @@ import type {
 } from '@bibgraph/types';
 
 import type { GenericLogger } from '../logger.js';
-import type { CatalogueEntity,CatalogueList } from './catalogue-db.js';
-import { CatalogueService } from './catalogue-db.js';
+import type { CatalogueEntity, CatalogueList } from './catalogue-db/index.js';
+import { CatalogueService } from './catalogue-db/service.js';
 import type { AddBookmarkParams, AddEntityParams, AddToHistoryParams, BatchAddResult, CatalogueStorageProvider, CreateListParams, ListStats, ShareAccessResult } from './catalogue-storage-provider.js';
 import {
 	convertIndexedDBError,

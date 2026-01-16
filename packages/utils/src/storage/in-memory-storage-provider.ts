@@ -11,8 +11,8 @@ import type {
 } from '@bibgraph/types';
 import { GRAPH_LIST_CONFIG } from '@bibgraph/types';
 
-import type { CatalogueEntity, CatalogueList, CatalogueShareRecord } from './catalogue-db.js';
-import { SPECIAL_LIST_IDS } from './catalogue-db.js';
+import type { CatalogueEntity, CatalogueList, CatalogueShareRecord } from './catalogue-db/index.js';
+import { SPECIAL_LIST_IDS } from './catalogue-db/index.js';
 import type {
 	AddBookmarkParams,
 	AddEntityParams,

@@ -20,7 +20,7 @@ import type {
   CatalogueEntity,
   CatalogueList,
   ListType,
-} from './catalogue-db.js';
+} from './catalogue-db/index.js';
 
 /**
  * Parameters for creating a new catalogue list

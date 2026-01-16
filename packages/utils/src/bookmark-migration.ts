@@ -7,7 +7,7 @@
 
 import { EntityDetectionService } from "./entity-detection-service.js"
 import { logger } from "./logger.js"
-import type { CatalogueService } from "./storage/catalogue-db.js"
+import type { CatalogueService } from "./storage/catalogue-db/index.js"
 
 /**
  * Migration result containing statistics and any errors encountered

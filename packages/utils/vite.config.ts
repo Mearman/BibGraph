@@ -32,7 +32,7 @@ export default defineConfig({
         validation: resolve(__dirname, "src/validation.ts"),
         "normalize-route": resolve(__dirname, "src/normalize-route.ts"),
         "storage/user-interactions-db": resolve(__dirname, "src/storage/user-interactions-db.ts"),
-        "storage/catalogue-db": resolve(__dirname, "src/storage/catalogue-db.ts"),
+        "storage/catalogue-db": resolve(__dirname, "src/storage/catalogue-db/index.ts"),
         "workers/messages": resolve(__dirname, "src/workers/messages.ts"),
       },
       name: "BibGraphUtils",

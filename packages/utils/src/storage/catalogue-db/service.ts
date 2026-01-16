@@ -1,6 +1,6 @@
 /**
- * Catalogue database for lists and bibliographies
- * Extends user interactions with specialized list management
+ * Catalogue Service
+ * Main service class for managing catalogue lists and entities
  */
 
 import type {
@@ -9,320 +9,25 @@ import type {
   GraphListNode,
   PruneGraphListResult,
 } from "@bibgraph/types";
-import { GRAPH_LIST_CONFIG } from "@bibgraph/types";
 import Dexie from "dexie";
 
-import type { GenericLogger } from "../logger.js";
-
-// Event system for catalogue changes
-type CatalogueEventListener = (event: {
-  type: 'list-added' | 'list-removed' | 'list-updated' | 'entity-added' | 'entity-removed' | 'entity-reordered';
-  listId?: string;
-  entityIds?: string[];
-  list?: CatalogueList;
-}) => void;
-
-class CatalogueEventEmitter {
-  private listeners: CatalogueEventListener[] = [];
-
-  subscribe(listener: CatalogueEventListener) {
-    this.listeners.push(listener);
-    return () => {
-      const index = this.listeners.indexOf(listener);
-      if (index !== -1) {
-        this.listeners.splice(index, 1);
-      }
-    };
-  }
-
-  emit(event: Parameters<CatalogueEventListener>[0]) {
-    this.listeners.forEach(listener => {
-      try {
-        listener(event);
-      } catch (error) {
-        console.error('Error in catalogue event listener:', error);
-      }
-    });
-  }
-}
-
-// Global event emitter for catalogue changes
-export const catalogueEventEmitter = new CatalogueEventEmitter();
-
-// Constants
-const LOG_CATEGORY = "catalogue";
-const DB_NAME = "bibgraph-catalogue";
-
-// Pattern for corrupted history entries (from location.search object concatenation bug)
-const CORRUPTED_ENTITY_ID_PATTERN = "[object Object]";
-
-// Special list identifiers
-export const SPECIAL_LIST_IDS = {
-  BOOKMARKS: "bookmarks-list",
-  HISTORY: "history-list",
-  GRAPH: "graph-list",
-  SEARCH_HISTORY: "search-history",
-} as const;
-
-export const SPECIAL_LIST_TYPES = {
-  BOOKMARKS: "bookmarks" as const,
-  HISTORY: "history" as const,
-} as const;
-
-// List types
-export type ListType = "list" | "bibliography";
-
-// Database interfaces
-export interface CatalogueList {
-  id?: string;
-  /** List title */
-  title: string;
-  /** Optional description */
-  description?: string;
-  /** List type: general list or works-only bibliography */
-  type: ListType;
-  /** User-defined tags for organization */
-  tags?: string[];
-  /** When the list was created */
-  createdAt: Date;
-  /** When the list was last modified */
-  updatedAt: Date;
-  /** Whether this list is publicly shareable */
-  isPublic: boolean;
-  /** Optional share token for public access */
-  shareToken?: string;
-}
-
-export interface SearchHistoryEntry {
-  id?: string;
-  /** Search query text */
-  query: string;
-  /** When the search was performed */
-  timestamp: Date;
-}
-
-/**
- * Graph annotation storage interface
- * Annotations are visual markup on graphs (text labels, shapes, drawings)
- */
-export interface GraphAnnotationStorage {
-  id?: string;
-  /** Annotation type discriminator */
-  type: 'text' | 'rectangle' | 'circle' | 'drawing';
-  /** Creation timestamp */
-  createdAt: Date;
-  /** Last modified timestamp */
-  updatedAt: Date;
-  /** Whether annotation is visible */
-  visible: boolean;
-  /** Optional color */
-  color?: string;
-
-  // Text annotation fields
-  content?: string;
-  x?: number;
-  y?: number;
-  fontSize?: number;
-  backgroundColor?: string;
-  /** Linked node ID (optional) */
-  nodeId?: string;
-
-  // Rectangle annotation fields
-  width?: number;
-  height?: number;
-  borderColor?: string;
-  fillColor?: string;
-  borderWidth?: number;
-
-  // Circle annotation fields
-  radius?: number;
-
-  // Drawing annotation fields
-  points?: Array<{ x: number; y: number }>;
-  strokeColor?: string;
-  strokeWidth?: number;
-  closed?: boolean;
-
-  /** Optional graph/snapshot ID for sharing annotations via URL */
-  graphId?: string;
-}
-
-/**
- * Graph snapshot storage
- * Captures complete graph state for later restoration or sharing
- */
-export interface GraphSnapshotStorage {
-  id?: string;
-  /** Snapshot name for display */
-  name: string;
-  /** Creation timestamp */
-  createdAt: Date;
-  /** Last modified timestamp */
-  updatedAt: Date;
-  /** Whether this is an auto-saved snapshot */
-  isAutoSave: boolean;
-  /** Graph nodes (serialized) */
-  nodes: string;
-  /** Graph edges (serialized) */
-  edges: string;
-  /** Camera zoom level */
-  zoom: number;
-  /** Camera pan X position */
-  panX: number;
-  /** Camera pan Y position */
-  panY: number;
-  /** Layout type */
-  layoutType: string;
-  /** Node positions (for static layouts) */
-  nodePositions?: string;
-  /** Annotations associated with this snapshot */
-  annotations?: string;
-  /** Optional share token for URL sharing */
-  shareToken?: string;
-}
-
-export interface CatalogueEntity {
-  id?: string;
-  /** List this entity belongs to */
-  listId: string;
-  /** Entity type (works, authors, etc.) */
-  entityType: EntityType;
-  /** OpenAlex entity ID */
-  entityId: string;
-  /** When entity was added to list */
-  addedAt: Date;
-  /** Optional notes for this specific entity in the list */
-  notes?: string;
-  /** Order position within the list */
-  position: number;
-}
-
-export interface CatalogueShareRecord {
-  id?: string;
-  /** List ID this share belongs to */
-  listId: string;
-  /** Unique share token */
-  shareToken: string;
-  /** When share was created */
-  createdAt: Date;
-  /** When share expires (optional) */
-  expiresAt?: Date;
-  /** How many times this share was accessed */
-  accessCount: number;
-  /** Last access timestamp */
-  lastAccessedAt?: Date;
-}
-
-// Dexie database class
-class CatalogueDB extends Dexie {
-  catalogueLists!: Dexie.Table<CatalogueList, string>;
-  catalogueEntities!: Dexie.Table<CatalogueEntity, string>;
-  catalogueShares!: Dexie.Table<CatalogueShareRecord, string>;
-  searchHistory!: Dexie.Table<SearchHistoryEntry, string>;
-  annotations!: Dexie.Table<GraphAnnotationStorage, string>;
-  snapshots!: Dexie.Table<GraphSnapshotStorage, string>;
-
-  constructor() {
-    super(DB_NAME);
-
-    // T076: Optimized indexes for common query patterns
-    this.version(1).stores({
-      catalogueLists: "id, title, type, createdAt, updatedAt, isPublic, shareToken, *tags",
-      // Added compound index [listId+position] for efficient reordering and sorted entity retrieval
-      // Added compound index [listId+entityType+entityId] for duplicate detection
-      catalogueEntities: "id, listId, entityType, entityId, addedAt, position, [listId+position], [listId+entityType+entityId]",
-      catalogueShares: "id, listId, shareToken, createdAt, expiresAt",
-    });
-
-    // Migration v2: Clean up corrupted history entries containing [object Object]
-    // This fixes data corruption from the useNavigationEnhancements.ts bug where
-    // TanStack Router's location.search (an object) was concatenated with strings
-    this.version(2)
-      .stores({
-        // Same schema as v1 - no structural changes
-        catalogueLists: "id, title, type, createdAt, updatedAt, isPublic, shareToken, *tags",
-        catalogueEntities: "id, listId, entityType, entityId, addedAt, position, [listId+position], [listId+entityType+entityId]",
-        catalogueShares: "id, listId, shareToken, createdAt, expiresAt",
-      })
-      .upgrade(async (tx) => {
-        const entities = tx.table("catalogueEntities");
-        const corruptedEntries = await entities
-          .filter((entity: CatalogueEntity) =>
-            entity.entityId.includes(CORRUPTED_ENTITY_ID_PATTERN)
-          )
-          .toArray();
-
-        if (corruptedEntries.length > 0) {
-          const corruptedIds = corruptedEntries
-            .map((e: CatalogueEntity) => e.id)
-            .filter((id): id is string => id !== undefined);
-
-          await entities.bulkDelete(corruptedIds);
-
-          // Log cleanup (console.log since logger not available in migration context)
-          console.log(
-            `[catalogue-db] Migration v2: Cleaned up ${corruptedIds.length} corrupted history entries`
-          );
-        }
-      });
-
-    // Migration v3: Add search history table
-    this.version(3)
-      .stores({
-        // Same schema as v2
-        catalogueLists: "id, title, type, createdAt, updatedAt, isPublic, shareToken, *tags",
-        catalogueEntities: "id, listId, entityType, entityId, addedAt, position, [listId+position], [listId+entityType+entityId]",
-        catalogueShares: "id, listId, shareToken, createdAt, expiresAt",
-        // New search history table
-        searchHistory: "id, query, timestamp",
-      })
-      .upgrade(async () => {
-        // No data migration needed - this is a new table
-        console.log('[catalogue-db] Migration v3: Added search history table');
-      });
-
-    // Migration v4: Add graph annotations table
-    this.version(4)
-      .stores({
-        // Same schema as v3
-        catalogueLists: "id, title, type, createdAt, updatedAt, isPublic, shareToken, *tags",
-        catalogueEntities: "id, listId, entityType, entityId, addedAt, position, [listId+position], [listId+entityType+entityId]",
-        catalogueShares: "id, listId, shareToken, createdAt, expiresAt",
-        searchHistory: "id, query, timestamp",
-        // New annotations table with indexes for querying by graph and type
-        annotations: "id, type, createdAt, updatedAt, visible, graphId, nodeId",
-      })
-      .upgrade(async () => {
-        // No data migration needed - this is a new table
-        console.log('[catalogue-db] Migration v4: Added graph annotations table');
-      });
-
-    // Migration v5: Add graph snapshots table
-    this.version(5)
-      .stores({
-        // Same schema as v4
-        catalogueLists: "id, title, type, createdAt, updatedAt, isPublic, shareToken, *tags",
-        catalogueEntities: "id, listId, entityType, entityId, addedAt, position, [listId+position], [listId+entityType+entityId]",
-        catalogueShares: "id, listId, shareToken, createdAt, expiresAt",
-        searchHistory: "id, query, timestamp",
-        annotations: "id, type, createdAt, updatedAt, visible, graphId, nodeId",
-        // New snapshots table with indexes for querying and auto-save management
-        snapshots: "id, name, createdAt, updatedAt, isAutoSave, shareToken",
-      })
-      .upgrade(async () => {
-        // No data migration needed - this is a new table
-        console.log('[catalogue-db] Migration v5: Added graph snapshots table');
-      });
-  }
-}
-
-// Singleton instance
-let dbInstance: CatalogueDB | null = null;
-
-const getDB = (): CatalogueDB => {
-  dbInstance ??= new CatalogueDB();
-  return dbInstance;
-};
+import type { GenericLogger } from "../../logger.js";
+import * as AnnotationOps from "./annotation-operations.js";
+import * as GraphListOps from "./graph-list-operations.js";
+import type {
+  CatalogueEntity,
+  CatalogueList,
+  CatalogueShareRecord,
+  GraphAnnotationStorage,
+  GraphSnapshotStorage,
+  ListType,
+  SearchHistoryEntry,
+} from "./index.js";
+import { catalogueEventEmitter, CORRUPTED_ENTITY_ID_PATTERN,LOG_CATEGORY, SPECIAL_LIST_IDS } from "./index.js";
+import type { CatalogueDB } from "./schema.js";
+import { getDB } from "./schema.js";
+import * as SearchHistoryOps from "./search-history-operations.js";
+import * as SnapshotOps from "./snapshot-operations.js";
 
 /**
  * Service for managing catalogue lists and entities
@@ -766,7 +471,8 @@ export class CatalogueService {
 
       // Update positions atomically within a transaction
       await this.db.transaction("rw", this.db.catalogueEntities, async () => {
-        for (const [i, orderedEntityId] of orderedEntityIds.entries()) {
+        for (let i = 0; i < orderedEntityIds.length; i++) {
+          const orderedEntityId = orderedEntityIds[i];
           await this.db.catalogueEntities.update(orderedEntityId, {
             position: i + 1
           });
@@ -1332,22 +1038,7 @@ export class CatalogueService {
    * Get all nodes in the graph list
    */
   async getGraphList(): Promise<GraphListNode[]> {
-    try {
-      const entities = await this.getListEntities(SPECIAL_LIST_IDS.GRAPH);
-      return entities
-        .filter(entity => entity.id !== undefined)
-        .map(entity => ({
-          id: String(entity.id), // Convert Dexie auto-incremented id to string
-          entityId: entity.entityId,
-          entityType: entity.entityType,
-          label: entity.notes || entity.entityId, // notes field stores label
-          addedAt: entity.addedAt,
-          provenance: this.parseProvenance(entity.notes),
-        }));
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to get graph list", { error });
-      throw error;
-    }
+    return await GraphListOps.getGraphList(this.db, this.logger);
   }
 
   /**
@@ -1355,44 +1046,7 @@ export class CatalogueService {
    * @param params
    */
   async addToGraphList(params: AddToGraphListParams): Promise<string> {
-    try {
-      // Check size limit
-      const currentSize = await this.getGraphListSize();
-      if (currentSize >= GRAPH_LIST_CONFIG.MAX_SIZE) {
-        throw new Error(`Graph list is full (${GRAPH_LIST_CONFIG.MAX_SIZE} nodes). Remove some nodes to add more.`);
-      }
-
-      // Check if node already exists
-      const existing = await this.db.catalogueEntities
-        .where("[listId+entityType+entityId]")
-        .equals([SPECIAL_LIST_IDS.GRAPH, params.entityType, params.entityId])
-        .first();
-
-      if (existing && existing.id !== undefined) {
-        // Update provenance
-        await this.db.catalogueEntities.update(existing.id, {
-          notes: this.serializeProvenanceWithLabel(params.provenance, params.label),
-          addedAt: new Date(),
-        });
-        this.logger?.debug(LOG_CATEGORY, `Updated graph list node: ${params.entityId}`);
-        return existing.id;
-      }
-
-      // Add new node
-      const id = await this.addEntityToList({
-        listId: SPECIAL_LIST_IDS.GRAPH,
-        entityType: params.entityType,
-        entityId: params.entityId,
-        notes: this.serializeProvenanceWithLabel(params.provenance, params.label),
-      });
-
-      this.logger?.debug(LOG_CATEGORY, `Added node to graph list: ${params.entityId}`);
-      catalogueEventEmitter.emit({ type: 'entity-added', listId: SPECIAL_LIST_IDS.GRAPH, entityIds: [params.entityId] });
-      return id;
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to add to graph list", { error, params });
-      throw error;
-    }
+    return await GraphListOps.addToGraphList(this.db, params, this.logger);
   }
 
   /**
@@ -1400,84 +1054,28 @@ export class CatalogueService {
    * @param entityId
    */
   async removeFromGraphList(entityId: string): Promise<void> {
-    try {
-      const entity = await this.db.catalogueEntities
-        .where("listId")
-        .equals(SPECIAL_LIST_IDS.GRAPH)
-        .filter(e => e.entityId === entityId)
-        .first();
-
-      if (entity && entity.id) {
-        await this.removeEntityFromList(SPECIAL_LIST_IDS.GRAPH, entity.id);
-        this.logger?.debug(LOG_CATEGORY, `Removed node from graph list: ${entityId}`);
-        catalogueEventEmitter.emit({ type: 'entity-removed', listId: SPECIAL_LIST_IDS.GRAPH, entityIds: [entityId] });
-      }
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to remove from graph list", { error, entityId });
-      throw error;
-    }
+    await GraphListOps.removeFromGraphList(this.db, entityId, this.logger);
   }
 
   /**
    * Clear all nodes from the graph list
    */
   async clearGraphList(): Promise<void> {
-    try {
-      await this.db.catalogueEntities.where("listId").equals(SPECIAL_LIST_IDS.GRAPH).delete();
-      await this.updateList(SPECIAL_LIST_IDS.GRAPH, {});
-      this.logger?.debug(LOG_CATEGORY, "Graph list cleared");
-      catalogueEventEmitter.emit({ type: 'list-updated', listId: SPECIAL_LIST_IDS.GRAPH });
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to clear graph list", { error });
-      throw error;
-    }
+    await GraphListOps.clearGraphList(this.db, this.logger);
   }
 
   /**
    * Get current size of graph list
    */
   async getGraphListSize(): Promise<number> {
-    try {
-      return await this.db.catalogueEntities
-        .where("listId")
-        .equals(SPECIAL_LIST_IDS.GRAPH)
-        .count();
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to get graph list size", { error });
-      return 0;
-    }
+    return await GraphListOps.getGraphListSize(this.db);
   }
 
   /**
    * Prune old auto-populated nodes
    */
   async pruneGraphList(): Promise<PruneGraphListResult> {
-    try {
-      const cutoffDate = new Date(Date.now() - GRAPH_LIST_CONFIG.PRUNE_AGE_MS);
-      const entities = await this.getListEntities(SPECIAL_LIST_IDS.GRAPH);
-
-      const toPrune = entities.filter(entity => {
-        const provenance = this.parseProvenance(entity.notes);
-        return provenance === 'auto-population' && entity.addedAt < cutoffDate;
-      });
-
-      const removedNodeIds: string[] = [];
-      for (const entity of toPrune) {
-        if (entity.id) {
-          await this.removeEntityFromList(SPECIAL_LIST_IDS.GRAPH, entity.id);
-          removedNodeIds.push(entity.entityId);
-        }
-      }
-
-      this.logger?.debug(LOG_CATEGORY, `Pruned ${removedNodeIds.length} auto-populated nodes from graph list`);
-      return {
-        removedCount: removedNodeIds.length,
-        removedNodeIds,
-      };
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to prune graph list", { error });
-      throw error;
-    }
+    return await GraphListOps.pruneGraphList(this.db, this.logger);
   }
 
   /**
@@ -1485,17 +1083,7 @@ export class CatalogueService {
    * @param entityId
    */
   async isInGraphList(entityId: string): Promise<boolean> {
-    try {
-      const count = await this.db.catalogueEntities
-        .where("listId")
-        .equals(SPECIAL_LIST_IDS.GRAPH)
-        .filter(e => e.entityId === entityId)
-        .count();
-      return count > 0;
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to check if in graph list", { error, entityId });
-      return false;
-    }
+    return await GraphListOps.isInGraphList(this.db, entityId);
   }
 
   /**
@@ -1503,22 +1091,7 @@ export class CatalogueService {
    * @param nodes
    */
   async batchAddToGraphList(nodes: AddToGraphListParams[]): Promise<string[]> {
-    const addedIds: string[] = [];
-    for (const node of nodes) {
-      try {
-        const currentSize = await this.getGraphListSize();
-        if (currentSize >= GRAPH_LIST_CONFIG.MAX_SIZE) {
-          this.logger?.warn(LOG_CATEGORY, `Graph list full, stopping batch add at ${addedIds.length} nodes`);
-          break;
-        }
-        const id = await this.addToGraphList(node);
-        addedIds.push(id);
-      } catch (error) {
-        this.logger?.warn(LOG_CATEGORY, "Failed to add node in batch", { error, node });
-        // Continue with next node
-      }
-    }
-    return addedIds;
+    return await GraphListOps.batchAddToGraphList(this.db, nodes, this.logger);
   }
 
   /**
@@ -1527,45 +1100,14 @@ export class CatalogueService {
    * @param maxHistory Maximum entries to keep (default: 50)
    */
   async addSearchQuery(query: string, maxHistory = 50): Promise<void> {
-    try {
-      if (!query.trim()) return;
-
-      const id = crypto.randomUUID();
-      const entry: SearchHistoryEntry = {
-        id,
-        query: query.trim(),
-        timestamp: new Date(),
-      };
-
-      await this.db.searchHistory.add(entry);
-
-      // Enforce FIFO eviction by removing oldest entries if exceeding max
-      const allEntries = await this.db.searchHistory.orderBy('timestamp').toArray();
-      if (allEntries.length > maxHistory) {
-        const entriesToRemove = allEntries.slice(0, allEntries.length - maxHistory);
-        const idsToRemove = entriesToRemove
-          .map((e) => e.id)
-          .filter((id): id is string => id !== undefined);
-        await this.db.searchHistory.bulkDelete(idsToRemove);
-      }
-
-      this.logger?.debug(LOG_CATEGORY, 'Added search query to history', { query });
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to add search query to history', { error, query });
-      throw error;
-    }
+    await SearchHistoryOps.addSearchQuery(this.db, query, maxHistory, this.logger);
   }
 
   /**
    * Get all search history entries ordered by timestamp (newest first)
    */
   async getSearchHistory(): Promise<SearchHistoryEntry[]> {
-    try {
-      return await this.db.searchHistory.orderBy('timestamp').reverse().toArray();
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to get search history', { error });
-      return [];
-    }
+    return await SearchHistoryOps.getSearchHistory(this.db, this.logger);
   }
 
   /**
@@ -1573,26 +1115,14 @@ export class CatalogueService {
    * @param id Entry ID to remove
    */
   async removeSearchQuery(id: string): Promise<void> {
-    try {
-      await this.db.searchHistory.delete(id);
-      this.logger?.debug(LOG_CATEGORY, 'Removed search query from history', { id });
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to remove search query from history', { error, id });
-      throw error;
-    }
+    await SearchHistoryOps.removeSearchQuery(this.db, id, this.logger);
   }
 
   /**
    * Clear all search history
    */
   async clearSearchHistory(): Promise<void> {
-    try {
-      await this.db.searchHistory.clear();
-      this.logger?.debug(LOG_CATEGORY, 'Cleared search history');
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to clear search history', { error });
-      throw error;
-    }
+    await SearchHistoryOps.clearSearchHistory(this.db, this.logger);
   }
 
   // ========== Graph Annotation Operations ==========
@@ -1602,47 +1132,7 @@ export class CatalogueService {
    * @param annotation Annotation data (id will be generated if not provided)
    */
   async addAnnotation(annotation: Omit<GraphAnnotationStorage, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-    try {
-      const id = crypto.randomUUID();
-      const now = new Date();
-      const entry: GraphAnnotationStorage = {
-        id,
-        type: annotation.type,
-        createdAt: now,
-        updatedAt: now,
-        visible: annotation.visible ?? true,
-        color: annotation.color,
-        // Text annotation fields
-        content: annotation.content,
-        x: annotation.x,
-        y: annotation.y,
-        fontSize: annotation.fontSize,
-        backgroundColor: annotation.backgroundColor,
-        nodeId: annotation.nodeId,
-        // Rectangle annotation fields
-        width: annotation.width,
-        height: annotation.height,
-        borderColor: annotation.borderColor,
-        fillColor: annotation.fillColor,
-        borderWidth: annotation.borderWidth,
-        // Circle annotation fields
-        radius: annotation.radius,
-        // Drawing annotation fields
-        points: annotation.points,
-        strokeColor: annotation.strokeColor,
-        strokeWidth: annotation.strokeWidth,
-        closed: annotation.closed,
-        // Graph association for sharing
-        graphId: annotation.graphId,
-      };
-
-      await this.db.annotations.add(entry);
-      this.logger?.debug(LOG_CATEGORY, 'Added graph annotation', { id, type: annotation.type });
-      return id;
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to add graph annotation', { error, annotation });
-      throw error;
-    }
+    return await AnnotationOps.addAnnotation(this.db, annotation, this.logger);
   }
 
   /**
@@ -1650,15 +1140,7 @@ export class CatalogueService {
    * @param graphId Optional graph ID to filter annotations
    */
   async getAnnotations(graphId?: string): Promise<GraphAnnotationStorage[]> {
-    try {
-      if (graphId) {
-        return await this.db.annotations.where('graphId').equals(graphId).toArray();
-      }
-      return await this.db.annotations.toArray();
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to get graph annotations', { error, graphId });
-      return [];
-    }
+    return await AnnotationOps.getAnnotations(this.db, graphId, this.logger);
   }
 
   /**
@@ -1666,13 +1148,7 @@ export class CatalogueService {
    * @param id Annotation ID
    */
   async getAnnotation(id: string): Promise<GraphAnnotationStorage | null> {
-    try {
-      const result = await this.db.annotations.get(id);
-      return result ?? null;
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to get graph annotation', { id, error });
-      return null;
-    }
+    return await AnnotationOps.getAnnotation(this.db, id, this.logger);
   }
 
   /**
@@ -1681,18 +1157,7 @@ export class CatalogueService {
    * @param updates Fields to update
    */
   async updateAnnotation(id: string, updates: Partial<Omit<GraphAnnotationStorage, 'id' | 'createdAt' | 'updatedAt'>>): Promise<void> {
-    try {
-      const updateData = {
-        ...updates,
-        updatedAt: new Date(),
-      };
-
-      await this.db.annotations.update(id, updateData);
-      this.logger?.debug(LOG_CATEGORY, 'Updated graph annotation', { id, updates });
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to update graph annotation', { id, updates, error });
-      throw error;
-    }
+    await AnnotationOps.updateAnnotation(this.db, id, updates, this.logger);
   }
 
   /**
@@ -1700,13 +1165,7 @@ export class CatalogueService {
    * @param id Annotation ID
    */
   async deleteAnnotation(id: string): Promise<void> {
-    try {
-      await this.db.annotations.delete(id);
-      this.logger?.debug(LOG_CATEGORY, 'Deleted graph annotation', { id });
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to delete graph annotation', { id, error });
-      throw error;
-    }
+    await AnnotationOps.deleteAnnotation(this.db, id, this.logger);
   }
 
   /**
@@ -1714,13 +1173,7 @@ export class CatalogueService {
    * @param graphId Graph ID
    */
   async deleteAnnotationsByGraph(graphId: string): Promise<void> {
-    try {
-      await this.db.annotations.where('graphId').equals(graphId).delete();
-      this.logger?.debug(LOG_CATEGORY, 'Deleted annotations for graph', { graphId });
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to delete annotations for graph', { graphId, error });
-      throw error;
-    }
+    await AnnotationOps.deleteAnnotationsByGraph(this.db, graphId, this.logger);
   }
 
   /**
@@ -1729,16 +1182,7 @@ export class CatalogueService {
    * @param visible New visibility state
    */
   async toggleAnnotationVisibility(id: string, visible: boolean): Promise<void> {
-    try {
-      await this.db.annotations.update(id, {
-        visible,
-        updatedAt: new Date(),
-      });
-      this.logger?.debug(LOG_CATEGORY, 'Toggled annotation visibility', { id, visible });
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to toggle annotation visibility', { id, visible, error });
-      throw error;
-    }
+    await AnnotationOps.toggleAnnotationVisibility(this.db, id, visible, this.logger);
   }
 
   /**
@@ -1747,23 +1191,7 @@ export class CatalogueService {
    * @returns Snapshot ID
    */
   async addSnapshot(snapshot: Omit<GraphSnapshotStorage, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-    try {
-      const id = crypto.randomUUID();
-      const now = new Date();
-
-      await this.db.snapshots.add({
-        ...snapshot,
-        id,
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      this.logger?.debug(LOG_CATEGORY, 'Created graph snapshot', { id, name: snapshot.name });
-      return id;
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to create graph snapshot', { snapshot, error });
-      throw error;
-    }
+    return await SnapshotOps.addSnapshot(this.db, snapshot, this.logger);
   }
 
   /**
@@ -1771,13 +1199,7 @@ export class CatalogueService {
    * @returns All snapshots
    */
   async getSnapshots(): Promise<GraphSnapshotStorage[]> {
-    try {
-      const snapshots = await this.db.snapshots.orderBy('createdAt').reverse().toArray();
-      return snapshots;
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to get snapshots', { error });
-      return [];
-    }
+    return await SnapshotOps.getSnapshots(this.db, this.logger);
   }
 
   /**
@@ -1786,13 +1208,7 @@ export class CatalogueService {
    * @returns Snapshot or null if not found
    */
   async getSnapshot(id: string): Promise<GraphSnapshotStorage | null> {
-    try {
-      const result = await this.db.snapshots.get(id);
-      return result ?? null;
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to get snapshot', { id, error });
-      return null;
-    }
+    return await SnapshotOps.getSnapshot(this.db, id, this.logger);
   }
 
   /**
@@ -1801,18 +1217,7 @@ export class CatalogueService {
    * @param updates Fields to update
    */
   async updateSnapshot(id: string, updates: Partial<Omit<GraphSnapshotStorage, 'id' | 'createdAt' | 'updatedAt'>>): Promise<void> {
-    try {
-      const updateData = {
-        ...updates,
-        updatedAt: new Date(),
-      };
-
-      await this.db.snapshots.update(id, updateData);
-      this.logger?.debug(LOG_CATEGORY, 'Updated graph snapshot', { id, updates });
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to update graph snapshot', { id, updates, error });
-      throw error;
-    }
+    await SnapshotOps.updateSnapshot(this.db, id, updates, this.logger);
   }
 
   /**
@@ -1820,13 +1225,7 @@ export class CatalogueService {
    * @param id Snapshot ID
    */
   async deleteSnapshot(id: string): Promise<void> {
-    try {
-      await this.db.snapshots.delete(id);
-      this.logger?.debug(LOG_CATEGORY, 'Deleted graph snapshot', { id });
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to delete graph snapshot', { id, error });
-      throw error;
-    }
+    await SnapshotOps.deleteSnapshot(this.db, id, this.logger);
   }
 
   /**
@@ -1834,21 +1233,7 @@ export class CatalogueService {
    * @param keep Number of auto-saved snapshots to keep (default: 5)
    */
   async pruneAutoSaveSnapshots(keep = 5): Promise<void> {
-    try {
-      // Get all snapshots and filter for auto-saves
-      const allSnapshots = await this.db.snapshots.orderBy('createdAt').reverse().toArray();
-      const autoSnapshots = allSnapshots.filter(s => s.isAutoSave);
-
-      if (autoSnapshots.length > keep) {
-        const toDelete = autoSnapshots.slice(keep);
-        const idsToDelete = toDelete.map(s => s.id).filter((id): id is string => id !== undefined);
-        await this.db.snapshots.bulkDelete(idsToDelete);
-        this.logger?.debug(LOG_CATEGORY, 'Pruned auto-save snapshots', { count: idsToDelete.length, keep });
-      }
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to prune auto-save snapshots', { keep, error });
-      throw error;
-    }
+    await SnapshotOps.pruneAutoSaveSnapshots(this.db, keep, this.logger);
   }
 
   /**
@@ -1857,41 +1242,10 @@ export class CatalogueService {
    * @returns Snapshot or null if not found
    */
   async getSnapshotByShareToken(shareToken: string): Promise<GraphSnapshotStorage | null> {
-    try {
-      const result = await this.db.snapshots.where('shareToken').equals(shareToken).first();
-      return result ?? null;
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, 'Failed to get snapshot by share token', { shareToken, error });
-      return null;
-    }
-  }
-
-  /**
-   * Helper: Parse provenance from notes field
-   * @param notes
-   */
-  private parseProvenance(notes: string | undefined): GraphListNode['provenance'] {
-    if (!notes) return 'user';
-    // Notes format: "provenance:TYPE|label:LABEL"
-    const match = notes.match(/^provenance:([^|]+)/);
-    if (match) {
-      const prov = match[1];
-      if (prov === 'user' || prov === 'collection-load' || prov === 'expansion' || prov === 'auto-population') {
-        return prov;
-      }
-    }
-    return 'user';
-  }
-
-  /**
-   * Helper: Serialize provenance and label to notes field
-   * @param provenance
-   * @param label
-   */
-  private serializeProvenanceWithLabel(provenance: string, label: string): string {
-    return `provenance:${provenance}|label:${label}`;
+    return await SnapshotOps.getSnapshotByShareToken(this.db, shareToken, this.logger);
   }
 }
+
 
 // Export singleton instance
 export const catalogueService: CatalogueService = new CatalogueService();
