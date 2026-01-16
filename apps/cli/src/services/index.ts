@@ -1,0 +1,6 @@
+export { EntityCacheService } from "./entity-cache"
+export { IndexManagementService } from "./index-management-service"
+export { QueryCacheService } from "./query-cache"
+export { StaticDataGeneratorService } from "./static-data-generator-service"
+export { StatisticsService } from "./statistics"
+export type { CLIIndexEntry, CLIUnifiedIndex } from "./index-management-service"

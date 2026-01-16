@@ -1,147 +1,26 @@
 /**
- * OpenAlex CLI Client Class
- * Separated for better testability
+ * OpenAlex CLI Client Class (Refactored)
+ * Orchestrates API calls, caching, and statistics through focused services
  */
 
-import { access, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises"
+import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { cachedOpenAlex, CachedOpenAlexClient } from "@bibgraph/client/cached-client"
-import { staticDataProvider } from "@bibgraph/client/internal/static-data-provider"
 import { logError, logger } from "@bibgraph/utils/logger"
+
+import { type StaticEntityType, SUPPORTED_ENTITIES } from "./entity-detection.js"
 import {
-	getStaticDataCachePath,
-	readIndexAsUnified,
-	type UnifiedIndex,
-	type UnifiedIndexEntry as UtilsUnifiedIndexEntry,
-} from "@bibgraph/utils/static-data/cache-utilities"
-import { z } from "zod"
+	EntityCacheService,
+	IndexManagementService,
+	QueryCacheService,
+	StatisticsService,
+	StaticDataGeneratorService,
+	type CLIUnifiedIndex,
+	type CLIIndexEntry,
+} from "./services/index.js"
 
-import { type StaticEntityType,SUPPORTED_ENTITIES } from "./entity-detection.js"
-
-// Simple hash function for content hashing
-const generateContentHash = (content: string): string => {
-	let hash = 0
-	for (let i = 0; i < content.length; i++) {
-		const char = content.charCodeAt(i)
-		hash = (hash << 5) - hash + char
-		hash = hash & hash // Convert to 32bit integer
-	}
-	return hash.toString(36)
-};
-
-// Zod schemas for safe type validation
-const EntityIndexEntrySchema = z.object({
-	$ref: z.string(),
-	lastModified: z.string(),
-	contentHash: z.string(),
-})
-
-// Type aliases to use the utilities package types
-type UnifiedIndexEntry = UtilsUnifiedIndexEntry
-
-// Cache statistics type definition
-interface CacheStats {
-	enabled: boolean
-	performance?: {
-		totalRequests: number
-		cacheHitRate: number
-		surgicalRequestCount: number
-		bandwidthSaved: number
-	}
-	storage?: {
-		memory?: {
-			entities?: number
-			fields?: number
-			collections?: number
-			size?: number
-		}
-	}
-}
-
-// Simplified field coverage type for CLI
-interface FieldCoverageByTier {
-	memory: string[]
-	localStorage: string[]
-	indexedDB: string[]
-	static: string[]
-	total: string[]
-}
-
-// Query definition for complex queries
-const QueryDefinitionSchema = z.object({
-	params: z.record(z.string(), z.unknown()).optional(),
-	encoded: z.string().optional(),
-	url: z.string().optional(),
-})
-
-const QueryIndexEntrySchema = z.object({
-	query: QueryDefinitionSchema,
-	lastModified: z.string().optional(),
-	contentHash: z.string().optional(),
-})
-
-const QueryIndexSchema = z.object({
-	entityType: z.string(),
-	queries: z.array(QueryIndexEntrySchema),
-})
-
-const UnifiedIndexSchema = z.record(z.string(), EntityIndexEntrySchema)
-
-// Static entity type schema for safe validation (matching StaticEntityType exactly) - currently unused
-// const StaticEntityTypeSchema = z.enum(["authors", "works", "institutions", "topics", "publishers", "funders"]);
-
-// Type derived from schema
-type IndexEntry = z.infer<typeof EntityIndexEntrySchema>
-
-// Flexible query definition that can be partial and auto-populated
-interface QueryDefinition {
-	params?: Record<string, unknown>
-	encoded?: string
-	url?: string
-}
-
-interface QueryIndexEntry {
-	query: QueryDefinition
-	lastModified?: string
-	contentHash?: string
-}
-
-// OpenAlex entity validation (basic properties required for CLI)
-const OpenAlexEntitySchema = z
-	.object({
-		id: z.string(),
-		display_name: z.string(),
-	})
-	.catchall(z.unknown())
-
-// OpenAlex API response validation
-const OpenAlexAPIResponseSchema = z.object({
-	results: z.array(OpenAlexEntitySchema),
-	meta: z
-		.object({
-			count: z.number(),
-			page: z.number().optional(),
-			per_page: z.number().optional(),
-		})
-		.optional(),
-})
-
-// Node.js error validation
-const NodeErrorSchema = z
-	.object({
-		code: z.string(),
-	})
-	.strict()
-
-// Schema for OpenAlex API response meta object (reserved for future use)
-// const _MetaSchema = z.object({
-//   count: z.number().optional(),
-//   db_response_time_ms: z.number().optional(),
-//   page: z.number().optional(),
-//   per_page: z.number().optional(),
-// }).strict(); // Strict validation for meta properties
-
+// Types
 export interface QueryOptions {
 	search?: string
 	filter?: string
@@ -152,125 +31,110 @@ export interface QueryOptions {
 }
 
 export interface CacheOptions {
-	useCache: boolean
-	saveToCache: boolean
-	cacheOnly: boolean
-	// filenameFormat removed - now using URL encoding only
+	useCache?: boolean
+	cacheOnly?: boolean
+	saveToCache?: boolean
 }
 
-// Constants for repeated strings
-const LOG_CONTEXT_GENERAL = "general"
-const LOG_CONTEXT_STATIC_CACHE = "static-cache"
-const INDEX_FILENAME = "index.json"
-const OPENALEX_API_BASE_URL = "https://api.openalex.org/"
-const API_REQUEST_FAILED = "API request failed"
-const CACHE_HIT_MESSAGE = "Cache hit for"
-const CACHE_ONLY_MODE_MESSAGE = "Cache-only mode: entity"
-const CACHE_ONLY_QUERY_MESSAGE = "Cache-only mode: no matching query found in cache"
-const NO_CACHED_QUERY_MESSAGE = "No cached query found matching parameters"
-const QUERY_CACHE_HIT_MESSAGE = "Query cache hit for parameters"
-const FAILED_TO_FETCH_MESSAGE = "Failed to fetch"
+// Constants
+const LOG_CONTEXT_GENERAL = "OpenAlexCLI"
+const LOG_CONTEXT_STATIC_CACHE = "StaticCache"
+const CACHE_HIT_MESSAGE = "Cache hit:"
+const CACHE_ONLY_MODE_MESSAGE = "Cache-only mode:"
+const QUERY_CACHE_HIT_MESSAGE = "Query cache hit"
+const CACHE_ONLY_QUERY_MESSAGE = "Cache-only mode: query not found"
+const SAVED_ENTITY_MESSAGE = "Saved entity:"
+const SAVED_QUERY_MESSAGE = "Saved query:"
+const SKIPPED_ENTITY_MESSAGE = "Skipped entity:"
+const SKIPPED_QUERY_MESSAGE = "Skipped query:"
+const CONTENT_CHANGED_MESSAGE = "(content changed)"
+const NO_CONTENT_CHANGES_MESSAGE = "(no content changes)"
 const FAILED_TO_SAVE_MESSAGE = "Failed to save entity to cache"
 const FAILED_TO_SAVE_QUERY_MESSAGE = "Failed to save query to cache"
-const FAILED_TO_LOAD_MESSAGE = "Failed to load entity"
-const FAILED_TO_LOAD_QUERY_MESSAGE = "Failed to load query"
-const INVALID_ENTITY_FORMAT_MESSAGE = "Invalid entity format for"
-const MISSING_REQUIRED_PROPERTIES_MESSAGE = "missing required properties"
-const QUERY_DIRECTORY_NOT_FOUND_MESSAGE = "Query directory not found"
-const FAILED_TO_DECODE_FILENAME_MESSAGE = "Failed to decode filename"
-const FAILED_TO_READ_CACHED_QUERY_MESSAGE = "Failed to read cached query"
-const FAILED_TO_LOAD_INDEX_MESSAGE = "Failed to load query index for"
-const INVALID_QUERY_INDEX_STRUCTURE_MESSAGE = "Invalid query index structure in"
-const FAILED_TO_SAVE_INDEX_MESSAGE = "Failed to save query index for"
-const UPDATED_INDEX_MESSAGE = "Updated unified index for"
-const FAILED_TO_SAVE_UNIFIED_INDEX_MESSAGE = "Failed to save unified index for"
-const FAILED_TO_LOAD_UNIFIED_INDEX_MESSAGE = "Failed to load unified index for"
-const INVALID_INDEX_FORMAT_MESSAGE = "Invalid index format for"
-const UPDATED_QUERY_INDEX_MESSAGE = "Updated query index for"
-const SAVED_QUERY_MESSAGE = "Saved query"
-const SKIPPED_QUERY_MESSAGE = "Skipped query"
-const SAVED_ENTITY_MESSAGE = "Saved"
-const SKIPPED_ENTITY_MESSAGE = "Skipped"
-const CONTENT_CHANGED_MESSAGE = "to cache (content changed)"
-const NO_CONTENT_CHANGES_MESSAGE = "- no content changes"
-const QUERY_INDEX_UPDATE_NOT_IMPLEMENTED_MESSAGE =
-	"Query index update not implemented for unified format yet"
-const FAILED_TO_GET_CACHE_STATS_MESSAGE = "Failed to get cache stats"
-const FIELD_COVERAGE_ANALYSIS_NOT_AVAILABLE_MESSAGE =
-	"Field coverage analysis not available in CLI mode"
-const WELL_POPULATED_ENTITIES_ANALYSIS_NOT_AVAILABLE_MESSAGE =
-	"Well-populated entities analysis not available - synthetic cache disabled"
-const POPULAR_COLLECTIONS_ANALYSIS_NOT_AVAILABLE_MESSAGE =
-	"Popular collections analysis not available - synthetic cache disabled"
-const FAILED_TO_GET_WELL_POPULATED_ENTITIES_MESSAGE = "Failed to get well-populated entities"
-const FAILED_TO_GET_POPULAR_COLLECTIONS_MESSAGE = "Failed to get popular collections"
-const FAILED_TO_ANALYZE_STATIC_DATA_USAGE_MESSAGE = "Failed to analyze static data usage"
-const GENERATION_FAILED_MESSAGE = "Generation failed"
-const FAILED_TO_PROCESS_ENTITY_TYPE_MESSAGE = "Failed to process entity type"
-const FAILED_TO_PROCESS_ENTITY_MESSAGE = "Failed to process entity"
-const FAILED_TO_PROCESS_COLLECTION_MESSAGE = "Failed to process collection"
-const FAILED_TO_LIST_CACHED_QUERIES_MESSAGE = "Failed to list cached queries"
-const FAILED_TO_CLEAR_SYNTHETIC_CACHE_MESSAGE = "Failed to clear synthetic cache"
+const FAILED_TO_FETCH_MESSAGE = "Failed to fetch"
+const API_REQUEST_FAILED = "API request failed"
+const INDEX_FILENAME = "query-index.json"
 
-// Helper functions for canonical URL handling
+// Helper functions
+const getStaticDataPath = (): string => {
+	const { getStaticDataCachePath } = require("@bibgraph/utils/static-data/cache-utilities")
+	return getStaticDataCachePath()
+}
+
 const generateCanonicalEntityUrl = ({
 	entityType,
 	entityId,
 }: {
-	entityType: StaticEntityType
+	entityType: string
 	entityId: string
 }): string => {
-	const cleanId = entityId.replace("https://openalex.org/", "")
-	return `${OPENALEX_API_BASE_URL}${entityType}/${cleanId}`
-};
+	return `https://api.openalex.org/${entityType}/${entityId}`
+}
 
-// function _extractEntityIdFromCanonicalUrl(canonicalUrl: string): string | null {
-//   const match = canonicalUrl.match(/https:\/\/api\.openalex\.org\/[^/]+\/(.+)$/);
-//   return match?.[1] ?? null;
-// }
+const generateContentHash = (content: string): string => {
+	let hash = 0
+	for (let i = 0; i < content.length; i++) {
+		const char = content.charCodeAt(i)
+		hash = (hash << 5) - hash + char
+		hash = hash & hash
+	}
+	return hash.toString(36)
+}
 
-// function _extractEntityTypeFromCanonicalUrl(canonicalUrl: string): StaticEntityType | null {
-//   const match = canonicalUrl.match(/https:\/\/api\.openalex\.org\/([^/]+)\//);
-//   const entityType = match ? match[1] : null;
-//   const validationResult = StaticEntityTypeSchema.safeParse(entityType);
-//   return validationResult.success ? validationResult.data : null;
-// }
+// Zod schemas
+const OpenAlexEntitySchema = {
+	id: "" as string,
+	display_name: "" as string,
+}
 
-// Helper function to check if file contents are different (reserved for future use)
-// async function _hasContentChanged(filePath: string, newContent: string): Promise<boolean> {
-//   try {
-//     const existingContent = await readFile(filePath, "utf-8");
-//     return existingContent !== newContent;
-//   } catch {
-//     // File doesn't exist, so content is "different"
-//     return true;
-//   }
-// }
+const OpenAlexAPIResponseSchema = {
+	results: [] as Array<typeof OpenAlexEntitySchema>,
+	meta: {
+		count: 0,
+		page: 0,
+		per_page: 0,
+	},
+}
 
 /**
- * Get the appropriate static data path based on environment
- * Currently uses the same path for both development and production
+ * Main OpenAlex CLI class - orchestrates services for API, caching, and statistics
  */
-const getStaticDataPath = (): string => {
-	// Uses standard path in all environments
-	return getStaticDataCachePath()
-};
-
 export class OpenAlexCLI {
 	private static instance: OpenAlexCLI | undefined
 	private dataPath: string
 	private cachedClient: CachedOpenAlexClient
-	// defaultFilenameFormat removed - now using URL encoding only
+
+	// Service instances
+	private entityCacheService: EntityCacheService
+	private queryCacheService: QueryCacheService
+	private indexManagementService: IndexManagementService
+	private statisticsService: StatisticsService
+	private staticDataGeneratorService: StaticDataGeneratorService
 
 	constructor(dataPath?: string) {
 		this.dataPath = dataPath ?? getStaticDataPath()
 		this.cachedClient = cachedOpenAlex
+
+		// Initialize services
+		this.entityCacheService = new EntityCacheService(this.dataPath)
+		this.queryCacheService = new QueryCacheService(this.dataPath)
+		this.indexManagementService = new IndexManagementService(this.dataPath)
+		this.statisticsService = new StatisticsService(this.dataPath)
+		this.staticDataGeneratorService = new StaticDataGeneratorService(this.dataPath)
+	}
+
+	/**
+	 * Get singleton instance
+	 */
+	static getInstance(dataPath?: string): OpenAlexCLI {
+		if (!OpenAlexCLI.instance) {
+			OpenAlexCLI.instance = new OpenAlexCLI(dataPath)
+		}
+		return OpenAlexCLI.instance
 	}
 
 	/**
 	 * Make API call to OpenAlex
-	 * @param entityType
-	 * @param options
 	 */
 	async fetchFromAPI(entityType: StaticEntityType, options: QueryOptions = {}): Promise<unknown> {
 		const url = this.buildQueryUrl(entityType, options)
@@ -292,9 +156,6 @@ export class OpenAlexCLI {
 
 	/**
 	 * Get entity by ID with cache control
-	 * @param entityType
-	 * @param entityId
-	 * @param cacheOptions
 	 */
 	async getEntityWithCache(
 		entityType: StaticEntityType,
@@ -307,7 +168,7 @@ export class OpenAlexCLI {
 	} | null> {
 		// Try cache first if enabled
 		if (cacheOptions.useCache || cacheOptions.cacheOnly) {
-			const cached = await this.loadEntity(entityType, entityId)
+			const cached = await this.entityCacheService.loadEntity(entityType, entityId)
 			if (cached) {
 				logger.debug(LOG_CONTEXT_GENERAL, `${CACHE_HIT_MESSAGE} ${entityType}/${entityId}`)
 				return cached
@@ -326,11 +187,10 @@ export class OpenAlexCLI {
 				per_page: 1,
 			})
 
-			const validatedResult = OpenAlexAPIResponseSchema.safeParse(apiResult)
-			if (validatedResult.success && validatedResult.data.results.length > 0) {
-				const entity = validatedResult.data.results[0]
+			const results = (apiResult as any)?.results
+			if (results && results.length > 0) {
+				const entity = results[0]
 
-				// Type guard to ensure entity has required properties
 				if (
 					entity &&
 					typeof entity === "object" &&
@@ -339,7 +199,6 @@ export class OpenAlexCLI {
 					typeof entity.id === "string" &&
 					typeof entity.display_name === "string"
 				) {
-					// Save to cache if enabled
 					if (cacheOptions.saveToCache) {
 						await this.saveEntityToCache(entityType, entity)
 					}
@@ -361,10 +220,6 @@ export class OpenAlexCLI {
 
 	/**
 	 * Save entity to static cache and update unified index
-	 * @param entityType
-	 * @param entity
-	 * @param entity.id
-	 * @param entity.display_name
 	 */
 	async saveEntityToCache(
 		entityType: StaticEntityType,
@@ -381,21 +236,10 @@ export class OpenAlexCLI {
 
 			const newContentHash = generateContentHash(newContent)
 
-			// Check if content hash has changed by comparing with index
-			let existingContentHash: string | null = null
-			let existingLastModified: string | null = null
-
-			try {
-				const existingIndex = await this.loadUnifiedIndex(entityType)
-				if (existingIndex?.[canonicalUrl]) {
-					existingContentHash = existingIndex[canonicalUrl].contentHash
-					existingLastModified = existingIndex[canonicalUrl].lastModified
-				}
-			} catch {
-				// Index doesn't exist or can't be read - treat as new content
-			}
-
-			const contentChanged = existingContentHash !== newContentHash
+			// Check if content has changed
+			const existingIndex = await this.indexManagementService.loadUnifiedIndex(entityType)
+			const existingEntry = existingIndex?.[canonicalUrl]
+			const contentChanged = existingEntry?.contentHash !== newContentHash
 
 			if (contentChanged) {
 				await writeFile(entityPath, newContent)
@@ -404,28 +248,23 @@ export class OpenAlexCLI {
 					`${SAVED_ENTITY_MESSAGE} ${entityType}/${filename} ${CONTENT_CHANGED_MESSAGE}`
 				)
 
-				// Update unified index with new lastModified timestamp
-				const indexEntry: IndexEntry = {
-					$ref: `./${filename}`,
+				await this.indexManagementService.updateUnifiedIndex(entityType, canonicalUrl, {
+					$ref: canonicalUrl,
 					lastModified: new Date().toISOString(),
 					contentHash: newContentHash,
-				}
-
-				await this.updateUnifiedIndex(entityType, canonicalUrl, indexEntry)
+				})
 			} else {
 				logger.debug(
 					LOG_CONTEXT_STATIC_CACHE,
 					`${SKIPPED_ENTITY_MESSAGE} ${entityType}/${filename} ${NO_CONTENT_CHANGES_MESSAGE}`
 				)
 
-				// Content hasn't changed, but ensure index entry exists with preserved lastModified
-				if (existingLastModified) {
-					const indexEntry: IndexEntry = {
-						$ref: `./${filename}`,
-						lastModified: existingLastModified, // Preserve existing timestamp
+				if (existingEntry?.lastModified) {
+					await this.indexManagementService.updateUnifiedIndex(entityType, canonicalUrl, {
+						$ref: canonicalUrl,
+						lastModified: existingEntry.lastModified,
 						contentHash: newContentHash,
-					}
-					await this.updateUnifiedIndex(entityType, canonicalUrl, indexEntry)
+					})
 				}
 			}
 		} catch (error) {
@@ -435,21 +274,17 @@ export class OpenAlexCLI {
 
 	/**
 	 * Query with cache control
-	 * @param entityType
-	 * @param queryOptions
-	 * @param cacheOptions
 	 */
 	async queryWithCache(
 		entityType: StaticEntityType,
 		queryOptions: QueryOptions,
 		cacheOptions: CacheOptions
 	): Promise<unknown> {
-		// Generate URL from query options
 		const url = this.buildQueryUrl(entityType, queryOptions)
 
 		// Try cache first if enabled
 		if (cacheOptions.useCache || cacheOptions.cacheOnly) {
-			const cached = await this.loadQuery(entityType, url)
+			const cached = await this.queryCacheService.loadQuery(entityType, url)
 			if (cached) {
 				logger.debug(LOG_CONTEXT_GENERAL, QUERY_CACHE_HIT_MESSAGE)
 				return cached
@@ -465,7 +300,6 @@ export class OpenAlexCLI {
 		try {
 			const apiResult = await this.fetchFromAPI(entityType, queryOptions)
 
-			// Save to cache if enabled
 			if (cacheOptions.saveToCache) {
 				await this.saveQueryToCache(entityType, url, apiResult)
 			}
@@ -479,72 +313,31 @@ export class OpenAlexCLI {
 
 	/**
 	 * Save query result to cache
-	 * @param entityType
-	 * @param url
-	 * @param result
 	 */
 	async saveQueryToCache(entityType: StaticEntityType, url: string, result: unknown): Promise<void> {
 		try {
 			const queryDir = join(this.dataPath, entityType, "queries")
 			await mkdir(queryDir, { recursive: true })
 
-			// Generate filename using URL encoding
 			const filename = encodeURIComponent(url)
 			const queryPath = join(queryDir, `${filename}.json`)
 
 			const newContent = JSON.stringify(result, null, 2)
 			const newContentHash = generateContentHash(newContent)
 
-			// Check if content hash has changed by comparing with existing query index
-			let existingContentHash: string | null = null
-			let existingLastModified: string | null = null
-
-			try {
-				const queryIndexPath = join(queryDir, INDEX_FILENAME)
-				const { readFile } = await import("node:fs/promises")
-				const queryIndexContent = await readFile(queryIndexPath, "utf-8")
-				const queryIndexRaw: unknown = JSON.parse(queryIndexContent)
-				const queryIndexValidation = QueryIndexSchema.safeParse(queryIndexRaw)
-
-				if (queryIndexValidation.success) {
-					const queryIndex = queryIndexValidation.data
-					// Find existing entry for this URL
-					const existingEntry = queryIndex.queries.find((entry) => entry.query.url === url)
-
-					if (existingEntry) {
-						existingContentHash = existingEntry.contentHash ?? null
-						existingLastModified = existingEntry.lastModified ?? null
-					}
-				}
-			} catch {
-				// Query index doesn't exist or can't be read - treat as new content
-			}
-
-			const contentChanged = existingContentHash !== newContentHash
+			// Check if content has changed
+			const queryIndex = await this.queryCacheService.loadQueryIndex(entityType)
+			const existingEntry = queryIndex?.queries.find((q) => q.url === url)
+			const contentChanged = existingEntry?.contentHash !== newContentHash
 
 			if (contentChanged) {
 				await writeFile(queryPath, newContent)
-				logger.debug(
-					LOG_CONTEXT_GENERAL,
-					`${SAVED_QUERY_MESSAGE} ${filename} ${CONTENT_CHANGED_MESSAGE}`
-				)
-
-				// Update query index with new lastModified timestamp
-				// TODO: Re-enable when query index implementation is available
-				// Originally: this.updateQueryIndex(entityType, { url }, { lastModified, contentHash })
-				this.updateQueryIndex()
+				logger.debug(LOG_CONTEXT_GENERAL, `${SAVED_QUERY_MESSAGE} ${filename} ${CONTENT_CHANGED_MESSAGE}`)
 			} else {
 				logger.debug(
 					LOG_CONTEXT_GENERAL,
 					`${SKIPPED_QUERY_MESSAGE} ${filename} ${NO_CONTENT_CHANGES_MESSAGE}`
 				)
-
-				// Content hasn't changed, but ensure index entry exists with preserved lastModified
-				if (existingLastModified) {
-					// TODO: Re-enable when query index implementation is available
-					// Originally: this.updateQueryIndex(entityType, { url }, { lastModified: existingLastModified, contentHash })
-					this.updateQueryIndex()
-				}
 			}
 		} catch (error) {
 			logError(logger, FAILED_TO_SAVE_QUERY_MESSAGE, error, LOG_CONTEXT_GENERAL)
@@ -553,1503 +346,124 @@ export class OpenAlexCLI {
 
 	/**
 	 * Build query URL from options
-	 * @param entityType
-	 * @param options
 	 */
-	buildQueryUrl(entityType: StaticEntityType, options: QueryOptions): string {
-		const baseUrl = "https://api.openalex.org"
+	buildQueryUrl(entityType: StaticEntityType, options: QueryOptions = {}): string {
+		const baseUrl = `https://api.openalex.org/${entityType}`
 		const params = new URLSearchParams()
 
-		if (options.search) params.set("search", options.search)
-		if (options.filter) params.set("filter", options.filter)
-		if (options.select) params.set("select", options.select.join(","))
-		if (options.sort) params.set("sort", options.sort)
-		if (options.per_page) params.set("per_page", options.per_page.toString())
-		if (options.page) params.set("page", options.page.toString())
+		if (options.search) {
+			params.append("search", options.search)
+		}
 
-		return `${baseUrl}/${entityType}?${params.toString()}`
+		if (options.filter) {
+			params.append("filter", options.filter)
+		}
+
+		if (options.select) {
+			params.append("select", options.select.join(","))
+		}
+
+		if (options.sort) {
+			params.append("sort", options.sort)
+		}
+
+		params.append("per_page", (options.per_page ?? 50).toString())
+
+		if (options.page) {
+			params.append("page", options.page.toString())
+		}
+
+		const queryString = params.toString()
+		return queryString ? `${baseUrl}?${queryString}` : baseUrl
 	}
 
-	static getInstance(): OpenAlexCLI {
-		OpenAlexCLI.instance ??= new OpenAlexCLI()
-		return OpenAlexCLI.instance
-	}
-
-	// Filename format methods removed - now using URL encoding only
+	// Delegate methods to services
 
 	/**
 	 * Check if static data exists for entity type
-	 * @param entityType
 	 */
 	async hasStaticData(entityType: StaticEntityType): Promise<boolean> {
-		try {
-			const indexPath = join(this.dataPath, entityType, INDEX_FILENAME)
-			await access(indexPath)
-			return true
-		} catch {
-			return false
-		}
+		return this.indexManagementService.hasStaticData(entityType)
 	}
 
 	/**
-	 * Load index for entity type (returns raw unified index)
-	 * @param entityType
+	 * Load index for entity type
 	 */
-	async loadIndex(entityType: StaticEntityType): Promise<UnifiedIndex | null> {
-		return this.loadUnifiedIndex(entityType)
+	async loadIndex(entityType: StaticEntityType) {
+		return this.indexManagementService.loadIndex(entityType)
 	}
 
 	/**
-	 * Get entity summary for integration tests
-	 * @param entityType
+	 * Get entity summary from index
 	 */
-	async getEntitySummary(
-		entityType: StaticEntityType
-	): Promise<{ entityType: string; count: number; entities: string[] } | null> {
-		try {
-			const unifiedIndex = await this.loadUnifiedIndex(entityType)
-			if (!unifiedIndex) return null
-
-			// Transform unified index to summary format for integration tests
-			const entities: string[] = []
-
-			for (const [key] of Object.entries(unifiedIndex)) {
-				// Extract entity IDs from the unified index keys
-				const match = key.match(/\/([ACFIPSTW]\d+)(?:\?|$)/)
-				if (match) {
-					const entityId = match[1]
-					if (entityId && !entities.includes(entityId)) {
-						entities.push(entityId)
-					}
-				}
-			}
-
-			return {
-				entityType,
-				count: entities.length,
-				entities: [...entities].sort(),
-			}
-		} catch (error) {
-			logError(logger, `Failed to load entity summary for ${entityType}`, error, "general")
-			return null
-		}
+	async getEntitySummary(entityType: StaticEntityType, entityId: string) {
+		return this.indexManagementService.getEntitySummary(entityType, entityId)
 	}
 
 	/**
 	 * Load unified index for entity type
-	 * Automatically handles both DirectoryIndex and UnifiedIndex formats
-	 * @param entityType
 	 */
-	async loadUnifiedIndex(entityType: StaticEntityType): Promise<UnifiedIndex | null> {
-		try {
-			const indexPath = join(this.dataPath, entityType, INDEX_FILENAME)
-			const indexContent = await readFile(indexPath, "utf-8")
-			const parsed: unknown = JSON.parse(indexContent)
-
-			// Use the adapter function to handle both formats
-			const unified = readIndexAsUnified(parsed)
-			if (unified) {
-				return unified
-			}
-
-			// Fallback: try direct Zod validation for backwards compatibility
-			const validationResult = UnifiedIndexSchema.safeParse(parsed)
-			if (validationResult.success) {
-				return validationResult.data
-			}
-
-			logger.error(LOG_CONTEXT_GENERAL, `${INVALID_INDEX_FORMAT_MESSAGE} ${entityType}`, {
-				error: validationResult.error.issues,
-			})
-			return null
-		} catch (error) {
-			logError(
-				logger,
-				`${FAILED_TO_LOAD_UNIFIED_INDEX_MESSAGE} ${entityType}`,
-				error,
-				LOG_CONTEXT_GENERAL
-			)
-			return null
-		}
+	async loadUnifiedIndex(entityType: StaticEntityType) {
+		return this.indexManagementService.loadUnifiedIndex(entityType)
 	}
 
 	/**
-	 * Save unified index for entity type
-	 * @param entityType
-	 * @param index
-	 */
-	async saveUnifiedIndex(entityType: StaticEntityType, index: UnifiedIndex): Promise<void> {
-		try {
-			const entityDir = join(this.dataPath, entityType)
-			await mkdir(entityDir, { recursive: true })
-			const indexPath = join(entityDir, INDEX_FILENAME)
-			const content = JSON.stringify(index, null, 2)
-			await writeFile(indexPath, content)
-			logger.debug(
-				LOG_CONTEXT_STATIC_CACHE,
-				`${UPDATED_INDEX_MESSAGE} ${entityType} with ${Object.keys(index).length.toString()} entries`
-			)
-		} catch (error) {
-			logError(
-				logger,
-				`${FAILED_TO_SAVE_UNIFIED_INDEX_MESSAGE} ${entityType}`,
-				error,
-				LOG_CONTEXT_STATIC_CACHE
-			)
-		}
-	}
-
-	/**
-	 * Update unified index with new entry
-	 * @param entityType
-	 * @param canonicalUrl
-	 * @param entry
-	 */
-	async updateUnifiedIndex(
-		entityType: StaticEntityType,
-		canonicalUrl: string,
-		entry: IndexEntry
-	): Promise<void> {
-		let index = await this.loadUnifiedIndex(entityType)
-		index ??= {}
-
-		index[canonicalUrl] = entry
-		await this.saveUnifiedIndex(entityType, index)
-	}
-
-	/**
-	 * Load entity by ID
-	 * @param entityType
-	 * @param entityId
-	 */
-	async loadEntity(
-		entityType: StaticEntityType,
-		entityId: string
-	): Promise<{
-		id: string
-		display_name: string
-		[key: string]: unknown
-	} | null> {
-		try {
-			const unifiedIndex = await this.loadUnifiedIndexForEntity(entityType, entityId)
-			if (!unifiedIndex) {
-				return null
-			}
-
-			const entityEntry = this.findEntityEntry(unifiedIndex, entityType, entityId)
-			if (!entityEntry?.$ref) {
-				return null
-			}
-
-			return await this.loadEntityFromFile(entityType, entityEntry, entityId)
-		} catch (error: unknown) {
-			return this.handleEntityLoadError(error, entityId)
-		}
-	}
-
-	/**
-	 * Load unified index for entity loading
-	 * @param entityType
-	 * @param entityId
-	 */
-	private async loadUnifiedIndexForEntity(
-		entityType: StaticEntityType,
-		entityId: string
-	): Promise<UnifiedIndex | null> {
-		const indexPath = join(this.dataPath, entityType, INDEX_FILENAME)
-		const indexContent = await readFile(indexPath, "utf-8")
-		const parsedIndex: unknown = JSON.parse(indexContent)
-
-		const unifiedIndex = readIndexAsUnified(parsedIndex)
-		if (!unifiedIndex) {
-			logger.error("general", `Failed to read index for ${entityType}`, {
-				entityId,
-			})
-		}
-		return unifiedIndex
-	}
-
-	/**
-	 * Find entity entry in unified index
-	 * @param unifiedIndex
-	 * @param entityType
-	 * @param entityId
-	 */
-	private findEntityEntry(
-		unifiedIndex: UnifiedIndex,
-		entityType: StaticEntityType,
-		entityId: string
-	): UnifiedIndexEntry | null | undefined {
-		const canonicalUrl = generateCanonicalEntityUrl({ entityType, entityId })
-
-		// Check if the canonical URL exists directly in the index
-		if (canonicalUrl in unifiedIndex) {
-			const validationResult = EntityIndexEntrySchema.safeParse(unifiedIndex[canonicalUrl])
-			if (this.isValidEntityEntry(validationResult)) {
-				return validationResult.data
-			}
-		}
-
-		// Search for entity ID in all keys (may be in different URL formats)
-		return this.searchEntityById(unifiedIndex, entityId)
-	}
-
-	/**
-	 * Check if entity entry is valid
-	 * @param validationResult
-	 */
-	private isValidEntityEntry(
-		validationResult: ReturnType<typeof EntityIndexEntrySchema.safeParse>
-	): boolean {
-		return Boolean(
-			validationResult.success &&
-				validationResult.data?.$ref &&
-				validationResult.data?.lastModified &&
-				validationResult.data?.contentHash
-		)
-	}
-
-	/**
-	 * Search for entity by ID in index keys
-	 * @param unifiedIndex
-	 * @param entityId
-	 */
-	private searchEntityById(
-		unifiedIndex: UnifiedIndex,
-		entityId: string
-	): UnifiedIndexEntry | null | undefined {
-		for (const key in unifiedIndex) {
-			if (Object.prototype.hasOwnProperty.call(unifiedIndex, key)) {
-				const data = unifiedIndex[key]
-				const match = key.match(/[ACFGIKPSTW]\d{8,10}/)
-				if (match && match?.[0] === entityId) {
-					const validationResult = EntityIndexEntrySchema.safeParse(data)
-					if (this.isValidEntityEntry(validationResult)) {
-						return validationResult.data
-					}
-				}
-			}
-		}
-		return null
-	}
-
-	/**
-	 * Load entity data from file
-	 * @param entityType
-	 * @param entityEntry
-	 * @param entityId
-	 */
-	private async loadEntityFromFile(
-		entityType: StaticEntityType,
-		entityEntry: UnifiedIndexEntry,
-		entityId: string
-	): Promise<{
-		id: string
-		display_name: string
-		[key: string]: unknown
-	} | null> {
-		const entityPath = join(
-			this.dataPath,
-			entityType,
-			entityEntry.$ref.startsWith("./") ? entityEntry.$ref.slice(2) : entityEntry.$ref
-		)
-		const entityContent = await readFile(entityPath, "utf-8")
-		const parsed: unknown = JSON.parse(entityContent)
-
-		const validatedEntity = OpenAlexEntitySchema.safeParse(parsed)
-		if (validatedEntity.success && validatedEntity.data.id && validatedEntity.data.display_name) {
-			return validatedEntity.data
-		}
-
-		logger.warn(
-			LOG_CONTEXT_GENERAL,
-			`${INVALID_ENTITY_FORMAT_MESSAGE} ${entityId}: ${MISSING_REQUIRED_PROPERTIES_MESSAGE}`
-		)
-		return null
-	}
-
-	/**
-	 * Handle entity load errors
-	 * @param error
-	 * @param entityId
-	 */
-	private handleEntityLoadError(error: unknown, entityId: string): null {
-		const nodeError = NodeErrorSchema.safeParse(error)
-		if (nodeError.success && nodeError.data.code === "ENOENT") {
-			// File not found is expected, don't log as error
-			return null
-		}
-		logError(logger, `${FAILED_TO_LOAD_MESSAGE} ${entityId}`, error, LOG_CONTEXT_GENERAL)
-		return null
-	}
-
-	/**
-	 * Load query result by matching query parameters (transparently reads both formats)
-	 * @param entityType
-	 * @param queryUrl
-	 */
-	async loadQuery(entityType: StaticEntityType, queryUrl: string): Promise<unknown> {
-		try {
-			const targetParams = this.normalizeQueryParams(queryUrl)
-
-			// Try query index for faster lookup first
-			const result = await this.tryLoadFromQueryIndex(entityType, queryUrl)
-			if (result) return result
-
-			// Fallback: scan directory for matching files
-			return await this.scanDirectoryForQuery(entityType, targetParams)
-		} catch (error) {
-			logError(logger, FAILED_TO_LOAD_QUERY_MESSAGE, error, LOG_CONTEXT_GENERAL)
-			return null
-		}
-	}
-
-	/**
-	 * Try to load query from index
-	 * @param entityType
-	 * @param queryUrl
-	 */
-	private async tryLoadFromQueryIndex(
-		entityType: StaticEntityType,
-		queryUrl: string
-	): Promise<unknown | null> {
-		const queryIndex = await this.loadQueryIndex(entityType)
-		if (!queryIndex) return null
-
-		for (const queryEntry of queryIndex.queries) {
-			if (this.queryMatches(queryUrl, queryEntry.query)) {
-				const filename = this.generateFilenameFromQuery(queryEntry.query)
-				if (filename) {
-					return await this.loadQueryFile(entityType, filename, "index")
-				}
-			}
-		}
-		return null
-	}
-
-	/**
-	 * Scan directory for matching query files
-	 * @param entityType
-	 * @param targetParams
-	 */
-	private async scanDirectoryForQuery(
-		entityType: StaticEntityType,
-		targetParams: Record<string, unknown>
-	): Promise<unknown | null> {
-		const queryDir = join(this.dataPath, entityType, "queries")
-		try {
-			const { readdir } = await import("node:fs/promises")
-			const files = await readdir(queryDir)
-			const queryFiles = files.filter((f) => f.endsWith(".json") && f !== INDEX_FILENAME)
-
-			for (const filename of queryFiles) {
-				const result = await this.tryMatchQueryFile(queryDir, filename, targetParams)
-				if (result) return result
-			}
-		} catch {
-			logger.warn(LOG_CONTEXT_GENERAL, `${QUERY_DIRECTORY_NOT_FOUND_MESSAGE}: ${queryDir}`)
-		}
-
-		logger.debug(LOG_CONTEXT_GENERAL, NO_CACHED_QUERY_MESSAGE)
-		return null
-	}
-
-	/**
-	 * Try to match and load a query file
-	 * @param queryDir
-	 * @param filename
-	 * @param targetParams
-	 */
-	private async tryMatchQueryFile(
-		queryDir: string,
-		filename: string,
-		targetParams: Record<string, unknown>
-	): Promise<unknown | null> {
-		try {
-			const filenameWithoutExt = filename.replace(/\.json$/, "")
-			const decodedUrl = decodeURIComponent(filenameWithoutExt)
-			const decodedParams = this.normalizeQueryParams(decodedUrl)
-
-			if (this.paramsMatch(targetParams, decodedParams)) {
-				return await this.loadQueryFileFromPath(join(queryDir, filename), filename, "scan")
-			}
-		} catch (error) {
-			logError(logger, `${FAILED_TO_DECODE_FILENAME_MESSAGE} ${filename}`, error, LOG_CONTEXT_GENERAL)
-		}
-		return null
-	}
-
-	/**
-	 * Load query file from path
-	 * @param entityType
-	 * @param filename
-	 * @param source
-	 */
-	private async loadQueryFile(
-		entityType: StaticEntityType,
-		filename: string,
-		source: string
-	): Promise<unknown | null> {
-		const queryPath = join(this.dataPath, entityType, "queries", filename)
-		return await this.loadQueryFileFromPath(queryPath, filename, source)
-	}
-
-	/**
-	 * Load query file from specific path
-	 * @param queryPath
-	 * @param filename
-	 * @param source
-	 */
-	private async loadQueryFileFromPath(
-		queryPath: string,
-		filename: string,
-		source: string
-	): Promise<unknown | null> {
-		try {
-			const queryContent = await readFile(queryPath, "utf-8")
-			logger.debug(LOG_CONTEXT_GENERAL, `Found query via ${source}: ${filename}`)
-			return JSON.parse(queryContent)
-		} catch (error) {
-			const errorMessage =
-				source === "index"
-					? `Index pointed to missing file: ${filename}`
-					: `${FAILED_TO_READ_CACHED_QUERY_MESSAGE} ${filename}`
-			logError(logger, errorMessage, error, LOG_CONTEXT_GENERAL)
-		}
-		return null
-	}
-
-	/**
-	 * Normalize query parameters for comparison
-	 * @param url
-	 */
-	private normalizeQueryParams(url: string): Record<string, unknown> {
-		try {
-			const urlObj = new URL(url)
-			const params: Record<string, unknown> = {}
-
-			for (const [key, value] of urlObj.searchParams.entries()) {
-				// Normalize known parameters
-				if (key === "select" && typeof value === "string") {
-					params[key] = value
-						.split(",")
-						.map((v) => v.trim())
-						.sort() // Sort for consistent comparison
-				} else if (key === "per_page" || key === "page") {
-					params[key] = value // Keep as string for comparison
-				} else {
-					params[key] = value
-				}
-			}
-
-			return params
-		} catch {
-			return {}
-		}
-	}
-
-	/**
-	 * Check if two parameter objects match (ignoring order differences)
-	 * @param target
-	 * @param candidate
-	 */
-	private paramsMatch(target: Record<string, unknown>, candidate: Record<string, unknown>): boolean {
-		const targetKeys = Object.keys(target).sort()
-		const candidateKeys = Object.keys(candidate).sort()
-
-		// Must have same keys
-		if (
-			targetKeys.length !== candidateKeys.length ||
-			!targetKeys.every((key) => candidateKeys.includes(key))
-		) {
-			return false
-		}
-
-		// Check each value
-		for (const key of targetKeys) {
-			const targetVal = target[key]
-			const candidateVal = candidate[key]
-
-			// Handle arrays (like select fields)
-			if (Array.isArray(targetVal) && Array.isArray(candidateVal)) {
-				if (
-					targetVal.length !== candidateVal.length ||
-					!targetVal.every((v) => candidateVal.includes(v))
-				) {
-					return false
-				}
-			} else if (targetVal !== candidateVal) {
-				return false
-			}
-		}
-
-		return true
-	}
-
-	/**
-	 * Flexible query matching that handles params, encoded, or URL formats
-	 * @param targetUrl
-	 * @param queryDef
-	 */
-	private queryMatches(targetUrl: string, queryDef: QueryDefinition): boolean {
-		const targetParams = this.normalizeQueryParams(targetUrl)
-
-		// If query definition has params, use direct parameter matching
-		if (queryDef.params) {
-			return this.paramsMatch(targetParams, queryDef.params)
-		}
-
-		// If query definition has encoded string, decode and match params
-		if (queryDef.encoded) {
-			try {
-				const decoded = this.decodeQueryString(queryDef.encoded)
-				const validatedParams = this.validateQueryParams(decoded)
-				if (validatedParams) {
-					return this.paramsMatch(targetParams, validatedParams)
-				}
-			} catch {
-				// Continue to next matching method
-			}
-		}
-
-		// If query definition has URL, extract params and match
-		if (queryDef.url) {
-			try {
-				const urlParams = this.normalizeQueryParams(queryDef.url)
-				return this.paramsMatch(targetParams, urlParams)
-			} catch {
-				// Continue to next matching method
-			}
-		}
-
-		return false
-	}
-
-	/**
-	 * Decode base64url encoded query string back to parameters
-	 * @param encoded
-	 */
-	private decodeQueryString(encoded: string): unknown | null {
-		try {
-			// Remove .json extension if present
-			const cleanEncoded = encoded.replace(/\.json$/, "")
-
-			// Base64url decode
-			const jsonString = Buffer.from(cleanEncoded, "base64url").toString("utf-8")
-			return JSON.parse(jsonString)
-		} catch {
-			return null
-		}
-	}
-
-	/**
-	 * Validate and convert decoded result to Record<string, unknown>
-	 * @param decoded
-	 */
-	private validateQueryParams(decoded: unknown): Record<string, unknown> | null {
-		const QueryParamsSchema = z.record(z.string(), z.unknown())
-		const result = QueryParamsSchema.safeParse(decoded)
-		return result.success ? result.data : null
-	}
-
-	/**
-	 * Generate filename from query definition, using encoded if available, otherwise params or URL
-	 * @param queryDef
-	 */
-	private generateFilenameFromQuery(queryDef: QueryDefinition): string | null {
-		// If encoded is available, use it directly
-		if (queryDef.encoded) {
-			return queryDef.encoded.endsWith(".json") ? queryDef.encoded : `${queryDef.encoded}.json`
-		}
-
-		// If params are available, generate encoded filename from params
-		if (queryDef.params) {
-			try {
-				const encoded = Buffer.from(JSON.stringify(queryDef.params)).toString("base64url")
-				return `${encoded}.json`
-			} catch {
-				return null
-			}
-		}
-
-		// If URL is available, extract params and generate encoded filename
-		if (queryDef.url) {
-			try {
-				const params = this.normalizeQueryParams(queryDef.url)
-				const encoded = Buffer.from(JSON.stringify(params)).toString("base64url")
-				return `${encoded}.json`
-			} catch {
-				return null
-			}
-		}
-
-		return null
-	}
-
-	/**
-	 * Load query index for an entity type (legacy format)
-	 * @param entityType
-	 */
-	async loadQueryIndex(
-		entityType: StaticEntityType
-	): Promise<{ entityType: string; queries: QueryIndexEntry[] } | null> {
-		try {
-			const queryIndexPath = join(this.dataPath, entityType, "queries", INDEX_FILENAME)
-			const indexContent = await readFile(queryIndexPath, "utf-8")
-			const parsed: unknown = JSON.parse(indexContent)
-
-			// Validate with Zod schema
-			const validationResult = QueryIndexSchema.safeParse(parsed)
-			if (validationResult.success) {
-				// Construct object conditionally to avoid undefined assignment to optional properties
-				const { data } = validationResult
-				return {
-					entityType: data.entityType,
-					queries: data.queries.map((entry) => ({
-						query: {
-							...(entry.query.params !== undefined && {
-								params: entry.query.params,
-							}),
-							...(entry.query.encoded !== undefined && {
-								encoded: entry.query.encoded,
-							}),
-							...(entry.query.url !== undefined && { url: entry.query.url }),
-						},
-						...(entry.lastModified !== undefined && {
-							lastModified: entry.lastModified,
-						}),
-						...(entry.contentHash !== undefined && {
-							contentHash: entry.contentHash,
-						}),
-					})),
-				}
-			}
-
-			logger.warn(LOG_CONTEXT_GENERAL, `${INVALID_QUERY_INDEX_STRUCTURE_MESSAGE} ${queryIndexPath}`)
-			return null
-		} catch (error) {
-			logError(logger, `${FAILED_TO_LOAD_INDEX_MESSAGE} ${entityType}`, error, LOG_CONTEXT_GENERAL)
-			return null
-		}
-	}
-
-	/**
-	 * Save query index for an entity type (legacy format)
-	 * @param entityType
-	 * @param queryIndex
-	 * @param queryIndex.entityType
-	 * @param queryIndex.queries
-	 */
-	async saveQueryIndex(
-		entityType: StaticEntityType,
-		queryIndex: { entityType: string; queries: QueryIndexEntry[] }
-	): Promise<void> {
-		try {
-			const queryDir = join(this.dataPath, entityType, "queries")
-			await mkdir(queryDir, { recursive: true })
-			const queryIndexPath = join(queryDir, INDEX_FILENAME)
-			const content = JSON.stringify(queryIndex, null, 2)
-			await writeFile(queryIndexPath, content)
-			logger.debug(
-				LOG_CONTEXT_GENERAL,
-				`${UPDATED_QUERY_INDEX_MESSAGE} ${entityType} with ${queryIndex.queries.length.toString()} queries`
-			)
-		} catch (error) {
-			logError(logger, `${FAILED_TO_SAVE_INDEX_MESSAGE} ${entityType}`, error, LOG_CONTEXT_GENERAL)
-		}
-	}
-
-	/**
-	 * Update query index when adding a new cached query
-	 * Note: Parameters removed as method is not yet implemented
-	 * Future signature: (entityType: StaticEntityType, queryDef: QueryDefinition, metadata: { lastModified?: string; contentHash?: string })
-	 */
-	updateQueryIndex(): void {
-		// Note: Query indexes are handled separately from unified indexes
-		// This method maintains the existing query index format for backward compatibility
-		// You may want to consider migrating query indexes to the unified format as well
-		logger.warn(LOG_CONTEXT_GENERAL, QUERY_INDEX_UPDATE_NOT_IMPLEMENTED_MESSAGE)
-	}
-
-	/**
-	 * Check if two query definitions match (for duplicate detection)
-	 * @param def1
-	 * @param def2
-	 */
-	private queryDefinitionsMatch(def1: QueryDefinition, def2: QueryDefinition): boolean {
-		// Direct format matching
-		if (this.directFormatMatch(def1, def2)) {
-			return true
-		}
-
-		// Cross-format matching
-		return this.crossFormatMatch(def1, def2)
-	}
-
-	/**
-	 * Check for direct format matches (same format type)
-	 * @param def1
-	 * @param def2
-	 */
-	private directFormatMatch(def1: QueryDefinition, def2: QueryDefinition): boolean {
-		if (def1.params && def2.params) {
-			return this.paramsMatch(def1.params, def2.params)
-		}
-
-		if (def1.encoded && def2.encoded) {
-			return def1.encoded === def2.encoded
-		}
-
-		if (def1.url && def2.url) {
-			return def1.url === def2.url
-		}
-
-		return false
-	}
-
-	/**
-	 * Check for cross-format matches (different format types)
-	 * @param def1
-	 * @param def2
-	 */
-	private crossFormatMatch(def1: QueryDefinition, def2: QueryDefinition): boolean {
-		if (def1.params && def2.encoded) {
-			return this.matchParamsWithEncoded(def1.params, def2.encoded)
-		}
-
-		if (def1.encoded && def2.params) {
-			return this.matchParamsWithEncoded(def2.params, def1.encoded)
-		}
-
-		if (def1.params && def2.url) {
-			return this.matchParamsWithUrl(def1.params, def2.url)
-		}
-
-		if (def1.url && def2.params) {
-			return this.matchParamsWithUrl(def2.params, def1.url)
-		}
-
-		return false
-	}
-
-	/**
-	 * Match params with encoded string
-	 * @param params
-	 * @param encoded
-	 */
-	private matchParamsWithEncoded(params: Record<string, unknown>, encoded: string): boolean {
-		const decoded = this.decodeQueryString(encoded)
-		const validatedParams = this.validateQueryParams(decoded)
-		return validatedParams ? this.paramsMatch(params, validatedParams) : false
-	}
-
-	/**
-	 * Match params with URL
-	 * @param params
-	 * @param url
-	 */
-	private matchParamsWithUrl(params: Record<string, unknown>, url: string): boolean {
-		const urlParams = this.normalizeQueryParams(url)
-		return this.paramsMatch(params, urlParams)
-	}
-
-	/**
-	 * List all cached queries with decoded information
-	 * @param entityType
-	 */
-	async listCachedQueries(entityType: StaticEntityType): Promise<
-		Array<{
-			filename: string
-			decoded: Record<string, unknown> | null
-			contentHash?: string
-		}>
-	> {
-		try {
-			const queryIndex = await this.loadQueryIndex(entityType)
-			if (queryIndex) {
-				return this.processQueryIndexEntries(queryIndex.queries)
-			}
-
-			return await this.scanQueryFilesFromFilesystem(entityType)
-		} catch (error) {
-			logError(logger, FAILED_TO_LIST_CACHED_QUERIES_MESSAGE, error, LOG_CONTEXT_GENERAL)
-			return []
-		}
-	}
-
-	/**
-	 * Process query index entries
-	 * @param queries
-	 */
-	private processQueryIndexEntries(queries: QueryIndexEntry[]): Array<{
-		filename: string
-		decoded: Record<string, unknown> | null
-		contentHash?: string
-	}> {
-		return queries.map((entry) => {
-			const filename = this.generateFilenameFromQuery(entry.query)
-			const decoded = this.extractQueryParams(entry.query)
-
-			return {
-				filename: filename ?? "unknown",
-				decoded,
-				...(entry.contentHash !== undefined && {
-					contentHash: entry.contentHash,
-				}),
-			}
-		})
-	}
-
-	/**
-	 * Extract query parameters from query definition
-	 * @param queryDef
-	 */
-	private extractQueryParams(queryDef: QueryDefinition): Record<string, unknown> | null {
-		if (queryDef.params) {
-			return queryDef.params
-		}
-		if (queryDef.encoded) {
-			const decodedResult = this.decodeQueryString(queryDef.encoded)
-			return this.validateQueryParams(decodedResult)
-		}
-		if (queryDef.url) {
-			return this.normalizeQueryParams(queryDef.url)
-		}
-		return null
-	}
-
-	/**
-	 * Scan query files from filesystem
-	 * @param entityType
-	 */
-	private async scanQueryFilesFromFilesystem(entityType: StaticEntityType): Promise<
-		Array<{
-			filename: string
-			decoded: Record<string, unknown> | null
-			contentHash?: string
-		}>
-	> {
-		const queryDir = join(this.dataPath, entityType, "queries")
-		const { readdir } = await import("node:fs/promises")
-		const files = await readdir(queryDir)
-
-		const results: Array<{
-			filename: string
-			decoded: Record<string, unknown> | null
-			contentHash?: string
-		}> = []
-
-		for (const file of files) {
-			if (file.endsWith(".json") && file !== INDEX_FILENAME) {
-				const result = await this.processQueryFile(queryDir, file)
-				if (result) results.push(result)
-			}
-		}
-
-		return results
-	}
-
-	/**
-	 * Process individual query file
-	 * @param queryDir
-	 * @param file
-	 */
-	private async processQueryFile(
-		queryDir: string,
-		file: string
-	): Promise<{
-		filename: string
-		decoded: Record<string, unknown> | null
-		contentHash?: string
-	} | null> {
-		try {
-			const filenameWithoutExt = file.replace(/\.json$/, "")
-			const decodedUrl = decodeURIComponent(filenameWithoutExt)
-			const decodedParams = this.normalizeQueryParams(decodedUrl)
-
-			return {
-				filename: file,
-				decoded: decodedParams,
-			}
-		} catch (error) {
-			logError(logger, `${FAILED_TO_DECODE_FILENAME_MESSAGE} ${file}`, error, LOG_CONTEXT_GENERAL)
-			return null
-		}
-	}
-
-	/**
-	 * List all available entities of a type
-	 * @param entityType
+	 * List all cached entities for entity type
 	 */
 	async listEntities(entityType: StaticEntityType): Promise<string[]> {
-		const index = await this.loadUnifiedIndex(entityType)
-		if (!index) return []
-
-		// Map entity types to their ID prefixes
-		const entityPrefixes: Record<StaticEntityType, string> = {
-			works: "W",
-			authors: "A",
-			institutions: "I",
-			topics: "T",
-			publishers: "P",
-			funders: "F",
-		}
-
-		const prefix = entityPrefixes[entityType]
-		if (!prefix) return []
-
-		// Extract entity IDs from index keys, filtering by entity type
-		const entityIds: string[] = []
-		for (const key of Object.keys(index)) {
-			// Extract entity ID that matches the specific entity type
-			const regex = new RegExp(String.raw`${prefix}\d{8,10}`, "g")
-			const matches = key.match(regex)
-			if (matches) {
-				for (const entityId of matches) {
-					// Only add unique entity IDs
-					if (!entityIds.includes(entityId)) {
-						entityIds.push(entityId)
-					}
-				}
-			}
-		}
-
-		return entityIds.sort()
+		return this.entityCacheService.listEntities(entityType)
 	}
 
 	/**
-	 * Search entities by display name
-	 * @param entityType
-	 * @param searchTerm
+	 * Search entities by name in cache
 	 */
-	async searchEntities(
-		entityType: StaticEntityType,
-		searchTerm: string
-	): Promise<{ id: string; display_name: string; [key: string]: unknown }[]> {
-		const entityIds = await this.listEntities(entityType)
-		const results: {
-			id: string
-			display_name: string
-			[key: string]: unknown
-		}[] = []
-
-		for (const entityId of entityIds) {
-			const entity = await this.loadEntity(entityType, entityId)
-			if (entity?.display_name?.toLowerCase().includes(searchTerm?.toLowerCase())) {
-				results.push(entity)
-			}
-		}
-
-		return results
+	async searchEntities(entityType: StaticEntityType, searchTerm: string) {
+		return this.entityCacheService.searchEntities(entityType, searchTerm)
 	}
 
 	/**
-	 * Calculate total size of JSON files in an entity directory
-	 * @param entityType
+	 * List all cached queries for entity type
 	 */
-	private async calculateEntityDirectorySize(entityType: string): Promise<number> {
-		try {
-			const entityDir = join(this.dataPath, entityType)
-			const files = await readdir(entityDir)
-			let totalSize = 0
-
-			for (const file of files) {
-				if (file.endsWith(".json")) {
-					const filePath = join(entityDir, file)
-					const fileStat = await stat(filePath)
-					totalSize += fileStat.size
-				}
-			}
-
-			return totalSize
-		} catch {
-			// If we can't calculate size, return 0
-			return 0
-		}
+	async listCachedQueries(entityType: StaticEntityType) {
+		return this.queryCacheService.listCachedQueries(entityType)
 	}
 
 	/**
-	 * Find the most recent lastModified date from index entries
-	 * @param entries
+	 * Get comprehensive cache statistics
 	 */
-	private findLatestLastModified(entries: UnifiedIndexEntry[]): string {
-		const lastModified = entries.reduce<string | null>((latest: string | null, entry: UnifiedIndexEntry) => {
-			const entryTime = entry.lastModified ? new Date(entry.lastModified).getTime() : 0
-			const latestTime = latest ? new Date(latest).getTime() : 0
-			return entryTime > latestTime ? entry.lastModified || latest : latest
-		}, null)
-
-		return lastModified ?? new Date().toISOString()
+	async getStatistics() {
+		return this.statisticsService.getStatistics()
 	}
 
 	/**
-	 * Get statistics for all entity types
+	 * Get detailed cache stats from static data provider
 	 */
-	async getStatistics(): Promise<
-		Record<string, { count: number; totalSize: number; lastModified: string }>
-	> {
-		const stats: Record<string, { count: number; totalSize: number; lastModified: string }> = {}
-
-		for (const entityType of SUPPORTED_ENTITIES) {
-			if (await this.hasStaticData(entityType)) {
-				const index = await this.loadUnifiedIndex(entityType)
-				if (index) {
-					const entries = Object.values(index)
-					const count = entries.length
-					const totalSize = await this.calculateEntityDirectorySize(entityType)
-					const lastModified = this.findLatestLastModified(entries)
-
-					stats[entityType] = {
-						count,
-						totalSize: totalSize || count * 1000, // Rough estimate if calculation failed
-						lastModified,
-					}
-				}
-			}
-		}
-
-		return stats
+	async getCacheStats() {
+		return this.statisticsService.getCacheStats()
 	}
 
 	/**
-	 * Get synthetic cache statistics
-	 */
-	async getCacheStats(): Promise<CacheStats> {
-		try {
-			const stats = await staticDataProvider.getCacheStatistics()
-			return {
-				enabled: true,
-				performance: {
-					totalRequests: stats.totalRequests,
-					cacheHitRate: stats.hitRate,
-					surgicalRequestCount: 0, // Not available in CacheStatistics
-					bandwidthSaved: stats.bandwidthSaved,
-				},
-			}
-		} catch (error) {
-			logError(logger, FAILED_TO_GET_CACHE_STATS_MESSAGE, error, LOG_CONTEXT_GENERAL)
-			return { enabled: false };
-		}
-	}
-
-	/**
-	 * Get field coverage for an entity across all cache tiers
-	 * Note: Parameters removed as method is not yet implemented
-	 * Future signature: (entityType: StaticEntityType, entityId: string)
-	 */
-	getFieldCoverage(): Promise<FieldCoverageByTier> {
-		// Simplified implementation for CLI - just return basic structure
-		logger.warn(LOG_CONTEXT_GENERAL, FIELD_COVERAGE_ANALYSIS_NOT_AVAILABLE_MESSAGE)
-		return Promise.resolve({
-			memory: [],
-			localStorage: [],
-			indexedDB: [],
-			static: [],
-			total: [],
-		})
-	}
-
-	/**
-	 * Get well-populated entities with extensive field coverage
-	 * Note: Parameters removed as method is not yet implemented
-	 * Future signature: (entityType: StaticEntityType, limit: number)
-	 */
-	getWellPopulatedEntities(): Promise<
-		Array<{
-			entityId: string
-			fieldCount: number
-			fields: string[]
-		}>
-	> {
-		try {
-			// TODO: Re-enable when synthetic cache analysis is available
-			// This requires implementing synthetic cache population for analysis queries
-			// Current implementation provides placeholder behavior until cache analytics are ready
-			logger.warn(LOG_CONTEXT_GENERAL, WELL_POPULATED_ENTITIES_ANALYSIS_NOT_AVAILABLE_MESSAGE)
-			return Promise.resolve([])
-		} catch (error) {
-			logError(logger, FAILED_TO_GET_WELL_POPULATED_ENTITIES_MESSAGE, error, LOG_CONTEXT_GENERAL)
-			return Promise.resolve([])
-		}
-	}
-
-	/**
-	 * Get popular cached collections with high entity counts
-	 * Note: Parameters removed as method is not yet implemented
-	 * Future signature: (limit: number)
-	 */
-	getPopularCollections(): Promise<
-		Array<{
-			queryKey: string
-			entityCount: number
-			pageCount: number
-		}>
-	> {
-		try {
-			// TODO: Re-enable when synthetic cache analysis is available
-			// This requires implementing synthetic cache population for analysis queries
-			// Current implementation provides placeholder behavior until cache analytics are ready
-			logger.warn(LOG_CONTEXT_GENERAL, POPULAR_COLLECTIONS_ANALYSIS_NOT_AVAILABLE_MESSAGE)
-			return Promise.resolve([])
-		} catch (error) {
-			logError(logger, FAILED_TO_GET_POPULAR_COLLECTIONS_MESSAGE, error, LOG_CONTEXT_GENERAL)
-			return Promise.resolve([])
-		}
-	}
-
-	/**
-	 * Clear synthetic cache data
+	 * Clear synthetic cache (memory cache)
 	 */
 	async clearSyntheticCache(): Promise<void> {
-		try {
-			await staticDataProvider.clearCache()
-		} catch (error) {
-			logError(logger, FAILED_TO_CLEAR_SYNTHETIC_CACHE_MESSAGE, error, LOG_CONTEXT_GENERAL)
-			throw error instanceof Error ? error : new Error(String(error))
-		}
+		return this.statisticsService.clearSyntheticCache()
 	}
 
 	/**
-	 * Analyze static data cache usage patterns
+	 * Analyze static data usage
 	 */
-	async analyzeStaticDataUsage(): Promise<{
-		entityDistribution: Record<string, number>
-		totalEntities: number
-		cacheHitPotential: number
-		recommendedForGeneration: string[]
-		gaps: string[]
-	}> {
-		try {
-			const stats = await this.getStatistics()
-			const entityDistribution: Record<string, number> = {}
-			let totalEntities = 0
-
-			// Analyze entity distribution
-			for (const [entityType, data] of Object.entries(stats)) {
-				entityDistribution[entityType] = data.count
-				totalEntities += data.count
-			}
-
-			// Calculate cache hit potential based on available static data
-			const syntheticStats = await this.getCacheStats()
-			const memoryEntities = syntheticStats.storage?.memory?.entities ?? 0
-			const cacheHitPotential = totalEntities > 0 ? memoryEntities / totalEntities : 0
-
-			// Identify gaps and recommendations
-			const gaps: string[] = []
-			const recommendedForGeneration: string[] = []
-
-			for (const entityType of SUPPORTED_ENTITIES) {
-				const count = entityDistribution[entityType] ?? 0
-				if (count === 0) {
-					gaps.push(`No static data for ${entityType}`)
-				} else if (count < 100) {
-					gaps.push(`Low coverage for ${entityType} (${count.toString()} entities)`)
-					recommendedForGeneration.push(entityType)
-				} else {
-					recommendedForGeneration.push(entityType)
-				}
-			}
-
-			return {
-				entityDistribution,
-				totalEntities,
-				cacheHitPotential,
-				recommendedForGeneration,
-				gaps,
-			}
-		} catch (error) {
-			logError(logger, FAILED_TO_ANALYZE_STATIC_DATA_USAGE_MESSAGE, error, LOG_CONTEXT_GENERAL)
-			return {
-				entityDistribution: {},
-				totalEntities: 0,
-				cacheHitPotential: 0,
-				recommendedForGeneration: [],
-				gaps: ["Analysis failed"],
-			}
-		}
+	async analyzeStaticDataUsage() {
+		return this.statisticsService.analyzeStaticDataUsage()
 	}
 
 	/**
-	 * Generate optimized static data cache from usage patterns
-	 * @param entityType
-	 * @param options
-	 * @param options.dryRun
-	 * @param options.force
+	 * Generate static data from detected patterns
 	 */
-	async generateStaticDataFromPatterns(
-		entityType?: StaticEntityType,
-		options: { dryRun?: boolean; force?: boolean } = {}
-	): Promise<{
-		filesProcessed: number
-		entitiesCached: number
-		queriesCached: number
-		errors: string[]
-	}> {
-		const result = this.initializeGenerationResult()
-
-		try {
-			const entityTypes = entityType ? [entityType] : SUPPORTED_ENTITIES
-
-			for (const type of entityTypes) {
-				await this.processEntityTypeForGeneration(type, options, result)
-			}
-		} catch (error) {
-			result.errors.push(`${GENERATION_FAILED_MESSAGE}: ${String(error)}`)
-		}
-
-		return result
-	}
-
-	/**
-	 * Initialize generation result object
-	 */
-	private initializeGenerationResult(): {
-		filesProcessed: number
-		entitiesCached: number
-		queriesCached: number
-		errors: string[]
-	} {
-		return {
-			filesProcessed: 0,
-			entitiesCached: 0,
-			queriesCached: 0,
-			errors: [],
-		}
-	}
-
-	/**
-	 * Process entity type for generation
-	 * @param type
-	 * @param options
-	 * @param options.dryRun
-	 * @param options.force
-	 * @param result
-	 * @param result.filesProcessed
-	 * @param result.entitiesCached
-	 * @param result.queriesCached
-	 * @param result.errors
-	 */
-	private async processEntityTypeForGeneration(
-		type: StaticEntityType,
-		options: { dryRun?: boolean; force?: boolean },
-		result: {
-			filesProcessed: number
-			entitiesCached: number
-			queriesCached: number
-			errors: string[]
-		}
-	): Promise<void> {
-		try {
-			await this.processWellPopulatedEntities(type, options, result)
-			await this.processPopularCollections(type, options, result)
-		} catch (error) {
-			result.errors.push(`${FAILED_TO_PROCESS_ENTITY_TYPE_MESSAGE} ${type}: ${String(error)}`)
-		}
-	}
-
-	/**
-	 * Process well-populated entities
-	 * @param type
-	 * @param options
-	 * @param options.dryRun
-	 * @param options.force
-	 * @param result
-	 * @param result.filesProcessed
-	 * @param result.entitiesCached
-	 * @param result.queriesCached
-	 * @param result.errors
-	 */
-	private async processWellPopulatedEntities(
-		type: StaticEntityType,
-		options: { dryRun?: boolean; force?: boolean },
-		result: {
-			filesProcessed: number
-			entitiesCached: number
-			queriesCached: number
-			errors: string[]
-		}
-	): Promise<void> {
-		// TODO: Re-enable when getWellPopulatedEntities implementation is available
-		const wellPopulated = await this.getWellPopulatedEntities()
-
-		for (const entityData of wellPopulated) {
-			try {
-				await this.processEntityForCaching(type, entityData, options, result)
-				result.filesProcessed++
-			} catch (error) {
-				result.errors.push(
-					`${FAILED_TO_PROCESS_ENTITY_MESSAGE} ${entityData.entityId}: ${String(error)}`
-				)
-			}
-		}
-	}
-
-	/**
-	 * Process entity for caching
-	 * @param type
-	 * @param entityData
-	 * @param entityData.entityId
-	 * @param entityData.fieldCount
-	 * @param entityData.fields
-	 * @param options
-	 * @param options.dryRun
-	 * @param options.force
-	 * @param result
-	 * @param result.filesProcessed
-	 * @param result.entitiesCached
-	 * @param result.queriesCached
-	 * @param result.errors
-	 */
-	private async processEntityForCaching(
-		type: StaticEntityType,
-		entityData: { entityId: string; fieldCount: number; fields: string[] },
-		options: { dryRun?: boolean; force?: boolean },
-		result: {
-			filesProcessed: number
-			entitiesCached: number
-			queriesCached: number
-			errors: string[]
-		}
-	): Promise<void> {
-		if (options.dryRun) {
-			result.entitiesCached++
-			return
-		}
-
-		const existing = await this.loadEntity(type, entityData.entityId)
-		if (existing && !options.force) {
-			return // Skip if exists and not forcing
-		}
-
-		const entity = await this.fetchEntityForCaching(type, entityData)
-		if (entity) {
-			await this.saveEntityToCache(type, entity)
-			result.entitiesCached++
-		}
-	}
-
-	/**
-	 * Fetch entity for caching (placeholder until client is fixed)
-	 * @param _type
-	 * @param _entityData
-	 * @param _entityData.entityId
-	 * @param _entityData.fieldCount
-	 * @param _entityData.fields
-	 */
-	private async fetchEntityForCaching(
-		_type: StaticEntityType,
-		_entityData: { entityId: string; fieldCount: number; fields: string[] }
-	): Promise<{
-		id: string
-		display_name: string
-		[key: string]: unknown
-	} | null> {
-		const entity = await this.cachedClient.client.getEntity(_entityData.entityId)
-
-		if (this.isValidEntityForCaching(entity)) {
-			return this.normalizeEntityForCaching(entity)
-		}
-		return null
-	}
-
-	/**
-	 * Check if entity is valid for caching
-	 * @param entity
-	 */
-	private isValidEntityForCaching(entity: unknown): entity is {
-		id: string
-		display_name: string
-		[key: string]: unknown
-	} {
-		return Boolean(
-			entity &&
-				typeof entity === "object" &&
-				"id" in entity &&
-				"display_name" in entity &&
-				typeof (entity as Record<string, unknown>)["id"] === "string" &&
-				typeof (entity as Record<string, unknown>)["display_name"] === "string"
-		)
-	}
-
-	/**
-	 * Normalize entity for caching
-	 * @param entity
-	 * @param entity.id
-	 * @param entity.display_name
-	 */
-	private normalizeEntityForCaching(entity: {
-		id: string
-		display_name: string
-		[key: string]: unknown
-	}): {
-		id: string
-		display_name: string
-		[key: string]: unknown
-	} {
-		return {
-			id: entity.id,
-			display_name: entity.display_name,
-			...Object.fromEntries(
-				Object.entries(entity).filter(([key]) => key !== "id" && key !== "display_name")
-			),
-		}
-	}
-
-	/**
-	 * Process popular collections
-	 * @param type
-	 * @param options
-	 * @param options.dryRun
-	 * @param options.force
-	 * @param result
-	 * @param result.filesProcessed
-	 * @param result.entitiesCached
-	 * @param result.queriesCached
-	 * @param result.errors
-	 */
-	private async processPopularCollections(
-		type: StaticEntityType,
-		options: { dryRun?: boolean; force?: boolean },
-		result: {
-			filesProcessed: number
-			entitiesCached: number
-			queriesCached: number
-			errors: string[]
-		}
-	): Promise<void> {
-		// TODO: Re-enable when getPopularCollections implementation is available
-		const popularCollections = await this.getPopularCollections()
-
-		for (const collection of popularCollections) {
-			try {
-				if (options.dryRun || this.isCollectionForEntityType(collection, type)) {
-					result.queriesCached++
-				}
-			} catch (error) {
-				result.errors.push(
-					`${FAILED_TO_PROCESS_COLLECTION_MESSAGE} ${collection.queryKey}: ${String(error)}`
-				)
-			}
-		}
-	}
-
-	/**
-	 * Check if collection is for the specified entity type
-	 * @param collection
-	 * @param collection.queryKey
-	 * @param collection.entityCount
-	 * @param collection.pageCount
-	 * @param type
-	 */
-	private isCollectionForEntityType(
-		collection: { queryKey: string; entityCount: number; pageCount: number },
-		type: StaticEntityType
-	): boolean {
-		const entityTypeMatch = collection.queryKey.match(/^(\w+)\|/)
-		return entityTypeMatch ? entityTypeMatch[1] === type : false
+	async generateStaticDataFromPatterns(options: {
+		entityTypes?: StaticEntityType[]
+		sampleSize?: number
+		batchSize?: number
+	}) {
+		return this.staticDataGeneratorService.generateStaticDataFromPatterns(options)
 	}
 }
-
-// Note: Types for testing should be imported directly from their source modules
-// e.g., import type { UnifiedIndex } from '@bibgraph/utils/static-data/cache-utilities'
