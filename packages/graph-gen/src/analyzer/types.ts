@@ -190,3 +190,81 @@ export const isBipartiteUndirectedBinary = (g: AnalyzerGraph): boolean => {
   }
   return true;
 };
+
+/**
+ * Check if an undirected binary graph is chordal using Maximum Cardinality Search.
+ * A graph is chordal if every cycle of length >= 4 has a chord (equivalent to having a PEO).
+ * @param g - Graph to check
+ * @returns True if graph is chordal
+ */
+export const isChordalUndirectedBinary = (g: AnalyzerGraph): boolean => {
+  if (g.vertices.length <= 3) return true;
+
+  // Maximum Cardinality Search to find PEO
+  const vertices = g.vertices.map(v => v.id);
+  const adj = buildAdjUndirectedBinary(g);
+  const numbered = new Set<AnalyzerVertexId>();
+  const order: AnalyzerVertexId[] = [];
+  const weights: Record<AnalyzerVertexId, number> = {};
+
+  // Initialize weights
+  for (const v of vertices) weights[v] = 0;
+
+  // MCS: repeatedly pick vertex with maximum weight among unnumbered
+  for (let i = 0; i < vertices.length; i++) {
+    let maxWeight = -1;
+    let maxV: AnalyzerVertexId | null = null;
+
+    for (const v of vertices) {
+      if (!numbered.has(v) && weights[v] > maxWeight) {
+        maxWeight = weights[v];
+        maxV = v;
+      }
+    }
+
+    if (maxV === null) break;
+
+    numbered.add(maxV);
+    order.push(maxV);
+
+    // Update weights of unnumbered neighbors
+    for (const nb of adj[maxV] ?? []) {
+      if (!numbered.has(nb)) {
+        weights[nb]++;
+      }
+    }
+  }
+
+  // Check if this is a perfect elimination ordering
+  // For each vertex, its later neighbors should form a clique
+  const laterNeighbors = new Map<AnalyzerVertexId, Set<AnalyzerVertexId>>();
+
+  for (let i = 0; i < order.length; i++) {
+    const v = order[i];
+    const laterNbs = new Set<AnalyzerVertexId>();
+
+    // Find neighbors that appear later in ordering
+    for (const nb of adj[v] ?? []) {
+      const j = order.indexOf(nb);
+      if (j > i) laterNbs.add(nb);
+    }
+
+    laterNeighbors.set(v, laterNbs);
+  }
+
+  // Check each set of later neighbors forms a clique
+  for (const [, laterNbs] of laterNeighbors) {
+    const nbs = [...laterNbs];
+    for (let i = 0; i < nbs.length; i++) {
+      for (let j = i + 1; j < nbs.length; j++) {
+        // Check if nbs[i] and nbs[j] are adjacent
+        const adjList = adj[nbs[i]] ?? [];
+        if (!adjList.includes(nbs[j])) {
+          return false; // Not a clique
+        }
+      }
+    }
+  }
+
+  return true;
+};

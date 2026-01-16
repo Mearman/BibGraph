@@ -15,11 +15,9 @@ import type {
 import {
   buildAdjUndirectedBinary,
   degreesUndirectedBinary,
-  isBipartiteUndirectedBinary
+  isBipartiteUndirectedBinary,
+  isChordalUndirectedBinary
 } from './types';
-
-// Forward declarations for helper functions used in this module
-declare function isChordalUndirectedBinary(g: AnalyzerGraph): boolean;
 /**
  * Compute perfect graph property.
  * Perfect graphs have no odd holes or odd anti-holes.
