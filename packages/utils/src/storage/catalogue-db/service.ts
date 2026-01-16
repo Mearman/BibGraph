@@ -14,6 +14,7 @@ import Dexie from "dexie";
 import type { GenericLogger } from "../../logger.js";
 import * as AnnotationOps from "./annotation-operations.js";
 import * as GraphListOps from "./graph-list-operations.js";
+import * as ListOps from "./list-operations.js";
 import type {
   CatalogueEntity,
   CatalogueList,
@@ -57,51 +58,14 @@ export class CatalogueService {
     tags?: string[];
     isPublic?: boolean;
   }): Promise<string> {
-    try {
-      const id = crypto.randomUUID();
-      const list: CatalogueList = {
-        id,
-        title: params.title,
-        description: params.description,
-        type: params.type,
-        tags: params.tags,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isPublic: params.isPublic ?? false,
-      };
-
-      await this.db.catalogueLists.add(list);
-
-      // Emit event for list creation
-      catalogueEventEmitter.emit({
-        type: 'list-added',
-        listId: id,
-        list,
-      });
-
-      this.logger?.debug(LOG_CATEGORY, "Catalogue list created", { id, title: params.title, type: params.type });
-
-      return id;
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to create catalogue list", {
-        title: params.title,
-        type: params.type,
-        error,
-      });
-      throw error;
-    }
+    return await ListOps.createList(this.db, params, this.logger);
   }
 
   /**
    * Get all catalogue lists
    */
   async getAllLists(): Promise<CatalogueList[]> {
-    try {
-      return await this.db.catalogueLists.orderBy("updatedAt").reverse().toArray();
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to get all catalogue lists", { error });
-      return [];
-    }
+    return await ListOps.getAllLists(this.db, this.logger);
   }
 
   /**
@@ -109,13 +73,7 @@ export class CatalogueService {
    * @param listId
    */
   async getList(listId: string): Promise<CatalogueList | null> {
-    try {
-      const result = await this.db.catalogueLists.get(listId);
-      return result ?? null;
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to get catalogue list", { listId, error });
-      return null;
-    }
+    return await ListOps.getList(this.db, listId, this.logger);
   }
 
   /**
@@ -126,25 +84,7 @@ export class CatalogueService {
   async updateList(listId: string, updates: Partial<Pick<CatalogueList,
     "title" | "description" | "tags" | "isPublic"
   >>): Promise<void> {
-    try {
-      const updateData = {
-        ...updates,
-        updatedAt: new Date(),
-      };
-
-      await this.db.catalogueLists.update(listId, updateData);
-
-      // Emit event for list update
-      catalogueEventEmitter.emit({
-        type: 'list-updated',
-        listId,
-      });
-
-      this.logger?.debug(LOG_CATEGORY, "Catalogue list updated", { listId, updates });
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to update catalogue list", { listId, updates, error });
-      throw error;
-    }
+    return await ListOps.updateList(this.db, listId, updates, this.logger);
   }
 
   
@@ -507,20 +447,7 @@ export class CatalogueService {
    * @param query
    */
   async searchLists(query: string): Promise<CatalogueList[]> {
-    try {
-      const lists = await this.db.catalogueLists.toArray();
-      const lowercaseQuery = query.toLowerCase();
-
-      return lists.filter(
-        (list) =>
-          list.title.toLowerCase().includes(lowercaseQuery) ||
-          Boolean(list.description?.toLowerCase().includes(lowercaseQuery)) ||
-          list.tags?.some((tag) => tag.toLowerCase().includes(lowercaseQuery))
-      );
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to search catalogue lists", { query, error });
-      return [];
-    }
+    return await ListOps.searchLists(this.db, query, this.logger);
   }
 
   /**
@@ -597,52 +524,7 @@ export class CatalogueService {
     totalEntities: number;
     entityCounts: Record<EntityType, number>;
   }> {
-    try {
-      const entities = await this.getListEntities(listId);
-
-      const entityCounts: Record<EntityType, number> = {
-        works: 0,
-        authors: 0,
-        sources: 0,
-        institutions: 0,
-        topics: 0,
-        concepts: 0,
-        publishers: 0,
-        funders: 0,
-        keywords: 0,
-        domains: 0,
-        fields: 0,
-        subfields: 0,
-      };
-
-      entities.forEach(entity => {
-        entityCounts[entity.entityType]++;
-      });
-
-      return {
-        totalEntities: entities.length,
-        entityCounts,
-      };
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to get list stats", { listId, error });
-      return {
-        totalEntities: 0,
-        entityCounts: {
-          works: 0,
-          authors: 0,
-          sources: 0,
-          institutions: 0,
-          topics: 0,
-          concepts: 0,
-          publishers: 0,
-          funders: 0,
-          keywords: 0,
-          domains: 0,
-          fields: 0,
-          subfields: 0,
-        },
-      };
-    }
+    return await ListOps.getListStats(this.db, listId, this.getListEntities.bind(this), this.logger);
   }
 
   /**
@@ -651,166 +533,31 @@ export class CatalogueService {
    * Includes timeout protection for CI environments where IndexedDB may be slow
    */
   async initializeSpecialLists(): Promise<void> {
-    try {
-      // Create timeout promise to prevent hanging in CI environments
-      const timeoutPromise = new Promise<never>((_resolve, _reject) => {
-        setTimeout(() => {
-          _reject(new Error("Special lists initialization timeout after 10 seconds"));
-        }, 10000);
-      });
+    await ListOps.initializeSpecialLists(this.db, this.getList.bind(this), this.logger);
 
-      const initializationPromise = this._doInitializeSpecialLists();
-
-      await Promise.race([initializationPromise, timeoutPromise]);
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to initialize special lists", { error });
-      // In CI environments, we don't want to fail completely - just log and continue
-      if (this._isCIEnvironment()) {
-        this.logger?.warn(LOG_CATEGORY, "CI environment detected, continuing without special lists initialization");
-        return;
-      }
-      // Don't re-throw constraint errors - they indicate the lists already exist
-      if (!(error instanceof Dexie.ConstraintError)) {
-        throw error;
-      }
-    }
-  }
-
-  /**
-   * Internal method for actual special lists initialization
-   */
-  private async _doInitializeSpecialLists(): Promise<void> {
-    const bookmarksList = await this.getList(SPECIAL_LIST_IDS.BOOKMARKS);
-    const historyList = await this.getList(SPECIAL_LIST_IDS.HISTORY);
-
-      if (!bookmarksList) {
-        try {
-          await this.db.catalogueLists.add({
-            id: SPECIAL_LIST_IDS.BOOKMARKS,
-            title: "Bookmarks",
-            description: "System-managed bookmarks list",
-            type: "list",
-            tags: ["system"],
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            isPublic: false,
-          });
-          this.logger?.debug(LOG_CATEGORY, "Bookmarks list initialized");
-        } catch (addError) {
-          // If list already exists (created by another instance), that's fine
-          if (addError instanceof Dexie.ConstraintError) {
-            this.logger?.debug(LOG_CATEGORY, "Bookmarks list already exists, skipping initialization");
-          } else {
-            throw addError;
-          }
+    // Also initialize graph list
+    const graphList = await this.getList(SPECIAL_LIST_IDS.GRAPH);
+    if (!graphList) {
+      try {
+        await this.db.catalogueLists.add({
+          id: SPECIAL_LIST_IDS.GRAPH,
+          title: "Graph",
+          description: "System-managed graph working set",
+          type: "list",
+          tags: ["system"],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isPublic: false,
+        });
+        this.logger?.debug(LOG_CATEGORY, "Graph list initialized");
+      } catch (addError) {
+        // If list already exists (created by another instance), that's fine
+        if (addError instanceof Dexie.ConstraintError) {
+          this.logger?.debug(LOG_CATEGORY, "Graph list already exists, skipping initialization");
+        } else {
+          throw addError;
         }
       }
-
-      if (!historyList) {
-        try {
-          await this.db.catalogueLists.add({
-            id: SPECIAL_LIST_IDS.HISTORY,
-            title: "History",
-            description: "System-managed browsing history",
-            type: "list",
-            tags: ["system"],
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            isPublic: false,
-          });
-          this.logger?.debug(LOG_CATEGORY, "History list initialized");
-        } catch (addError) {
-          // If list already exists (created by another instance), that's fine
-          if (addError instanceof Dexie.ConstraintError) {
-            this.logger?.debug(LOG_CATEGORY, "History list already exists, skipping initialization");
-          } else {
-            throw addError;
-          }
-        }
-      }
-
-      const graphList = await this.getList(SPECIAL_LIST_IDS.GRAPH);
-      if (!graphList) {
-        try {
-          await this.db.catalogueLists.add({
-            id: SPECIAL_LIST_IDS.GRAPH,
-            title: "Graph",
-            description: "System-managed graph working set",
-            type: "list",
-            tags: ["system"],
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            isPublic: false,
-          });
-          this.logger?.debug(LOG_CATEGORY, "Graph list initialized");
-        } catch (addError) {
-          // If list already exists (created by another instance), that's fine
-          if (addError instanceof Dexie.ConstraintError) {
-            this.logger?.debug(LOG_CATEGORY, "Graph list already exists, skipping initialization");
-          } else {
-            throw addError;
-          }
-        }
-      }
-  }
-
-  /**
-   * Check if running in CI environment
-   */
-  private _isCIEnvironment(): boolean {
-    // Check for common CI environment variables
-    return Boolean(
-      typeof process !== 'undefined' && (
-        process.env.CI ||
-        process.env.GITHUB_ACTIONS ||
-        process.env.TRAVIS ||
-        process.env.CIRCLECI ||
-        process.env.JENKINS_URL ||
-        process.env.BUILDKITE
-      )
-    );
-  }
-
-  /**
-   * Check if a list is a special system list
-   * @param listId
-   */
-  isSpecialList(listId: string): boolean {
-    const specialIds: string[] = Object.values(SPECIAL_LIST_IDS);
-    return specialIds.includes(listId);
-  }
-
-  /**
-   * Prevent deletion of special lists
-   * @param listId
-   */
-  async deleteList(listId: string): Promise<void> {
-    if (this.isSpecialList(listId)) {
-      throw new Error(`Cannot delete special system list: ${listId}`);
-    }
-
-    try {
-      await this.db.transaction("rw", this.db.catalogueLists, this.db.catalogueEntities, async () => {
-        // Delete the list
-        await this.db.catalogueLists.delete(listId);
-
-        // Delete all entities in the list
-        await this.db.catalogueEntities.where("listId").equals(listId).delete();
-
-        // Delete any share records
-        await this.db.catalogueShares.where("listId").equals(listId).delete();
-      });
-
-      // Emit event for list deletion
-      catalogueEventEmitter.emit({
-        type: 'list-removed',
-        listId,
-      });
-
-      this.logger?.debug(LOG_CATEGORY, "Catalogue list deleted", { listId });
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to delete catalogue list", { listId, error });
-      throw error;
     }
   }
 
@@ -1020,16 +767,7 @@ export class CatalogueService {
    * Get special lists without the system tag
    */
   async getNonSystemLists(): Promise<CatalogueList[]> {
-    try {
-      const allLists = await this.getAllLists();
-      return allLists.filter(list =>
-        list.id && !this.isSpecialList(list.id) &&
-        !list.tags?.includes("system")
-      );
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to get non-system lists", { error });
-      return [];
-    }
+    return await ListOps.getNonSystemLists(this.db, ListOps.isSpecialList, this.logger);
   }
 
   // ========== Graph List Operations (Feature 038-graph-list) ==========

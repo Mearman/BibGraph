@@ -213,6 +213,8 @@ export interface GraphSnapshotStorage {
 
 // Export for use in other modules
 export { CORRUPTED_ENTITY_ID_PATTERN, DB_NAME };
+
+// Export CatalogueService and catalogueService singleton
 export { CatalogueService, catalogueService } from "./service.js";
 
 
