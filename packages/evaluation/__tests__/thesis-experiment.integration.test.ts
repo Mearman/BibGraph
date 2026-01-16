@@ -733,6 +733,242 @@ describe('Path Length Independence Experiments', () => {
     });
   });
 
+  describe('Extreme Length Differences', () => {
+    /**
+     * Creates a graph demonstrating that high-quality paths can be preferred
+     * even when MUCH longer (5-hop vs 2-hop = 150% longer).
+     *
+     * Structure:
+     *   - Short path (2 hops): START -> SHORT_MID -> END (minimal shared neighbors)
+     *   - Long path (5 hops): START -> L1 -> L2 -> L3 -> L4 -> END (dense shared neighbors)
+     */
+    function createExtremeLengthGraph(): Graph<TestNode, TestEdge> {
+      const graph = new Graph<TestNode, TestEdge>(false);
+      let edgeId = 0;
+
+      // Main nodes
+      graph.addNode({ id: 'START', type: 'Work' });
+      graph.addNode({ id: 'END', type: 'Work' });
+
+      // Short path intermediate
+      graph.addNode({ id: 'SHORT_MID', type: 'Work' });
+
+      // Long path intermediates
+      graph.addNode({ id: 'L1', type: 'Work' });
+      graph.addNode({ id: 'L2', type: 'Work' });
+      graph.addNode({ id: 'L3', type: 'Work' });
+      graph.addNode({ id: 'L4', type: 'Work' });
+
+      // Shared neighbor for short path (just 1 = low MI)
+      graph.addNode({ id: 'SHORT_S', type: 'Work' });
+
+      // Many shared neighbors for long path (3 per edge pair = high MI)
+      for (let i = 0; i < 15; i++) {
+        graph.addNode({ id: `LONG_S${i}`, type: 'Work' });
+      }
+
+      // === Short path (2 hops): START -> SHORT_MID -> END ===
+      graph.addEdge({ id: `e${edgeId++}`, source: 'START', target: 'SHORT_MID' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'SHORT_MID', target: 'END' });
+
+      // Minimal shared neighbors (low MI)
+      graph.addEdge({ id: `e${edgeId++}`, source: 'START', target: 'SHORT_S' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'SHORT_MID', target: 'SHORT_S' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'END', target: 'SHORT_S' });
+
+      // === Long path (5 hops): START -> L1 -> L2 -> L3 -> L4 -> END ===
+      graph.addEdge({ id: `e${edgeId++}`, source: 'START', target: 'L1' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L1', target: 'L2' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L2', target: 'L3' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L3', target: 'L4' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L4', target: 'END' });
+
+      // Dense shared neighbors for each edge (3 per edge pair = high MI)
+      // START <-> L1: LONG_S0, LONG_S1, LONG_S2
+      graph.addEdge({ id: `e${edgeId++}`, source: 'START', target: 'LONG_S0' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L1', target: 'LONG_S0' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'START', target: 'LONG_S1' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L1', target: 'LONG_S1' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'START', target: 'LONG_S2' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L1', target: 'LONG_S2' });
+
+      // L1 <-> L2: LONG_S3, LONG_S4, LONG_S5
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L1', target: 'LONG_S3' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L2', target: 'LONG_S3' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L1', target: 'LONG_S4' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L2', target: 'LONG_S4' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L1', target: 'LONG_S5' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L2', target: 'LONG_S5' });
+
+      // L2 <-> L3: LONG_S6, LONG_S7, LONG_S8
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L2', target: 'LONG_S6' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L3', target: 'LONG_S6' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L2', target: 'LONG_S7' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L3', target: 'LONG_S7' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L2', target: 'LONG_S8' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L3', target: 'LONG_S8' });
+
+      // L3 <-> L4: LONG_S9, LONG_S10, LONG_S11
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L3', target: 'LONG_S9' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L4', target: 'LONG_S9' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L3', target: 'LONG_S10' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L4', target: 'LONG_S10' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L3', target: 'LONG_S11' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L4', target: 'LONG_S11' });
+
+      // L4 <-> END: LONG_S12, LONG_S13, LONG_S14
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L4', target: 'LONG_S12' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'END', target: 'LONG_S12' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L4', target: 'LONG_S13' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'END', target: 'LONG_S13' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'L4', target: 'LONG_S14' });
+      graph.addEdge({ id: `e${edgeId++}`, source: 'END', target: 'LONG_S14' });
+
+      return graph;
+    }
+
+    it('should prefer 5-hop high-MI path over 2-hop low-MI path at λ=0', () => {
+      const graph = createExtremeLengthGraph();
+
+      const result = rankPaths(graph, 'START', 'END', {
+        traversalMode: 'undirected',
+        lambda: 0, // Pure quality
+        shortestOnly: false,
+        maxLength: 6,
+        maxPaths: 500, // Need more paths to capture both routes
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.value.some).toBe(true);
+
+      const paths = result.value.value;
+
+      // Find exact short path: START->SHORT_MID->END (2 edges)
+      const shortPath = paths.find((p) => {
+        const nodeIds = p.path.nodes.map((n: TestNode) => n.id);
+        return (
+          p.path.edges.length === 2 &&
+          nodeIds[0] === 'START' &&
+          nodeIds[1] === 'SHORT_MID' &&
+          nodeIds[2] === 'END'
+        );
+      });
+
+      // Find exact long path: START->L1->L2->L3->L4->END (5 edges)
+      const longPath = paths.find((p) => {
+        const nodeIds = p.path.nodes.map((n: TestNode) => n.id);
+        return (
+          p.path.edges.length === 5 &&
+          nodeIds[0] === 'START' &&
+          nodeIds[1] === 'L1' &&
+          nodeIds[2] === 'L2' &&
+          nodeIds[3] === 'L3' &&
+          nodeIds[4] === 'L4' &&
+          nodeIds[5] === 'END'
+        );
+      });
+
+      expect(shortPath).toBeDefined();
+      expect(longPath).toBeDefined();
+
+      const lengthRatio = ((longPath!.path.edges.length / shortPath!.path.edges.length) * 100).toFixed(0);
+      const scoreRatio = (longPath!.score / shortPath!.score).toFixed(2);
+
+      console.log('\n   Extreme Length Test (2-hop vs 5-hop, λ=0):');
+      console.log(`   ├─ Short path (2 hops): score=${shortPath!.score.toFixed(4)}, GM(MI)=${shortPath!.geometricMeanMI.toFixed(4)}`);
+      console.log(`   ├─ Long path (5 hops):  score=${longPath!.score.toFixed(4)}, GM(MI)=${longPath!.geometricMeanMI.toFixed(4)}`);
+      console.log(`   ├─ Length ratio: ${lengthRatio}% longer (5 hops vs 2 hops)`);
+      console.log(`   ├─ Score ratio: ${scoreRatio}x`);
+      console.log(`   └─ Winner: ${longPath!.score > shortPath!.score ? '5-hop path ✓' : '2-hop path'}`);
+
+      // The 5-hop high-MI path should beat the 2-hop low-MI path at λ=0
+      expect(longPath!.score).toBeGreaterThan(shortPath!.score);
+
+      lengthResults.push({
+        name: 'Extreme (5-hop vs 2-hop)',
+        shortPathWeight: 0,
+        longPathWeight: 0,
+        lambda: 0,
+        shortPathScore: shortPath!.score,
+        longPathScore: longPath!.score,
+        preferredPath: 'long',
+        correctPreference: longPath!.score > shortPath!.score,
+      });
+    });
+
+    it('should find crossover point for extreme length difference', () => {
+      const graph = createExtremeLengthGraph();
+      const lambdaValues = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0];
+
+      console.log('\n   Extreme Length (5-hop vs 2-hop) Lambda Analysis:');
+      console.log('   ┌────────┬────────────┬───────────┬──────────┐');
+      console.log('   │ λ      │ 2-hop      │ 5-hop     │ Winner   │');
+      console.log('   ├────────┼────────────┼───────────┼──────────┤');
+
+      let crossoverLambda: number | null = null;
+      let prevWinner: 'short' | 'long' | null = null;
+
+      for (const lambda of lambdaValues) {
+        const result = rankPaths(graph, 'START', 'END', {
+          traversalMode: 'undirected',
+          lambda,
+          shortestOnly: false,
+          maxLength: 6,
+          maxPaths: 500,
+        });
+
+        if (!result.ok || !result.value.some) continue;
+
+        const paths = result.value.value;
+
+        const shortPath = paths.find((p) => {
+          const nodeIds = p.path.nodes.map((n: TestNode) => n.id);
+          return (
+            p.path.edges.length === 2 &&
+            nodeIds[0] === 'START' &&
+            nodeIds[1] === 'SHORT_MID' &&
+            nodeIds[2] === 'END'
+          );
+        });
+
+        const longPath = paths.find((p) => {
+          const nodeIds = p.path.nodes.map((n: TestNode) => n.id);
+          return (
+            p.path.edges.length === 5 &&
+            nodeIds[0] === 'START' &&
+            nodeIds[1] === 'L1' &&
+            nodeIds[2] === 'L2' &&
+            nodeIds[3] === 'L3' &&
+            nodeIds[4] === 'L4' &&
+            nodeIds[5] === 'END'
+          );
+        });
+
+        if (!shortPath || !longPath) continue;
+
+        const winner = shortPath.score > longPath.score ? 'short' : 'long';
+        const winnerLabel = winner === 'long' ? '5-hop' : '2-hop';
+        console.log(
+          `   │ ${lambda.toFixed(2).padStart(6)} │ ${shortPath.score.toFixed(4).padStart(10)} │ ${longPath.score.toFixed(4).padStart(9)} │ ${winnerLabel.padStart(8)} │`
+        );
+
+        if (prevWinner === 'long' && winner === 'short' && crossoverLambda === null) {
+          crossoverLambda = lambda;
+        }
+        prevWinner = winner;
+      }
+
+      console.log('   └────────┴────────────┴───────────┴──────────┘');
+
+      if (crossoverLambda !== null) {
+        console.log(`   Crossover: λ ≈ ${crossoverLambda} (150% longer path loses preference)`);
+      }
+
+      // Verify: at λ=0 long wins, at some higher λ short wins
+      expect(prevWinner).toBe('short'); // At highest λ tested, short should win
+    });
+  });
+
   it('should generate length independence LaTeX table', () => {
     if (lengthResults.length === 0) {
       console.log('No length results to generate table from');
