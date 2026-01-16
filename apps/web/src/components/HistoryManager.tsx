@@ -5,7 +5,7 @@
 
 import type { EntityType } from "@bibgraph/types";
 import { logError, logger } from "@bibgraph/utils/logger";
-import { type CatalogueEntity,catalogueService } from "@bibgraph/utils/storage/catalogue-db";
+import { type CatalogueEntity } from "@bibgraph/utils/storage/catalogue-db";
 import {
   ActionIcon,
   Badge,
@@ -32,6 +32,7 @@ import { useState } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
 import { useEntityDisplayName } from "@/hooks/use-entity-display-name";
+import { useStorageProvider } from "@/contexts/storage-provider-context";
 import { useUserInteractions } from "@/hooks/use-user-interactions";
 
 /** Non-entity pages that shouldn't trigger display name fetches */
@@ -195,6 +196,7 @@ interface HistoryManagerProps {
 }
 
 export const HistoryManager = ({ onNavigate }: HistoryManagerProps) => {
+  const storageProvider = useStorageProvider();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -273,7 +275,7 @@ export const HistoryManager = ({ onNavigate }: HistoryManagerProps) => {
       confirmProps: { color: "red" },
       onConfirm: async () => {
         try {
-          await catalogueService.removeEntityFromList("history-list", entityRecordId);
+          await storageProvider.removeEntityFromList("history-list", entityRecordId);
         } catch (error) {
           logError(logger, "Failed to delete history entry", error, "HistoryManager");
         }

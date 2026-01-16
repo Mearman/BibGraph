@@ -5,7 +5,7 @@
 
 import type { EntityType } from "@bibgraph/types";
 import { logError, logger } from "@bibgraph/utils/logger";
-import { type CatalogueEntity,catalogueService } from "@bibgraph/utils/storage/catalogue-db";
+import { type CatalogueEntity } from "@bibgraph/utils/storage/catalogue-db";
 import {
   ActionIcon,
   Card,
@@ -20,6 +20,7 @@ import { Link } from "@tanstack/react-router";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
 import { useEntityDisplayName } from "@/hooks/use-entity-display-name";
+import { useStorageProvider } from "@/contexts/storage-provider-context";
 
 import * as styles from "./sidebar.css";
 
@@ -36,6 +37,8 @@ const NON_ENTITY_URL_PATTERNS = ["/about", "/settings", "/history", "/bookmarks"
 const CORRUPTED_URL_PATTERNS = ["[object Object]", "[object%20Object]", "%5Bobject"];
 
 export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardProps) => {
+  const storageProvider = useStorageProvider();
+
   // Check if this is a special ID (search or list)
   const isSpecialId = entry.entityId.startsWith("search-") || entry.entityId.startsWith("list-");
 
@@ -142,7 +145,7 @@ export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardProps) =>
       onConfirm: async () => {
         try {
           if (entry.id) {
-            await catalogueService.removeEntityFromList("history-list", entry.id);
+            await storageProvider.removeEntityFromList("history-list", entry.id);
           }
         } catch (error) {
           logError(logger, "Failed to delete history entry", error, "HistoryCard");

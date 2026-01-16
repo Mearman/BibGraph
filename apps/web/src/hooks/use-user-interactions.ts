@@ -8,9 +8,9 @@ import { logger } from "@bibgraph/utils/logger";
 import {
   type CatalogueEntity,
   catalogueEventEmitter,
-  catalogueService,
   SPECIAL_LIST_IDS,
 } from "@bibgraph/utils/storage/catalogue-db";
+import { useStorageProvider } from "@/contexts/storage-provider-context";
 import { useLocation } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -112,6 +112,9 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
   // Get notifications for user feedback
   const { showNotification } = useNotifications();
 
+  // Get storage provider
+  const storageProvider = useStorageProvider();
+
   // State
   const [recentHistory, setRecentHistory] = useState<CatalogueEntity[]>([]);
   const [bookmarks, setBookmarks] = useState<CatalogueEntity[]>([]);
@@ -157,17 +160,17 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
       // Wrap all database operations in a race against timeout
       const dataLoadPromise = (async () => {
         // Initialize special lists if they don't exist
-        await catalogueService.initializeSpecialLists();
+        await storageProvider.initializeSpecialLists();
 
         // Load recent history (last 20 entries)
-        const historyEntries = await catalogueService.getHistory();
+        const historyEntries = await storageProvider.getHistory();
         if (isMountedRef.current) {
           setRecentHistory(historyEntries.slice(-20).reverse());
         }
 
         // Check bookmark status based on content type
         if (entityId && entityType) {
-          const bookmarked = await catalogueService.isBookmarked(
+          const bookmarked = await storageProvider.isBookmarked(
             entityType as EntityType,
             entityId
           );
@@ -178,7 +181,7 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
           // For search and list bookmarks, we'll use a simple check in the bookmarks
           // This is a simplified approach - in a real implementation you might want
           // more sophisticated identification
-          const allBookmarks = await catalogueService.getBookmarks();
+          const allBookmarks = await storageProvider.getBookmarks();
           const searchTerm = searchQuery || url;
           const bookmarked = allBookmarks.some(bookmark =>
             bookmark.notes?.includes(searchTerm || '')
@@ -189,13 +192,13 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
         }
 
         // Load all bookmarks
-        const allBookmarks = await catalogueService.getBookmarks();
+        const allBookmarks = await storageProvider.getBookmarks();
         if (isMountedRef.current) {
           setBookmarks(allBookmarks);
         }
 
         // Calculate history stats
-        const stats = await catalogueService.getListStats(SPECIAL_LIST_IDS.HISTORY);
+        const stats = await storageProvider.getListStats(SPECIAL_LIST_IDS.HISTORY);
         if (isMountedRef.current) {
           setHistoryStats({
             totalVisits: stats.totalEntities,
@@ -276,7 +279,7 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
           // This prevents race conditions where a stale displayName is stored
           const safeDisplayName = displayNameEntityRef.current === entityId ? displayName : undefined;
 
-          await catalogueService.addToHistory({
+          await storageProvider.addToHistory({
             entityType: entityType as EntityType,
             entityId: entityId,
             url: currentUrl,
@@ -346,7 +349,7 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
           throw new Error("Entity ID and type are required to record page visit");
         }
 
-        await catalogueService.addToHistory({
+        await storageProvider.addToHistory({
           entityType: metadata.entityType as EntityType,
           entityId: metadata.entityId,
           url,
@@ -390,7 +393,7 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
       setIsBookmarked(true);
 
       try {
-        await catalogueService.addBookmark({
+        await storageProvider.addBookmark({
           entityType: entityType as EntityType,
           entityId: entityId,
           notes: tags ? `${notes || ''}\n\nTags: ${tags.join(', ')}` : notes,
@@ -448,13 +451,13 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
 
     try {
       // Find the bookmark record for this entity
-      const allBookmarks = await catalogueService.getBookmarks();
+      const allBookmarks = await storageProvider.getBookmarks();
       const bookmark = allBookmarks.find(b =>
         b.entityType === entityType && b.entityId === entityId
       );
 
       if (bookmark?.id) {
-        await catalogueService.removeBookmark(bookmark.id);
+        await storageProvider.removeBookmark(bookmark.id);
 
         showNotification({
           title: "Success",
@@ -506,7 +509,7 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
         // Create a unique ID for the search query
         const searchId = `search-${searchQuery}-${JSON.stringify(filters || {})}`;
 
-        await catalogueService.addBookmark({
+        await storageProvider.addBookmark({
           entityType: "works", // Use works as default for search bookmarks
           entityId: searchId,
           notes: `Title: ${title}\n\nSearch Query: ${searchQuery}\n${filters ? `Filters: ${JSON.stringify(filters, null, 2)}` : ''}${notes ? `\n\nNotes: ${notes}` : ''}${tags ? `\n\nTags: ${tags.join(', ')}` : ''}`,
@@ -560,7 +563,7 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
         // Create a unique ID for the list
         const listId = `list-${url}`;
 
-        await catalogueService.addBookmark({
+        await storageProvider.addBookmark({
           entityType: "works", // Use works as default for list bookmarks
           entityId: listId,
           notes: `Title: ${title}\n\n${tags ? `${notes || ''}\n\nTags: ${tags.join(', ')}` : notes}`,
@@ -607,14 +610,14 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
 
     try {
       // Find the bookmark record for this search
-      const allBookmarks = await catalogueService.getBookmarks();
+      const allBookmarks = await storageProvider.getBookmarks();
       const searchId = `search-${searchQuery}-${JSON.stringify(filters || {})}`;
       const bookmark = allBookmarks.find(b =>
         b.entityId === searchId
       );
 
       if (bookmark?.id) {
-        await catalogueService.removeBookmark(bookmark.id);
+        await storageProvider.removeBookmark(bookmark.id);
 
         showNotification({
           title: "Success",
@@ -658,14 +661,14 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
 
     try {
       // Find the bookmark record for this list
-      const allBookmarks = await catalogueService.getBookmarks();
+      const allBookmarks = await storageProvider.getBookmarks();
       const listId = `list-${url}`;
       const bookmark = allBookmarks.find(b =>
         b.entityId === listId
       );
 
       if (bookmark?.id) {
-        await catalogueService.removeBookmark(bookmark.id);
+        await storageProvider.removeBookmark(bookmark.id);
 
         showNotification({
           title: "Success",
@@ -708,14 +711,14 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
 
       try {
         // Find the bookmark record for this entity
-        const allBookmarks = await catalogueService.getBookmarks();
+        const allBookmarks = await storageProvider.getBookmarks();
         const bookmark = allBookmarks.find(b =>
           b.entityType === entityType && b.entityId === entityId
         );
 
         if (bookmark?.id) {
           // Update the bookmark notes
-          await catalogueService.updateList(SPECIAL_LIST_IDS.BOOKMARKS, {});
+          await storageProvider.updateList(SPECIAL_LIST_IDS.BOOKMARKS, {});
           await refreshData();
         }
       } catch (error) {
@@ -738,7 +741,7 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
   const searchBookmarks = useCallback(
     async (query: string): Promise<CatalogueEntity[]> => {
       try {
-        const allBookmarks = await catalogueService.getBookmarks();
+        const allBookmarks = await storageProvider.getBookmarks();
         const lowercaseQuery = query.toLowerCase();
 
         return allBookmarks.filter(bookmark =>
@@ -768,7 +771,7 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
       try {
         for (const recordId of bookmarkRecordIds) {
           try {
-            await catalogueService.removeEntityFromList(SPECIAL_LIST_IDS.BOOKMARKS, recordId);
+            await storageProvider.removeEntityFromList(SPECIAL_LIST_IDS.BOOKMARKS, recordId);
             success++;
           } catch (error) {
             logger.error(
@@ -781,7 +784,7 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
         }
 
         // Update list's updated timestamp
-        await catalogueService.updateList(SPECIAL_LIST_IDS.BOOKMARKS, {});
+        await storageProvider.updateList(SPECIAL_LIST_IDS.BOOKMARKS, {});
 
         // Emit event for bulk entity removal
         if (success > 0) {
@@ -823,7 +826,7 @@ export const useUserInteractions = (options: UseUserInteractionsOptions = {}): U
 
   const clearHistory = useCallback(async () => {
     try {
-      await catalogueService.clearHistory();
+      await storageProvider.clearHistory();
 
       showNotification({
         title: "Success",

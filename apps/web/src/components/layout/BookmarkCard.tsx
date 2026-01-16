@@ -7,7 +7,6 @@ import type { EntityType } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils/logger";
 import {
   type CatalogueEntity,
-  catalogueService,
 } from "@bibgraph/utils/storage/catalogue-db";
 import {
   parseExistingAppUrl,
@@ -28,6 +27,7 @@ import { Link } from "@tanstack/react-router";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
 import { useEntityDisplayName } from "@/hooks/use-entity-display-name";
+import { useStorageProvider } from "@/contexts/storage-provider-context";
 
 import * as styles from "./sidebar.css";
 
@@ -38,6 +38,9 @@ interface BookmarkCardProps {
 }
 
 export const BookmarkCard = ({ bookmark, onClose, onDeleted }: BookmarkCardProps) => {
+  // Get storage provider
+  const storageProvider = useStorageProvider();
+
   // Check if this is a special ID (search or list)
   const isSpecialId = bookmark.entityId.startsWith("search-") || bookmark.entityId.startsWith("list-");
 
@@ -128,7 +131,7 @@ export const BookmarkCard = ({ bookmark, onClose, onDeleted }: BookmarkCardProps
       onConfirm: async () => {
         try {
           if (bookmark.id) {
-            await catalogueService.removeBookmark(bookmark.id);
+            await storageProvider.removeBookmark(bookmark.id);
             onDeleted?.();
           }
         } catch (error) {
