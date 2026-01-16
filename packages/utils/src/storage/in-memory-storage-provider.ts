@@ -20,6 +20,8 @@ import type {
 	BatchAddResult,
 	CatalogueStorageProvider,
 	CreateListParams,
+	GraphAnnotationStorage,
+	GraphSnapshotStorage,
 	ListStats,
 	ShareAccessResult,
 } from './catalogue-storage-provider.js';
@@ -33,11 +35,17 @@ export class InMemoryStorageProvider implements CatalogueStorageProvider {
 	private lists: Map<string, CatalogueList>;
 	private entities: Map<string, CatalogueEntity>;
 	private shares: Map<string, CatalogueShareRecord>;
+	private annotations: Map<string, GraphAnnotationStorage>;
+	private snapshots: Map<string, GraphSnapshotStorage>;
+	private searchHistory: Map<string, { query: string; timestamp: Date }>;
 
 	constructor() {
 		this.lists = new Map();
 		this.entities = new Map();
 		this.shares = new Map();
+		this.annotations = new Map();
+		this.snapshots = new Map();
+		this.searchHistory = new Map();
 	}
 
 	/**
@@ -48,6 +56,9 @@ export class InMemoryStorageProvider implements CatalogueStorageProvider {
 		this.lists.clear();
 		this.entities.clear();
 		this.shares.clear();
+		this.annotations.clear();
+		this.snapshots.clear();
+		this.searchHistory.clear();
 	}
 
 	// ========== List Operations ==========
@@ -845,5 +856,227 @@ export class InMemoryStorageProvider implements CatalogueStorageProvider {
 		}
 
 		return addedIds;
+	}
+
+	// ========== Annotation Operations ==========
+
+	async addAnnotation(annotation: Omit<GraphAnnotationStorage, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+		const id = crypto.randomUUID();
+		const timestamp = new Date();
+		const storedAnnotation: GraphAnnotationStorage = {
+			id,
+			type: annotation.type,
+			visible: annotation.visible ?? true,
+			x: annotation.x,
+			y: annotation.y,
+			content: annotation.content,
+			width: annotation.width,
+			height: annotation.height,
+			radius: annotation.radius,
+			borderColor: annotation.borderColor,
+			fillColor: annotation.fillColor,
+			borderWidth: annotation.borderWidth,
+			points: annotation.points,
+			strokeColor: annotation.strokeColor,
+			strokeWidth: annotation.strokeWidth,
+			closed: annotation.closed,
+			fontSize: annotation.fontSize,
+			backgroundColor: annotation.backgroundColor,
+			nodeId: annotation.nodeId,
+			graphId: annotation.graphId,
+			createdAt: timestamp,
+			updatedAt: timestamp,
+		};
+		this.annotations.set(id, storedAnnotation);
+		return id;
+	}
+
+	async getAnnotations(graphId?: string): Promise<GraphAnnotationStorage[]> {
+		const allAnnotations = Array.from(this.annotations.values());
+		if (!graphId) {
+			return allAnnotations;
+		}
+		return allAnnotations.filter(ann => ann.graphId === graphId);
+	}
+
+	async updateAnnotation(annotationId: string, updates: {
+		visible?: boolean;
+		x?: number;
+		y?: number;
+		content?: string;
+	}): Promise<void> {
+		const annotation = this.annotations.get(annotationId);
+		if (!annotation) {
+			throw new Error('Annotation not found');
+		}
+		const updatedAnnotation: GraphAnnotationStorage = {
+			...annotation,
+			...updates,
+			updatedAt: new Date(),
+		};
+		this.annotations.set(annotationId, updatedAnnotation);
+	}
+
+	async deleteAnnotation(annotationId: string): Promise<void> {
+		this.annotations.delete(annotationId);
+	}
+
+	async toggleAnnotationVisibility(annotationId: string, visible: boolean): Promise<void> {
+		const annotation = this.annotations.get(annotationId);
+		if (!annotation) {
+			throw new Error('Annotation not found');
+		}
+		const updatedAnnotation: GraphAnnotationStorage = {
+			...annotation,
+			visible,
+			updatedAt: new Date(),
+		};
+		this.annotations.set(annotationId, updatedAnnotation);
+	}
+
+	async deleteAnnotationsByGraph(graphId: string): Promise<void> {
+		for (const [id, annotation] of this.annotations.entries()) {
+			if (annotation.graphId === graphId) {
+				this.annotations.delete(id);
+			}
+		}
+	}
+
+	// ========== Snapshot Operations ==========
+
+	async saveSnapshot(snapshot: {
+		name: string;
+		nodes: string;
+		edges: string;
+		zoom: number;
+		panX: number;
+		panY: number;
+		layoutType: string;
+		nodePositions?: string;
+		annotations?: string;
+		isAutoSave?: boolean;
+	}): Promise<string> {
+		const id = crypto.randomUUID();
+		const timestamp = new Date();
+		const storedSnapshot: GraphSnapshotStorage = {
+			id,
+			name: snapshot.name,
+			nodes: snapshot.nodes,
+			edges: snapshot.edges,
+			zoom: snapshot.zoom,
+			panX: snapshot.panX,
+			panY: snapshot.panY,
+			layoutType: snapshot.layoutType,
+			nodePositions: snapshot.nodePositions,
+			annotations: snapshot.annotations,
+			isAutoSave: snapshot.isAutoSave ?? false,
+			createdAt: timestamp,
+			updatedAt: timestamp,
+		};
+		this.snapshots.set(id, storedSnapshot);
+		return id;
+	}
+
+	async getSnapshots(): Promise<GraphSnapshotStorage[]> {
+		return Array.from(this.snapshots.values());
+	}
+
+	async getSnapshot(snapshotId: string): Promise<GraphSnapshotStorage | null> {
+		return this.snapshots.get(snapshotId) ?? null;
+	}
+
+	async deleteSnapshot(snapshotId: string): Promise<void> {
+		this.snapshots.delete(snapshotId);
+	}
+
+	async updateSnapshot(snapshotId: string, updates: {
+		name?: string;
+		nodes?: string;
+		edges?: string;
+		zoom?: number;
+		panX?: number;
+		panY?: number;
+		layoutType?: string;
+		nodePositions?: string;
+		annotations?: string;
+	}): Promise<void> {
+		const snapshot = this.snapshots.get(snapshotId);
+		if (!snapshot) {
+			throw new Error('Snapshot not found');
+		}
+		const updatedSnapshot: GraphSnapshotStorage = {
+			...snapshot,
+			...updates,
+			updatedAt: new Date(),
+		};
+		this.snapshots.set(snapshotId, updatedSnapshot);
+	}
+
+	async pruneAutoSaveSnapshots(maxCount: number): Promise<void> {
+		const autoSnapshots = Array.from(this.snapshots.values())
+			.filter(snap => snap.isAutoSave)
+			.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+		if (autoSnapshots.length > maxCount) {
+			const toDelete = autoSnapshots.slice(0, autoSnapshots.length - maxCount);
+			for (const snap of toDelete) {
+				if (snap.id) {
+					this.snapshots.delete(snap.id);
+				}
+			}
+		}
+	}
+
+	async addSnapshot(snapshot: Omit<GraphSnapshotStorage, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+		const id = crypto.randomUUID();
+		const timestamp = new Date();
+		const storedSnapshot: GraphSnapshotStorage = {
+			id,
+			name: snapshot.name,
+			nodes: snapshot.nodes,
+			edges: snapshot.edges,
+			zoom: snapshot.zoom,
+			panX: snapshot.panX,
+			panY: snapshot.panY,
+			layoutType: snapshot.layoutType,
+			nodePositions: snapshot.nodePositions,
+			annotations: snapshot.annotations,
+			isAutoSave: snapshot.isAutoSave ?? false,
+			createdAt: timestamp,
+			updatedAt: timestamp,
+		};
+		this.snapshots.set(id, storedSnapshot);
+		return id;
+	}
+
+	// ========== Search History Operations ==========
+
+	async addSearchQuery(query: string, maxHistory: number = 50): Promise<void> {
+		const timestamp = new Date();
+		const id = crypto.randomUUID();
+		this.searchHistory.set(id, { query, timestamp });
+
+		// Prune old entries if exceeds max
+		const entries = Array.from(this.searchHistory.entries())
+			.sort(([, a], [, b]) => b.timestamp.getTime() - a.timestamp.getTime());
+
+		if (entries.length > maxHistory) {
+			for (const [idToDelete] of entries.slice(maxHistory)) {
+				this.searchHistory.delete(idToDelete);
+			}
+		}
+	}
+
+	async getSearchHistory(): Promise<Array<{ query: string; timestamp: Date }>> {
+		return Array.from(this.searchHistory.values())
+			.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+	}
+
+	async removeSearchQuery(queryId: string): Promise<void> {
+		this.searchHistory.delete(queryId);
+	}
+
+	async clearSearchHistory(): Promise<void> {
+		this.searchHistory.clear();
 	}
 }
