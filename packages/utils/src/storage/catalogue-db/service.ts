@@ -13,8 +13,10 @@ import Dexie from "dexie";
 
 import type { GenericLogger } from "../../logger.js";
 import * as AnnotationOps from "./annotation-operations.js";
+import * as BookmarkOps from "./bookmark-operations.js";
 import * as EntityOps from "./entity-operations.js";
 import * as GraphListOps from "./graph-list-operations.js";
+import * as HistoryOps from "./history-operations.js";
 import * as ListOps from "./list-operations.js";
 import type {
   CatalogueEntity,
@@ -293,15 +295,13 @@ export class CatalogueService {
     entityId: string;
     notes?: string;
   }): Promise<string> {
-    await this.initializeSpecialLists();
-
-    // Store entity data directly in proper fields, user notes only in notes field
-    return await this.addEntityToList({
-      listId: SPECIAL_LIST_IDS.BOOKMARKS,
-      entityType: params.entityType,
-      entityId: params.entityId,
-      notes: params.notes, // User notes only, no URLs
-    });
+    return await BookmarkOps.addBookmark(
+      this.db,
+      this.initializeSpecialLists.bind(this),
+      this.addEntityToList.bind(this),
+      params,
+      this.logger
+    );
   }
 
   /**
@@ -309,15 +309,19 @@ export class CatalogueService {
    * @param entityRecordId
    */
   async removeBookmark(entityRecordId: string): Promise<void> {
-    await this.removeEntityFromList(SPECIAL_LIST_IDS.BOOKMARKS, entityRecordId);
+    return await BookmarkOps.removeBookmark(this.removeEntityFromList.bind(this), entityRecordId);
   }
 
   /**
    * Get all bookmarks
    */
   async getBookmarks(): Promise<CatalogueEntity[]> {
-    await this.initializeSpecialLists();
-    return await this.getListEntities(SPECIAL_LIST_IDS.BOOKMARKS);
+    return await BookmarkOps.getBookmarks(
+      this.db,
+      this.initializeSpecialLists.bind(this),
+      this.getListEntities.bind(this),
+      this.logger
+    );
   }
 
   /**
@@ -326,16 +330,7 @@ export class CatalogueService {
    * @param entityId
    */
   async isBookmarked(entityType: EntityType, entityId: string): Promise<boolean> {
-    try {
-      const existing = await this.db.catalogueEntities
-        .where(["listId", "entityType", "entityId"])
-        .equals([SPECIAL_LIST_IDS.BOOKMARKS, entityType, entityId])
-        .first();
-      return !!existing;
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to check bookmark status", { entityType, entityId, error });
-      return false;
-    }
+    return await BookmarkOps.isBookmarked(this.db, entityType, entityId, this.logger);
   }
 
   /**
