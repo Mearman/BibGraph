@@ -3,650 +3,225 @@
  *
  * Atomic graph-type properties using discriminated unions for type-safe composition.
  * Each property is a disjoint union with a `kind` discriminator for exhaustiveness checking.
+ *
+ * Property types are organized into focused modules in the spec/ directory.
  */
 
 // ============================================================================
-// CORE PROPERTY AXES (used in current test fixtures)
+// PROPERTY TYPE IMPORTS
 // ============================================================================
 
-/** Edge direction property */
-export type Directionality =
-  | { kind: "directed" }
-  | { kind: "undirected" };
-
-/** Edge weighting property */
-export type Weighting =
-  | { kind: "unweighted" }
-  | { kind: "weighted_numeric" }; // TODO: extend to weighted_vector, valued_symbolic
-
-/** Cycle presence property */
-export type Cycles =
-  | { kind: "acyclic" }
-  | { kind: "cycles_allowed" };
-
-/** Connectivity property */
-export type Connectivity =
-  | { kind: "connected" }
-  | { kind: "unconstrained" }; // "disconnected" in our old system
-
-/** Node/edge type diversity property */
-export type SchemaHomogeneity =
-  | { kind: "homogeneous" }
-  | { kind: "heterogeneous" };
-
-/** Multiple edges between same vertices property */
-export type EdgeMultiplicity =
-  | { kind: "simple" }
-  | { kind: "multi" };
-
-/** Self-loop permission property */
-export type SelfLoops =
-  | { kind: "allowed" }
-  | { kind: "disallowed" };
-
-/** Target density for graph generation */
-export type Density =
-  | { kind: "sparse" }     // ~15% of max edges
-  | { kind: "moderate" }   // ~40% of max edges
-  | { kind: "dense" }      // ~70% of max edges
-  | { kind: "unconstrained" };
-
-/** Graph completeness property */
-export type Completeness =
-  | { kind: "complete" }
-  | { kind: "incomplete" };
-
-// ============================================================================
-// ADVANCED PROPERTY AXES (future extension)
-// ============================================================================
-
-/** Vertex set cardinality */
-export type VertexCardinality =
-  | { kind: "finite"; n?: number }
-  | { kind: "countably_infinite" }
-  | { kind: "uncountably_infinite" };
-
-/** Vertex identity */
-export type VertexIdentity =
-  | { kind: "distinguishable" }
-  | { kind: "indistinguishable" };
-
-/** Vertex ordering */
-export type VertexOrdering =
-  | { kind: "unordered" }
-  | { kind: "total_order" }
-  | { kind: "partial_order" };
-
-/** Edge arity (binary vs hypergraph) */
-export type EdgeArity =
-  | { kind: "binary" }
-  | { kind: "k_ary"; k: number };
-
-/** Edge signedness */
-export type Signedness =
-  | { kind: "unsigned" }
-  | { kind: "signed" }
-  | { kind: "multi_signed" };
-
-/** Edge uncertainty */
-export type Uncertainty =
-  | { kind: "deterministic" }
-  | { kind: "probabilistic" }
-  | { kind: "fuzzy" };
-
-/** Vertex metadata */
-export type VertexData =
-  | { kind: "unlabelled" }
-  | { kind: "labelled" }
-  | { kind: "attributed" };
-
-/** Edge metadata */
-export type EdgeData =
-  | { kind: "unlabelled" }
-  | { kind: "labelled" }
-  | { kind: "attributed" };
-
-/** Degree constraints */
-export type DegreeConstraint =
-  | { kind: "unconstrained" }
-  | { kind: "bounded"; max: number }
-  | { kind: "regular"; degree: number }
-  | { kind: "degree_sequence"; sequence: readonly number[] };
-
-/** Partiteness (bipartite, k-partite) */
-export type Partiteness =
-  | { kind: "unrestricted" }
-  | { kind: "bipartite" }
-  | { kind: "k_partite"; k: number };
-
-/** Graph embedding */
-export type Embedding =
-  | { kind: "abstract" }
-  | { kind: "planar" }
-  | { kind: "surface_embedded" }
-  | { kind: "geometric_metric_space" }
-  | { kind: "spatial_coordinates"; dims: 2 | 3 };
-
-/** Tree rooting */
-export type Rooting =
-  | { kind: "unrooted" }
-  | { kind: "rooted" }
-  | { kind: "multi_rooted" };
-
-/** Temporal properties */
-export type Temporal =
-  | { kind: "static" }
-  | { kind: "dynamic_structure" }
-  | { kind: "temporal_edges" }
-  | { kind: "temporal_vertices" }
-  | { kind: "time_ordered" };
-
-/** Layering (multiplex networks, etc.) */
-export type Layering =
-  | { kind: "single_layer" }
-  | { kind: "multi_layer" }
-  | { kind: "multiplex" }
-  | { kind: "interdependent" };
-
-/** Edge ordering */
-export type EdgeOrdering =
-  | { kind: "unordered" }
-  | { kind: "ordered" };
-
-/** Port specification */
-export type Ports =
-  | { kind: "none" }
-  | { kind: "port_labelled_vertices" };
-
-/** Observability */
-export type Observability =
-  | { kind: "fully_specified" }
-  | { kind: "partially_observed" }
-  | { kind: "latent_or_inferred" };
-
-/** Operational semantics */
-export type OperationalSemantics =
-  | { kind: "structural_only" }
-  | { kind: "annotated_with_functions" }
-  | { kind: "executable" };
-
-/** Measure semantics (cost, utility, etc.) */
-export type MeasureSemantics =
-  | { kind: "none" }
-  | { kind: "metric" }
-  | { kind: "cost" }
-  | { kind: "utility" };
-
-// ============================================================================
-// NETWORK ANALYSIS PROPERTIES (scale-free, small-world, community structure)
-// ============================================================================
-
-/** Scale-free property (power-law degree distribution) */
-export type ScaleFree =
-  | { kind: "scale_free"; exponent?: number }  // Power-law with given exponent γ (default: 2.1)
-  | { kind: "not_scale_free" };              // Degree distribution not power-law
-
-/** Small-world property (high clustering + short paths) */
-export type SmallWorld =
-  | { kind: "small_world"; rewireProbability?: number; meanDegree?: number }
-  | { kind: "not_small_world" }
-  | { kind: "unconstrained" };
-
-/** Modular/community structure property */
-export type CommunityStructure =
-  | { kind: "modular"; numCommunities?: number; intraCommunityDensity?: number; interCommunityDensity?: number }
-  | { kind: "non_modular" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// GEOMETRIC AND TOPOLOGICAL PROPERTIES (Unit disk, planar)
-// ============================================================================
-
-/** Unit disk graph property (geometric constraint) */
-export type UnitDisk =
-  | { kind: "unit_disk"; unitRadius?: number; spaceSize?: number }
-  | { kind: "not_unit_disk" }
-  | { kind: "unconstrained" };
-
-/** Planar graph property (K5/K3,3-free) */
-export type Planarity =
-  | { kind: "planar" }
-  | { kind: "non_planar" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// PATH/CYCLE PROPERTIES (Hamiltonian, traceable)
-// ============================================================================
-
-/** Hamiltonian cycle property */
-export type Hamiltonian =
-  | { kind: "hamiltonian" }      // Has cycle visiting every vertex
-  | { kind: "non_hamiltonian" }
-  | { kind: "unconstrained" };
-
-/** Hamiltonian path property */
-export type Traceable =
-  | { kind: "traceable" }        // Has path visiting every vertex
-  | { kind: "non_traceable" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// STRUCTURAL GRAPH CLASSES (perfect, split, cograph, etc.)
-// ============================================================================
-
-/** Perfect graph property (ω(H) = χ(H) for all induced subgraphs) */
-export type Perfect =
-  | { kind: "perfect" }
-  | { kind: "imperfect" }
-  | { kind: "unconstrained" };
-
-/** Split graph property (clique + independent set partition) */
-export type Split =
-  | { kind: "split" }
-  | { kind: "non_split" }
-  | { kind: "unconstrained" };
-
-/** Cograph property (P4-free, can be constructed via union/complement) */
-export type Cograph =
-  | { kind: "cograph" }
-  | { kind: "non_cograph" }
-  | { kind: "unconstrained" };
-
-/** Threshold graph property (split + cograph) */
-export type Threshold =
-  | { kind: "threshold" }
-  | { kind: "non_threshold" }
-  | { kind: "unconstrained" };
-
-/** Line graph property */
-export type Line =
-  | { kind: "line_graph" }
-  | { kind: "non_line_graph" }
-  | { kind: "unconstrained" };
-
-/** Claw-free property (no K1,3 induced subgraph) */
-export type ClawFree =
-  | { kind: "claw_free" }
-  | { kind: "has_claw" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// REGULARITY PROPERTIES (cubic, k-regular, strongly regular)
-// ============================================================================
-
-/** Cubic graph property (3-regular) */
-export type Cubic =
-  | { kind: "cubic" }           // All vertices have degree 3
-  | { kind: "non_cubic" }
-  | { kind: "unconstrained" };
-
-/** Specific regularity property */
-export type SpecificRegular =
-  | { kind: "k_regular"; k: number }  // All vertices have degree k
-  | { kind: "not_k_regular" }
-  | { kind: "unconstrained" };
-
-/** Strongly regular graph property */
-export type StronglyRegular =
-  | { kind: "strongly_regular"; k: number; lambda: number; mu: number }
-  | { kind: "not_strongly_regular" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// SYMMETRY PROPERTIES (self-complementary, vertex-transitive)
-// ============================================================================
-
-/** Self-complementary property */
-export type SelfComplementary =
-  | { kind: "self_complementary" }
-  | { kind: "not_self_complementary" }
-  | { kind: "unconstrained" };
-
-/** Vertex-transitive property (automorphisms can map any vertex to any other) */
-export type VertexTransitive =
-  | { kind: "vertex_transitive" }
-  | { kind: "not_vertex_transitive" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// SYMMETRY REFINEMENTS (edge-transitive, arc-transitive)
-// ============================================================================
-
-/** Edge-transitive property (automorphisms can map any edge to any other) */
-export type EdgeTransitive =
-  | { kind: "edge_transitive" }
-  | { kind: "not_edge_transitive" }
-  | { kind: "unconstrained" };
-
-/** Arc-transitive property (both vertex AND edge transitive - symmetric graphs) */
-export type ArcTransitive =
-  | { kind: "arc_transitive" }
-  | { kind: "not_arc_transitive" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// DIAMETER-BASED PROPERTIES
-// ============================================================================
-
-/** Longest shortest path in graph */
-export type Diameter =
-  | { kind: "diameter"; value: number }
-  | { kind: "unconstrained" };
-
-/** Minimum eccentricity among all vertices */
-export type Radius =
-  | { kind: "radius"; value: number }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// GIRTH & CIRCUMFERENCE
-// ============================================================================
-
-/** Length of shortest cycle */
-export type Girth =
-  | { kind: "girth"; girth: number }
-  | { kind: "unconstrained" };
-
-/** Length of longest cycle */
-export type Circumference =
-  | { kind: "circumference"; value: number }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// FORBIDDEN INDUCED SUBGRAPHS
-// ============================================================================
-
-/** Hereditary class with forbidden induced subgraphs */
-export type HereditaryClass =
-  | { kind: "hereditary_class"; forbidden: readonly string[] }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// NUMERICAL INVARIANTS
-// ============================================================================
-
-/** Independence number (α): size of largest independent set */
-export type IndependenceNumber =
-  | { kind: "independence_number"; value: number }
-  | { kind: "unconstrained" };
-
-/** Vertex cover number (τ): minimum vertices covering all edges */
-export type VertexCover =
-  | { kind: "vertex_cover"; value: number }
-  | { kind: "unconstrained" };
-
-/** Domination number (γ): minimum vertices dominating all others */
-export type DominationNumber =
-  | { kind: "domination_number"; value: number }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// SPECTRAL PROPERTIES
-// ============================================================================
-
-/** Full spectrum: eigenvalue-based properties */
-export type Spectrum =
-  | { kind: "spectrum"; eigenvalues: readonly number[] }
-  | { kind: "unconstrained" };
-
-/** Algebraic connectivity (λ₂): second smallest Laplacian eigenvalue (Fiedler value) */
-export type AlgebraicConnectivity =
-  | { kind: "algebraic_connectivity"; value: number }
-  | { kind: "unconstrained" };
-
-/** Spectral radius (ρ): largest eigenvalue (Perron-Frobenius for non-negative) */
-export type SpectralRadius =
-  | { kind: "spectral_radius"; value: number }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// ROBUSTNESS MEASURES
-// ============================================================================
-
-/** Toughness: minimum k such that removing k vertices disconnects */
-export type Toughness =
-  | { kind: "toughness"; value: number }
-  | { kind: "unconstrained" };
-
-/** Integrity: resilience measure based on vertex removal */
-export type Integrity =
-  | { kind: "integrity"; value: number }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// EXTREMAL GRAPHS
-// ============================================================================
-
-/** Cage graph: (girth, degree) combination with minimal vertices */
-export type Cage =
-  | { kind: "cage"; girth: number; degree: number }
-  | { kind: "not_cage" }
-  | { kind: "unconstrained" };
-
-/** Moore graph: maximum vertices for given (diameter, degree) bound */
-export type MooreGraph =
-  | { kind: "moore"; diameter: number; degree: number }
-  | { kind: "not_moore" }
-  | { kind: "unconstrained" };
-
-/** Ramanujan graph: optimal expander with spectral gap property */
-export type Ramanujan =
-  | { kind: "ramanujan"; degree: number }
-  | { kind: "not_ramanujan" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// GRAPH PRODUCTS
-// ============================================================================
-
-/** Cartesian product G □ H */
-export type CartesianProduct =
-  | { kind: "cartesian_product"; leftFactors: number; rightFactors: number }
-  | { kind: "not_cartesian_product" }
-  | { kind: "unconstrained" };
-
-/** Tensor (direct) product G × H */
-export type TensorProduct =
-  | { kind: "tensor_product"; leftFactors: number; rightFactors: number }
-  | { kind: "not_tensor_product" }
-  | { kind: "unconstrained" };
-
-/** Strong product G ⊠ H */
-export type StrongProduct =
-  | { kind: "strong_product"; leftFactors: number; rightFactors: number }
-  | { kind: "not_strong_product" }
-  | { kind: "unconstrained" };
-
-/** Lexicographic product G ∘ H */
-export type LexicographicProduct =
-  | { kind: "lexicographic_product"; leftFactors: number; rightFactors: number }
-  | { kind: "not_lexicographic_product" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// MINOR-FREE GRAPHS
-// ============================================================================
-
-/** Minor-free: excludes specific graph minors (Kuratowski-Wagner theorem) */
-export type MinorFree =
-  | { kind: "minor_free"; forbiddenMinors: string[] }
-  | { kind: "not_minor_free" }
-  | { kind: "unconstrained" };
-
-/** Topological minor-free: excludes specific subdivisions */
-export type TopologicalMinorFree =
-  | { kind: "topological_minor_free"; forbiddenMinors: string[] }
-  | { kind: "not_topological_minor_free" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// SPECIAL BIPARTITE PROPERTIES
-// ============================================================================
-
-/** Complete bipartite property K_{m,n} */
-export type CompleteBipartite =
-  | { kind: "complete_bipartite"; m: number; n: number }
-  | { kind: "not_complete_bipartite" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// EULERIAN/TRAIL PROPERTIES
-// ============================================================================
-
-/** Eulerian circuit property (uses every edge exactly once, returns to start) */
-export type Eulerian =
-  | { kind: "eulerian" }        // Has Eulerian circuit
-  | { kind: "semi_eulerian" }   // Has Eulerian trail (start ≠ end)
-  | { kind: "non_eulerian" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// ADVANCED CONNECTIVITY (k-vertex and k-edge)
-// ============================================================================
-
-/** k-vertex-connected property (cannot disconnect by removing < k vertices) */
-export type KVertexConnected =
-  | { kind: "k_vertex_connected"; k: number }  // k-connected
-  | { kind: "unconstrained" };
-
-/** k-edge-connected property (cannot disconnect by removing < k edges) */
-export type KEdgeConnected =
-  | { kind: "k_edge_connected"; k: number }  // k-edge-connected
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// SPECIAL GRAPH STRUCTURES
-// ============================================================================
-
-/** Wheel graph property (cycle + central hub connected to all) */
-export type Wheel =
-  | { kind: "wheel" }
-  | { kind: "not_wheel" }
-  | { kind: "unconstrained" };
-
-/** Grid/lattice graph property */
-export type Grid =
-  | { kind: "grid"; rows: number; cols: number }
-  | { kind: "not_grid" }
-  | { kind: "unconstrained" };
-
-/** Toroidal graph property (grid on torus) */
-export type Toroidal =
-  | { kind: "toroidal"; rows: number; cols: number }
-  | { kind: "not_toroidal" }
-  | { kind: "unconstrained" };
-
-/** Star graph property (one central vertex) */
-export type Star =
-  | { kind: "star" }
-  | { kind: "not_star" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// COMPARISON AND ORDER GRAPHS
-// ============================================================================
-
-/** Comparability graph property (represents partial order) */
-export type Comparability =
-  | { kind: "comparability" }
-  | { kind: "incomparability" }
-  | { kind: "unconstrained" };
-
-/** Interval graph property (intersection of intervals) */
-export type Interval =
-  | { kind: "interval" }
-  | { kind: "not_interval" }
-  | { kind: "unconstrained" };
-
-/** Permutation graph property */
-export type Permutation =
-  | { kind: "permutation" }
-  | { kind: "not_permutation" }
-  | { kind: "unconstrained" };
-
-/** Chordal graph property (no induced cycles > 3) */
-export type Chordal =
-  | { kind: "chordal" }
-  | { kind: "non_chordal" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// MATCHING PROPERTIES
-// ============================================================================
-
-/** Perfect matching property */
-export type PerfectMatching =
-  | { kind: "perfect_matching" }    // All vertices matched
-  | { kind: "near_perfect" }        // All but one vertex matched
-  | { kind: "no_perfect_matching" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// COLORING PROPERTIES
-// ============================================================================
-
-/** k-colorable property */
-export type KColorable =
-  | { kind: "k_colorable"; k: number }  // Can be colored with k colors
-  | { kind: "bipartite_colorable" }     // 2-colorable
-  | { kind: "unconstrained" };
-
-/** Chromatic number property (minimum colors needed) */
-export type ChromaticNumber =
-  | { kind: "chromatic_number"; chi: number }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// DECOMPOSITION PROPERTIES
-// ============================================================================
-
-/** Treewidth property (how tree-like the graph is) */
-export type Treewidth =
-  | { kind: "treewidth"; width: number }
-  | { kind: "unconstrained" };
-
-/** Branchwidth property */
-export type Branchwidth =
-  | { kind: "branchwidth"; width: number }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// FLOW NETWORKS
-// ============================================================================
-
-/** Flow network property */
-export type FlowNetwork =
-  | { kind: "flow_network"; source: string; sink: string }
-  | { kind: "not_flow_network" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// SPECIALIZED TREE PROPERTIES
-// ============================================================================
-
-/** Binary tree property */
-export type BinaryTree =
-  | { kind: "binary_tree" }     // Each node has ≤ 2 children
-  | { kind: "full_binary" }     // Each node has 0 or 2 children
-  | { kind: "complete_binary" } // All levels filled except possibly last
-  | { kind: "not_binary_tree" }
-  | { kind: "unconstrained" };
-
-/** Spanning tree property */
-export type SpanningTree =
-  | { kind: "spanning_tree"; of: string }  // Spanning tree of graph with ID
-  | { kind: "not_spanning_tree" }
-  | { kind: "unconstrained" };
-
-// ============================================================================
-// TOURNAMENT GRAPHS
-// ============================================================================
-
-/** Tournament property (complete oriented graph) */
-export type Tournament =
-  | { kind: "tournament" }
-  | { kind: "not_tournament" }
-  | { kind: "unconstrained" };
+// Import all property types from modular structure for use in composite types
+import type {
+  // Core properties
+  Directionality,
+  Weighting,
+  Cycles,
+  Connectivity,
+  SchemaHomogeneity,
+  EdgeMultiplicity,
+  SelfLoops,
+  Density,
+  Completeness,
+  // Advanced properties
+  VertexCardinality,
+  VertexIdentity,
+  VertexOrdering,
+  EdgeArity,
+  Signedness,
+  Uncertainty,
+  VertexData,
+  EdgeData,
+  DegreeConstraint,
+  Partiteness,
+  Embedding,
+  Rooting,
+  Temporal,
+  Layering,
+  EdgeOrdering,
+  Ports,
+  Observability,
+  OperationalSemantics,
+  MeasureSemantics,
+  // Network analysis
+  ScaleFree,
+  SmallWorld,
+  CommunityStructure,
+  // Geometric
+  UnitDisk,
+  Planarity,
+  // Path & cycle
+  Hamiltonian,
+  Traceable,
+  // Structural classes
+  Perfect,
+  Split,
+  Cograph,
+  Threshold,
+  Line,
+  ClawFree,
+  // Regularity
+  Cubic,
+  SpecificRegular,
+  StronglyRegular,
+  // Symmetry
+  SelfComplementary,
+  VertexTransitive,
+  EdgeTransitive,
+  ArcTransitive,
+  // Metrics
+  Diameter,
+  Radius,
+  Girth,
+  Circumference,
+  // Invariants & spectral
+  HereditaryClass,
+  IndependenceNumber,
+  VertexCover,
+  DominationNumber,
+  Spectrum,
+  AlgebraicConnectivity,
+  SpectralRadius,
+  // Products & structures
+  Toughness,
+  Integrity,
+  Cage,
+  MooreGraph,
+  Ramanujan,
+  CartesianProduct,
+  TensorProduct,
+  StrongProduct,
+  LexicographicProduct,
+  MinorFree,
+  TopologicalMinorFree,
+  CompleteBipartite,
+  Eulerian,
+  KVertexConnected,
+  KEdgeConnected,
+  Wheel,
+  Grid,
+  Toroidal,
+  Star,
+  Comparability,
+  Interval,
+  Permutation,
+  Chordal,
+  PerfectMatching,
+  KColorable,
+  ChromaticNumber,
+  Treewidth,
+  Branchwidth,
+  FlowNetwork,
+  BinaryTree,
+  SpanningTree,
+  Tournament,
+} from "./spec/index.js";
+
+// Re-export for backward compatibility
+export type {
+  // Core properties
+  Directionality,
+  Weighting,
+  Cycles,
+  Connectivity,
+  SchemaHomogeneity,
+  EdgeMultiplicity,
+  SelfLoops,
+  Density,
+  Completeness,
+  // Advanced properties
+  VertexCardinality,
+  VertexIdentity,
+  VertexOrdering,
+  EdgeArity,
+  Signedness,
+  Uncertainty,
+  VertexData,
+  EdgeData,
+  DegreeConstraint,
+  Partiteness,
+  Embedding,
+  Rooting,
+  Temporal,
+  Layering,
+  EdgeOrdering,
+  Ports,
+  Observability,
+  OperationalSemantics,
+  MeasureSemantics,
+  // Network analysis
+  ScaleFree,
+  SmallWorld,
+  CommunityStructure,
+  // Geometric
+  UnitDisk,
+  Planarity,
+  // Path & cycle
+  Hamiltonian,
+  Traceable,
+  // Structural classes
+  Perfect,
+  Split,
+  Cograph,
+  Threshold,
+  Line,
+  ClawFree,
+  // Regularity
+  Cubic,
+  SpecificRegular,
+  StronglyRegular,
+  // Symmetry
+  SelfComplementary,
+  VertexTransitive,
+  EdgeTransitive,
+  ArcTransitive,
+  // Metrics
+  Diameter,
+  Radius,
+  Girth,
+  Circumference,
+  // Invariants & spectral
+  HereditaryClass,
+  IndependenceNumber,
+  VertexCover,
+  DominationNumber,
+  Spectrum,
+  AlgebraicConnectivity,
+  SpectralRadius,
+  // Products & structures
+  Toughness,
+  Integrity,
+  Cage,
+  MooreGraph,
+  Ramanujan,
+  CartesianProduct,
+  TensorProduct,
+  StrongProduct,
+  LexicographicProduct,
+  MinorFree,
+  TopologicalMinorFree,
+  CompleteBipartite,
+  Eulerian,
+  KVertexConnected,
+  KEdgeConnected,
+  Wheel,
+  Grid,
+  Toroidal,
+  Star,
+  Comparability,
+  Interval,
+  Permutation,
+  Chordal,
+  PerfectMatching,
+  KColorable,
+  ChromaticNumber,
+  Treewidth,
+  Branchwidth,
+  FlowNetwork,
+  BinaryTree,
+  SpanningTree,
+  Tournament,
+};
 
 // ============================================================================
 // COMPOSABLE GRAPH SPECIFICATION
