@@ -6,14 +6,14 @@
  * - Shapes (rectangles, circles)
  * - Freehand drawings
  *
- * Annotations are stored in IndexedDB via catalogueService
+ * Annotations are stored in IndexedDB via storage provider
  * and can be shared via graph snapshots (URL-encoded)
  *
  * @module hooks/use-graph-annotations
  */
 
 import type { GraphAnnotationStorage } from '@bibgraph/utils';
-import { catalogueService } from '@bibgraph/utils';
+import { useStorageProvider } from '@/contexts/storage-provider-context';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 /**
@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
  * @param graphId Optional graph ID for filtering annotations (used for sharing)
  */
 export const useGraphAnnotations = (graphId?: string) => {
+  const storageProvider = useStorageProvider();
   const [annotations, setAnnotations] = useState<GraphAnnotationStorage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -31,7 +32,7 @@ export const useGraphAnnotations = (graphId?: string) => {
       try {
         setIsLoading(true);
         setError(null);
-        const loadedAnnotations = await catalogueService.getAnnotations(graphId);
+        const loadedAnnotations = await storageProvider.getAnnotations(graphId);
         setAnnotations(loadedAnnotations);
       } catch (err) {
         const errorObj = err instanceof Error ? err : new Error(String(err));
@@ -52,13 +53,13 @@ export const useGraphAnnotations = (graphId?: string) => {
     annotation: Omit<GraphAnnotationStorage, 'id' | 'createdAt' | 'updatedAt' | 'graphId'>
   ) => {
     try {
-      const id = await catalogueService.addAnnotation({
+      const id = await storageProvider.addAnnotation({
         ...annotation,
         graphId,
       });
 
       // Refresh annotations from storage
-      const updatedAnnotations = await catalogueService.getAnnotations(graphId);
+      const updatedAnnotations = await storageProvider.getAnnotations(graphId);
       setAnnotations(updatedAnnotations);
 
       return id;
@@ -176,10 +177,10 @@ export const useGraphAnnotations = (graphId?: string) => {
     updates: Partial<Omit<GraphAnnotationStorage, 'id' | 'createdAt' | 'updatedAt' | 'graphId'>>
   ) => {
     try {
-      await catalogueService.updateAnnotation(id, updates);
+      await storageProvider.updateAnnotation(id, updates);
 
       // Refresh annotations from storage
-      const updatedAnnotations = await catalogueService.getAnnotations(graphId);
+      const updatedAnnotations = await storageProvider.getAnnotations(graphId);
       setAnnotations(updatedAnnotations);
     } catch (err) {
       const errorObj = err instanceof Error ? err : new Error(String(err));
@@ -194,7 +195,7 @@ export const useGraphAnnotations = (graphId?: string) => {
    */
   const deleteAnnotation = useCallback(async (id: string) => {
     try {
-      await catalogueService.deleteAnnotation(id);
+      await storageProvider.deleteAnnotation(id);
 
       // Remove from local state
       setAnnotations(prev => prev.filter(a => a.id !== id));
@@ -215,7 +216,7 @@ export const useGraphAnnotations = (graphId?: string) => {
 
     const newVisibility = !annotation.visible;
     try {
-      await catalogueService.toggleAnnotationVisibility(id, newVisibility);
+      await storageProvider.toggleAnnotationVisibility(id, newVisibility);
 
       // Update local state
       setAnnotations(prev =>
@@ -242,7 +243,7 @@ export const useGraphAnnotations = (graphId?: string) => {
     }
 
     try {
-      await catalogueService.deleteAnnotationsByGraph(graphId);
+      await storageProvider.deleteAnnotationsByGraph(graphId);
       setAnnotations([]);
     } catch (err) {
       const errorObj = err instanceof Error ? err : new Error(String(err));
@@ -296,7 +297,7 @@ export const useGraphAnnotations = (graphId?: string) => {
 
     // Helpers
     refresh: useCallback(async () => {
-      const updatedAnnotations = await catalogueService.getAnnotations(graphId);
+      const updatedAnnotations = await storageProvider.getAnnotations(graphId);
       setAnnotations(updatedAnnotations);
     }, [graphId]),
   };

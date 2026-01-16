@@ -1,11 +1,11 @@
 /**
  * Search History Hook
  *
- * Manages search query history with IndexedDB persistence via catalogue service.
+ * Manages search query history with IndexedDB persistence via storage provider.
  * Stores up to 50 search queries with FIFO eviction.
  */
 
-import { catalogueService } from '@bibgraph/utils/storage/catalogue-db';
+import { useStorageProvider } from '@/contexts/storage-provider-context';
 import { useCallback, useEffect, useState } from 'react';
 
 interface SearchHistoryEntry {
@@ -21,6 +21,7 @@ const MAX_SEARCH_HISTORY = 50;
  * @returns Search history state and operations
  */
 export const useSearchHistory = () => {
+  const storageProvider = useStorageProvider();
   const [searchHistory, setSearchHistory] = useState<SearchHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -30,7 +31,7 @@ export const useSearchHistory = () => {
 
     const loadHistory = async () => {
       try {
-        const history = await catalogueService.getSearchHistory();
+        const history = await storageProvider.getSearchHistory();
         if (mounted) {
           setSearchHistory(history);
           setIsLoading(false);
@@ -59,10 +60,10 @@ export const useSearchHistory = () => {
     if (!query.trim()) return;
 
     try {
-      await catalogueService.addSearchQuery(query, MAX_SEARCH_HISTORY);
+      await storageProvider.addSearchQuery(query, MAX_SEARCH_HISTORY);
 
       // Reload history after adding
-      const updatedHistory = await catalogueService.getSearchHistory();
+      const updatedHistory = await storageProvider.getSearchHistory();
       setSearchHistory(updatedHistory);
     } catch (error) {
       console.error('Failed to add search query:', error);
@@ -75,7 +76,7 @@ export const useSearchHistory = () => {
    */
   const removeSearchQuery = useCallback(async (id: string) => {
     try {
-      await catalogueService.removeSearchQuery(id);
+      await storageProvider.removeSearchQuery(id);
 
       // Update local state
       setSearchHistory(prev => prev.filter(entry => entry.id !== id));
@@ -89,7 +90,7 @@ export const useSearchHistory = () => {
    */
   const clearSearchHistory = useCallback(async () => {
     try {
-      await catalogueService.clearSearchHistory();
+      await storageProvider.clearSearchHistory();
       setSearchHistory([]);
     } catch (error) {
       console.error('Failed to clear search history:', error);

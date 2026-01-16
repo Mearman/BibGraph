@@ -11,7 +11,7 @@
  */
 
 import type { GraphEdge, GraphNode } from '@bibgraph/types';
-import { catalogueService } from '@bibgraph/utils';
+import { useStorageProvider } from '@/contexts/storage-provider-context';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface GraphSnapshot {
@@ -37,6 +37,7 @@ const MAX_AUTO_SAVE_COUNT = 5;
  * Hook for managing graph snapshots
  */
 export const useGraphSnapshots = () => {
+  const storageProvider = useStorageProvider();
   const [snapshots, setSnapshots] = useState<GraphSnapshot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -47,7 +48,7 @@ export const useGraphSnapshots = () => {
       try {
         setIsLoading(true);
         setError(null);
-        const loadedSnapshots = await catalogueService.getSnapshots();
+        const loadedSnapshots = await storageProvider.getSnapshots();
 
         // Deserialize snapshots
         const deserialized = loadedSnapshots.map(snapshot => {
@@ -127,7 +128,7 @@ export const useGraphSnapshots = () => {
         ? JSON.stringify(params.annotations)
         : undefined;
 
-      const id = await catalogueService.addSnapshot({
+      const id = await storageProvider.addSnapshot({
         name: params.name,
         nodes: JSON.stringify(params.nodes),
         edges: JSON.stringify(params.edges),
@@ -142,11 +143,11 @@ export const useGraphSnapshots = () => {
 
       // Prune old auto-saves if this is a manual save
       if (!params.isAutoSave) {
-        await catalogueService.pruneAutoSaveSnapshots(MAX_AUTO_SAVE_COUNT);
+        await storageProvider.pruneAutoSaveSnapshots(MAX_AUTO_SAVE_COUNT);
       }
 
       // Refresh snapshots from storage
-      const updatedSnapshots = await catalogueService.getSnapshots();
+      const updatedSnapshots = await storageProvider.getSnapshots();
       const deserialized = updatedSnapshots.map(snapshot => {
         let parsedNodes: GraphNode[] = [];
         let parsedEdges: GraphEdge[] = [];
@@ -226,7 +227,7 @@ export const useGraphSnapshots = () => {
    */
   const deleteSnapshot = useCallback(async (id: string) => {
     try {
-      await catalogueService.deleteSnapshot(id);
+      await storageProvider.deleteSnapshot(id);
 
       // Remove from local state
       setSnapshots(prev => prev.filter(s => s.id !== id));
@@ -243,7 +244,7 @@ export const useGraphSnapshots = () => {
    */
   const loadSnapshot = useCallback(async (id: string): Promise<GraphSnapshot | null> => {
     try {
-      const snapshot = await catalogueService.getSnapshot(id);
+      const snapshot = await storageProvider.getSnapshot(id);
 
       if (!snapshot) return null;
 
@@ -322,7 +323,7 @@ export const useGraphSnapshots = () => {
 
     // Helpers
     refresh: useCallback(async () => {
-      const updatedSnapshots = await catalogueService.getSnapshots();
+      const updatedSnapshots = await storageProvider.getSnapshots();
       const deserialized = updatedSnapshots.map(snapshot => {
         let parsedNodes: GraphNode[] = [];
         let parsedEdges: GraphEdge[] = [];
