@@ -112,3 +112,25 @@ export {
   type GroundTruthPath,
   type PrecomputedImportance,
 } from './ground-truth';
+
+// Export expansion comparison metrics
+export {
+  // Path diversity
+  jaccardDistance,
+  pathToNodeSet,
+  meanPairwiseJaccardDistance,
+  meanPairwiseEdgeJaccardDistance,
+  computePathDiversityMetrics,
+  computeHubCoverage,
+  identifyHubNodes,
+  type PathDiversityMetrics,
+  // Degree distribution
+  computeDegreeDistribution,
+  klDivergence,
+  jsDivergence,
+  earthMoversDistance,
+  compareDegreeDistributions,
+  degreeDistributionFromMap,
+  computeDegreeHistogram,
+  type DegreeDistributionMetrics,
+} from './metrics';

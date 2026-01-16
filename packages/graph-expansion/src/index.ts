@@ -80,3 +80,18 @@ export type {
   ExtractionError,
   InducedSubgraph,
 } from './extraction/ego-network';
+
+// Baselines for expansion comparison experiments
+export {
+  StandardBfsExpansion,
+  FrontierBalancedExpansion,
+  RandomPriorityExpansion,
+} from './baselines/index';
+export type {
+  StandardBfsResult,
+  BfsExpansionStats,
+  FrontierBalancedResult,
+  FrontierBalancedStats,
+  RandomPriorityResult,
+  RandomPriorityStats,
+} from './baselines/index';
