@@ -13,6 +13,7 @@ import Dexie from "dexie";
 
 import type { GenericLogger } from "../../logger.js";
 import * as AnnotationOps from "./annotation-operations.js";
+import * as EntityOps from "./entity-operations.js";
 import * as GraphListOps from "./graph-list-operations.js";
 import * as ListOps from "./list-operations.js";
 import type {
@@ -104,107 +105,13 @@ export class CatalogueService {
     notes?: string;
     position?: number;
   }): Promise<string> {
-    try {
-      // Validate that the entity type matches the list type
-      const list = await this.getList(params.listId);
-      if (!list) {
-        throw new Error("List not found");
-      }
-
-      if (list.type === "bibliography" && params.entityType !== "works") {
-        throw new Error("Bibliographies can only contain works");
-      }
-
-      // Check if entity already exists in list
-      const existing = await this.db.catalogueEntities
-        .where(["listId", "entityType", "entityId"])
-        .equals([params.listId, params.entityType, params.entityId])
-        .first();
-
-      if (existing && existing.id) {
-        // Instead of throwing, return the existing ID
-        this.logger?.debug(LOG_CATEGORY, "Entity already exists in list, returning existing ID", {
-          listId: params.listId,
-          entityType: params.entityType,
-          entityId: params.entityId,
-          existingId: existing.id,
-        });
-        return existing.id;
-      }
-
-      // Get next position if not specified
-      let position = params.position;
-      if (position === undefined) {
-        const entities = await this.db.catalogueEntities
-          .where("listId")
-          .equals(params.listId)
-          .toArray();
-        const maxPosition = entities.reduce((max, entity) => Math.max(max, entity.position), 0);
-        position = maxPosition + 1;
-      }
-
-      const id = crypto.randomUUID();
-      const entity: CatalogueEntity = {
-        id,
-        listId: params.listId,
-        entityType: params.entityType,
-        entityId: params.entityId,
-        addedAt: new Date(),
-        notes: params.notes,
-        position: position ?? 0,
-      };
-
-      await this.db.catalogueEntities.add(entity);
-
-      // Update list's updated timestamp
-      await this.updateList(params.listId, {});
-
-      // Emit event for entity addition
-      catalogueEventEmitter.emit({
-        type: 'entity-added',
-        listId: params.listId,
-        entityIds: [params.entityId],
-      });
-
-      this.logger?.debug(LOG_CATEGORY, "Entity added to catalogue list", {
-        listId: params.listId,
-        entityType: params.entityType,
-        entityId: params.entityId,
-      });
-
-      return id;
-    } catch (error) {
-      // Handle constraint errors gracefully - they might occur in race conditions
-      if (error instanceof Dexie.ConstraintError) {
-        this.logger?.debug(LOG_CATEGORY, "Entity already exists due to race condition, attempting to find existing", {
-          params,
-          error: error.message,
-        });
-
-        // Try to find and return the existing entity
-        try {
-          const existing = await this.db.catalogueEntities
-            .where(["listId", "entityType", "entityId"])
-            .equals([params.listId, params.entityType, params.entityId])
-            .first();
-
-          if (existing?.id) {
-            return existing.id;
-          }
-        } catch (findError) {
-          this.logger?.warn(LOG_CATEGORY, "Failed to find existing entity after constraint error", {
-            params,
-            findError,
-          });
-        }
-      }
-
-      this.logger?.error(LOG_CATEGORY, "Failed to add entity to catalogue list", {
-        params,
-        error,
-      });
-      throw error;
-    }
+    return await EntityOps.addEntityToList(
+      this.db,
+      this.getList.bind(this),
+      this.updateList.bind(this),
+      params,
+      this.logger
+    );
   }
 
   /**
@@ -213,30 +120,7 @@ export class CatalogueService {
    * @param entityRecordId
    */
   async removeEntityFromList(listId: string, entityRecordId: string): Promise<void> {
-    try {
-      await this.db.catalogueEntities.delete(entityRecordId);
-
-      // Update list's updated timestamp
-      await this.updateList(listId, {});
-
-      // Emit event for entity removal
-      catalogueEventEmitter.emit({
-        type: 'entity-removed',
-        listId,
-      });
-
-      this.logger?.debug(LOG_CATEGORY, "Entity removed from catalogue list", {
-        listId,
-        entityRecordId,
-      });
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to remove entity from catalogue list", {
-        listId,
-        entityRecordId,
-        error,
-      });
-      throw error;
-    }
+    return await EntityOps.removeEntityFromList(this.db, this.updateList.bind(this), listId, entityRecordId, this.logger);
   }
 
   /**
@@ -245,26 +129,7 @@ export class CatalogueService {
    * @param notes
    */
   async updateEntityNotes(entityRecordId: string, notes: string): Promise<void> {
-    try {
-      await this.db.catalogueEntities.update(entityRecordId, { notes });
-
-      // Get the entity to find its listId for updating the list timestamp
-      const entity = await this.db.catalogueEntities.get(entityRecordId);
-      if (entity) {
-        await this.updateList(entity.listId, {});
-      }
-
-      this.logger?.debug(LOG_CATEGORY, "Entity notes updated", {
-        entityRecordId,
-        notesLength: notes.length,
-      });
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to update entity notes", {
-        entityRecordId,
-        error,
-      });
-      throw error;
-    }
+    return await EntityOps.updateEntityNotes(this.db, this.updateList.bind(this), entityRecordId, notes, this.logger);
   }
 
   /**
@@ -272,15 +137,7 @@ export class CatalogueService {
    * @param listId
    */
   async getListEntities(listId: string): Promise<CatalogueEntity[]> {
-    try {
-      return await this.db.catalogueEntities
-        .where("listId")
-        .equals(listId)
-        .sortBy("position");
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to get catalogue list entities", { listId, error });
-      return [];
-    }
+    return await EntityOps.getListEntities(this.db, listId, this.logger);
   }
 
   /**
@@ -293,96 +150,7 @@ export class CatalogueService {
     entityId: string;
     notes?: string;
   }>): Promise<{ success: number; failed: number }> {
-    let success = 0;
-    let failed = 0;
-
-    try {
-      // Validate list type
-      const list = await this.getList(listId);
-      if (!list) {
-        throw new Error("List not found");
-      }
-
-      // Get next position
-      const entities = await this.db.catalogueEntities
-        .where("listId")
-        .equals(listId)
-        .toArray();
-      const maxPosition = entities.reduce((max, entity) => Math.max(max, entity.position), 0);
-      let nextPosition = maxPosition + 1;
-
-      await this.db.transaction("rw", this.db.catalogueEntities, async () => {
-        for (const entity of entities) {
-          try {
-            // Validate entity type for bibliographies
-            if (list.type === "bibliography" && entity.entityType !== "works") {
-              throw new Error("Bibliographies can only contain works");
-            }
-
-            // Check for duplicates
-            const existing = await this.db.catalogueEntities
-              .where(["listId", "entityType", "entityId"])
-              .equals([listId, entity.entityType, entity.entityId])
-              .first();
-
-            if (existing) {
-              failed++;
-              continue;
-            }
-
-            const id = crypto.randomUUID();
-            const entityRecord: CatalogueEntity = {
-              id,
-              listId,
-              entityType: entity.entityType,
-              entityId: entity.entityId,
-              addedAt: new Date(),
-              notes: entity.notes,
-              position: nextPosition++,
-            };
-
-            await this.db.catalogueEntities.add(entityRecord);
-            success++;
-          } catch (error) {
-            this.logger?.warn(LOG_CATEGORY, "Failed to add entity in bulk operation", {
-              listId,
-              entityType: entity.entityType,
-              entityId: entity.entityId,
-              error,
-            });
-            failed++;
-          }
-        }
-      });
-
-      // Update list's updated timestamp
-      await this.updateList(listId, {});
-
-      // Emit event for bulk entity addition
-      if (success > 0) {
-        catalogueEventEmitter.emit({
-          type: 'entity-added',
-          listId,
-          entityIds: entities.map(e => e.entityId),
-        });
-      }
-
-      this.logger?.debug(LOG_CATEGORY, "Bulk entity addition completed", {
-        listId,
-        totalRequested: entities.length,
-        success,
-        failed,
-      });
-
-      return { success, failed };
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to perform bulk entity addition", {
-        listId,
-        entitiesCount: entities.length,
-        error,
-      });
-      throw error;
-    }
+    return await EntityOps.addEntitiesToList(this.db, this.getList.bind(this), this.updateList.bind(this), listId, entities, this.logger);
   }
 
   /**
@@ -391,55 +159,7 @@ export class CatalogueService {
    * @param orderedEntityIds
    */
   async reorderEntities(listId: string, orderedEntityIds: string[]): Promise<void> {
-    try {
-      // Validate that the list exists
-      const list = await this.getList(listId);
-      if (!list) {
-        throw new Error("List not found");
-      }
-
-      // Get all entities for the list to validate IDs
-      const listEntities = await this.getListEntities(listId);
-      const entityIdSet = new Set(listEntities.map(e => e.id));
-
-      // Validate that all provided IDs exist in the list
-      for (const entityId of orderedEntityIds) {
-        if (!entityIdSet.has(entityId)) {
-          throw new Error(`Entity ${entityId} not found in list ${listId}`);
-        }
-      }
-
-      // Update positions atomically within a transaction
-      await this.db.transaction("rw", this.db.catalogueEntities, async () => {
-        for (let i = 0; i < orderedEntityIds.length; i++) {
-          const orderedEntityId = orderedEntityIds[i];
-          await this.db.catalogueEntities.update(orderedEntityId, {
-            position: i + 1
-          });
-        }
-      });
-
-      // Update list's updated timestamp
-      await this.updateList(listId, {});
-
-      // Emit event for entity reorder
-      catalogueEventEmitter.emit({
-        type: 'entity-reordered',
-        listId,
-      });
-
-      this.logger?.debug(LOG_CATEGORY, "Entities reordered successfully", {
-        listId,
-        entityCount: orderedEntityIds.length
-      });
-    } catch (error) {
-      this.logger?.error(LOG_CATEGORY, "Failed to reorder entities", {
-        listId,
-        entityCount: orderedEntityIds.length,
-        error
-      });
-      throw error;
-    }
+    return await EntityOps.reorderEntities(this.db, this.getList.bind(this), this.getListEntities.bind(this), this.updateList.bind(this), listId, orderedEntityIds, this.logger);
   }
 
   /**
