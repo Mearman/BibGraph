@@ -371,7 +371,7 @@ export default tseslint.config([
         files: ["**/*.tsx"],
         ...eslintReact.configs["recommended-typescript"],
         plugins: {
-            ...eslintReact.configs["recommended-typescript"].plugins,
+            ...((eslintReact.configs["recommended-typescript"] as Record<string, unknown>).plugins ?? {}),
             "jsx-a11y": jsxA11yPlugin,
         },
         rules: {

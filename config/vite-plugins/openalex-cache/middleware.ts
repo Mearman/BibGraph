@@ -1,5 +1,5 @@
 import type { Connect } from "vite";
-import { parseOpenAlexUrl } from "../../../packages/utils/src/static-data/cache-utilities";
+import { parseOpenAlexUrl } from "../../../packages/utils/src/static-data/cache";
 import type { CacheContext } from "./types";
 import { createLogVerbose } from "./utils";
 import {
