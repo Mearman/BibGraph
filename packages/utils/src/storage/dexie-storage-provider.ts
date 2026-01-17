@@ -9,7 +9,6 @@ import type {
 	GraphListNode,
 	PruneGraphListResult,
 } from '@bibgraph/types';
-
 import Dexie from 'dexie';
 
 import type { GenericLogger } from '../logger.js';
@@ -17,18 +16,19 @@ import * as AnnotationOps from './catalogue-db/annotation-operations.js';
 import * as BookmarkOps from './catalogue-db/bookmark-operations.js';
 import * as EntityOps from './catalogue-db/entity-operations.js';
 import * as GraphListOps from './catalogue-db/graph-list-operations.js';
-import * as ListOps from './catalogue-db/list-operations.js';
-import * as SearchHistoryOps from './catalogue-db/search-history-operations.js';
-import * as SnapshotOps from './catalogue-db/snapshot-operations.js';
 import type { CatalogueEntity, CatalogueList, GraphAnnotationStorage, GraphSnapshotStorage } from './catalogue-db/index.js';
 import { CORRUPTED_ENTITY_ID_PATTERN, LOG_CATEGORY, SPECIAL_LIST_IDS } from './catalogue-db/index.js';
+import * as ListOps from './catalogue-db/list-operations.js';
 import type { CatalogueDB } from './catalogue-db/schema.js';
 import { getDB } from './catalogue-db/schema.js';
-import type { AddBookmarkParams, AddEntityParams, AddToHistoryParams, BatchAddResult, CatalogueStorageProvider, CreateListParams, ListStats, ShareAccessResult } from './catalogue-storage-provider.js';
+import * as SearchHistoryOps from './catalogue-db/search-history-operations.js';
+import * as SnapshotOps from './catalogue-db/snapshot-operations.js';
+import type { CatalogueStorageProvider } from './catalogue-storage-provider.js';
 import {
 	convertIndexedDBError,
 	ValidationError,
 } from './errors.js';
+import type { AddBookmarkParams, AddEntityParams, AddToHistoryParams, BatchAddResult, CreateListParams, ListStats, ShareAccessResult } from './storage-provider-types.js';
 
 /**
  * Production storage provider using IndexedDB via Dexie
@@ -50,7 +50,7 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 		return await ListOps.getList(this.db, listId, this.logger);
 	}
 
-	private async modifyList(listId: string, updates: {}): Promise<void> {
+	private async modifyList(listId: string, updates: Record<string, unknown>): Promise<void> {
 		await ListOps.updateList(this.db, listId, updates, this.logger);
 	}
 
@@ -217,6 +217,13 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 
 	async updateEntityNotes(entityRecordId: string, notes: string): Promise<void> {
 		return await EntityOps.updateEntityNotes(this.db, this.updateList.bind(this), entityRecordId, notes, this.logger);
+	}
+
+	async updateEntityData(
+		entityRecordId: string,
+		data: { entityType: EntityType; entityId: string; notes?: string }
+	): Promise<void> {
+		return await EntityOps.updateEntityData(this.db, this.updateList.bind(this), entityRecordId, data, this.logger);
 	}
 
 	async addEntitiesToList(

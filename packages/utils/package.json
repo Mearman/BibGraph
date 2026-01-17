@@ -112,23 +112,28 @@
     },
     "./static-data/cache-utilities": {
       "types": "./dist/static-data/cache-utilities.d.ts",
-      "source": "./src/static-data/cache-utilities.ts",
+      "source": "./src/static-data/cache/index.ts",
       "import": "./dist/static-data/cache-utilities.js"
+    },
+    "./static-data/cache": {
+      "types": "./dist/static-data/cache.d.ts",
+      "source": "./src/static-data/cache/index.ts",
+      "import": "./dist/static-data/cache.js"
     },
     "./normalize-route": {
       "types": "./dist/normalize-route.d.ts",
       "source": "./src/normalize-route.ts",
       "import": "./dist/normalize-route.js"
     },
-    "./storage/user-interactions-db": {
-      "types": "./dist/storage/user-interactions-db.d.ts",
-      "source": "./src/storage/user-interactions-db.ts",
-      "import": "./dist/storage/user-interactions-db.js"
-    },
     "./storage/catalogue-db": {
       "types": "./dist/storage/catalogue-db.d.ts",
       "source": "./src/storage/catalogue-db.ts",
       "import": "./dist/storage/catalogue-db.js"
+    },
+    "./storage/user-interactions": {
+      "types": "./dist/storage/user-interactions/index.d.ts",
+      "source": "./src/storage/user-interactions/index.ts",
+      "import": "./dist/storage/user-interactions/index.js"
     },
     "./ui/filter-base": {
       "types": "./dist/ui/filter-base.d.ts",

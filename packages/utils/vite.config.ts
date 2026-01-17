@@ -21,7 +21,8 @@ export default defineConfig({
       entry: {
         index: resolve(__dirname, "src/index.ts"),
         logger: resolve(__dirname, "src/logger.ts"),
-        "static-data/cache-utilities": resolve(__dirname, "src/static-data/cache-utilities.ts"),
+        "static-data/cache-utilities": resolve(__dirname, "src/static-data/cache/index.ts"),
+        "static-data/cache": resolve(__dirname, "src/static-data/cache/index.ts"),
         cache: resolve(__dirname, "src/cache/index.ts"),
         "ui/filter-base": resolve(__dirname, "src/ui/filter-base.tsx"),
         "date-helpers": resolve(__dirname, "src/date-helpers.ts"),
@@ -31,7 +32,6 @@ export default defineConfig({
         services: resolve(__dirname, "src/services.ts"),
         validation: resolve(__dirname, "src/validation.ts"),
         "normalize-route": resolve(__dirname, "src/normalize-route.ts"),
-        "storage/user-interactions-db": resolve(__dirname, "src/storage/user-interactions-db.ts"),
         "storage/catalogue-db": resolve(__dirname, "src/storage/catalogue-db/index.ts"),
         "workers/messages": resolve(__dirname, "src/workers/messages.ts"),
       },

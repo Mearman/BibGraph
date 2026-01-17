@@ -3,12 +3,13 @@
  * CRUD operations for catalogue entities (items in lists)
  */
 
-import type { GenericLogger } from "../../logger.js";
 import type { EntityType } from "@bibgraph/types";
-import type { CatalogueList, CatalogueEntity } from "./index.js";
+import Dexie from "dexie";
+
+import type { GenericLogger } from "../../logger.js";
+import type { CatalogueEntity,CatalogueList } from "./index.js";
 import { catalogueEventEmitter, LOG_CATEGORY } from "./index.js";
 import type { CatalogueDB } from "./schema.js";
-import Dexie from "dexie";
 
 /**
  * Add a single entity to a catalogue list
@@ -16,13 +17,18 @@ import Dexie from "dexie";
  * @param getList Helper function to get a list
  * @param updateList Helper function to update a list
  * @param params Entity parameters
+ * @param params.listId
+ * @param params.entityType
+ * @param params.entityId
+ * @param params.notes
+ * @param params.position
  * @param logger Optional logger
  * @returns The ID of the created entity record
  */
 export const addEntityToList = async (
 	db: CatalogueDB,
 	getList: (id: string) => Promise<CatalogueList | null>,
-	updateList: (id: string, updates: {}) => Promise<void>,
+	updateList: (id: string, updates: Record<string, unknown>) => Promise<void>,
 	params: {
 		listId: string;
 		entityType: EntityType;
@@ -145,7 +151,7 @@ export const addEntityToList = async (
  */
 export const removeEntityFromList = async (
 	db: CatalogueDB,
-	updateList: (id: string, updates: {}) => Promise<void>,
+	updateList: (id: string, updates: Record<string, unknown>) => Promise<void>,
 	listId: string,
 	entityRecordId: string,
 	logger?: GenericLogger
@@ -186,7 +192,7 @@ export const removeEntityFromList = async (
  */
 export const updateEntityNotes = async (
 	db: CatalogueDB,
-	updateList: (id: string, updates: {}) => Promise<void>,
+	updateList: (id: string, updates: Record<string, unknown>) => Promise<void>,
 	entityRecordId: string,
 	notes: string,
 	logger?: GenericLogger
@@ -206,6 +212,48 @@ export const updateEntityNotes = async (
 		});
 	} catch (error) {
 		logger?.error(LOG_CATEGORY, "Failed to update entity notes", {
+			entityRecordId,
+			error,
+		});
+		throw error;
+	}
+};
+
+/**
+ * Update entity data (entityType, entityId, and optionally notes)
+ * Used primarily for migration scenarios where entity identification changes
+ * @param db Database instance
+ * @param updateList Helper function to update a list
+ * @param entityRecordId Entity record ID
+ * @param data Update data
+ * @param data.entityType
+ * @param data.entityId
+ * @param data.notes
+ * @param logger Optional logger
+ */
+export const updateEntityData = async (
+	db: CatalogueDB,
+	updateList: (id: string, updates: Record<string, unknown>) => Promise<void>,
+	entityRecordId: string,
+	data: { entityType: EntityType; entityId: string; notes?: string },
+	logger?: GenericLogger
+): Promise<void> => {
+	try {
+		await db.catalogueEntities.update(entityRecordId, data);
+
+		// Get the entity to find its listId for updating the list timestamp
+		const entity = await db.catalogueEntities.get(entityRecordId);
+		if (entity) {
+			await updateList(entity.listId, {});
+		}
+
+		logger?.debug(LOG_CATEGORY, "Entity data updated", {
+			entityRecordId,
+			entityType: data.entityType,
+			entityId: data.entityId,
+		});
+	} catch (error) {
+		logger?.error(LOG_CATEGORY, "Failed to update entity data", {
 			entityRecordId,
 			error,
 		});
@@ -249,7 +297,7 @@ export const getListEntities = async (
 export const addEntitiesToList = async (
 	db: CatalogueDB,
 	getList: (id: string) => Promise<CatalogueList | null>,
-	updateList: (id: string, updates: {}) => Promise<void>,
+	updateList: (id: string, updates: Record<string, unknown>) => Promise<void>,
 	listId: string,
 	entities: Array<{
 		entityType: EntityType;
@@ -364,7 +412,7 @@ export const reorderEntities = async (
 	db: CatalogueDB,
 	getList: (id: string) => Promise<CatalogueList | null>,
 	getListEntities: (id: string) => Promise<CatalogueEntity[]>,
-	updateList: (id: string, updates: {}) => Promise<void>,
+	updateList: (id: string, updates: Record<string, unknown>) => Promise<void>,
 	listId: string,
 	orderedEntityIds: string[],
 	logger?: GenericLogger

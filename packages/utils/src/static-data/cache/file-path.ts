@@ -5,15 +5,9 @@
  * and managing cache entry metadata.
  */
 
-import type { FileEntry } from "./types.js"
 import { logger } from "../../logger.js"
-import {
-	encodeFilename,
-	generateContentHash,
-	normalizeQueryForFilename,
-	parseOpenAlexUrl,
-	sanitizeUrlForCaching,
-} from "../cache-utilities.js"
+import { generateContentHash } from "./hash.js"
+import { encodeFilename, normalizeQueryForFilename, parseOpenAlexUrl, sanitizeUrlForCaching } from "./url.js"
 
 /**
  * Generate cache file path from OpenAlex URL

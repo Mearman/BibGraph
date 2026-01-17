@@ -52,6 +52,7 @@ export * from "./storage/catalogue-db";
 export * from "./storage/catalogue-storage-provider";
 export * from "./storage/in-memory-storage-provider";
 export * from "./storage/indexeddb-storage";
+export * from "./storage/storage-provider-types";
 
 // UI utilities
 export * from "./ui/filter-base";
@@ -59,8 +60,8 @@ export * from "./ui/filter-base";
 // Cache utilities
 export * from "./cache";
 
-// Static data utilities
-export * from "./static-data/cache-utilities";
+// Static data cache utilities
+export * from "./static-data/cache";
 
 // Hooks
 export * from "./hooks/use-entity-route";

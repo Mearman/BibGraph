@@ -6,7 +6,6 @@
  */
 
 import type { CacheStorageType } from "../../cache-browser/types.js"
-import { logger } from "../../logger.js"
 import { isCacheStorageType } from "./constants.js"
 import { parseOpenAlexUrl } from "./url.js"
 

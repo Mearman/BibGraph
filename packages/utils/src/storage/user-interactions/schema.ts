@@ -5,8 +5,7 @@
 
 import Dexie from "dexie"
 
-import type { BookmarkRecord, PageVisitRecord, StoredNormalizedRequest } from "./types.js"
-import type { GenericLogger } from "../../logger.js"
+import type { BookmarkRecord, PageVisitRecord } from "./types.js"
 
 // Constants for database operations
 const DB_NAME = "user-interactions"
@@ -78,4 +77,4 @@ export const getDB = (): UserInteractionsDB => {
 }
 
 export { UserInteractionsDB }
-export type { BookmarkRecord, PageVisitRecord, StoredNormalizedRequest }
+

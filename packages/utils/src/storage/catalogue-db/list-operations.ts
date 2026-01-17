@@ -3,17 +3,23 @@
  * CRUD operations for catalogue lists (user-created lists and bibliographies)
  */
 
-import type { GenericLogger } from "../../logger.js";
 import type { EntityType } from "@bibgraph/types";
+import Dexie from "dexie";
+
+import type { GenericLogger } from "../../logger.js";
 import type { CatalogueList } from "./index.js";
 import { catalogueEventEmitter, LOG_CATEGORY, SPECIAL_LIST_IDS } from "./index.js";
 import type { CatalogueDB } from "./schema.js";
-import Dexie from "dexie";
 
 /**
  * Create a new catalogue list
  * @param db Database instance
  * @param params List parameters
+ * @param params.title
+ * @param params.description
+ * @param params.type
+ * @param params.tags
+ * @param params.isPublic
  * @param logger Optional logger
  * @returns The ID of the created list
  */

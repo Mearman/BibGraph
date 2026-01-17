@@ -5,23 +5,23 @@
  */
 
 // Export all types
-export * from "./types.js"
+export * from "./types"
 
 // Export core utilities
-export { generateContentHash } from "./hash.js"
-export { isCacheStorageType, getStaticDataCachePath, STATIC_DATA_CACHE_PATH } from "./constants.js"
+export { generateContentHash } from "./hash"
+export { isCacheStorageType, getStaticDataCachePath, STATIC_DATA_CACHE_PATH } from "./constants"
 
 // Export URL utilities
-export { decodeFilename, encodeFilename, normalizeQueryForFilename, parseOpenAlexUrl, sanitizeUrlForCaching } from "./url.js"
+export { decodeFilename, encodeFilename, normalizeQueryForFilename, parseOpenAlexUrl, sanitizeUrlForCaching } from "./url"
 
 // Export file path utilities
-export { createCacheEntryMetadata, getCacheFilePath, getStaticFilePath, shouldUpdateCache } from "./file-path.js"
+export { createCacheEntryMetadata, getCacheFilePath, getStaticFilePath, shouldUpdateCache } from "./file-path"
 
 // Export validation utilities
-export { extractEntityType, isValidOpenAlexEntity, isValidOpenAlexQueryResult } from "./validation.js"
+export { extractEntityType, isValidOpenAlexEntity, isValidOpenAlexQueryResult } from "./validation"
 
 // Export query utilities
-export { filenameToQuery, queryToFilename } from "./query.js"
+export { filenameToQuery, queryToFilename } from "./query"
 
 // Export collision handling
 export {
@@ -32,7 +32,7 @@ export {
 	migrateToMultiUrl,
 	reconstructPossibleCollisions,
 	validateFileEntry,
-} from "./collision-handling.js"
+} from "./collision-handling"
 
 // Export index conversion utilities
 export {
@@ -42,4 +42,4 @@ export {
 	readIndexAsDirectory,
 	readIndexAsUnified,
 	unifiedIndexToDirectoryIndex,
-} from "./index-conversion.js"
+} from "./index-conversion"

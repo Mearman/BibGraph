@@ -3,8 +3,9 @@
  * Operations for managing bookmarks in the special bookmarks list
  */
 
-import type { GenericLogger } from "../../logger.js";
 import type { EntityType } from "@bibgraph/types";
+
+import type { GenericLogger } from "../../logger.js";
 import type { CatalogueEntity } from "./index.js";
 import { LOG_CATEGORY, SPECIAL_LIST_IDS } from "./index.js";
 import type { CatalogueDB } from "./schema.js";
@@ -15,7 +16,11 @@ import type { CatalogueDB } from "./schema.js";
  * @param initializeSpecialLists Helper to initialize special lists
  * @param addEntityToList Helper to add entity to list
  * @param params Bookmark parameters
+ * @param params.entityType
+ * @param params.entityId
+ * @param params.notes
  * @param logger Optional logger
+ * @param _logger
  * @returns The ID of the created bookmark entity record
  */
 export const addBookmark = async (
@@ -32,7 +37,7 @@ export const addBookmark = async (
 		entityId: string;
 		notes?: string;
 	},
-	logger?: GenericLogger
+	_logger?: GenericLogger
 ): Promise<string> => {
 	await initializeSpecialLists();
 
@@ -63,13 +68,14 @@ export const removeBookmark = async (
  * @param initializeSpecialLists Helper to initialize special lists
  * @param getListEntities Helper to get list entities
  * @param logger Optional logger
+ * @param _logger
  * @returns Array of bookmark entities
  */
 export const getBookmarks = async (
 	db: CatalogueDB,
 	initializeSpecialLists: () => Promise<void>,
 	getListEntities: (listId: string) => Promise<CatalogueEntity[]>,
-	logger?: GenericLogger
+	_logger?: GenericLogger
 ): Promise<CatalogueEntity[]> => {
 	await initializeSpecialLists();
 	return await getListEntities(SPECIAL_LIST_IDS.BOOKMARKS);

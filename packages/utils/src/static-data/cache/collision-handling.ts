@@ -10,10 +10,11 @@
  */
 
 import type { CacheStorageType } from "../../cache-browser/types.js"
-import type { FileEntry } from "./types.js"
-import { getCacheFilePath } from "./file-path.js"
 import { logger } from "../../logger.js"
-import { decodeFilename, filenameToQuery, normalizeQueryForFilename, sanitizeUrlForCaching } from "../cache-utilities.js"
+import { getCacheFilePath } from "./file-path.js"
+import { filenameToQuery } from "./query.js"
+import type { FileEntry } from "./types.js"
+import { decodeFilename, normalizeQueryForFilename, sanitizeUrlForCaching } from "./url.js"
 
 /**
  * Compare two URLs for equivalence in caching context

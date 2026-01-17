@@ -42,6 +42,7 @@ export interface MigrationOptions {
  * proper entity fields while preserving user notes.
  *
  * @param catalogueService - The catalogue service instance
+ * @param storageProvider
  * @param options - Migration configuration options
  * @returns Migration result with statistics
  */
@@ -105,10 +106,9 @@ export const migrateBookmarkUrls = async (storageProvider: DexieStorageProvider,
 							.replace(/\n+$/, "")
 					}
 
-					// Update the bookmark with entity data using direct database access
-					const db = (storageProvider as any)['db']
+					// Update the bookmark with entity data
 					if (bookmark.id != null) {
-						await db.catalogueEntities.update(bookmark.id, {
+						await storageProvider.updateEntityData(bookmark.id, {
 							entityType: detection.entityType,
 							entityId: detection.normalizedId,
 							notes: userNotes || undefined
@@ -161,6 +161,7 @@ export const migrateBookmarkUrls = async (storageProvider: DexieStorageProvider,
  * Validates bookmark data integrity after migration
  *
  * @param catalogueService - The catalogue service instance
+ * @param storageProvider
  * @returns Validation result with issues found
  */
 export const validateMigration = async (storageProvider: DexieStorageProvider): Promise<{
@@ -215,6 +216,7 @@ export const validateMigration = async (storageProvider: DexieStorageProvider): 
  * Gets migration statistics without performing migration
  *
  * @param catalogueService - The catalogue service instance
+ * @param storageProvider
  * @returns Statistics about bookmarks that need migration
  */
 export const getMigrationStats = async (storageProvider: DexieStorageProvider): Promise<{
@@ -251,6 +253,7 @@ export const getMigrationStats = async (storageProvider: DexieStorageProvider): 
  * Convenience function to perform complete migration workflow
  *
  * @param catalogueService - The catalogue service instance
+ * @param storageProvider
  * @param options - Migration options
  * @returns Complete migration result
  */
