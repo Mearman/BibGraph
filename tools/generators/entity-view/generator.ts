@@ -1,6 +1,7 @@
 import { readProjectConfiguration, Tree, updateProjectConfiguration } from '@nx/devkit'
 
-import { EntityViewBase, EntityViewGeneratorOptions,NormalizedEntityViewOptions } from '../base/EntityViewBase'
+import { EntityViewGeneratorOptions, NormalizedEntityViewOptions } from '../base/entity-view-types'
+import { EntityViewBase } from '../base/EntityViewBase'
 
 interface OpenAlexEntityViewNormalizedOptions extends NormalizedEntityViewOptions {
   entityCamel: string

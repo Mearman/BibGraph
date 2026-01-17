@@ -107,13 +107,11 @@ export const noRedundantAssignment = createRule({
           return;
         }
 
-        // Check if there's a type annotation
+        // Check if there's a type annotation on the variable declarator
         const hasTypeAnnotation = !!(
-          node.parent &&
-          node.parent.type === "VariableDeclaration" &&
-          node.parent.declarations.length === 1 &&
-          node.parent.declarations[0] === node &&
-          node.parent.typeAnnotation
+          node.id.type === "Identifier" &&
+          "typeAnnotation" in node.id &&
+          node.id.typeAnnotation
         );
 
         // Check if we're in an interface or type alias
@@ -167,7 +165,7 @@ export const noRedundantAssignment = createRule({
             }
 
             // If we get here, the variable is never modified, so we can safely auto-fix
-            const fixes = [];
+            const fixes: ReturnType<typeof fixer.remove>[] = [];
 
             // 1. Remove the entire variable declaration
             const declaration = node.parent;
@@ -177,7 +175,8 @@ export const noRedundantAssignment = createRule({
                 fixes.push(fixer.remove(declaration));
               } else {
                 // If there are multiple declarations, just remove this one
-                const varIndex = declaration.declarations.indexOf(node);
+                // Use findIndex with explicit comparison since indexOf has type issues with union types
+                const varIndex = declaration.declarations.findIndex(d => d === node);
                 if (varIndex > -1) {
                   // Remove the declaration and any preceding comma/space
                   const prevToken = context.sourceCode.getTokenBefore(node);

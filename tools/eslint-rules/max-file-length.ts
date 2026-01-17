@@ -34,9 +34,9 @@ export const maxFileLength = createRule({
       },
     ],
   },
-  defaultOptions: [],
+  defaultOptions: [{ max: 750, excludePatterns: [] }],
   create(context, [options]) {
-    const maxLines = options?.max ?? 750;
+    const maxLines = options.max;
 
     return {
       Program(node: TSESTree.Program) {
