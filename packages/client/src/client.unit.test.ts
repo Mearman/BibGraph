@@ -16,11 +16,9 @@ Object.defineProperty(global, "fetch", {
 import type { OpenAlexResponse } from "@bibgraph/types";
 import { beforeEach,describe, expect, it, vi } from "vitest";
 
-import {
-  OpenAlexApiError,
-  OpenAlexBaseClient,
-  type OpenAlexClientConfig,
-} from "./client";
+import { OpenAlexBaseClient } from "./client";
+import type { OpenAlexClientConfig } from "./internal/client-config";
+import { OpenAlexApiError } from "./internal/errors";
 
 describe("OpenAlexBaseClient", () => {
   let client: OpenAlexBaseClient;
