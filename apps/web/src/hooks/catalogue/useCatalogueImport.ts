@@ -3,7 +3,6 @@
  * Handles importing lists from various sources (files, compressed data, JSON)
  */
 
-import type { CatalogueEntity } from "@bibgraph/utils";
 import type { EntityType } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils/logger";
 import { useCallback } from "react";
@@ -189,7 +188,7 @@ export const useCatalogueImport = () => {
 	const importListCompressed = useCallback(async (compressed: string): Promise<string> => {
 		try {
 			// Import decompression utility dynamically
-			const { decompressListData, validateListData } = await import("@bibgraph/utils");
+			const { decompressListData } = await import("@bibgraph/utils");
 
 			// Decompress the data
 			const listData = decompressListData(compressed);
@@ -237,9 +236,10 @@ export const useCatalogueImport = () => {
 	// Import list from compressed data (alias for importListCompressed)
 	const importListFromCompressedData = useCallback(async (compressedData: string): Promise<string | null> => {
 		try {
-			const listData = (await import("@bibgraph/utils")).decompressListData(compressedData);
+			const utils = await import("@bibgraph/utils");
+			const listData = utils.decompressListData(compressedData);
 
-			if (!listData || !(await import("@bibgraph/utils")).validateListData(listData)) {
+			if (!listData || !utils.validateListData(listData)) {
 				throw new Error("Invalid or corrupted list data");
 			}
 

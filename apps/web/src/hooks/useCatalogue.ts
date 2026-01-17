@@ -4,9 +4,9 @@
  */
 
 import type { EntityType } from "@bibgraph/types";
-import { type CatalogueEntity, catalogueEventEmitter, type CatalogueList, type ListType } from "@bibgraph/utils";
+import type { CatalogueEntity, CatalogueList, ListType } from "@bibgraph/utils";
 import { logger } from "@bibgraph/utils/logger";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { useStorageProvider } from "@/contexts/storage-provider-context";
 import type { ExportFormat } from "@/types/catalogue";
@@ -14,11 +14,11 @@ import type { ExportFormat } from "@/types/catalogue";
 import {
 	useCatalogueCore,
 	useCatalogueCRUD,
-	useCatalogueSearch,
-	useCatalogueSharing,
 	useCatalogueExport,
 	useCatalogueImport,
 	type UseCatalogueOptions,
+	useCatalogueSearch,
+	useCatalogueSharing,
 } from "./catalogue";
 
 const CATALOGUE_LOGGER_CONTEXT = "catalogue-hook";

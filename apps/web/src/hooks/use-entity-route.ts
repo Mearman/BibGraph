@@ -8,7 +8,7 @@ import { useParams, useSearch } from "@tanstack/react-router";
 import { useCallback,useState } from "react";
 
 import { useRawEntityData } from "./use-raw-entity-data";
-import { useUserInteractions } from "./use-user-interactions";
+import { useUserInteractions } from "./user-interactions";
 
 export const useEntityRoute = <T = unknown>(config: EntityRouteConfig, options: UseEntityRouteOptions = {}): UseEntityRouteResult<T> => {
   const params = useParams({ strict: false }) as Record<string, string>;

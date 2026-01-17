@@ -2,11 +2,8 @@
  * Shared types for catalogue hooks
  */
 
-import type { ListType } from "@bibgraph/utils";
-import type { CatalogueEntity, CatalogueList } from "@bibgraph/utils";
 import type { EntityType } from "@bibgraph/types";
-
-import type { ExportFormat } from "@/types/catalogue";
+import type { CatalogueList, ListType } from "@bibgraph/utils";
 
 export interface UseCatalogueOptions {
 	/** Auto-refresh on list changes */

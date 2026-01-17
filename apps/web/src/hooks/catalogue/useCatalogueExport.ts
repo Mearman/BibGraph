@@ -3,7 +3,7 @@
  * Handles exporting lists to various formats (JSON, CSV, BibTeX, compressed)
  */
 
-import type { CatalogueEntity, CatalogueList, compressListData } from "@bibgraph/utils";
+import type { CatalogueEntity } from "@bibgraph/utils";
 import { logger } from "@bibgraph/utils/logger";
 import { useCallback } from "react";
 

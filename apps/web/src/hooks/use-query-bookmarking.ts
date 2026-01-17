@@ -18,7 +18,7 @@ import {
 import type { OpenAlexSearchParams } from "@/lib/route-schemas";
 import { serializeSearch } from "@/utils/url-decoding";
 
-import { useUserInteractions } from "./use-user-interactions";
+import { useUserInteractions } from "./user-interactions";
 
 
 

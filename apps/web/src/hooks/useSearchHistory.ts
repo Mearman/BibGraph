@@ -5,8 +5,9 @@
  * Stores up to 50 search queries with FIFO eviction.
  */
 
-import { useStorageProvider } from '@/contexts/storage-provider-context';
 import { useCallback, useEffect, useState } from 'react';
+
+import { useStorageProvider } from '@/contexts/storage-provider-context';
 
 interface SearchHistoryEntry {
   id?: string;

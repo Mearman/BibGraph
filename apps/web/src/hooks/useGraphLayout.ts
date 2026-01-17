@@ -11,9 +11,10 @@
  * @module hooks/use-graph-layout
  */
 
-import { hierarchicalLayout, type HierarchicalLayoutOptions } from '@bibgraph/algorithms';
 import type { GraphEdge, GraphNode } from '@bibgraph/types';
 import { useCallback, useMemo, useState } from 'react';
+
+import { hierarchicalLayout, type HierarchicalLayoutOptions } from '@/utils/hierarchical-layout';
 
 /**
  * Supported layout types

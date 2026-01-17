@@ -14,6 +14,7 @@ import type { UseCatalogueOptions } from "./types";
 /**
  * Core catalogue hook for state management
  * Handles list/entity loading and selection state
+ * @param options
  */
 export const useCatalogueCore = (options: UseCatalogueOptions = {}) => {
 	const storageProvider = useStorageProvider();

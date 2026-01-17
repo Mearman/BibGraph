@@ -3,8 +3,8 @@
  * Provides search and filter functionality for lists and entities
  */
 
-import type { CatalogueEntity, CatalogueList } from "@bibgraph/utils";
 import type { EntityType } from "@bibgraph/types";
+import type { CatalogueEntity, CatalogueList } from "@bibgraph/utils";
 import { logger } from "@bibgraph/utils/logger";
 import { useCallback } from "react";
 
@@ -18,6 +18,7 @@ export interface UseCatalogueSearchParams {
 
 /**
  * Search and filter hook for catalogue lists and entities
+ * @param params
  */
 export const useCatalogueSearch = (params: UseCatalogueSearchParams) => {
 	const storageProvider = useStorageProvider();

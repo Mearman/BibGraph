@@ -3,7 +3,7 @@
  * Handles share URL generation, QR code generation, and clipboard operations
  */
 
-import type { CatalogueEntity, CatalogueList, CompressedListData, createShareUrl } from "@bibgraph/utils";
+import type { CompressedListData } from "@bibgraph/utils";
 import { logger } from "@bibgraph/utils/logger";
 import QRCode from "qrcode";
 import { useCallback } from "react";

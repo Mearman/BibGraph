@@ -13,8 +13,9 @@
  */
 
 import type { GraphAnnotationStorage } from '@bibgraph/utils';
-import { useStorageProvider } from '@/contexts/storage-provider-context';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { useStorageProvider } from '@/contexts/storage-provider-context';
 
 /**
  * Hook for managing graph annotations

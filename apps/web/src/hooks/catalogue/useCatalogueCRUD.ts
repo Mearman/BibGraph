@@ -3,15 +3,15 @@
  * Handles create, read, update, delete operations for lists and entities
  */
 
-import type { CatalogueEntity, CatalogueList, ListType } from "@bibgraph/utils";
 import type { EntityType } from "@bibgraph/types";
+import type { CatalogueEntity, CatalogueList } from "@bibgraph/utils";
 import { logger } from "@bibgraph/utils/logger";
 import { useCallback } from "react";
 
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useStorageProvider } from "@/contexts/storage-provider-context";
 
-import type { CreateListParams, UpdateListParams, AddEntityParams } from "./types";
+import type { AddEntityParams,CreateListParams, UpdateListParams } from "./types";
 
 const CATALOGUE_LOGGER_CONTEXT = "catalogue-crud";
 
@@ -88,6 +88,7 @@ export interface UseCatalogueCRUDParams {
 /**
  * CRUD operations hook for catalogue lists and entities
  * Provides optimistic updates with rollback on error
+ * @param params
  */
 export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 	const storageProvider = useStorageProvider();
@@ -96,7 +97,6 @@ export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 	const {
 		setLists,
 		setEntities,
-		setSelectedList,
 		setIsUpdatingList,
 		setIsDeletingList,
 		setIsAddingEntity,
