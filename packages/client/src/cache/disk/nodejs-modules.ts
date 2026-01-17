@@ -3,7 +3,7 @@
  * Handles dynamic imports to avoid browser bundling issues
  */
 
-import { logError, logger } from "@bibgraph/utils";
+// Unused imports removed - logging handled by caller modules
 
 // Dynamic imports for Node.js modules to avoid browser bundling issues
 let fs: typeof import("node:fs/promises") | undefined;
@@ -12,6 +12,10 @@ let crypto: typeof import("node:crypto") | undefined;
 
 /**
  * For testing: allow injecting mock Node.js modules
+ * @param root0
+ * @param root0.mockFs
+ * @param root0.mockPath
+ * @param root0.mockCrypto
  */
 export const __setMockModules = ({
 	mockFs,
@@ -100,6 +104,7 @@ export const findWorkspaceRoot = async (): Promise<string> => {
 
 /**
  * Sleep for specified milliseconds
+ * @param ms
  */
 export const sleep = (ms: number): Promise<void> => {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -107,6 +112,7 @@ export const sleep = (ms: number): Promise<void> => {
 
 /**
  * Format bytes for human-readable display
+ * @param bytes
  */
 export const formatBytes = (bytes: number): string => {
 	const units = ["B", "KB", "MB", "GB", "TB"];

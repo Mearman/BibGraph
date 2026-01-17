@@ -3,87 +3,43 @@
  * Provides advanced grouping and aggregation functionality
  */
 
-import type { EntityType, GroupParams, QueryParams } from "@bibgraph/types";
+import type { EntityType, QueryParams } from "@bibgraph/types";
 import { extractPropertyValue } from "@bibgraph/types";
 
-import { OpenAlexBaseClient } from "../client";
+import type { OpenAlexBaseClient } from "../client";
 import { logger } from "../internal/logger";
-
-
-/**
- * Raw group item from OpenAlex API response
- */
-export interface GroupItem {
-  key: string;
-  key_display_name?: string;
-  count: number;
-  cited_by_count?: number;
-  works_count?: number;
-  h_index?: number;
-}
-
-/**
- * Group result with enhanced metadata
- */
-export interface GroupResult {
-  key: string;
-  key_display_name: string;
-  count: number;
-  cited_by_count?: number;
-  works_count?: number;
-  h_index?: number;
-  percentage: number;
-}
-
-/**
- * Advanced grouping options
- */
-export interface AdvancedGroupParams extends GroupParams {
-  /** Include citation statistics */
-  include_citation_stats?: boolean;
-  /** Include temporal trends */
-  include_temporal_trends?: boolean;
-  /** Minimum count threshold */
-  min_count?: number;
-  /** Calculate percentiles */
-  calculate_percentiles?: boolean;
-}
-
-/**
- * Multi-dimensional grouping parameters
- */
-export interface MultiDimensionalGroupParams extends GroupParams {
-  /** Primary grouping field */
-  primary_group_by: string;
-  /** Secondary grouping field */
-  secondary_group_by?: string;
-  /** Tertiary grouping field */
-  tertiary_group_by?: string;
-  /** Maximum groups per dimension */
-  max_groups_per_dimension?: number;
-}
+import {
+  calculateBasicStats,
+  calculateGroupPercentiles,
+  calculateGrowthRate,
+} from "./grouping-statistics";
+import {
+  extractMetricFromRecord,
+  isFiniteNumber,
+  isPerformerRecord,
+} from "./grouping-type-guards";
+import type {
+  AdvancedGroupParams,
+  CrossTabulationEntry,
+  DistributionStatsResult,
+  GroupByResult,
+  GroupDistributionStats,
+  GroupItem,
+  GroupResult,
+  GroupTrend,
+  GroupWithTopPerformers,
+  MultiDimensionalGroupParams,
+  MultiDimensionalGroupResult,
+  TemporalDataPoint,
+  TemporalTrendsResult,
+  TopPerformersByGroupResult,
+} from "./grouping-types";
 
 /**
  * Grouping API class providing advanced aggregation methods
  */
 export class GroupingApi {
   constructor(private client: OpenAlexBaseClient) {}
-
-  /**
-   * Type guard to check if value is a valid performer record
-   * @param value
-   */
-  private isPerformerRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-  }
-
-  /**
-   * Type guard to check if value is a number
-   * @param value
-   */
-  private isNumber(value: unknown): value is number {
-    return typeof value === "number" && !Number.isNaN(value);
-  }
 
   /**
    * Group entities by a specified field
@@ -103,17 +59,14 @@ export class GroupingApi {
     entityType: EntityType,
     groupBy: string,
     params: AdvancedGroupParams = {},
-  ): Promise<{
-    groups: GroupResult[];
-    total_count: number;
-    ungrouped_count: number;
-    meta: {
-      processing_time_ms: number;
-      group_by_field: string;
-      total_groups: number;
-    };
-  }> {
-    const { group_limit = 100, min_count = 1, ...queryParams } = params;
+  ): Promise<GroupByResult> {
+    const DEFAULT_GROUP_LIMIT = 100;
+    const DEFAULT_MIN_COUNT = 1;
+    const {
+      group_limit = DEFAULT_GROUP_LIMIT,
+      min_count = DEFAULT_MIN_COUNT,
+      ...queryParams
+    } = params;
 
     const groupParams: QueryParams = {
       ...queryParams,
@@ -191,27 +144,13 @@ export class GroupingApi {
       from_year?: number;
       to_year?: number;
     } = {},
-  ): Promise<{
-    trends: Array<{
-      group: string;
-      group_display_name: string;
-      temporal_data: Array<{
-        year: number;
-        count: number;
-        percentage_of_group: number;
-      }>;
-      total_count: number;
-      growth_rate?: number; // Year-over-year growth rate
-    }>;
-    overall_trend: Array<{
-      year: number;
-      total_count: number;
-    }>;
-  }> {
+  ): Promise<TemporalTrendsResult> {
+    const DEFAULT_FROM_YEAR = 2010;
+    const DEFAULT_TREND_GROUP_LIMIT = 10;
     const {
-      from_year = 2010,
+      from_year = DEFAULT_FROM_YEAR,
       to_year = new Date().getFullYear(),
-      group_limit = 10,
+      group_limit = DEFAULT_TREND_GROUP_LIMIT,
     } = params;
 
     // First get the main groups
@@ -220,68 +159,21 @@ export class GroupingApi {
       group_limit,
     });
 
-    const trends: Array<{
-      group: string;
-      group_display_name: string;
-      temporal_data: Array<{
-        year: number;
-        count: number;
-        percentage_of_group: number;
-      }>;
-      total_count: number;
-      growth_rate?: number;
-    }> = [];
+    const trends: GroupTrend[] = [];
 
     // For each major group, get temporal breakdown
     for (const group of mainGroups.groups.slice(0, group_limit)) {
-      try {
-        const timeFilter =
-          timeField === "publication_year"
-            ? `publication_year:${from_year.toString()}-${to_year.toString()}`
-            : `from_created_date:${from_year.toString()}-01-01,to_created_date:${to_year.toString()}-12-31`;
-
-        const groupFilter = `${groupBy}:${group.key}`;
-        const combinedFilter = params.filter
-          ? `${params.filter},${groupFilter},${timeFilter}`
-          : `${groupFilter},${timeFilter}`;
-
-        const temporalBreakdown = await this.groupBy(entityType, timeField, {
-          filter: combinedFilter,
-          group_limit: to_year - from_year + 1,
-        });
-
-        const temporalData = temporalBreakdown.groups.map((yearGroup) => ({
-          year: Number.parseInt(yearGroup.key),
-          count: yearGroup.count,
-          percentage_of_group: (yearGroup.count / group.count) * 100,
-        }));
-
-        // Calculate growth rate (simple year-over-year)
-        let growthRate: number | undefined;
-        if (temporalData.length >= 2) {
-          const recent = temporalData.slice(-3); // Last 3 years
-          const early = temporalData.slice(0, 3); // First 3 years
-          const recentAvg =
-            recent.reduce((sum, d) => sum + d.count, 0) / recent.length;
-          const earlyAvg =
-            early.reduce((sum, d) => sum + d.count, 0) / early.length;
-          if (earlyAvg > 0) {
-            growthRate = ((recentAvg - earlyAvg) / earlyAvg) * 100;
-          }
-        }
-
-        trends.push({
-          group: group.key,
-          group_display_name: group.key_display_name,
-          temporal_data: [...temporalData].sort((a, b) => a.year - b.year),
-          total_count: group.count,
-          ...(growthRate !== undefined && { growth_rate: growthRate }),
-        });
-      } catch (error: unknown) {
-        logger.warn(
-          `[GroupingApi] Failed to get temporal trends for group ${group.key}`,
-          { groupKey: group.key, error },
-        );
+      const trendData = await this.getGroupTemporalData(
+        entityType,
+        groupBy,
+        group,
+        timeField,
+        from_year,
+        to_year,
+        params,
+      );
+      if (trendData) {
+        trends.push(trendData);
       }
     }
 
@@ -298,10 +190,68 @@ export class GroupingApi {
       }))
       .sort((a, b) => a.year - b.year);
 
-    return {
-      trends,
-      overall_trend: overallTrend,
-    };
+    return { trends, overall_trend: overallTrend };
+  }
+
+  /**
+   * Get temporal data for a single group
+   * @param entityType - Type of entity
+   * @param groupBy - Field to group by
+   * @param group - Group result
+   * @param timeField - Time field for temporal breakdown
+   * @param fromYear - Start year
+   * @param toYear - End year
+   * @param params - Advanced group parameters
+   */
+  private async getGroupTemporalData(
+    entityType: EntityType,
+    groupBy: string,
+    group: GroupResult,
+    timeField: string,
+    fromYear: number,
+    toYear: number,
+    params: AdvancedGroupParams,
+  ): Promise<GroupTrend | undefined> {
+    try {
+      const timeFilter =
+        timeField === "publication_year"
+          ? `publication_year:${fromYear.toString()}-${toYear.toString()}`
+          : `from_created_date:${fromYear.toString()}-01-01,to_created_date:${toYear.toString()}-12-31`;
+
+      const groupFilter = `${groupBy}:${group.key}`;
+      const combinedFilter = params.filter
+        ? `${params.filter},${groupFilter},${timeFilter}`
+        : `${groupFilter},${timeFilter}`;
+
+      const temporalBreakdown = await this.groupBy(entityType, timeField, {
+        filter: combinedFilter,
+        group_limit: toYear - fromYear + 1,
+      });
+
+      const temporalData: TemporalDataPoint[] = temporalBreakdown.groups.map(
+        (yearGroup) => ({
+          year: Number.parseInt(yearGroup.key),
+          count: yearGroup.count,
+          percentage_of_group: (yearGroup.count / group.count) * 100,
+        }),
+      );
+
+      const growthRate = calculateGrowthRate(temporalData);
+
+      return {
+        group: group.key,
+        group_display_name: group.key_display_name,
+        temporal_data: [...temporalData].sort((a, b) => a.year - b.year),
+        total_count: group.count,
+        ...(growthRate !== undefined && { growth_rate: growthRate }),
+      };
+    } catch (error: unknown) {
+      logger.warn(
+        `[GroupingApi] Failed to get temporal trends for group ${group.key}`,
+        { groupKey: group.key, error },
+      );
+      return undefined;
+    }
   }
 
   /**
@@ -321,29 +271,12 @@ export class GroupingApi {
   async multiDimensionalGroup(
     entityType: EntityType,
     params: MultiDimensionalGroupParams,
-  ): Promise<{
-    dimensions: {
-      primary: GroupResult[];
-      secondary?: GroupResult[];
-      tertiary?: GroupResult[];
-    };
-    cross_tabulation: Array<{
-      primary_key: string;
-      secondary_key?: string;
-      tertiary_key?: string;
-      count: number;
-      percentage_of_total: number;
-      percentage_of_primary: number;
-    }>;
-    totals: {
-      grand_total: number;
-      primary_totals: Record<string, number>;
-    };
-  }> {
+  ): Promise<MultiDimensionalGroupResult> {
+    const DEFAULT_MAX_GROUPS = 10;
     const {
       primary_group_by,
       secondary_group_by,
-      max_groups_per_dimension = 10,
+      max_groups_per_dimension = DEFAULT_MAX_GROUPS,
       ...baseParams
     } = params;
 
@@ -356,14 +289,7 @@ export class GroupingApi {
     const dimensions: { primary: GroupResult[]; secondary?: GroupResult[] } = {
       primary: primary.groups,
     };
-    const crossTabulation: Array<{
-      primary_key: string;
-      secondary_key: string;
-      tertiary_key?: string;
-      count: number;
-      percentage_of_total: number;
-      percentage_of_primary: number;
-    }> = [];
+    const crossTabulation: CrossTabulationEntry[] = [];
     const primaryTotals: Record<string, number> = {};
 
     // Process secondary dimension if specified
@@ -374,46 +300,16 @@ export class GroupingApi {
       });
       dimensions.secondary = secondary.groups;
 
-      // Cross-tabulate primary x secondary
-      for (const primaryGroup of primary.groups.slice(0, 5)) {
-        // Limit to avoid too many API calls
-        primaryTotals[primaryGroup.key] = primaryGroup.count;
-
-        for (const secondaryGroup of secondary.groups.slice(0, 5)) {
-          try {
-            const combinedFilter = `${primary_group_by}:${primaryGroup.key},${secondary_group_by}:${secondaryGroup.key}`;
-            const fullFilter = baseParams.filter
-              ? `${baseParams.filter},${combinedFilter}`
-              : combinedFilter;
-
-            const crossResult = await this.client.getResponse<{
-              meta: { count: number };
-            }>(entityType, {
-              filter: fullFilter,
-              per_page: 1,
-            });
-
-            const { count } = crossResult.meta;
-
-            crossTabulation.push({
-              primary_key: primaryGroup.key,
-              secondary_key: secondaryGroup.key,
-              count,
-              percentage_of_total: (count / primary.total_count) * 100,
-              percentage_of_primary: (count / primaryGroup.count) * 100,
-            });
-          } catch (error: unknown) {
-            logger.warn(
-              `[GroupingApi] Failed cross-tabulation for ${primaryGroup.key} x ${secondaryGroup.key}`,
-              {
-                primaryKey: primaryGroup.key,
-                secondaryKey: secondaryGroup.key,
-                error,
-              },
-            );
-          }
-        }
-      }
+      await this.buildCrossTabulation(
+        entityType,
+        primary_group_by,
+        secondary_group_by,
+        primary,
+        secondary,
+        baseParams,
+        crossTabulation,
+        primaryTotals,
+      );
     }
 
     return {
@@ -424,6 +320,72 @@ export class GroupingApi {
         primary_totals: primaryTotals,
       },
     };
+  }
+
+  /**
+   * Build cross-tabulation data for two dimensions
+   * @param entityType - Type of entity
+   * @param primaryGroupBy - Primary grouping field
+   * @param secondaryGroupBy - Secondary grouping field
+   * @param primary - Primary group results
+   * @param secondary - Secondary group results
+   * @param baseParams - Base query parameters
+   * @param crossTabulation - Array to populate with cross-tabulation entries
+   * @param primaryTotals - Record to populate with primary totals
+   */
+  private async buildCrossTabulation(
+    entityType: EntityType,
+    primaryGroupBy: string,
+    secondaryGroupBy: string,
+    primary: GroupByResult,
+    secondary: GroupByResult,
+    baseParams: Omit<
+      MultiDimensionalGroupParams,
+      "primary_group_by" | "secondary_group_by" | "max_groups_per_dimension"
+    >,
+    crossTabulation: CrossTabulationEntry[],
+    primaryTotals: Record<string, number>,
+  ): Promise<void> {
+    const CROSS_TAB_LIMIT = 5;
+
+    for (const primaryGroup of primary.groups.slice(0, CROSS_TAB_LIMIT)) {
+      primaryTotals[primaryGroup.key] = primaryGroup.count;
+
+      for (const secondaryGroup of secondary.groups.slice(0, CROSS_TAB_LIMIT)) {
+        try {
+          const combinedFilter = `${primaryGroupBy}:${primaryGroup.key},${secondaryGroupBy}:${secondaryGroup.key}`;
+          const fullFilter = baseParams.filter
+            ? `${baseParams.filter},${combinedFilter}`
+            : combinedFilter;
+
+          const crossResult = await this.client.getResponse<{
+            meta: { count: number };
+          }>(entityType, {
+            filter: fullFilter,
+            per_page: 1,
+          });
+
+          const { count } = crossResult.meta;
+
+          crossTabulation.push({
+            primary_key: primaryGroup.key,
+            secondary_key: secondaryGroup.key,
+            count,
+            percentage_of_total: (count / primary.total_count) * 100,
+            percentage_of_primary: (count / primaryGroup.count) * 100,
+          });
+        } catch (error: unknown) {
+          logger.warn(
+            `[GroupingApi] Failed cross-tabulation for ${primaryGroup.key} x ${secondaryGroup.key}`,
+            {
+              primaryKey: primaryGroup.key,
+              secondaryKey: secondaryGroup.key,
+              error,
+            },
+          );
+        }
+      }
+    }
   }
 
   /**
@@ -448,20 +410,10 @@ export class GroupingApi {
     groupBy: string,
     metric: string = "cited_by_count",
     params: AdvancedGroupParams & { top_n?: number } = {},
-  ): Promise<{
-    groups: Array<{
-      group: string;
-      group_display_name: string;
-      group_total: number;
-      top_performers: Array<{
-        id: string;
-        display_name: string;
-        metric_value: number;
-        rank_in_group: number;
-      }>;
-    }>;
-  }> {
-    const { top_n = 5, group_limit = 10 } = params;
+  ): Promise<TopPerformersByGroupResult> {
+    const DEFAULT_TOP_N = 5;
+    const DEFAULT_GROUP_LIMIT = 10;
+    const { top_n = DEFAULT_TOP_N, group_limit = DEFAULT_GROUP_LIMIT } = params;
 
     // Get main groups
     const groups = await this.groupBy(entityType, groupBy, {
@@ -469,86 +421,124 @@ export class GroupingApi {
       group_limit,
     });
 
-    const result: Array<{
-      group: string;
-      group_display_name: string;
-      group_total: number;
-      top_performers: Array<{
-        id: string;
-        display_name: string;
-        metric_value: number;
-        rank_in_group: number;
-      }>;
-    }> = [];
+    const result: GroupWithTopPerformers[] = [];
 
     // For each group, get top performers
     for (const group of groups.groups) {
-      try {
-        const groupFilter = `${groupBy}:${group.key}`;
-        const fullFilter = params.filter
-          ? `${params.filter},${groupFilter}`
-          : groupFilter;
-
-        const topPerformers = await this.client.getResponse<{
-          results: Array<{
-            id: string;
-            display_name: string;
-            [key: string]: unknown;
-          }>;
-        }>(entityType, {
-          filter: fullFilter,
-          sort: metric,
-          per_page: top_n,
-          select: ["id", "display_name", metric],
-        });
-
-        const resultsArray = topPerformers.results;
-        const performersWithRank = resultsArray.map(
-          (performer, index: number) => {
-            if (!this.isPerformerRecord(performer)) {
-              throw new Error("Invalid performer record structure");
-            }
-
-            // Extract properties with explicit type checking using helper
-            const idValue = extractPropertyValue({ obj: performer, key: "id" });
-            const displayNameValue = extractPropertyValue({
-              obj: performer,
-              key: "display_name",
-            });
-            const metricValue = extractPropertyValue({
-              obj: performer,
-              key: metric,
-            });
-
-            const id = typeof idValue === "string" ? idValue : "";
-            const displayName =
-              typeof displayNameValue === "string" ? displayNameValue : "";
-            const metric_value = this.isNumber(metricValue) ? metricValue : 0;
-
-            return {
-              id,
-              display_name: displayName,
-              metric_value,
-              rank_in_group: index + 1,
-            };
-          },
-        );
-
-        result.push({
-          group: group.key,
-          group_display_name: group.key_display_name,
-          group_total: group.count,
-          top_performers: performersWithRank,
-        });
-      } catch (error: unknown) {
-        logger.warn(
-          `[GroupingApi] Failed to get top performers for group ${group.key}`,
-          { groupKey: group.key, error },
-        );
+      const groupData = await this.getTopPerformersForGroup(
+        entityType,
+        groupBy,
+        group,
+        metric,
+        top_n,
+        params,
+      );
+      if (groupData) {
+        result.push(groupData);
       }
     }
 
     return { groups: result };
+  }
+
+  /**
+   * Get top performers for a single group
+   * @param entityType - Type of entity
+   * @param groupBy - Field to group by
+   * @param group - Group result
+   * @param metric - Metric to rank by
+   * @param topN - Number of top performers to return
+   * @param params - Advanced group parameters
+   */
+  private async getTopPerformersForGroup(
+    entityType: EntityType,
+    groupBy: string,
+    group: GroupResult,
+    metric: string,
+    topN: number,
+    params: AdvancedGroupParams,
+  ): Promise<GroupWithTopPerformers | undefined> {
+    try {
+      const groupFilter = `${groupBy}:${group.key}`;
+      const fullFilter = params.filter
+        ? `${params.filter},${groupFilter}`
+        : groupFilter;
+
+      const topPerformers = await this.client.getResponse<{
+        results: Array<{
+          id: string;
+          display_name: string;
+          [key: string]: unknown;
+        }>;
+      }>(entityType, {
+        filter: fullFilter,
+        sort: metric,
+        per_page: topN,
+        select: ["id", "display_name", metric],
+      });
+
+      const resultsArray = topPerformers.results;
+      const performersWithRank = resultsArray.map((performer, index: number) =>
+        this.mapPerformerToRanked(performer, metric, index),
+      );
+
+      return {
+        group: group.key,
+        group_display_name: group.key_display_name,
+        group_total: group.count,
+        top_performers: performersWithRank,
+      };
+    } catch (error: unknown) {
+      logger.warn(
+        `[GroupingApi] Failed to get top performers for group ${group.key}`,
+        { groupKey: group.key, error },
+      );
+      return undefined;
+    }
+  }
+
+  /**
+   * Map a performer record to a ranked result
+   * @param performer - Performer record from API
+   * @param metric - Metric key to extract
+   * @param index - Position in results array
+   */
+  private mapPerformerToRanked(
+    performer: unknown,
+    metric: string,
+    index: number,
+  ): {
+    id: string;
+    display_name: string;
+    metric_value: number;
+    rank_in_group: number;
+  } {
+    if (!isPerformerRecord(performer)) {
+      throw new Error("Invalid performer record structure");
+    }
+
+    // Extract properties with explicit type checking using helper
+    const idValue = extractPropertyValue({ obj: performer, key: "id" });
+    const displayNameValue = extractPropertyValue({
+      obj: performer,
+      key: "display_name",
+    });
+    const metricValue = extractPropertyValue({
+      obj: performer,
+      key: metric,
+    });
+
+    const id = typeof idValue === "string" ? idValue : "";
+    const displayName =
+      typeof displayNameValue === "string" ? displayNameValue : "";
+    const metric_value = isFiniteNumber(metricValue) ? metricValue : 0;
+
+    return {
+      id,
+      display_name: displayName,
+      metric_value,
+      rank_in_group: index + 1,
+    };
   }
 
   /**
@@ -573,31 +563,12 @@ export class GroupingApi {
     groupBy: string,
     metric: string = "cited_by_count",
     params: AdvancedGroupParams = {},
-  ): Promise<{
-    groups: Array<{
-      group: string;
-      group_display_name: string;
-      count: number;
-      stats: {
-        total: number;
-        mean: number;
-        median?: number;
-        percentiles?: {
-          p25: number;
-          p75: number;
-          p90: number;
-          p95: number;
-          p99: number;
-        };
-      };
-    }>;
-    overall_stats: {
-      total_entities: number;
-      grand_total_metric: number;
-      overall_mean: number;
-    };
-  }> {
-    const { calculate_percentiles = false, group_limit = 20 } = params;
+  ): Promise<DistributionStatsResult> {
+    const DEFAULT_GROUP_LIMIT = 20;
+    const {
+      calculate_percentiles = false,
+      group_limit = DEFAULT_GROUP_LIMIT,
+    } = params;
 
     const groups = await this.groupBy(entityType, groupBy, {
       ...params,
@@ -605,23 +576,7 @@ export class GroupingApi {
       include_citation_stats: true,
     });
 
-    const result: Array<{
-      group: string;
-      group_display_name: string;
-      count: number;
-      stats: {
-        total: number;
-        mean: number;
-        median?: number;
-        percentiles?: {
-          p25: number;
-          p75: number;
-          p90: number;
-          p95: number;
-          p99: number;
-        };
-      };
-    }> = [];
+    const result: GroupDistributionStats[] = [];
     let grandTotalMetric = 0;
     const totalEntities = groups.groups.reduce(
       (sum, group) => sum + group.count,
@@ -629,16 +584,19 @@ export class GroupingApi {
     );
 
     for (const group of groups.groups) {
-      const totalMetric = this.extractMetricValue(group, metric);
-      const basicStats = this.calculateGroupStats(totalMetric, group.count);
-      const percentiles = await this.calculatePercentilesIfNeeded(
-        entityType,
-        groupBy,
-        group,
-        metric,
-        params,
-        calculate_percentiles,
-      );
+      const totalMetric = extractMetricFromRecord(group, metric);
+      const basicStats = calculateBasicStats(totalMetric, group.count);
+
+      const percentiles = calculate_percentiles
+        ? await calculateGroupPercentiles(
+            this.client,
+            entityType,
+            groupBy,
+            group,
+            metric,
+            params,
+          )
+        : undefined;
 
       result.push({
         group: group.key,
@@ -671,120 +629,5 @@ export class GroupingApi {
         overall_mean: totalEntities > 0 ? grandTotalMetric / totalEntities : 0,
       },
     };
-  }
-
-  /**
-   * Calculate percentile from sorted array
-   * @param sortedArray
-   * @param percentile
-   */
-  private percentile(sortedArray: number[], percentile: number): number {
-    if (sortedArray.length === 0) return 0;
-
-    const index = (percentile / 100) * (sortedArray.length - 1);
-    const lower = Math.floor(index);
-    const upper = Math.ceil(index);
-    const weight = index - lower;
-
-    if (upper >= sortedArray.length)
-      return sortedArray.at(-1) ?? 0;
-    if (lower < 0) return sortedArray[0] ?? 0;
-
-    const lowerValue = sortedArray[lower] ?? 0;
-    const upperValue = sortedArray[upper] ?? 0;
-    return lowerValue * (1 - weight) + upperValue * weight;
-  }
-
-  /**
-   * Extract metric value from group record with type safety
-   * @param group
-   * @param metric
-   */
-  private extractMetricValue(group: unknown, metric: string): number {
-    if (group && typeof group === "object") {
-      const groupRecord = group as Record<string, unknown>;
-      const value = metric in groupRecord ? groupRecord[metric] : undefined;
-      if (typeof value === "number" && !Number.isNaN(value)) {
-        return value;
-      }
-    }
-    return 0;
-  }
-
-  /**
-   * Calculate basic statistics for a group
-   * @param totalMetric
-   * @param count
-   */
-  private calculateGroupStats(
-    totalMetric: number,
-    count: number,
-  ): { total: number; mean: number } {
-    return {
-      total: totalMetric,
-      mean: count > 0 ? totalMetric / count : 0,
-    };
-  }
-
-  /**
-   * Calculate percentiles for a group if requested
-   * @param entityType
-   * @param groupBy
-   * @param group
-   * @param metric
-   * @param params
-   * @param calculatePercentiles
-   */
-  private async calculatePercentilesIfNeeded(
-    entityType: EntityType,
-    groupBy: string,
-    group: GroupResult,
-    metric: string,
-    params: AdvancedGroupParams,
-    calculatePercentiles: boolean,
-  ): Promise<
-    { p25: number; p50: number; p75: number; p90: number } | undefined
-  > {
-    if (!calculatePercentiles || group.count <= 10) {
-      return undefined;
-    }
-
-    try {
-      const groupFilter = `${groupBy}:${group.key}`;
-      const fullFilter = params.filter
-        ? `${params.filter},${groupFilter}`
-        : groupFilter;
-
-      const sample = await this.client.getResponse<{
-        results: Array<Record<string, unknown>>;
-      }>(entityType, {
-        filter: fullFilter,
-        sort: metric,
-        per_page: Math.min(100, group.count),
-        select: [metric],
-      });
-
-      const values = sample.results
-        .map((item: Record<string, unknown>) => {
-          const value = item[metric];
-          return this.isNumber(value) ? value : 0;
-        })
-        .sort((a: number, b: number) => a - b);
-
-      if (values.length === 0) return undefined;
-
-      return {
-        p25: this.percentile(values, 25),
-        p50: this.percentile(values, 50),
-        p75: this.percentile(values, 75),
-        p90: this.percentile(values, 90),
-      };
-    } catch (error: unknown) {
-      logger.warn(
-        `[GroupingApi] Failed to calculate percentiles for group ${group.key}`,
-        { groupKey: group.key, error },
-      );
-      return undefined;
-    }
   }
 }

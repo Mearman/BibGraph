@@ -5,6 +5,7 @@
 
 import type { EntityType, OpenAlexEntity, OpenAlexResponse } from "@bibgraph/types";
 import { generateContentHash, sanitizeUrlForCaching } from "@bibgraph/utils";
+
 import * as NodeModules from "./nodejs-modules";
 
 const ERROR_MESSAGE_ENTITY_EXTRACTION_FAILED = "Entity info extraction failed";
@@ -68,6 +69,7 @@ export interface CacheMetadata {
 
 /**
  * Extract entity type and ID from URL or response data
+ * @param data
  */
 export const extractEntityInfo = async (data: InterceptedData): Promise<EntityInfo> => {
 	try {
@@ -112,6 +114,7 @@ export const extractEntityInfo = async (data: InterceptedData): Promise<EntityIn
 
 /**
  * Extract entity info from URL path
+ * @param url
  */
 export const extractEntityInfoFromUrl = (url: string): EntityInfo => {
 	try {
@@ -202,6 +205,7 @@ export const extractEntityInfoFromUrl = (url: string): EntityInfo => {
 
 /**
  * Extract entity info from response data
+ * @param responseData
  */
 export const extractEntityInfoFromResponse = (responseData: unknown): EntityInfo => {
 	try {
@@ -236,6 +240,7 @@ export const extractEntityInfoFromResponse = (responseData: unknown): EntityInfo
 
 /**
  * Extract external canonical ID from URL for proper caching
+ * @param url
  */
 export const extractExternalCanonicalIdFromUrl = (url: string): {
 	entityType?: EntityType;
@@ -284,6 +289,7 @@ export const extractExternalCanonicalIdFromUrl = (url: string): {
 
 /**
  * Check if a string looks like an external canonical ID
+ * @param id
  */
 const isExternalCanonicalId = (id: string): boolean => {
 	// DOI patterns
@@ -306,6 +312,7 @@ const isExternalCanonicalId = (id: string): boolean => {
 
 /**
  * Type guard for OpenAlex entity
+ * @param data
  */
 const isOpenAlexEntity = (data: unknown): data is OpenAlexEntity => {
 	const obj = data as Record<string, unknown>;
@@ -319,6 +326,7 @@ const isOpenAlexEntity = (data: unknown): data is OpenAlexEntity => {
 
 /**
  * Type guard for OpenAlex response
+ * @param data
  */
 const isOpenAlexResponse = (
 	data: unknown,
@@ -334,6 +342,7 @@ const isOpenAlexResponse = (
 
 /**
  * Detect entity type from entity data
+ * @param entity
  */
 const detectEntityType = (entity: OpenAlexEntity): EntityType => {
 	// Try to detect based on specific properties
@@ -352,6 +361,8 @@ const detectEntityType = (entity: OpenAlexEntity): EntityType => {
 
 /**
  * Generate file paths for cached data
+ * @param entityInfo
+ * @param basePath
  */
 export const generateFilePaths = async (
 	entityInfo: EntityInfo,
@@ -414,6 +425,7 @@ export const generateFilePaths = async (
 /**
  * Sanitize filename to be filesystem-safe
  * Uses hash for very long filenames to avoid ENAMETOOLONG errors
+ * @param filename
  */
 const sanitizeFilename = (filename: string): string => {
 	const sanitized = filename
@@ -443,6 +455,7 @@ const sanitizeFilename = (filename: string): string => {
 
 /**
  * Exclude meta field from response data before caching
+ * @param responseData
  */
 export const excludeMetaField = (responseData: unknown): unknown => {
 	if (
@@ -459,6 +472,7 @@ export const excludeMetaField = (responseData: unknown): unknown => {
 
 /**
  * Check if response data has empty results
+ * @param responseData
  */
 export const hasEmptyResults = (responseData: unknown): boolean => {
 	if (

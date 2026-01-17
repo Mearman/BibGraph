@@ -10,20 +10,16 @@
  * - index-manager.ts: Hierarchical index.json operations
  */
 
-import type { EntityType, OpenAlexEntity, OpenAlexResponse } from "@bibgraph/types";
-import { logError, logger, STATIC_DATA_CACHE_PATH } from "@bibgraph/utils";
-import * as NodeModules from "./nodejs-modules";
-import * as FileOps from "./file-operations";
+import { type FileEntry,logger, STATIC_DATA_CACHE_PATH } from "@bibgraph/utils";
+
 import * as EntityExtraction from "./entity-extraction";
+import * as FileOps from "./file-operations";
 import * as IndexManager from "./index-manager";
-import type { DirectoryIndex, FileEntry } from "./index-manager";
+import * as NodeModules from "./nodejs-modules";
 
 // Re-export types from sub-modules
-export type { CacheMetadata, InterceptedData } from "./entity-extraction";
-export type { DirectoryIndex, FileEntry } from "./index-manager";
 
 // Re-export utilities for testing
-export { __setMockModules } from "./nodejs-modules";
 
 /**
  * Configuration for disk cache writer
@@ -102,6 +98,7 @@ export class DiskCacheWriter {
 
 	/**
 	 * Write intercepted response data to disk cache
+	 * @param data
 	 */
 	public async writeToCache(data: EntityExtraction.InterceptedData): Promise<void> {
 		// Enforce concurrent write limit
@@ -131,6 +128,7 @@ export class DiskCacheWriter {
 	 * 4. Atomic file writes using temporary files
 	 * 5. Index updates with hierarchical propagation
 	 * 6. Lock release in finally block
+	 * @param data
 	 */
 	private async _writeToCache(data: EntityExtraction.InterceptedData): Promise<void> {
 		let indexLockId: string | undefined;
@@ -201,7 +199,8 @@ export class DiskCacheWriter {
 			}
 
 			const content = JSON.stringify(responseDataToCache, null, 2);
-			const newContentHash = await (await import("@bibgraph/utils")).generateContentHash(
+			const utils = await import("@bibgraph/utils");
+			const newContentHash = await utils.generateContentHash(
 				responseDataToCache,
 			);
 			const newLastRetrieved = new Date().toISOString();
@@ -216,7 +215,7 @@ export class DiskCacheWriter {
 				);
 
 			// Create or update file entry with sanitized URL
-			const sanitizedUrl = (await import("@bibgraph/utils")).sanitizeUrlForCaching(
+			const sanitizedUrl = utils.sanitizeUrlForCaching(
 				data.url,
 			);
 			const fileEntry: FileEntry = {
@@ -291,6 +290,7 @@ export class DiskCacheWriter {
 
 	/**
 	 * Validate intercepted data structure
+	 * @param data
 	 */
 	private validateInterceptedData(data: EntityExtraction.InterceptedData): void {
 		if (!data || typeof data !== "object") {
@@ -372,6 +372,7 @@ export const defaultDiskWriter = new DiskCacheWriter();
 
 /**
  * Convenience function to write intercepted data to cache
+ * @param data
  */
 export const writeToDiskCache = async (
 	data: EntityExtraction.InterceptedData,

@@ -3,4 +3,4 @@
  */
 
 export { defaultDiskWriter, writeToDiskCache } from './disk-writer.js';
-export type { InterceptedData } from './disk-writer.js';
+export type { InterceptedData } from './entity-extraction.js';

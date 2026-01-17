@@ -25,13 +25,23 @@ import { logger } from '@bibgraph/utils';
 
 import { generateEdgeId } from './graph-index-db';
 import { getGraphIndexTier, type GraphIndexTier } from './graph-index-tier';
-
-const LOG_PREFIX = 'persistent-graph';
-
-/**
- * PersistentGraph state
- */
-type HydrationState = 'not_started' | 'hydrating' | 'hydrated' | 'error';
+import {
+  addEdgeToCache,
+  applyEdgeFilter,
+  createEdgeRecord,
+} from './persistent-graph-edges';
+import {
+  addNodeToCache,
+  createNodeRecord,
+  createUpdatedNodeRecord,
+  shouldUpgradeCompleteness,
+} from './persistent-graph-nodes';
+import {
+  clearCache,
+  type GraphCache,
+  type HydrationState,
+  LOG_PREFIX,
+} from './persistent-graph-types';
 
 /**
  * PersistentGraph - In-memory graph with IndexedDB persistence
@@ -44,14 +54,12 @@ export class PersistentGraph {
   private tier: GraphIndexTier;
   private hydrationState: HydrationState = 'not_started';
   private hydrationPromise: Promise<void> | null = null;
-
-  // In-memory caches for fast access
-  private nodeCache: Map<string, GraphNodeRecord> = new Map();
-  private edgeCache: Map<string, GraphEdgeRecord> = new Map();
-
-  // Adjacency lists for fast neighbor lookups
-  private outboundEdges: Map<string, Set<string>> = new Map(); // nodeId -> edgeIds
-  private inboundEdges: Map<string, Set<string>> = new Map(); // nodeId -> edgeIds
+  private cache: GraphCache = {
+    nodes: new Map(),
+    edges: new Map(),
+    outboundEdges: new Map(),
+    inboundEdges: new Map(),
+  };
 
   constructor(tier?: GraphIndexTier) {
     this.tier = tier ?? getGraphIndexTier();
@@ -61,17 +69,10 @@ export class PersistentGraph {
   // Lifecycle
   // ===========================================================================
 
-  /**
-   * Initialize the persistent graph (idempotent)
-   * Starts hydration if not already started
-   */
   async initialize(): Promise<void> {
     await this.ensureHydrated();
   }
 
-  /**
-   * Hydrate in-memory cache from IndexedDB
-   */
   async hydrate(): Promise<void> {
     if (this.hydrationState === 'hydrated') {
       return;
@@ -89,8 +90,8 @@ export class PersistentGraph {
       await this.hydrationPromise;
       this.hydrationState = 'hydrated';
       logger.debug(LOG_PREFIX, 'Graph hydrated', {
-        nodes: this.nodeCache.size,
-        edges: this.edgeCache.size,
+        nodes: this.cache.nodes.size,
+        edges: this.cache.edges.size,
       });
     } catch (error) {
       this.hydrationState = 'error';
@@ -103,76 +104,42 @@ export class PersistentGraph {
 
   private async doHydrate(): Promise<void> {
     const startTime = Date.now();
-
-    // Load all nodes and edges from IndexedDB
     const [nodes, edges] = await Promise.all([
       this.tier.getAllNodes(),
       this.tier.getAllEdges(),
     ]);
 
     // Populate node cache
-    this.nodeCache.clear();
+    this.cache.nodes.clear();
     for (const node of nodes) {
-      this.nodeCache.set(node.id, node);
-      this.outboundEdges.set(node.id, new Set());
-      this.inboundEdges.set(node.id, new Set());
+      this.cache.nodes.set(node.id, node);
+      this.cache.outboundEdges.set(node.id, new Set());
+      this.cache.inboundEdges.set(node.id, new Set());
     }
 
     // Populate edge cache and adjacency lists
-    this.edgeCache.clear();
+    this.cache.edges.clear();
     for (const edge of edges) {
-      this.edgeCache.set(edge.id, edge);
-
-      // Update adjacency lists
-      const outbound = this.outboundEdges.get(edge.source);
-      if (outbound) {
-        outbound.add(edge.id);
-      } else {
-        this.outboundEdges.set(edge.source, new Set([edge.id]));
-      }
-
-      const inbound = this.inboundEdges.get(edge.target);
-      if (inbound) {
-        inbound.add(edge.id);
-      } else {
-        this.inboundEdges.set(edge.target, new Set([edge.id]));
-      }
+      addEdgeToCache(this.cache, edge);
     }
 
-    const elapsed = Date.now() - startTime;
     logger.debug(LOG_PREFIX, 'Hydration complete', {
       nodes: nodes.length,
       edges: edges.length,
-      elapsed,
+      elapsed: Date.now() - startTime,
     });
   }
 
-  /**
-   * Clear all graph data from memory and IndexedDB
-   */
   async clear(): Promise<void> {
-    // Clear in-memory caches
-    this.nodeCache.clear();
-    this.edgeCache.clear();
-    this.outboundEdges.clear();
-    this.inboundEdges.clear();
-
-    // Clear IndexedDB
+    clearCache(this.cache);
     await this.tier.clear();
-
     logger.debug(LOG_PREFIX, 'Graph cleared');
   }
 
-  /**
-   * Check if the graph is hydrated and ready
-   */
   isReady(): boolean {
     return this.hydrationState === 'hydrated';
   }
 
-  /**
-   * Get hydration state
-   */
   getHydrationState(): HydrationState {
     return this.hydrationState;
   }
@@ -181,63 +148,28 @@ export class PersistentGraph {
   // Node Operations
   // ===========================================================================
 
-  /**
-   * Add a node to the graph
-   * Write-through: persists to IndexedDB immediately
-   * @param input
-   */
   async addNode(input: GraphNodeInput): Promise<void> {
     await this.ensureHydrated();
 
-    // Check if node already exists
-    if (this.nodeCache.has(input.id)) {
-      // Update if higher completeness
+    if (this.cache.nodes.has(input.id)) {
       await this.updateNodeCompleteness(input.id, input.completeness, input.label, input.metadata);
       return;
     }
 
-    const now = Date.now();
-    const record: GraphNodeRecord = {
-      ...input,
-      cachedAt: now,
-      updatedAt: now,
-    };
-
-    // Write to IndexedDB first (write-through)
+    const record = createNodeRecord(input, Date.now());
     await this.tier.addNode(input);
-
-    // Update in-memory cache
-    this.nodeCache.set(input.id, record);
-    this.outboundEdges.set(input.id, new Set());
-    this.inboundEdges.set(input.id, new Set());
-
+    addNodeToCache(this.cache, record);
     logger.debug(LOG_PREFIX, 'Node added', { id: input.id, completeness: input.completeness });
   }
 
-  /**
-   * Get a node by ID (synchronous - from memory)
-   * @param id
-   */
   getNode(id: string): GraphNodeRecord | undefined {
-    return this.nodeCache.get(id);
+    return this.cache.nodes.get(id);
   }
 
-  /**
-   * Check if a node exists (synchronous - from memory)
-   * @param id
-   */
   hasNode(id: string): boolean {
-    return this.nodeCache.has(id);
+    return this.cache.nodes.has(id);
   }
 
-  /**
-   * Update a node's completeness status
-   * Only upgrades: stub → partial → full (never downgrades)
-   * @param id
-   * @param completeness
-   * @param label
-   * @param metadata
-   */
   async updateNodeCompleteness(
     id: string,
     completeness: CompletenessStatus,
@@ -246,224 +178,109 @@ export class PersistentGraph {
   ): Promise<void> {
     await this.ensureHydrated();
 
-    const existing = this.nodeCache.get(id);
+    const existing = this.cache.nodes.get(id);
     if (!existing) {
       return;
     }
 
-    const shouldUpgrade = this.shouldUpgradeCompleteness(existing.completeness, completeness);
+    const shouldUpgrade = shouldUpgradeCompleteness(existing.completeness, completeness);
     if (!shouldUpgrade && !label && !metadata) {
       return;
     }
 
-    // Write to IndexedDB first
     await this.tier.updateNodeCompleteness(id, completeness, label, metadata);
-
-    // Update in-memory cache
-    const updated: GraphNodeRecord = {
-      ...existing,
-      updatedAt: Date.now(),
-    };
-
-    if (shouldUpgrade) {
-      updated.completeness = completeness;
-    }
-
-    if (label && label !== existing.label) {
-      updated.label = label;
-    }
-
-    if (metadata) {
-      updated.metadata = { ...existing.metadata, ...metadata };
-    }
-
-    this.nodeCache.set(id, updated);
+    const updated = createUpdatedNodeRecord(existing, completeness, label, metadata);
+    this.cache.nodes.set(id, updated);
   }
 
-  /**
-   * Update a node's label only
-   * Convenience method for updating display names without changing completeness
-   * @param id
-   * @param label
-   */
   async updateNodeLabel(id: string, label: string): Promise<void> {
     await this.ensureHydrated();
 
-    const existing = this.nodeCache.get(id);
+    const existing = this.cache.nodes.get(id);
     if (!existing || existing.label === label) {
       return;
     }
 
-    // Use updateNodeCompleteness with existing completeness to just update the label
     await this.updateNodeCompleteness(id, existing.completeness, label);
   }
 
-  /**
-   * Mark a node as expanded (relationships have been fetched)
-   * @param id
-   */
   async markNodeExpanded(id: string): Promise<void> {
     await this.ensureHydrated();
 
-    const existing = this.nodeCache.get(id);
-    if (!existing) {
+    const existing = this.cache.nodes.get(id);
+    if (!existing || existing.expandedAt !== undefined) {
       return;
     }
 
-    // Already expanded
-    if (existing.expandedAt !== undefined) {
-      return;
-    }
-
-    // Write to IndexedDB first
     await this.tier.markNodeExpanded(id);
-
-    // Update in-memory cache
     const updated: GraphNodeRecord = {
       ...existing,
       expandedAt: Date.now(),
       updatedAt: Date.now(),
     };
-
-    this.nodeCache.set(id, updated);
+    this.cache.nodes.set(id, updated);
   }
 
-  /**
-   * Get node count (synchronous - from memory)
-   */
   getNodeCount(): number {
-    return this.nodeCache.size;
+    return this.cache.nodes.size;
   }
 
-  /**
-   * Get all nodes (synchronous - from memory)
-   */
   getAllNodes(): GraphNodeRecord[] {
-    return [...this.nodeCache.values()];
+    return [...this.cache.nodes.values()];
   }
 
-  /**
-   * Get nodes by completeness status (synchronous - from memory)
-   * @param status
-   */
   getNodesByCompleteness(status: CompletenessStatus): GraphNodeRecord[] {
-    return [...this.nodeCache.values()].filter((n) => n.completeness === status);
+    return [...this.cache.nodes.values()].filter((n) => n.completeness === status);
   }
 
-  /**
-   * Get nodes by entity type (synchronous - from memory)
-   * @param entityType
-   */
   getNodesByType(entityType: EntityType): GraphNodeRecord[] {
-    return [...this.nodeCache.values()].filter((n) => n.entityType === entityType);
+    return [...this.cache.nodes.values()].filter((n) => n.entityType === entityType);
   }
 
   // ===========================================================================
   // Edge Operations
   // ===========================================================================
 
-  /**
-   * Add an edge to the graph
-   * Write-through: persists to IndexedDB immediately
-   * Returns false if edge already exists (deduplication)
-   * @param input
-   */
   async addEdge(input: GraphEdgeInput): Promise<boolean> {
     await this.ensureHydrated();
 
     const edgeId = generateEdgeId(input.source, input.target, input.type);
-
-    // Check for duplicate
-    if (this.edgeCache.has(edgeId)) {
+    if (this.cache.edges.has(edgeId)) {
       return false;
     }
 
-    const record: GraphEdgeRecord = {
-      id: edgeId,
-      source: input.source,
-      target: input.target,
-      type: input.type,
-      direction: input.direction,
-      discoveredAt: Date.now(),
-      authorPosition: input.authorPosition,
-      isCorresponding: input.isCorresponding,
-      isOpenAccess: input.isOpenAccess,
-      version: input.version,
-      score: input.score,
-      years: input.years,
-      awardId: input.awardId,
-      role: input.role,
-      metadata: input.metadata,
-    };
-
-    // Write to IndexedDB first
+    const record = createEdgeRecord(input, Date.now());
     await this.tier.addEdge(input);
-
-    // Update in-memory cache
-    this.edgeCache.set(edgeId, record);
-
-    // Update adjacency lists
-    const outbound = this.outboundEdges.get(input.source);
-    if (outbound) {
-      outbound.add(edgeId);
-    } else {
-      this.outboundEdges.set(input.source, new Set([edgeId]));
-    }
-
-    const inbound = this.inboundEdges.get(input.target);
-    if (inbound) {
-      inbound.add(edgeId);
-    } else {
-      this.inboundEdges.set(input.target, new Set([edgeId]));
-    }
-
+    addEdgeToCache(this.cache, record);
     logger.debug(LOG_PREFIX, 'Edge added', { edgeId, type: input.type });
     return true;
   }
 
-  /**
-   * Check if an edge exists (synchronous - from memory)
-   * @param source
-   * @param target
-   * @param type
-   */
   hasEdge(source: string, target: string, type: RelationType): boolean {
     const edgeId = generateEdgeId(source, target, type);
-    return this.edgeCache.has(edgeId);
+    return this.cache.edges.has(edgeId);
   }
 
-  /**
-   * Get edge count (synchronous - from memory)
-   */
   getEdgeCount(): number {
-    return this.edgeCache.size;
+    return this.cache.edges.size;
   }
 
-  /**
-   * Get all edges (synchronous - from memory)
-   */
   getAllEdges(): GraphEdgeRecord[] {
-    return [...this.edgeCache.values()];
+    return [...this.cache.edges.values()];
   }
 
-  /**
-   * Get edges from a source node (synchronous - from memory)
-   * @param nodeId
-   * @param type
-   * @param filter
-   */
   getEdgesFrom(
     nodeId: string,
     type?: RelationType,
     filter?: EdgePropertyFilter
   ): GraphEdgeRecord[] {
-    const edgeIds = this.outboundEdges.get(nodeId);
+    const edgeIds = this.cache.outboundEdges.get(nodeId);
     if (!edgeIds) {
       return [];
     }
 
     let edges = [...edgeIds]
-      .map((id) => this.edgeCache.get(id))
+      .map((id) => this.cache.edges.get(id))
       .filter((e): e is GraphEdgeRecord => e !== undefined);
 
     if (type) {
@@ -471,30 +288,24 @@ export class PersistentGraph {
     }
 
     if (filter) {
-      edges = this.applyEdgeFilter(edges, filter);
+      edges = applyEdgeFilter(edges, filter);
     }
 
     return edges;
   }
 
-  /**
-   * Get edges to a target node (synchronous - from memory)
-   * @param nodeId
-   * @param type
-   * @param filter
-   */
   getEdgesTo(
     nodeId: string,
     type?: RelationType,
     filter?: EdgePropertyFilter
   ): GraphEdgeRecord[] {
-    const edgeIds = this.inboundEdges.get(nodeId);
+    const edgeIds = this.cache.inboundEdges.get(nodeId);
     if (!edgeIds) {
       return [];
     }
 
     let edges = [...edgeIds]
-      .map((id) => this.edgeCache.get(id))
+      .map((id) => this.cache.edges.get(id))
       .filter((e): e is GraphEdgeRecord => e !== undefined);
 
     if (type) {
@@ -502,7 +313,7 @@ export class PersistentGraph {
     }
 
     if (filter) {
-      edges = this.applyEdgeFilter(edges, filter);
+      edges = applyEdgeFilter(edges, filter);
     }
 
     return edges;
@@ -512,11 +323,6 @@ export class PersistentGraph {
   // Query Operations
   // ===========================================================================
 
-  /**
-   * Get neighbors of a node (synchronous - from memory)
-   * @param nodeId
-   * @param options
-   */
   getNeighbors(nodeId: string, options?: NeighborQueryOptions): string[] {
     const direction = options?.direction ?? 'both';
     const types = options?.types;
@@ -524,12 +330,11 @@ export class PersistentGraph {
 
     const neighbors = new Set<string>();
 
-    // Outbound neighbors (targets of edges from this node)
     if (direction === 'outbound' || direction === 'both') {
-      const outEdgeIds = this.outboundEdges.get(nodeId);
+      const outEdgeIds = this.cache.outboundEdges.get(nodeId);
       if (outEdgeIds) {
         for (const edgeId of outEdgeIds) {
-          const edge = this.edgeCache.get(edgeId);
+          const edge = this.cache.edges.get(edgeId);
           if (edge && (!types || types.includes(edge.type))) {
             neighbors.add(edge.target);
           }
@@ -537,12 +342,11 @@ export class PersistentGraph {
       }
     }
 
-    // Inbound neighbors (sources of edges to this node)
     if (direction === 'inbound' || direction === 'both') {
-      const inEdgeIds = this.inboundEdges.get(nodeId);
+      const inEdgeIds = this.cache.inboundEdges.get(nodeId);
       if (inEdgeIds) {
         for (const edgeId of inEdgeIds) {
-          const edge = this.edgeCache.get(edgeId);
+          const edge = this.cache.edges.get(edgeId);
           if (edge && (!types || types.includes(edge.type))) {
             neighbors.add(edge.source);
           }
@@ -551,7 +355,6 @@ export class PersistentGraph {
     }
 
     let result = [...neighbors];
-
     if (limit && limit > 0) {
       result = result.slice(0, limit);
     }
@@ -559,13 +362,6 @@ export class PersistentGraph {
     return result;
   }
 
-  /**
-   * Get edges by direction (synchronous - from memory)
-   * @param nodeId
-   * @param direction
-   * @param type
-   * @param filter
-   */
   getEdgesByDirection(
     nodeId: string,
     direction: EdgeDirectionFilter,
@@ -585,33 +381,23 @@ export class PersistentGraph {
     return edges;
   }
 
-  /**
-   * Get edges filtered by indexed properties (synchronous - from memory)
-   * @param filter
-   */
   getEdgesByProperty(filter: EdgePropertyFilter): GraphEdgeRecord[] {
-    return this.applyEdgeFilter([...this.edgeCache.values()], filter);
+    return applyEdgeFilter([...this.cache.edges.values()], filter);
   }
 
-  /**
-   * Extract a subgraph containing specified nodes and their connecting edges
-   * @param nodeIds
-   */
   getSubgraph(nodeIds: string[]): SubgraphResult {
     const nodeSet = new Set(nodeIds);
     const nodes: GraphNodeRecord[] = [];
     const edges: GraphEdgeRecord[] = [];
 
-    // Collect nodes
     for (const nodeId of nodeIds) {
-      const node = this.nodeCache.get(nodeId);
+      const node = this.cache.nodes.get(nodeId);
       if (node) {
         nodes.push(node);
       }
     }
 
-    // Collect edges where both endpoints are in the subgraph
-    for (const edge of this.edgeCache.values()) {
+    for (const edge of this.cache.edges.values()) {
       if (nodeSet.has(edge.source) && nodeSet.has(edge.target)) {
         edges.push(edge);
       }
@@ -624,9 +410,6 @@ export class PersistentGraph {
   // Statistics
   // ===========================================================================
 
-  /**
-   * Get graph statistics (synchronous - from memory)
-   */
   getStatistics(): GraphStatistics {
     const nodesByCompleteness: Record<CompletenessStatus, number> = {
       full: 0,
@@ -636,18 +419,18 @@ export class PersistentGraph {
     const nodesByType: Partial<Record<EntityType, number>> = {};
     const edgesByType: Partial<Record<RelationType, number>> = {};
 
-    for (const node of this.nodeCache.values()) {
+    for (const node of this.cache.nodes.values()) {
       nodesByCompleteness[node.completeness]++;
       nodesByType[node.entityType] = (nodesByType[node.entityType] ?? 0) + 1;
     }
 
-    for (const edge of this.edgeCache.values()) {
+    for (const edge of this.cache.edges.values()) {
       edgesByType[edge.type] = (edgesByType[edge.type] ?? 0) + 1;
     }
 
     return {
-      nodeCount: this.nodeCache.size,
-      edgeCount: this.edgeCache.size,
+      nodeCount: this.cache.nodes.size,
+      edgeCount: this.cache.edges.size,
       nodesByCompleteness,
       nodesByType,
       edgesByType,
@@ -659,18 +442,12 @@ export class PersistentGraph {
   // Bulk Operations
   // ===========================================================================
 
-  /**
-   * Add multiple nodes in a batch
-   * @param inputs
-   */
   async addNodes(inputs: GraphNodeInput[]): Promise<void> {
     await this.ensureHydrated();
 
-    // Filter out existing nodes (or handle upgrades)
     const newInputs: GraphNodeInput[] = [];
     for (const input of inputs) {
-      if (this.nodeCache.has(input.id)) {
-        // Try to upgrade if needed
+      if (this.cache.nodes.has(input.id)) {
         await this.updateNodeCompleteness(input.id, input.completeness, input.label, input.metadata);
       } else {
         newInputs.push(input);
@@ -681,82 +458,35 @@ export class PersistentGraph {
       return;
     }
 
-    // Write to IndexedDB
     await this.tier.addNodes(newInputs);
 
-    // Update in-memory cache
     const now = Date.now();
     for (const input of newInputs) {
-      const record: GraphNodeRecord = {
-        ...input,
-        cachedAt: now,
-        updatedAt: now,
-      };
-      this.nodeCache.set(input.id, record);
-      this.outboundEdges.set(input.id, new Set());
-      this.inboundEdges.set(input.id, new Set());
+      const record = createNodeRecord(input, now);
+      addNodeToCache(this.cache, record);
     }
 
     logger.debug(LOG_PREFIX, 'Bulk nodes added', { count: newInputs.length });
   }
 
-  /**
-   * Add multiple edges in a batch
-   * @param inputs
-   */
   async addEdges(inputs: GraphEdgeInput[]): Promise<number> {
     await this.ensureHydrated();
 
-    // Filter out duplicates
     const newInputs = inputs.filter((input) => {
       const edgeId = generateEdgeId(input.source, input.target, input.type);
-      return !this.edgeCache.has(edgeId);
+      return !this.cache.edges.has(edgeId);
     });
 
     if (newInputs.length === 0) {
       return 0;
     }
 
-    // Write to IndexedDB
     await this.tier.addEdges(newInputs);
 
-    // Update in-memory cache
     const now = Date.now();
     for (const input of newInputs) {
-      const edgeId = generateEdgeId(input.source, input.target, input.type);
-      const record: GraphEdgeRecord = {
-        id: edgeId,
-        source: input.source,
-        target: input.target,
-        type: input.type,
-        direction: input.direction,
-        discoveredAt: now,
-        authorPosition: input.authorPosition,
-        isCorresponding: input.isCorresponding,
-        isOpenAccess: input.isOpenAccess,
-        version: input.version,
-        score: input.score,
-        years: input.years,
-        awardId: input.awardId,
-        role: input.role,
-        metadata: input.metadata,
-      };
-      this.edgeCache.set(edgeId, record);
-
-      // Update adjacency lists
-      const outbound = this.outboundEdges.get(input.source);
-      if (outbound) {
-        outbound.add(edgeId);
-      } else {
-        this.outboundEdges.set(input.source, new Set([edgeId]));
-      }
-
-      const inbound = this.inboundEdges.get(input.target);
-      if (inbound) {
-        inbound.add(edgeId);
-      } else {
-        this.inboundEdges.set(input.target, new Set([edgeId]));
-      }
+      const record = createEdgeRecord(input, now);
+      addEdgeToCache(this.cache, record);
     }
 
     logger.debug(LOG_PREFIX, 'Bulk edges added', { count: newInputs.length });
@@ -767,69 +497,11 @@ export class PersistentGraph {
   // Helper Methods
   // ===========================================================================
 
-  /**
-   * Ensure the graph is hydrated before operations
-   */
   private async ensureHydrated(): Promise<void> {
     if (this.hydrationState === 'hydrated') {
       return;
     }
     await this.hydrate();
-  }
-
-  /**
-   * Check if completeness should be upgraded
-   * @param current
-   * @param proposed
-   */
-  private shouldUpgradeCompleteness(
-    current: CompletenessStatus,
-    proposed: CompletenessStatus
-  ): boolean {
-    const order: Record<CompletenessStatus, number> = {
-      stub: 0,
-      partial: 1,
-      full: 2,
-    };
-    return order[proposed] > order[current];
-  }
-
-  /**
-   * Apply edge property filter to edges
-   * @param edges
-   * @param filter
-   */
-  private applyEdgeFilter(edges: GraphEdgeRecord[], filter: EdgePropertyFilter): GraphEdgeRecord[] {
-    return edges.filter((edge) => {
-      if (filter.authorPosition !== undefined && edge.authorPosition !== filter.authorPosition) {
-        return false;
-      }
-      if (filter.isCorresponding !== undefined && edge.isCorresponding !== filter.isCorresponding) {
-        return false;
-      }
-      if (filter.isOpenAccess !== undefined && edge.isOpenAccess !== filter.isOpenAccess) {
-        return false;
-      }
-      if (filter.version !== undefined && edge.version !== filter.version) {
-        return false;
-      }
-      if (filter.scoreMin !== undefined && (edge.score === undefined || edge.score < filter.scoreMin)) {
-        return false;
-      }
-      if (filter.scoreMax !== undefined && (edge.score === undefined || edge.score > filter.scoreMax)) {
-        return false;
-      }
-      if (filter.yearsInclude !== undefined && filter.yearsInclude.length > 0 && (!edge.years || !filter.yearsInclude.some((year) => edge.years?.includes(year)))) {
-          return false;
-        }
-      if (filter.awardId !== undefined && edge.awardId !== filter.awardId) {
-        return false;
-      }
-      if (filter.role !== undefined && edge.role !== filter.role) {
-        return false;
-      }
-      return true;
-    });
   }
 }
 
@@ -839,9 +511,6 @@ export class PersistentGraph {
 
 let persistentGraphInstance: PersistentGraph | null = null;
 
-/**
- * Get the singleton PersistentGraph instance
- */
 export const getPersistentGraph = (): PersistentGraph => {
   if (!persistentGraphInstance) {
     persistentGraphInstance = new PersistentGraph();
@@ -849,9 +518,6 @@ export const getPersistentGraph = (): PersistentGraph => {
   return persistentGraphInstance;
 };
 
-/**
- * Reset the singleton instance (for testing)
- */
 export const resetPersistentGraph = (): void => {
   persistentGraphInstance = null;
 };

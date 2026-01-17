@@ -456,10 +456,11 @@ describe("Cache Integration - CachedOpenAlexClient", () => {
 
   describe("Configuration Updates", () => {
     it("should update static cache configuration", () => {
+      // Type coercion permitted in test files per constitution
       cachedClient.updateConfig({
         staticCacheEnabled: false,
         staticCacheGitHubPagesUrl: "https://new-url.com",
-      });
+      } as Record<string, unknown>);
 
       expect(cachedClient.getStaticCacheEnabled()).toBe(false);
     });

@@ -3,14 +3,14 @@
  * Provides persistent browser storage between Memory and GitHub Pages tiers
  */
 
-import type { StaticEntityType } from "../../static-data-utils";
+import { logger } from "@bibgraph/utils";
+
 import { DexieCacheTier } from "../../../cache/dexie/dexie-cache-tier";
 import { isIndexedDBAvailable } from "../../../cache/dexie/entity-cache-db";
-import { logger } from "@bibgraph/utils";
-import type { CachedEntityEntry } from "../../static-data-provider";
-import { CacheTier } from "../../static-data-provider";
-import type { StaticDataResult } from "../../static-data-provider";
 import type { CacheTierInterface } from "../../cache-tiers-types";
+import type { CachedEntityEntry , StaticDataResult } from "../../static-data-provider";
+import { CacheTier } from "../../static-data-provider";
+import type { StaticEntityType } from "../../static-data-utils";
 
 interface CacheStats {
 	requests: number;
@@ -20,19 +20,18 @@ interface CacheStats {
 
 /**
  * Calculate cache statistics from raw stats
+ * @param stats
  */
-function calculateCacheStats(stats: CacheStats): {
+const calculateCacheStats = (stats: CacheStats): {
 	requests: number;
 	hits: number;
 	averageLoadTime: number;
-} {
-	return {
+} => ({
 		requests: stats.requests,
 		hits: stats.hits,
 		averageLoadTime:
 			stats.requests > 0 ? stats.totalLoadTime / stats.requests : 0,
-	};
-}
+	});
 
 /**
  * IndexedDB cache implementation using Dexie
@@ -162,6 +161,7 @@ export class IndexedDBCacheTier implements CacheTierInterface {
 
 	/**
 	 * Clear entities of a specific type
+	 * @param entityType
 	 */
 	async clearByType(entityType: StaticEntityType): Promise<number> {
 		return this.dexieTier.clearByType(entityType);

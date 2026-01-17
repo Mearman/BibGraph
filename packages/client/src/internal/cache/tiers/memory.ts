@@ -3,12 +3,12 @@
  * Fast in-memory caching with automatic size management
  */
 
-import type { StaticEntityType } from "../../static-data-utils";
 import { logger } from "@bibgraph/utils";
-import type { CachedEntityEntry } from "../../static-data-provider";
-import { CacheTier } from "../../static-data-provider";
-import type { StaticDataResult } from "../../static-data-provider";
+
 import type { CacheTierInterface } from "../../cache-tiers-types";
+import type { CachedEntityEntry , StaticDataResult } from "../../static-data-provider";
+import { CacheTier } from "../../static-data-provider";
+import type { StaticEntityType } from "../../static-data-utils";
 
 interface CacheEntry {
 	data: unknown;
@@ -24,19 +24,18 @@ interface CacheStats {
 
 /**
  * Calculate cache statistics from raw stats
+ * @param stats
  */
-function calculateCacheStats(stats: CacheStats): {
+const calculateCacheStats = (stats: CacheStats): {
 	requests: number;
 	hits: number;
 	averageLoadTime: number;
-} {
-	return {
+} => ({
 		requests: stats.requests,
 		hits: stats.hits,
 		averageLoadTime:
 			stats.requests > 0 ? stats.totalLoadTime / stats.requests : 0,
-	};
-}
+	});
 
 /**
  * Memory cache implementation with LRU eviction

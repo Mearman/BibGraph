@@ -3,9 +3,8 @@
  * Extracted to avoid circular dependencies
  */
 
-import type { StaticEntityType } from "./static-data-utils";
 import type { StaticDataResult } from "./static-data-provider";
-import { CacheTier } from "./static-data-provider";
+import type { StaticEntityType } from "./static-data-utils";
 
 /**
  * Interface for all cache tier implementations

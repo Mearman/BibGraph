@@ -3,9 +3,47 @@
  * Handles requests, rate limiting, error handling, and response parsing
  */
 
-import type { OpenAlexError, OpenAlexResponse, QueryParams } from "@bibgraph/types";
+import type { OpenAlexResponse, QueryParams } from "@bibgraph/types";
 import { validateWithSchema } from "@bibgraph/types";
-import { logger } from "@bibgraph/utils";
+
+import { apiInterceptor, type InterceptedRequest } from "./interceptors/api-interceptor";
+// Import from extracted modules
+import type {
+  FullyConfiguredClient,
+  OpenAlexClientConfig,
+  RateLimitState,
+} from "./internal/client-config";
+import {
+  DEFAULT_RATE_LIMIT,
+  DEFAULT_RETRIES,
+  DEFAULT_RETRY_DELAY_MS,
+  DEFAULT_TIMEOUT_MS,
+} from "./internal/client-config";
+import { isDevelopmentMode } from "./internal/environment-detection";
+import { OpenAlexApiError, OpenAlexRateLimitError } from "./internal/errors";
+import { calculateRetryDelay, RETRY_CONFIG } from "./internal/rate-limit";
+import {
+  buildRequestOptions,
+  checkHostCooldown,
+  createFetchWithTimeout,
+  enforceRateLimit,
+  getCleanOptions,
+  getMaxRetries,
+  getNextMidnightUTC,
+  getRetryDelay,
+  logRealApiCall,
+  parseRetryAfterToMs,
+  setHostCooldown,
+  sleep,
+} from "./internal/request-handler";
+import {
+  handleResponseInterception,
+  parseError,
+} from "./internal/response-handler";
+import { validateApiResponse } from "./internal/type-helpers";
+import { buildUrl } from "./internal/url-builder";
+
+// Re-export types and errors for external use - see index.ts
 
 /**
  * Schema interface that matches Zod-like validation
@@ -14,190 +52,24 @@ export interface ValidationSchema<T> {
   parse: (data: unknown) => T;
 }
 
-import { apiInterceptor, type InterceptedRequest } from "./interceptors/api-interceptor";
-import { calculateRetryDelay,RETRY_CONFIG } from "./internal/rate-limit";
-import {
-  validateApiResponse,
-} from "./internal/type-helpers";
-
-export interface OpenAlexClientConfig {
-  baseUrl?: string;
-  userEmail?: string;
-  apiKey?: string;
-  includeXpac?: boolean;
-  dataVersion?: '1' | '2';
-  rateLimit?: {
-    requestsPerSecond?: number;
-    requestsPerDay?: number;
-  };
-  timeout?: number;
-  retries?: number;
-  retryDelay?: number;
-  headers?: Record<string, string>;
-}
-
-interface FullyConfiguredClient {
-  baseUrl: string;
-  userEmail: string | undefined;
-  apiKey: string | undefined;
-  includeXpac: boolean;
-  dataVersion: '1' | '2' | undefined;
-  rateLimit: {
-    requestsPerSecond: number;
-    requestsPerDay: number;
-  };
-  timeout: number;
-  retries: number;
-  retryDelay: number;
-  headers: Record<string, string>;
-}
-
-export class OpenAlexApiError extends Error {
-  statusCode?: number;
-  response?: Response;
-
-  constructor({
-    message,
-    statusCode,
-    response,
-  }: {
-    message: string;
-    statusCode?: number;
-    response?: Response;
-  }) {
-    super(message);
-    this.name = "OpenAlexApiError";
-    this.statusCode = statusCode;
-    this.response = response;
-
-    // Set the prototype explicitly to maintain instanceof checks
-    Object.setPrototypeOf(this, OpenAlexApiError.prototype);
-  }
-}
-
-export class OpenAlexRateLimitError extends OpenAlexApiError {
-  retryAfter?: number;
-
-  constructor({
-    message,
-    retryAfter,
-  }: {
-    message: string;
-    retryAfter?: number;
-  }) {
-    super({ message, statusCode: 429 });
-    this.name = "OpenAlexRateLimitError";
-    this.retryAfter = retryAfter;
-  }
-}
-
-interface RateLimitState {
-  requestsToday: number;
-  lastRequestTime: number;
-  dailyResetTime: number;
-}
-
 export class OpenAlexBaseClient {
   private config: Required<FullyConfiguredClient>;
   private rateLimitState: RateLimitState;
 
-  /**
-   * Check if running in development mode based on NODE_ENV
-   */
-  private checkNodeEnv(): boolean | null {
-    if (globalThis.process?.env?.NODE_ENV) {
-      const nodeEnv = globalThis.process.env.NODE_ENV.toLowerCase();
-      if (nodeEnv === "development" || nodeEnv === "dev") return true;
-      if (nodeEnv === "production") return false;
-    }
-    return null;
-  }
-
-  /**
-   * Check Vite's __DEV__ flag
-   */
-  private checkViteDevFlag(): boolean | null {
-    if (typeof globalThis !== "undefined" && "__DEV__" in globalThis) {
-      try {
-        const globalObj = globalThis as Record<string, unknown>;
-        const devFlag = globalObj.__DEV__;
-        if (typeof devFlag === "boolean") {
-          return devFlag;
-        }
-      } catch {
-        // Ignore errors if __DEV__ is not accessible
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Check browser-based development indicators
-   */
-  private checkBrowserDevIndicators(): boolean | null {
-    try {
-      if (typeof globalThis !== "undefined" && "window" in globalThis) {
-        const win =
-          "window" in globalThis &&
-          globalThis.window &&
-          "location" in globalThis.window
-            ? globalThis.window
-            : undefined;
-        if (win?.location?.hostname) {
-          const { hostname } = win.location;
-          // Local development indicators
-          if (
-            hostname === "localhost" ||
-            hostname === "127.0.0.1" ||
-            hostname.endsWith(".local")
-          ) {
-            return true;
-          }
-        }
-      }
-    } catch {
-      // Ignore errors in browser detection
-    }
-    return null;
-  }
-
-  /**
-   * Detect if running in development mode
-   */
-  private isDevelopmentMode(): boolean {
-    // Check NODE_ENV first (most reliable)
-    const nodeEnvResult = this.checkNodeEnv();
-    if (nodeEnvResult !== null) return nodeEnvResult;
-
-    // Check Vite's __DEV__ flag
-    const viteResult = this.checkViteDevFlag();
-    if (viteResult !== null) return viteResult;
-
-    // Check browser-based development indicators
-    const browserResult = this.checkBrowserDevIndicators();
-    if (browserResult !== null) return browserResult;
-
-    // Default to development if uncertain (fail-safe for dev mode)
-    return true;
-  }
-
   constructor(config: OpenAlexClientConfig = {}) {
     // Create a fully-specified config with all required properties
     const defaultConfig: Required<FullyConfiguredClient> = {
-      baseUrl: this.isDevelopmentMode()
+      baseUrl: isDevelopmentMode()
         ? "/api/openalex"
         : "https://api.openalex.org",
       userEmail: undefined,
       apiKey: undefined,
       includeXpac: false,
       dataVersion: undefined,
-      rateLimit: {
-        requestsPerSecond: 10, // Conservative default
-        requestsPerDay: 100_000, // OpenAlex limit
-      },
-      timeout: 30_000, // 30 seconds
-      retries: 3,
-      retryDelay: 1000, // 1 second
+      rateLimit: DEFAULT_RATE_LIMIT,
+      timeout: DEFAULT_TIMEOUT_MS,
+      retries: DEFAULT_RETRIES,
+      retryDelay: DEFAULT_RETRY_DELAY_MS,
       headers: {},
     };
 
@@ -214,326 +86,17 @@ export class OpenAlexBaseClient {
     this.rateLimitState = {
       requestsToday: 0,
       lastRequestTime: 0,
-      dailyResetTime: this.getNextMidnightUTC(),
+      dailyResetTime: getNextMidnightUTC(),
     };
   }
 
   /**
-   * Get the next midnight UTC timestamp for rate limit reset
-   */
-  private getNextMidnightUTC(): number {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-    tomorrow.setUTCHours(0, 0, 0, 0);
-    return tomorrow.getTime();
-  }
-
-  /**
-   * Check and enforce rate limits
-   */
-  private async enforceRateLimit(): Promise<void> {
-    const now = Date.now();
-
-    // Reset daily counter if it's a new day
-    if (now >= this.rateLimitState.dailyResetTime) {
-      this.rateLimitState.requestsToday = 0;
-      this.rateLimitState.dailyResetTime = this.getNextMidnightUTC();
-    }
-
-    // Check daily limit
-    if (
-      this.rateLimitState.requestsToday >= this.config.rateLimit.requestsPerDay
-    ) {
-      const resetTime = new Date(this.rateLimitState.dailyResetTime);
-      throw new OpenAlexRateLimitError({
-        message: `Daily request limit of ${this.config.rateLimit.requestsPerDay} exceeded. Resets at ${resetTime.toISOString()}`,
-        retryAfter: this.rateLimitState.dailyResetTime - now,
-      });
-    }
-
-    // Check per-second limit
-    const minTimeBetweenRequests =
-      1000 / this.config.rateLimit.requestsPerSecond;
-    const timeSinceLastRequest = now - this.rateLimitState.lastRequestTime;
-
-    if (timeSinceLastRequest < minTimeBetweenRequests) {
-      const waitTime = minTimeBetweenRequests - timeSinceLastRequest;
-      await this.sleep(waitTime);
-    }
-
-    // Update state
-    this.rateLimitState.requestsToday++;
-    this.rateLimitState.lastRequestTime = Date.now();
-  }
-
-  /**
-   * Sleep for the specified number of milliseconds
-   * @param ms
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  private isAbsoluteUrl(url: string): boolean {
-    try {
-      const parsedUrl = new URL(url);
-      return Boolean(parsedUrl.protocol);
-    } catch {
-      return false;
-    }
-  }
-
-  private getEnvironmentOrigin(): string | null {
-    if (typeof window !== "undefined" && window.location?.origin) {
-      return window.location.origin;
-    }
-
-    if (typeof globalThis !== "undefined") {
-      const globalLocation =
-        "location" in globalThis ? globalThis.location : undefined;
-      if (globalLocation?.origin) {
-        return globalLocation.origin;
-      }
-    }
-
-    if (
-      typeof process !== "undefined" &&
-      typeof process.env?.VITE_ORIGIN === "string" &&
-      process.env.VITE_ORIGIN.length > 0
-    ) {
-      return process.env.VITE_ORIGIN;
-    }
-
-    return null;
-  }
-
-  private resolveBaseUrl(baseUrl: string): string {
-    if (this.isAbsoluteUrl(baseUrl)) {
-      return baseUrl.replace(/\/+$/, "");
-    }
-
-    const origin = this.getEnvironmentOrigin();
-    if (origin) {
-      const resolvedUrl = new URL(baseUrl, origin);
-      return resolvedUrl.toString().replace(/\/+$/, "");
-    }
-
-    const fallbackOrigin = "https://api.openalex.org";
-    const sanitizedBase = baseUrl.trim();
-
-    if (
-      sanitizedBase.startsWith("/") ||
-      sanitizedBase.startsWith("./") ||
-      sanitizedBase.startsWith("../")
-    ) {
-      return fallbackOrigin;
-    }
-
-    const resolvedUrl = new URL(sanitizedBase, `${fallbackOrigin}/`);
-    return resolvedUrl.toString().replace(/\/+$/, "");
-  }
-
-  /**
-   * Build URL with query parameters
-   * @param endpoint
-   * @param params
-   */
-  private buildUrl(endpoint: string, params: QueryParams = {}): string {
-    const normalizedEndpoint = endpoint.startsWith("/")
-      ? endpoint.slice(1)
-      : endpoint;
-    const resolvedBaseUrl = this.resolveBaseUrl(this.config.baseUrl);
-    const baseWithSlash = resolvedBaseUrl.endsWith("/")
-      ? resolvedBaseUrl
-      : `${resolvedBaseUrl}/`;
-    const url = new URL(normalizedEndpoint, baseWithSlash);
-
-    // Add user email if provided (recommended by OpenAlex)
-    if (this.config.userEmail) {
-      url.searchParams.set("mailto", this.config.userEmail);
-    }
-
-    // Add API key if provided (for higher rate limits)
-    if (this.config.apiKey) {
-      url.searchParams.set("api_key", this.config.apiKey);
-    }
-
-    // Add include_xpac parameter if enabled
-    if (this.config.includeXpac) {
-      url.searchParams.set("include_xpac", "true");
-    }
-
-    // Add data_version parameter if specified
-    if (this.config.dataVersion) {
-      url.searchParams.set("data_version", this.config.dataVersion);
-    }
-
-    // Build URL string first, then manually append select parameter to avoid encoding commas
-    // OpenAlex API requires actual commas, not %2C encoded commas in select parameter
-    const selectValue = params.select;
-    const otherParams = { ...params };
-    delete otherParams.select;
-
-    // Add other query parameters (these can be URL-encoded normally)
-    Object.entries(otherParams).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        if (Array.isArray(value)) {
-          // Handle arrays
-          url.searchParams.set(key, value.join(","));
-        } else if (
-          typeof value === "string" ||
-          typeof value === "number" ||
-          typeof value === "boolean"
-        ) {
-          url.searchParams.set(key, String(value));
-        }
-        // Ignore other types (objects, functions, etc.)
-      }
-    });
-
-    // Get the base URL string
-    let finalUrl = url.toString();
-
-    // Manually append select parameter with unencoded commas if present
-    if (selectValue !== undefined && selectValue !== null) {
-      const selectString = Array.isArray(selectValue)
-        ? selectValue.join(",")
-        : String(selectValue);
-      const separator = finalUrl.includes("?") ? "&" : "?";
-      finalUrl = `${finalUrl}${separator}select=${selectString}`;
-    }
-
-    logger.debug("client", "Built API URL", {
-      endpoint,
-      params,
-      finalUrl,
-    });
-    return finalUrl;
-  }
-
-  /**
-   * Parse error response from OpenAlex API
+   * Handle rate limit (429) response with retry logic
    * @param response
+   * @param url
+   * @param options
+   * @param retryCount
    */
-  private async parseError(response: Response): Promise<OpenAlexApiError> {
-    // Type guard for OpenAlexError
-    const isOpenAlexError = (data: unknown): data is OpenAlexError => {
-      return (
-        typeof data === "object" &&
-        data !== null &&
-        ("message" in data || "error" in data)
-      );
-    };
-
-    try {
-      const errorData: unknown = await response.json();
-
-      return isOpenAlexError(errorData) ? new OpenAlexApiError({
-          message:
-            errorData.message ||
-            errorData.error ||
-            `HTTP ${response.status.toString()}`,
-          statusCode: response.status,
-          response,
-        }) : new OpenAlexApiError({
-          message: `HTTP ${response.status.toString()} ${response.statusText}`,
-          statusCode: response.status,
-          response,
-        });
-    } catch {
-      return new OpenAlexApiError({
-        message: `HTTP ${response.status.toString()} ${response.statusText}`,
-        statusCode: response.status,
-        response,
-      });
-    }
-  }
-
-  /**
-   * Make a request with retries and error handling
-   * @param root0
-   * @param root0.url
-   * @param root0.options
-   * @param root0.retryCount
-   */
-  private logRealApiCall({
-    url,
-    options,
-    retryCount,
-  }: {
-    url: string;
-    options: RequestInit;
-    retryCount: number;
-  }): void {
-    // Only warn if we're actually in a test environment (NODE_ENV=test or VITEST)
-    const isTestEnv = Boolean(
-      globalThis.process?.env?.VITEST ??
-        globalThis.process?.env?.NODE_ENV === "test",
-    );
-
-    if (isTestEnv && url.includes("api.openalex.org")) {
-      logger.warn(
-        "client",
-        "Making real OpenAlex API call in test environment",
-        {
-          url: url.slice(0, 100), // Truncate for readability
-          method: options.method ?? "GET",
-          retryCount,
-        },
-      );
-    }
-  }
-
-  private getMaxRetries(): { server: number; network: number } {
-    return {
-      server:
-        this.config.retries === 3
-          ? RETRY_CONFIG.server.maxAttempts
-          : this.config.retries,
-      network:
-        this.config.retries === 3
-          ? RETRY_CONFIG.network.maxAttempts
-          : this.config.retries,
-    };
-  }
-
-  private async checkHostCooldown(url: string): Promise<void> {
-    try {
-      const host = new URL(url).hostname;
-      const cooldownUntil = hostCooldowns.get(host);
-      if (cooldownUntil && Date.now() < cooldownUntil) {
-        throw new OpenAlexRateLimitError({
-          message: `Host ${host} is in cooldown until ${new Date(cooldownUntil).toISOString()}`,
-          retryAfter: cooldownUntil - Date.now(),
-        });
-      }
-    } catch {
-      // If URL parsing fails or no cooldown, continue with normal flow
-    }
-  }
-
-  private buildRequestOptions(options: RequestInit): RequestInit {
-    // Filter out signal entirely - we'll handle it separately to prevent test environment errors
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { signal, ...filteredOptions } = options;
-
-    return {
-      ...filteredOptions,
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "OpenAlex-TypeScript-Client/1.0",
-        ...this.config.headers,
-        ...(options.headers &&
-        typeof options.headers === "object" &&
-        !Array.isArray(options.headers) &&
-        !(options.headers instanceof Headers)
-          ? options.headers
-          : {}),
-      },
-    };
-  }
-
   private async handleRateLimitResponse(
     response: Response,
     url: string,
@@ -552,28 +115,16 @@ export class OpenAlexBaseClient {
         RETRY_CONFIG.rateLimited,
         retryAfterMs,
       );
-      await this.sleep(waitTime);
-      // Create clean options without signal for retry to prevent AbortSignal issues
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { signal, ...cleanOptions } = options;
+      await sleep(waitTime);
       return await this.makeRequest({
         url,
-        options: cleanOptions,
+        options: getCleanOptions(options),
         retryCount: retryCount + 1,
       });
     }
 
     // Set host cooldown and throw error
-    try {
-      const host = new URL(url).hostname;
-      if (retryAfterMs) {
-        hostCooldowns.set(host, Date.now() + retryAfterMs);
-      } else {
-        hostCooldowns.set(host, Date.now() + 10_000);
-      }
-    } catch {
-      // ignore URL parsing failures
-    }
+    setHostCooldown(url, retryAfterMs);
 
     throw new OpenAlexRateLimitError({
       message: `Rate limit exceeded (HTTP 429) after ${maxRateLimitAttempts} attempts`,
@@ -581,6 +132,14 @@ export class OpenAlexBaseClient {
     });
   }
 
+  /**
+   * Handle server error (5xx) with retry logic
+   * @param response
+   * @param url
+   * @param options
+   * @param retryCount
+   * @param maxServerRetries
+   */
   private async handleServerError(
     response: Response,
     url: string,
@@ -589,21 +148,20 @@ export class OpenAlexBaseClient {
     maxServerRetries: number,
   ): Promise<Response> {
     if (response.status >= 500 && retryCount < maxServerRetries) {
-      const waitTime =
-        this.config.retries === 3
-          ? calculateRetryDelay(retryCount, RETRY_CONFIG.server)
-          : this.config.retryDelay * Math.pow(2, retryCount);
-      await this.sleep(waitTime);
-      // Create clean options without signal for retry to prevent AbortSignal issues
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { signal, ...cleanOptions } = options;
+      const waitTime = getRetryDelay(
+        retryCount,
+        this.config.retries,
+        this.config.retryDelay,
+        RETRY_CONFIG.server,
+      );
+      await sleep(waitTime);
       return await this.makeRequest({
         url,
-        options: cleanOptions,
+        options: getCleanOptions(options),
         retryCount: retryCount + 1,
       });
     }
-    throw await this.parseError(response);
+    throw await parseError(response);
   }
 
   /**
@@ -623,85 +181,20 @@ export class OpenAlexBaseClient {
     response: Response;
     responseTime: number;
   }): Promise<void> {
-    if (interceptedRequest && response.status >= 200 && response.status < 300) {
-      try {
-        const responseClone = response.clone();
-        let responseData: unknown;
-
-        try {
-          responseData = await responseClone.json();
-        } catch (jsonError) {
-          logger.debug(
-            "client",
-            "Failed to parse response as JSON for interception",
-            {
-              error: jsonError,
-              contentType: response.headers.get("content-type"),
-              status: response.status,
-            },
-          );
-          return;
-        }
-
-        const interceptedCall = apiInterceptor.interceptResponse(
-          interceptedRequest,
-          response,
-          responseData,
-          responseTime,
-        );
-
-        // Call hook for entity caching (can be overridden by subclasses)
-        await this.cacheResponseEntities({
-          url: interceptedRequest.url,
-          responseData,
-        });
-
-        const diskCacheEnabled =
-          globalThis.process?.env?.BIBGRAPH_DISK_CACHE_ENABLED !==
-          "false";
-
-        if (
-          interceptedCall &&
-          globalThis.process?.versions?.node &&
-          diskCacheEnabled
-        ) {
-          try {
-            const { defaultDiskWriter } = await import("./cache/disk");
-            await defaultDiskWriter.writeToCache({
-              url: interceptedCall.request.url,
-              finalUrl: interceptedCall.request.finalUrl,
-              method: interceptedCall.request.method,
-              requestHeaders: interceptedCall.request.headers,
-              responseData: interceptedCall.response.data,
-              statusCode: interceptedCall.response.status,
-              responseHeaders: interceptedCall.response.headers,
-              timestamp: new Date(
-                interceptedCall.response.timestamp,
-              ).toISOString(),
-            });
-          } catch (diskError: unknown) {
-            logger.debug(
-              "client",
-              "Disk caching unavailable (browser environment)",
-              { error: diskError },
-            );
-          }
-        }
-      } catch (interceptError: unknown) {
-        logger.debug("client", "Response interception failed", {
-          error: interceptError,
-        });
-      }
-    }
+    await handleResponseInterception({
+      interceptedRequest,
+      response,
+      responseTime,
+      cacheResponseEntities: this.cacheResponseEntities.bind(this),
+    });
   }
 
   /**
    * Hook for caching entities from response data
-   * Override in subclasses to implement entity-level caching (e.g., IndexedDB, memory)
-   * Called for all successful API responses with parsed JSON data
-   * @param _params - Parameters object (unused in base class)
-   * @param _params.url - Request URL
-   * @param _params.responseData - Parsed response data
+   * Override in subclasses to implement entity-level caching
+   * @param _params
+   * @param _params.url
+   * @param _params.responseData
    */
   protected async cacheResponseEntities(_params: {
     url: string;
@@ -710,6 +203,13 @@ export class OpenAlexBaseClient {
     // Base implementation does nothing - override in subclasses
   }
 
+  /**
+   * Make a request with retries and error handling
+   * @param root0
+   * @param root0.url
+   * @param root0.options
+   * @param root0.retryCount
+   */
   private async makeRequest({
     url,
     options = {},
@@ -719,58 +219,27 @@ export class OpenAlexBaseClient {
     options?: RequestInit;
     retryCount?: number;
   }): Promise<Response> {
-    this.logRealApiCall({ url, options, retryCount });
+    logRealApiCall({ url, options, retryCount });
     const { server: maxServerRetries, network: maxNetworkRetries } =
-      this.getMaxRetries();
+      getMaxRetries(this.config.retries);
 
     try {
-      await this.checkHostCooldown(url);
-      await this.enforceRateLimit();
+      checkHostCooldown(url);
+      await enforceRateLimit(this.config, this.rateLimitState);
 
       const requestStartTime = Date.now();
-      const requestOptions = this.buildRequestOptions(options);
+      const requestOptions = buildRequestOptions(options, this.config);
       const interceptedRequest = apiInterceptor.interceptRequest(
         url,
         requestOptions,
       );
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        controller.abort();
-      }, this.config.timeout);
-
-      // Handle signal merging - if original request has a signal, abort both
-      if (options.signal && typeof options.signal === 'object' && options.signal !== null) {
-        try {
-          if (options.signal.aborted) {
-            throw new DOMException("The operation was aborted.", "AbortError");
-          }
-          options.signal.addEventListener("abort", () => {
-            controller.abort();
-          });
-        } catch {
-          // Signal is not a valid AbortSignal (e.g., polyfill issues), continue without signal merging
-        }
-      }
-
-      // Only add signal if it's a valid AbortSignal (fixes test environment issues)
-      const fetchOptions: RequestInit = {
-        ...requestOptions,
-      };
-
-      // Check if we're in a test environment - disable AbortSignal usage entirely in tests
-      const isTestEnvironment = typeof process !== 'undefined' &&
-                               (process.env.NODE_ENV === 'test' ||
-                                process.env.VITEST === 'true' ||
-                                process.env.JEST_WORKER_ID !== undefined);
-
-      if (controller.signal &&
-          typeof controller.signal === 'object' &&
-          controller.signal !== null &&
-          !isTestEnvironment) {
-        // Only use AbortSignal in non-test environments to avoid polyfill compatibility issues
-        fetchOptions.signal = controller.signal;
-      }
+      const { fetchOptions, timeoutId } = createFetchWithTimeout(
+        url,
+        requestOptions,
+        options,
+        this.config.timeout,
+      );
 
       const response = await fetch(url, fetchOptions);
 
@@ -814,15 +283,18 @@ export class OpenAlexBaseClient {
       }
 
       if (retryCount < maxNetworkRetries) {
-        const waitTime =
-          this.config.retries === 3
-            ? calculateRetryDelay(retryCount, RETRY_CONFIG.network)
-            : this.config.retryDelay * Math.pow(2, retryCount);
-        await this.sleep(waitTime);
-        // Create clean options without signal for retry to prevent AbortSignal issues
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { signal, ...cleanOptions } = options;
-        return this.makeRequest({ url, options: cleanOptions, retryCount: retryCount + 1 });
+        const waitTime = getRetryDelay(
+          retryCount,
+          this.config.retries,
+          this.config.retryDelay,
+          RETRY_CONFIG.network,
+        );
+        await sleep(waitTime);
+        return this.makeRequest({
+          url,
+          options: getCleanOptions(options),
+          retryCount: retryCount + 1,
+        });
       }
 
       throw new OpenAlexApiError({
@@ -833,7 +305,6 @@ export class OpenAlexBaseClient {
 
   /**
    * GET request that returns parsed JSON with schema-based validation
-   * Returns typed result when schema is provided, otherwise unknown
    * @param endpoint
    * @param params
    * @param schema
@@ -843,7 +314,7 @@ export class OpenAlexBaseClient {
     params: QueryParams = {},
     schema?: ValidationSchema<T>,
   ): Promise<T> {
-    const url = this.buildUrl(endpoint, params);
+    const url = buildUrl(endpoint, params, this.config);
     const response = await this.makeRequest({ url });
 
     // Validate content-type before parsing JSON
@@ -882,7 +353,6 @@ export class OpenAlexBaseClient {
 
   /**
    * GET request for a single entity by ID
-   * Supports both legacy signature (endpoint, id, params) and new signature ({ endpoint, id, params })
    * @param endpointOrParams
    * @param id
    * @param params
@@ -902,7 +372,7 @@ export class OpenAlexBaseClient {
       }
       return this.get(`${endpoint}/${encodeURIComponent(id)}`, params, schema);
     }
-    
+
     // Handle new signature: getById({ endpoint, id, params, schema })
     const { endpoint, id: entityId, params: newParams = {}, schema: newSchema } = endpointOrParams;
     return this.get(`${endpoint}/${encodeURIComponent(entityId)}`, newParams, newSchema);
@@ -1019,31 +489,6 @@ export class OpenAlexBaseClient {
   }
 }
 
-/**
- * Parse Retry-After header value into milliseconds.
- * Accepts either integer seconds or HTTP-date formats. Returns undefined if unparsable.
- * @param value
- */
-const parseRetryAfterToMs = (value: string | null | undefined): number | undefined => {
-  if (!value) return undefined;
-  // If it's an integer number of seconds
-  const seconds = Number(value);
-  if (!Number.isNaN(seconds) && Number.isFinite(seconds)) {
-    return Math.max(0, Math.floor(seconds)) * 1000;
-  }
-
-  // Try parsing as HTTP-date
-  const parsed = Date.parse(value);
-  if (!Number.isNaN(parsed)) {
-    const diff = parsed - Date.now();
-    return Math.max(diff, 0);
-  }
-
-  return undefined;
-};
-
 // Default client instance
 export const defaultClient = new OpenAlexBaseClient();
 
-// Global cooldown map per host to avoid repeated bursts after 429s
-export const hostCooldowns: Map<string, number> = new Map();

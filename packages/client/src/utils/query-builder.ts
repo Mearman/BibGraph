@@ -1,63 +1,25 @@
 /**
- * OpenAlex Query Builder Utilities
+ * OpenAlex Query Builder
  *
- * This module provides comprehensive query building utilities for the OpenAlex API.
- * It handles filter conversion, parameter validation, and query string construction
- * following OpenAlex API conventions.
+ * Main QueryBuilder class for constructing OpenAlex API queries.
+ * Delegates to helper modules for types, utilities, constants, and factories.
  * @see https://docs.openalex.org/how-to-use-the-api/get-lists-of-entities/filter-entity-lists
  */
 
-import type {
-  AuthorsFilters,
-  EntityFilters,
-  FundersFilters,
-  InstitutionsFilters,
-  PublishersFilters,
-  SourcesFilters,
-  TopicsFilters,
-  WorksFilters,
-} from "@bibgraph/types";
+import type { EntityFilters } from "@bibgraph/types";
 
 // Import filter builder from canonical source
 import { buildFilterStringFromFilters } from "./filter-builder.js";
+// Import types from helper module
+import type { LogicalOperator, PaginationParams } from "./query-builder-types.js";
+// Import utilities from helper module
+import {
+  escapeFilterValue,
+  normalizePaginationParams,
+  validateDateRange,
+} from "./query-builder-utils.js";
 
-/**
- * Sort options for different entity types
- */
-export interface SortOptions {
-  /** Field to sort by */
-  field: string;
-  /** Sort direction */
-  direction?: "asc" | "desc";
-}
-
-/**
- * Logical operators for combining filters
- */
-export type LogicalOperator = "AND" | "OR" | "NOT";
-
-// Note: FilterCondition and FilterExpression are imported but not re-exported
-// to avoid duplicates in the barrel file (canonical source is filter-builder.ts)
-
-/**
- * Date range validation result
- */
-export interface DateRangeValidation {
-  isValid: boolean;
-  error?: string;
-  normalizedFrom?: string;
-  normalizedTo?: string;
-}
-
-/**
- * Pagination parameters for OpenAlex API queries
- */
-export interface PaginationParams {
-  page?: number;
-  per_page?: number;
-  cursor?: string;
-  group_by?: string;
-}
+// Re-export all types, utilities, constants, and factories for consumers
 
 /**
  * Main QueryBuilder class for constructing OpenAlex API queries
@@ -83,12 +45,6 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
    * @param value - The value to filter by
    * @param operator - The comparison operator (defaults to '=')
    * @returns This QueryBuilder instance for chaining
-   * @example
-   * ```typescript
-   * const query = new QueryBuilder<WorksFilters>()
-   *   .addFilter('publication_year', 2023)
-   *   .addFilter('is_oa', true);
-   * ```
    */
   addFilter<K extends keyof T>(
     field: K,
@@ -99,14 +55,11 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
       return this;
     }
 
-    // Handle different operators for numeric and string values
     if (operator === "=") {
-      // Use safe assignment method instead of type assertion
       this.safelyAssignToField(field, value);
     } else {
       const operatorSymbol = operator === "!=" ? "!" : operator;
       const formattedValue = `${operatorSymbol}${String(value)}`;
-      // Use safe assignment method instead of type assertion
       this.safelyAssignToField(field, formattedValue);
     }
 
@@ -117,20 +70,10 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
    * Add multiple filters at once
    * @param filters - Object containing filter field-value pairs
    * @returns This QueryBuilder instance for chaining
-   * @example
-   * ```typescript
-   * const query = new QueryBuilder<WorksFilters>()
-   *   .addFilters({
-   *     'publication_year': 2023,
-   *     'is_oa': true,
-   *     'has_doi': true
-   *   });
-   * ```
    */
   addFilters(filters: Partial<T>): this {
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
-        // Use safe assignment method instead of type assertion
         this.safelyAssignByKey(key, value);
       }
     });
@@ -144,11 +87,6 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
    * @param fromDate - Start date (ISO string or YYYY-MM-DD)
    * @param toDate - End date (ISO string or YYYY-MM-DD)
    * @returns This QueryBuilder instance for chaining
-   * @example
-   * ```typescript
-   * const query = new QueryBuilder<WorksFilters>()
-   *   .addDateRange('from_publication_date', 'to_publication_date', '2020-01-01', '2023-12-31');
-   * ```
    */
   addDateRange<K extends keyof T>(
     fromField: K,
@@ -176,12 +114,6 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
    * @param field - The search field (usually ends with '.search')
    * @param query - The search query string
    * @returns This QueryBuilder instance for chaining
-   * @example
-   * ```typescript
-   * const query = new QueryBuilder<WorksFilters>()
-   *   .addSearch('title.search', 'machine learning')
-   *   .addSearch('display_name.search', 'neural networks');
-   * ```
    */
   addSearch(field: keyof T, query: string): this {
     if (query?.trim().length === 0) {
@@ -223,11 +155,6 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
    * Set the page number for pagination
    * @param page - The page number to retrieve (1-based)
    * @returns This QueryBuilder instance for chaining
-   * @example
-   * ```typescript
-   * const query = new QueryBuilder<WorksFilters>()
-   *   .setPage(2);
-   * ```
    */
   setPage(page: number): this {
     if (page < 1) {
@@ -238,14 +165,9 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
   }
 
   /**
-   * Set the number of results per page (accepts both per_page and per-page formats)
+   * Set the number of results per page
    * @param perPage - Number of results per page (1-200)
    * @returns This QueryBuilder instance for chaining
-   * @example
-   * ```typescript
-   * const query = new QueryBuilder<WorksFilters>()
-   *   .setPerPage(50);
-   * ```
    */
   setPerPage(perPage: number): this {
     if (perPage < 1 || perPage > 200) {
@@ -259,11 +181,6 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
    * Set the cursor for cursor-based pagination
    * @param cursor - The cursor value from a previous response
    * @returns This QueryBuilder instance for chaining
-   * @example
-   * ```typescript
-   * const query = new QueryBuilder<WorksFilters>()
-   *   .setCursor("IlsxNjA5MzcyODAwMDAwLCAnaHR0cHM6Ly9vcGVuYWxleC5vcmcvVzI0ODg0OTk3NjQnXSI=");
-   * ```
    */
   setCursor(cursor: string): this {
     this.pagination.cursor = cursor;
@@ -274,11 +191,6 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
    * Set the group_by parameter for aggregation queries
    * @param groupBy - The field to group results by
    * @returns This QueryBuilder instance for chaining
-   * @example
-   * ```typescript
-   * const query = new QueryBuilder<WorksFilters>()
-   *   .setGroupBy("publication_year");
-   * ```
    */
   setGroupBy(groupBy: string): this {
     if (groupBy?.trim().length === 0) {
@@ -289,18 +201,9 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
   }
 
   /**
-   * Set pagination parameters from a raw object, normalizing both per_page and per-page formats
-   * @param params - Raw parameters object that may contain pagination params in either format
+   * Set pagination parameters from a raw object
+   * @param params - Raw parameters object that may contain pagination params
    * @returns This QueryBuilder instance for chaining
-   * @example
-   * ```typescript
-   * const query = new QueryBuilder<WorksFilters>()
-   *   .setPaginationFromParams({
-   *     page: 1,
-   *     'per-page': 50, // Alternative format
-   *     cursor: "some-cursor-value"
-   *   });
-   * ```
    */
   setPaginationFromParams(params: Record<string, unknown>): this {
     const normalized = normalizePaginationParams(params);
@@ -311,16 +214,6 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
   /**
    * Build the complete query parameters including filters and pagination
    * @returns Complete query parameters object
-   * @example
-   * ```typescript
-   * const query = new QueryBuilder<WorksFilters>()
-   *   .addFilter('publication_year', 2023)
-   *   .setPerPage(50)
-   *   .setPage(1);
-   *
-   * const params = query.buildQueryParams();
-   * // Result: { filter: "publication_year:2023", per_page: 50, page: 1 }
-   * ```
    */
   buildQueryParams(): Record<string, unknown> {
     const params: Record<string, unknown> = { ...this.pagination };
@@ -362,13 +255,11 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
    * @param key
    */
   private isValidKey(key: string): key is string & keyof T {
-    // OpenAlex API accepts any string key for filters, so this is always true
     return typeof key === "string" && key.length > 0;
   }
 
   /**
    * Type guard to check if a value can be assigned to filter fields
-   * OpenAlex API accepts strings, numbers, booleans, and arrays as filter values
    * @param value
    */
   private isAssignableToField(
@@ -384,7 +275,6 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
 
   /**
    * Type guard to safely access filters as a record
-   * Since Partial<T> is already an object type, this always returns true.
    * @param filters
    */
   private isFiltersRecord(
@@ -400,8 +290,6 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
    */
   private safelyAssignToField(field: keyof T, value: unknown): void {
     if (this.isAssignableToField(value) && this.isFiltersRecord(this.filters)) {
-      // OpenAlex API is flexible with filter value types, so this assignment is safe
-      // after type guard validation
       const filterKey = String(field);
       const filtersRecord = this.filters as Record<string, unknown>;
       if (typeof filtersRecord === "object" && filtersRecord !== null) {
@@ -421,9 +309,6 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
       this.isAssignableToField(value) &&
       this.isFiltersRecord(this.filters)
     ) {
-      // Both key and value are validated, safe to assign
-      // Type assertion needed due to generic constraints - type guards ensure safety
-
       (this.filters as Record<string, unknown>)[key] = value;
     }
   }
@@ -433,333 +318,10 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
  * Convert a filters object to OpenAlex API filter string format
  * @param filters - The filters object containing field-value pairs
  * @returns Formatted filter string for the OpenAlex API
- * @example
- * ```typescript
- * const filters: WorksFilters = {
- *   'publication_year': 2023,
- *   'is_oa': true,
- *   'authorships.author.id': ['A1234', 'A5678']
- * };
- * const filterString = buildFilterString(filters);
- * // Result: "publication_year:2023,is_oa:true,authorships.author.id:A1234|A5678"
- * ```
  */
 export const buildFilterString = (filters: EntityFilters | Partial<EntityFilters> | null | undefined): string => {
   if (!filters) {
     return "";
   }
-  // Use the feature-rich implementation from filter-builder.ts
   return buildFilterStringFromFilters(filters);
-};
-
-/**
- * Build sort parameter string for the OpenAlex API
- * @param sorts - Array of sort options or a single sort option
- * @returns Formatted sort string for the API
- * @example
- * ```typescript
- * const sortString = buildSortString([
- *   { field: 'publication_year', direction: 'desc' },
- *   { field: 'cited_by_count', direction: 'desc' }
- * ]);
- * // Result: "publication_year:desc,cited_by_count:desc"
- * ```
- */
-export const buildSortString = (sorts: SortOptions | SortOptions[] | null | undefined): string => {
-  if (!sorts) {
-    return "";
-  }
-
-  const sortArray = Array.isArray(sorts) ? sorts : [sorts];
-
-  return sortArray
-    .filter((sort) => sort.field)
-    .map((sort) => {
-      const direction = sort.direction ?? "asc";
-      return `${sort.field}:${direction}`;
-    })
-    .join(",");
-};
-
-/**
- * Build select parameter string for field selection
- * @param fields - Array of field names to select
- * @returns Comma-separated field string
- * @example
- * ```typescript
- * const selectString = buildSelectString(['id', 'display_name', 'publication_year']);
- * // Result: "id,display_name,publication_year"
- * ```
- */
-export const buildSelectString = (fields:
-    | readonly (string | null | undefined)[]
-    | (string | null | undefined)[]
-    | null
-    | undefined): string => {
-  if (!Array.isArray(fields) || fields.length === 0) {
-    return "";
-  }
-
-  return fields
-    .filter(
-      (field): field is string => field != null && field.trim().length > 0,
-    )
-    .map((field) => field.trim())
-    .join(",");
-};
-
-/**
- * Validate a date range for OpenAlex API filters
- * @param from - Start date string (ISO format or YYYY-MM-DD)
- * @param to - End date string (ISO format or YYYY-MM-DD)
- * @returns Validation result with normalized dates
- * @example
- * ```typescript
- * const validation = validateDateRange('2020-01-01', '2023-12-31');
- * if (validation.isValid) {
- *   logger.debug("general", 'Valid range:', validation.normalizedFrom, 'to', validation.normalizedTo);
- * }
- * ```
- */
-export const validateDateRange = (from: string | null | undefined, to: string | null | undefined): DateRangeValidation => {
-  if (!from || !to) {
-    return {
-      isValid: false,
-      error: "Both from and to dates must be provided",
-    };
-  }
-
-  // Normalize date strings to YYYY-MM-DD format
-  const normalizeDate = (dateStr: string): string | undefined => {
-    try {
-      // First check if the date string matches expected patterns
-      const trimmed = dateStr.trim();
-      if (!trimmed || trimmed.length < 4) {
-        return undefined; // Too short to be a valid date
-      }
-
-      // Strict validation: reject obviously invalid formats
-      if (trimmed === "not-a-date" || !/\d/.test(trimmed)) {
-        return undefined; // Contains no digits or is obviously invalid
-      }
-
-      const date = new Date(dateStr);
-      if (Number.isNaN(date.getTime())) {
-        return undefined;
-      }
-
-      // Additional validation: check if the parsed date matches the input intent
-      const isoString = date.toISOString().split("T")[0];
-
-      // For strict validation, check if year-only inputs are acceptable
-      if (/^\d{4}$/.test(trimmed)) {
-        return undefined; // Reject year-only dates as incomplete
-      }
-
-      return isoString; // YYYY-MM-DD
-    } catch {
-      return undefined;
-    }
-  };
-
-  const normalizedFrom = normalizeDate(from);
-  const normalizedTo = normalizeDate(to);
-
-  if (!normalizedFrom) {
-    return {
-      isValid: false,
-      error: `Invalid 'from' date format: ${from}`,
-    };
-  }
-
-  if (!normalizedTo) {
-    return {
-      isValid: false,
-      error: `Invalid 'to' date format: ${to}`,
-    };
-  }
-
-  // Check that from date is not after to date
-  if (new Date(normalizedFrom) > new Date(normalizedTo)) {
-    return {
-      isValid: false,
-      error: "Start date cannot be after end date",
-    };
-  }
-
-  return {
-    isValid: true,
-    normalizedFrom,
-    normalizedTo,
-  };
-};
-
-/**
- * Escape special characters in filter values for OpenAlex API
- * @param value - The filter value to escape
- * @returns Escaped value safe for use in API queries
- * @example
- * ```typescript
- * const escaped = escapeFilterValue('machine "learning" & AI');
- * // Handles quotes, special chars, etc.
- * ```
- */
-export const escapeFilterValue = (value: string): string => {
-  if (!value || typeof value !== "string") {
-    return "";
-  }
-
-  // OpenAlex API specific escaping rules:
-  // 1. Handle quotes by surrounding with double quotes if contains spaces/special chars
-  // 2. Escape existing quotes
-  // 3. Handle special characters that might break queries
-
-  let escaped = value.trim();
-
-  // If the value contains spaces, commas, or special characters, wrap in quotes
-  const needsQuoting = /[\s"&'(),:|]/.test(escaped);
-
-  if (needsQuoting) {
-    // Escape existing quotes
-    escaped = escaped.replaceAll('"', String.raw`\"`);
-    // Wrap in quotes
-    escaped = `"${escaped}"`;
-  }
-
-  return escaped;
-};
-
-/**
- * Create a new QueryBuilder instance for Works entities
- * @param filters - Initial filters (optional)
- * @returns QueryBuilder configured for Works
- */
-export const createWorksQuery = (filters?: Partial<WorksFilters>): QueryBuilder<WorksFilters> => new QueryBuilder<WorksFilters>(filters);
-
-/**
- * Create a new QueryBuilder instance for Authors entities
- * @param filters - Initial filters (optional)
- * @returns QueryBuilder configured for Authors
- */
-export const createAuthorsQuery = (filters?: Partial<AuthorsFilters>): QueryBuilder<AuthorsFilters> => new QueryBuilder<AuthorsFilters>(filters);
-
-/**
- * Create a new QueryBuilder instance for Sources entities
- * @param filters - Initial filters (optional)
- * @returns QueryBuilder configured for Sources
- */
-export const createSourcesQuery = (filters?: Partial<SourcesFilters>): QueryBuilder<SourcesFilters> => new QueryBuilder<SourcesFilters>(filters);
-
-/**
- * Create a new QueryBuilder instance for Institutions entities
- * @param filters - Initial filters (optional)
- * @returns QueryBuilder configured for Institutions
- */
-export const createInstitutionsQuery = (filters?: Partial<InstitutionsFilters>): QueryBuilder<InstitutionsFilters> => new QueryBuilder<InstitutionsFilters>(filters);
-
-/**
- * Create a new QueryBuilder instance for Topics entities
- * @param filters - Initial filters (optional)
- * @returns QueryBuilder configured for Topics
- */
-export const createTopicsQuery = (filters?: Partial<TopicsFilters>): QueryBuilder<TopicsFilters> => new QueryBuilder<TopicsFilters>(filters);
-
-/**
- * Create a new QueryBuilder instance for Publishers entities
- * @param filters - Initial filters (optional)
- * @returns QueryBuilder configured for Publishers
- */
-export const createPublishersQuery = (filters?: Partial<PublishersFilters>): QueryBuilder<PublishersFilters> => new QueryBuilder<PublishersFilters>(filters);
-
-/**
- * Create a new QueryBuilder instance for Funders entities
- * @param filters - Initial filters (optional)
- * @returns QueryBuilder configured for Funders
- */
-export const createFundersQuery = (filters?: Partial<FundersFilters>): QueryBuilder<FundersFilters> => new QueryBuilder<FundersFilters>(filters);
-
-/**
- * Normalize pagination parameters, handling both per_page and per-page formats
- * @param params - Raw parameters object that may contain pagination params
- * @returns Normalized pagination parameters
- * @example
- * ```typescript
- * const normalized = normalizePaginationParams({
- *   'per_page': 50,
- *   'per-page': 25, // This will be ignored if per_page is present
- *   page: 1
- * });
- * // Result: { per_page: 50, page: 1 }
- * ```
- */
-export const normalizePaginationParams = (params: Record<string, unknown>): PaginationParams => {
-  const normalized: PaginationParams = {};
-
-  // Handle page parameter
-  if (typeof params.page === "number") {
-    normalized.page = params.page;
-  }
-
-  // Handle per_page parameter (preferred format)
-  if (typeof params.per_page === "number") {
-    normalized.per_page = params.per_page;
-  }
-  // Handle per-page parameter (alternative format) - only if per_page not set
-  else if (typeof params["per-page"] === "number") {
-    normalized.per_page = params["per-page"];
-  }
-
-  // Handle cursor parameter
-  if (typeof params.cursor === "string" && params.cursor.trim().length > 0) {
-    normalized.cursor = params.cursor.trim();
-  }
-
-  // Handle group_by parameter (preferred format)
-  if (typeof params.group_by === "string") {
-    normalized.group_by = params.group_by;
-  }
-  // Handle group-by parameter (alternative format) - only if group_by not set
-  else if (typeof params["group-by"] === "string") {
-    normalized.group_by = params["group-by"];
-  }
-
-  return normalized;
-};
-
-// Common sort field constants for convenience
-export const SORT_FIELDS = {
-  CITED_BY_COUNT: "cited_by_count",
-  WORKS_COUNT: "works_count",
-  PUBLICATION_YEAR: "publication_year",
-  PUBLICATION_DATE: "publication_date",
-  CREATED_DATE: "created_date",
-  UPDATED_DATE: "updated_date",
-  DISPLAY_NAME: "display_name",
-  RELEVANCE_SCORE: "relevance_score",
-};
-
-// Common field selection presets
-export const SELECT_PRESETS = {
-  MINIMAL: ["id", "display_name"],
-  BASIC: ["id", "display_name", "cited_by_count"],
-  WORKS_DETAILED: [
-    "id",
-    "doi",
-    "display_name",
-    "publication_year",
-    "publication_date",
-    "cited_by_count",
-    "is_oa",
-    "primary_location",
-    "authorships",
-  ],
-  AUTHORS_DETAILED: [
-    "id",
-    "display_name",
-    "orcid",
-    "works_count",
-    "cited_by_count",
-    "last_known_institution",
-    "affiliations",
-  ],
 };

@@ -4,9 +4,10 @@
  */
 
 import { logError, logger } from "@bibgraph/utils";
+
 import * as NodeModules from "./nodejs-modules";
 
-const ERROR_MESSAGE_FS_NOT_INITIALIZED = "Node.js fs module not initialized";
+const _ERROR_MESSAGE_FS_NOT_INITIALIZED = "Node.js fs module not initialized";
 const UNKNOWN_ERROR_MESSAGE = "Unknown error";
 
 /**
@@ -28,6 +29,7 @@ export interface FileOperationsConfig {
 
 /**
  * Ensure directory structure exists
+ * @param dirPath
  */
 export const ensureDirectoryStructure = async (dirPath: string): Promise<void> => {
 	try {
@@ -44,6 +46,9 @@ export const ensureDirectoryStructure = async (dirPath: string): Promise<void> =
 
 /**
  * Write file atomically using temporary file
+ * @param root0
+ * @param root0.filePath
+ * @param root0.content
  */
 export const writeFileAtomic = async ({
 	filePath,
@@ -87,6 +92,9 @@ export const writeFileAtomic = async ({
  * (older than timeout) are automatically removed to prevent deadlocks from
  * crashed processes. Essential for safe concurrent writes in multi-tab
  * development or server environments.
+ * @param filePath
+ * @param activeLocks
+ * @param config
  */
 export const acquireFileLock = async (
 	filePath: string,
@@ -139,6 +147,10 @@ export const acquireFileLock = async (
 
 /**
  * Release file lock
+ * @param root0
+ * @param root0.lockId
+ * @param root0.filePath
+ * @param activeLocks
  */
 export const releaseFileLock = (
 	{ lockId, filePath }: { lockId: string; filePath: string },
@@ -163,6 +175,8 @@ export const releaseFileLock = (
 
 /**
  * Check available disk space
+ * @param basePath
+ * @param minDiskSpaceBytes
  */
 export const ensureSufficientDiskSpace = async (
 	basePath: string,

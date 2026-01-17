@@ -3,22 +3,24 @@
  * Handles hierarchical index.json file operations
  */
 
-import { generateContentHash, isDirectoryIndex, logError, logger, sanitizeUrlForCaching, type DirectoryIndex, type FileEntry } from "@bibgraph/utils";
-import * as NodeModules from "./nodejs-modules";
-import { writeFileAtomic } from "./file-operations";
+import { type DirectoryIndex, type FileEntry, generateContentHash, isDirectoryIndex, logError, logger } from "@bibgraph/utils";
+
 import type { EntityInfo, InterceptedData } from "./entity-extraction";
 import { excludeMetaField } from "./entity-extraction";
+import { writeFileAtomic } from "./file-operations";
+import * as NodeModules from "./nodejs-modules";
 
 const UNKNOWN_ERROR_MESSAGE = "Unknown error";
 
 export const INDEX_FILE_NAME = "index.json";
 
 // Re-export types from utils for convenience
-export type { DirectoryIndex, FileEntry };
 
 /**
  * Compare two DirectoryIndex objects to determine if content has changed
  * Excludes the lastUpdated field from comparison
+ * @param oldIndex
+ * @param newIndex
  */
 export const indexContentEquals = (oldIndex: DirectoryIndex, newIndex: DirectoryIndex): boolean => {
 	// Compare files
@@ -84,6 +86,13 @@ export const indexContentEquals = (oldIndex: DirectoryIndex, newIndex: Directory
 
 /**
  * Update hierarchical index.json files from the saved file up to the root
+ * @param entityInfo
+ * @param filePaths
+ * @param filePaths.dataFile
+ * @param filePaths.directoryPath
+ * @param data
+ * @param basePath
+ * @param skipContainingDirectory
  */
 export const updateHierarchicalIndexes = async (
 	entityInfo: EntityInfo,
@@ -129,6 +138,13 @@ export const updateHierarchicalIndexes = async (
 
 /**
  * Update a single directory's index.json file
+ * @param directoryPath
+ * @param entityInfo
+ * @param filePaths
+ * @param filePaths.dataFile
+ * @param filePaths.directoryPath
+ * @param data
+ * @param basePath
  */
 const updateDirectoryIndex = async (
 	directoryPath: string,
@@ -257,10 +273,13 @@ const updateDirectoryIndex = async (
 
 /**
  * Read or create directory index at specified path
+ * @param directoryPath
+ * @param basePath
+ * @param _basePath
  */
 export const readOrCreateDirectoryIndex = async (
 	directoryPath: string,
-	basePath: string,
+	_basePath: string,
 ): Promise<{ oldIndex: DirectoryIndex | null; currentIndex: DirectoryIndex }> => {
 	await NodeModules.initializeNodeModules();
 	const { fs, path } = NodeModules.getNodeModules();
@@ -293,6 +312,10 @@ export const readOrCreateDirectoryIndex = async (
 
 /**
  * Create a basic single-URL FileEntry
+ * @param baseName
+ * @param url
+ * @param lastRetrieved
+ * @param contentHash
  */
 export const createBasicFileEntry = (
 	baseName: string,

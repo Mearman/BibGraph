@@ -7,9 +7,6 @@
 
 import { logger } from "@bibgraph/utils";
 
-import type { StaticEntityType } from "./static-data-utils";
-import type { CacheTierInterface } from "./cache-tiers-types";
-
 // Import extracted cache tiers
 import {
 	GitHubPagesCacheTier,
@@ -17,6 +14,8 @@ import {
 	LocalDiskCacheTier,
 	MemoryCacheTier,
 } from "./cache/tiers";
+import type { CacheTierInterface } from "./cache-tiers-types";
+import type { StaticEntityType } from "./static-data-utils";
 
 // Define and export types and enums
 export interface StaticDataResult {
@@ -354,6 +353,7 @@ class StaticDataProvider {
 
 	/**
 	 * Clear IndexedDB cache entries by entity type
+	 * @param entityType
 	 */
 	async clearIndexedDBByType(entityType: StaticEntityType): Promise<number> {
 		return this.indexedDBCacheTier.clearByType(entityType);
@@ -389,6 +389,9 @@ class StaticDataProvider {
 	/**
 	 * Set static data in the cache (memory and IndexedDB tiers)
 	 * Used to cache API results for future lookups
+	 * @param entityType
+	 * @param id
+	 * @param data
 	 */
 	async setStaticData(
 		entityType: StaticEntityType,

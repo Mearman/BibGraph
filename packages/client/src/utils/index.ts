@@ -7,6 +7,7 @@
 export * from './autocomplete';
 export * from './filter-builder';
 export * from './grouping';
+export * from './grouping-types';
 export * from './hydration-helpers';
 export * from './id-resolver';
 export * from './query-builder';

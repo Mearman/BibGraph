@@ -5,8 +5,12 @@
  */
 
 // Main client classes
-export { OpenAlexBaseClient } from './client';
+export { OpenAlexBaseClient, type ValidationSchema } from './client';
 export { CachedOpenAlexClient } from './cached-client';
+
+// Client configuration and errors
+export type { OpenAlexClientConfig, FullyConfiguredClient } from './internal/client-config';
+export { OpenAlexApiError, OpenAlexRateLimitError } from './internal/errors';
 
 // Client instances and functions
 export { cachedOpenAlex, updateOpenAlexEmail, updateOpenAlexApiKey } from './cached-client';

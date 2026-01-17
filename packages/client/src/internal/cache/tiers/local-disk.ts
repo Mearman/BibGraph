@@ -3,11 +3,12 @@
  * Filesystem-based caching with graceful fallback in browser
  */
 
-import type { StaticEntityType } from "../../static-data-utils";
 import { logger } from "@bibgraph/utils";
-import { CacheTier } from "../../static-data-provider";
-import type { StaticDataResult } from "../../static-data-provider";
+
 import type { CacheTierInterface } from "../../cache-tiers-types";
+import type { StaticDataResult } from "../../static-data-provider";
+import { CacheTier } from "../../static-data-provider";
+import type { StaticEntityType } from "../../static-data-utils";
 
 interface CacheStats {
 	requests: number;
@@ -17,19 +18,18 @@ interface CacheStats {
 
 /**
  * Calculate cache statistics from raw stats
+ * @param stats
  */
-function calculateCacheStats(stats: CacheStats): {
+const calculateCacheStats = (stats: CacheStats): {
 	requests: number;
 	hits: number;
 	averageLoadTime: number;
-} {
-	return {
+} => ({
 		requests: stats.requests,
 		hits: stats.hits,
 		averageLoadTime:
 			stats.requests > 0 ? stats.totalLoadTime / stats.requests : 0,
-	};
-}
+	});
 
 /**
  * Local disk cache implementation (Node.js only)
