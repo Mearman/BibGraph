@@ -52,19 +52,19 @@
     "filter=select=id,display_name": {
       "url": "https://api.openalex.org/works/W123?select=id,display_name",
       "$ref": "./filter=select=id,display_name.json",
-      "lastRetrieved": "2026-01-15T08:15:12.436Z",
+      "lastRetrieved": "2026-01-17T12:15:18.370Z",
       "contentHash": "fb6d08e8002b7d8e"
     },
     "filter=per_page=2": {
       "url": "https://api.openalex.org/works?per_page=2",
       "$ref": "./filter=per_page=2.json",
-      "lastRetrieved": "2026-01-15T08:15:12.460Z",
+      "lastRetrieved": "2026-01-17T12:15:18.389Z",
       "contentHash": "a695960dbd857a99"
     },
     "filter=per_page=200": {
       "url": "https://api.openalex.org/works?per_page=200",
       "$ref": "./filter=per_page=200.json",
-      "lastRetrieved": "2026-01-15T08:15:12.470Z",
+      "lastRetrieved": "2026-01-17T12:15:18.395Z",
       "contentHash": "a695960dbd857a99"
     },
     "filter=select=id,display_name,publication_year,typ_g2wjtq": {
