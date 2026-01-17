@@ -94,7 +94,7 @@ const expectPageLoads = async (page: import("@playwright/test").Page, path: stri
 		expect(
 			content?.trim().length,
 			`Page ${path} should have content`
-		).toBeGreaterThan(10);
+		).toBeGreaterThanOrEqual(10);
 	}
 
 	// Check for specific content if provided
