@@ -7,6 +7,6 @@
     "strict": false,
     "types": ["node", "vitest"]
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "eslint.config.ts"],
   "exclude": ["dist", "node_modules"]
 }

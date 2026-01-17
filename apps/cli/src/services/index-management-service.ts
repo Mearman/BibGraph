@@ -30,6 +30,7 @@ export class IndexManagementService {
 
 	/**
 	 * Check if static data exists for entity type
+	 * @param entityType
 	 */
 	async hasStaticData(entityType: StaticEntityType): Promise<boolean> {
 		try {
@@ -43,13 +44,14 @@ export class IndexManagementService {
 
 	/**
 	 * Load index for entity type
+	 * @param entityType
 	 */
 	async loadIndex(entityType: StaticEntityType): Promise<CLIUnifiedIndex | null> {
 		try {
 			const indexPath = join(this.dataPath, entityType, "unified-index.json")
 			const content = await readFile(indexPath, "utf-8")
 			return JSON.parse(content) as CLIUnifiedIndex
-		} catch (error) {
+		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Index not found for ${entityType}`)
 			return null
 		}
@@ -57,6 +59,8 @@ export class IndexManagementService {
 
 	/**
 	 * Get entity summary from index
+	 * @param entityType
+	 * @param entityId
 	 */
 	async getEntitySummary(
 		entityType: StaticEntityType,
@@ -73,7 +77,7 @@ export class IndexManagementService {
 				id: entityId,
 				display_name: entry.$ref.split("/").pop() ?? entityId,
 			}
-		} catch (error) {
+		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Entity summary not found: ${entityType}/${entityId}`)
 			return null
 		}
@@ -81,13 +85,14 @@ export class IndexManagementService {
 
 	/**
 	 * Load unified index for entity type
+	 * @param entityType
 	 */
 	async loadUnifiedIndex(entityType: StaticEntityType): Promise<CLIUnifiedIndex | null> {
 		try {
 			const indexPath = join(this.dataPath, entityType, "unified-index.json")
 			const content = await readFile(indexPath, "utf-8")
 			return JSON.parse(content) as CLIUnifiedIndex
-		} catch (error) {
+		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Unified index not found for ${entityType}`)
 			return null
 		}
@@ -95,6 +100,8 @@ export class IndexManagementService {
 
 	/**
 	 * Save unified index for entity type
+	 * @param entityType
+	 * @param index
 	 */
 	async saveUnifiedIndex(entityType: StaticEntityType, index: CLIUnifiedIndex): Promise<void> {
 		try {
@@ -109,6 +116,9 @@ export class IndexManagementService {
 
 	/**
 	 * Update unified index with new entry
+	 * @param entityType
+	 * @param canonicalUrl
+	 * @param entry
 	 */
 	async updateUnifiedIndex(
 		entityType: StaticEntityType,
@@ -135,6 +145,7 @@ export class IndexManagementService {
 
 	/**
 	 * Rebuild unified index from existing entity files
+	 * @param entityType
 	 */
 	async rebuildUnifiedIndex(entityType: StaticEntityType): Promise<void> {
 		try {
@@ -176,6 +187,7 @@ export class IndexManagementService {
 
 	/**
 	 * Generate content hash
+	 * @param content
 	 */
 	private generateContentHash(content: string): string {
 		let hash = 0

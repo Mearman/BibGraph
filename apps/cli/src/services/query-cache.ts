@@ -3,7 +3,7 @@
  * Handles query result caching and query index management
  */
 
-import { mkdir, readdir, readFile } from "node:fs/promises"
+import { readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { logError, logger } from "@bibgraph/utils/logger"
@@ -31,6 +31,8 @@ export class QueryCacheService {
 
 	/**
 	 * Load cached query result
+	 * @param entityType
+	 * @param queryUrl
 	 */
 	async loadQuery(entityType: StaticEntityType, queryUrl: string): Promise<unknown> {
 		// First try to load from query index
@@ -50,6 +52,8 @@ export class QueryCacheService {
 
 	/**
 	 * Try to load query from query index
+	 * @param entityType
+	 * @param queryUrl
 	 */
 	private async tryLoadFromQueryIndex(
 		entityType: StaticEntityType,
@@ -70,7 +74,7 @@ export class QueryCacheService {
 
 			const queryContent = await readFile(queryPath, "utf-8")
 			return JSON.parse(queryContent)
-		} catch (error) {
+		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Query not found in index: ${queryUrl}`)
 			return undefined
 		}
@@ -78,6 +82,8 @@ export class QueryCacheService {
 
 	/**
 	 * Scan directory for query file matching URL
+	 * @param entityType
+	 * @param queryUrl
 	 */
 	private async scanDirectoryForQuery(
 		entityType: StaticEntityType,
@@ -95,7 +101,7 @@ export class QueryCacheService {
 			}
 
 			return undefined
-		} catch (error) {
+		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Query directory not found for ${entityType}`)
 			return undefined
 		}
@@ -103,6 +109,9 @@ export class QueryCacheService {
 
 	/**
 	 * Try to match query file by URL
+	 * @param queryDir
+	 * @param file
+	 * @param queryUrl
 	 */
 	private async tryMatchQueryFile(
 		queryDir: string,
@@ -123,6 +132,8 @@ export class QueryCacheService {
 
 	/**
 	 * Load query file from disk
+	 * @param queryDir
+	 * @param file
 	 */
 	private async loadQueryFile(queryDir: string, file: string): Promise<unknown> {
 		try {
@@ -136,6 +147,7 @@ export class QueryCacheService {
 
 	/**
 	 * Load query file from specific path
+	 * @param filePath
 	 */
 	private async loadQueryFileFromPath(filePath: string): Promise<unknown> {
 		try {
@@ -149,13 +161,14 @@ export class QueryCacheService {
 
 	/**
 	 * Load query index for entity type
+	 * @param entityType
 	 */
 	async loadQueryIndex(entityType: StaticEntityType): Promise<CLIQueryIndex | null> {
 		try {
 			const queryIndexPath = join(this.dataPath, entityType, "query-index.json")
 			const content = await readFile(queryIndexPath, "utf-8")
 			return JSON.parse(content) as CLIQueryIndex
-		} catch (error) {
+		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Query index not found for ${entityType}`)
 			return null
 		}
@@ -163,6 +176,8 @@ export class QueryCacheService {
 
 	/**
 	 * Save query index for entity type
+	 * @param entityType
+	 * @param queryIndex
 	 */
 	async saveQueryIndex(entityType: StaticEntityType, queryIndex: CLIQueryIndex): Promise<void> {
 		try {
@@ -176,6 +191,7 @@ export class QueryCacheService {
 
 	/**
 	 * List all cached queries for entity type
+	 * @param entityType
 	 */
 	async listCachedQueries(entityType: StaticEntityType): Promise<
 		{
@@ -201,6 +217,7 @@ export class QueryCacheService {
 
 	/**
 	 * Scan query files from filesystem
+	 * @param entityType
 	 */
 	async scanQueryFilesFromFilesystem(entityType: StaticEntityType): Promise<
 		{
@@ -225,7 +242,7 @@ export class QueryCacheService {
 			}
 
 			return queries
-		} catch (error) {
+		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `No query directory found for ${entityType}`)
 			return []
 		}
@@ -233,6 +250,8 @@ export class QueryCacheService {
 
 	/**
 	 * Process individual query file
+	 * @param queryDir
+	 * @param file
 	 */
 	private async processQueryFile(
 		queryDir: string,

@@ -3,7 +3,7 @@
  * Handles entity CRUD operations, file loading, and directory scanning
  */
 
-import { mkdir, readdir, readFile, stat } from "node:fs/promises"
+import { readdir, readFile, stat } from "node:fs/promises"
 import { join } from "node:path"
 
 import { logError, logger } from "@bibgraph/utils/logger"
@@ -20,6 +20,8 @@ export class EntityCacheService {
 
 	/**
 	 * Load entity from filesystem cache
+	 * @param entityType
+	 * @param entityId
 	 */
 	async loadEntity(
 		entityType: StaticEntityType,
@@ -44,7 +46,7 @@ export class EntityCacheService {
 						[key: string]: unknown
 				  }
 				| undefined
-		} catch (error) {
+		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Entity not found in cache: ${entityType}/${entityId}`)
 			return undefined
 		}
@@ -52,6 +54,8 @@ export class EntityCacheService {
 
 	/**
 	 * Load entity from filesystem using unified index
+	 * @param entityType
+	 * @param entityId
 	 */
 	async loadUnifiedIndexForEntity(
 		entityType: StaticEntityType,
@@ -69,6 +73,7 @@ export class EntityCacheService {
 
 	/**
 	 * Load entity directly from file path
+	 * @param filePath
 	 */
 	async loadEntityFromFile(filePath: string): Promise<
 		| {
@@ -87,7 +92,7 @@ export class EntityCacheService {
 						[key: string]: unknown
 				  }
 				| undefined
-		} catch (error) {
+		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Failed to load entity from file: ${filePath}`)
 			return undefined
 		}
@@ -95,6 +100,7 @@ export class EntityCacheService {
 
 	/**
 	 * List all cached entities for a given entity type
+	 * @param entityType
 	 */
 	async listEntities(entityType: StaticEntityType): Promise<string[]> {
 		try {
@@ -113,7 +119,7 @@ export class EntityCacheService {
 			})
 
 			return entityIds
-		} catch (error) {
+		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `No cached entities found for ${entityType}`)
 			return []
 		}
@@ -121,6 +127,8 @@ export class EntityCacheService {
 
 	/**
 	 * Search entities by name in cache
+	 * @param entityType
+	 * @param searchTerm
 	 */
 	async searchEntities(entityType: StaticEntityType, searchTerm: string): Promise<
 		{
@@ -153,6 +161,7 @@ export class EntityCacheService {
 
 	/**
 	 * Calculate size of entity directory in bytes
+	 * @param entityType
 	 */
 	async calculateEntityDirectorySize(entityType: string): Promise<number> {
 		try {

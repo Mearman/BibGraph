@@ -6,7 +6,7 @@
 import { readdir, readFile, stat } from "node:fs/promises"
 import { join } from "node:path"
 
-import { logError, logger } from "@bibgraph/utils/logger"
+import { logger } from "@bibgraph/utils/logger"
 
 import { type StaticEntityType } from "../entity-detection.js"
 
@@ -180,6 +180,7 @@ export class StatisticsService {
 
 	/**
 	 * Count entities for given type
+	 * @param entityType
 	 */
 	private async countEntities(entityType: StaticEntityType): Promise<number> {
 		try {
@@ -196,6 +197,7 @@ export class StatisticsService {
 
 	/**
 	 * Count queries for given type
+	 * @param entityType
 	 */
 	private async countQueries(entityType: StaticEntityType): Promise<number> {
 		try {
@@ -210,6 +212,7 @@ export class StatisticsService {
 
 	/**
 	 * Calculate directory size
+	 * @param dirPath
 	 */
 	private async calculateDirectorySize(dirPath: string): Promise<number> {
 		try {
@@ -235,6 +238,8 @@ export class StatisticsService {
 
 	/**
 	 * Analyze field coverage from sample entity
+	 * @param entityType
+	 * @param fieldCoverage
 	 */
 	private async analyzeFieldCoverage(
 		entityType: StaticEntityType,

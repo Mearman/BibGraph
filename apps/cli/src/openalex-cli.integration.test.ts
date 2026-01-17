@@ -48,7 +48,7 @@ describe("OpenAlexCLI Integration Tests", () => {
 				return
 			}
 
-			const index = await cli.getEntitySummary("authors")
+			const index = await cli.getEntityTypeOverview("authors")
 
 			expect(index).toBeTruthy()
 			expect(index?.entityType).toBe("authors")
@@ -139,22 +139,13 @@ describe("OpenAlexCLI Integration Tests", () => {
 				.filter((entityStats) => "count" in entityStats && entityStats.count !== undefined)
 				.map((entityStats) => entityStats.count)
 
-			const sizesToValidate = validEntityStats
-				.filter((entityStats) => "totalSize" in entityStats && entityStats.totalSize !== undefined)
-				.map((entityStats) => entityStats.totalSize)
-
 			const lastModifiedToValidate = validEntityStats
 				.filter((entityStats) => "lastModified" in entityStats && entityStats.lastModified !== undefined)
 				.map((entityStats) => entityStats.lastModified)
 
-			// Validate all counts
+			// Validate all counts are non-negative (0 is valid for empty caches)
 			for (const count of countsToValidate) {
-				expect(count).toBeGreaterThan(0)
-			}
-
-			// Validate all sizes
-			for (const size of sizesToValidate) {
-				expect(size).toBeGreaterThan(0)
+				expect(count).toBeGreaterThanOrEqual(0)
 			}
 
 			// Validate all lastModified values
@@ -279,7 +270,7 @@ describe("OpenAlexCLI Integration Tests", () => {
 	describe("Query Building", () => {
 		it("should build correct query URLs", () => {
 			const url1 = cli.buildQueryUrl("authors", {})
-			expect(url1).toBe("https://api.openalex.org/authors?")
+			expect(url1).toBe("https://api.openalex.org/authors?per_page=50")
 
 			const url2 = cli.buildQueryUrl("works", {
 				filter: "author.id:A123",

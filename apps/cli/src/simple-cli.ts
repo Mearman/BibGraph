@@ -4,9 +4,6 @@
  * Demonstrates CLI structure while complex dependencies are being resolved
  */
 
-/* eslint-disable custom/no-deprecated */
-// Commander.js methods flagged as deprecated are actually the correct modern API
-
 import { logger } from "@bibgraph/utils/logger"
 import { Command } from "commander"
 

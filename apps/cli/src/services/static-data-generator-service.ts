@@ -21,6 +21,10 @@ export class StaticDataGeneratorService {
 
 	/**
 	 * Generate static data from detected patterns
+	 * @param options
+	 * @param options.entityTypes
+	 * @param options.sampleSize
+	 * @param options.batchSize
 	 */
 	async generateStaticDataFromPatterns(options: {
 		entityTypes?: StaticEntityType[]
@@ -37,7 +41,7 @@ export class StaticDataGeneratorService {
 
 		let totalProcessed = 0
 		let totalCached = 0
-		const entityTypeCounts: Record<string, number> = {} as any
+		const entityTypeCounts: Record<string, number> = {}
 
 		for (const entityType of entityTypes) {
 			const result = await this.processEntityTypeForGeneration(entityType, sampleSize, batchSize)
@@ -56,6 +60,9 @@ export class StaticDataGeneratorService {
 
 	/**
 	 * Process entity type for static data generation
+	 * @param entityType
+	 * @param sampleSize
+	 * @param batchSize
 	 */
 	private async processEntityTypeForGeneration(
 		entityType: StaticEntityType,
@@ -83,6 +90,9 @@ export class StaticDataGeneratorService {
 
 	/**
 	 * Process well-populated entities (high completeness score)
+	 * @param entityType
+	 * @param sampleSize
+	 * @param batchSize
 	 */
 	private async processWellPopulatedEntities(
 		entityType: StaticEntityType,
@@ -117,6 +127,9 @@ export class StaticDataGeneratorService {
 
 	/**
 	 * Process individual entity for caching
+	 * @param entityType
+	 * @param filter
+	 * @param count
 	 */
 	private async processEntityForCaching(
 		entityType: StaticEntityType,
@@ -158,11 +171,13 @@ export class StaticDataGeneratorService {
 
 	/**
 	 * Fetch entity and save to cache
+	 * @param entityType
+	 * @param entityId
 	 */
 	private async fetchEntityForCaching(entityType: StaticEntityType, entityId: string): Promise<boolean> {
 		try {
-			// Use cachedOpenAlex.getEntity
-			const entity = await (cachedOpenAlex as any).getEntity(entityType, entityId)
+			// Use cachedOpenAlex.client.getEntity - takes ID only (entity type is detected from ID)
+			const entity = await cachedOpenAlex.client.getEntity(entityId)
 
 			if (entity) {
 				const entityDir = join(this.dataPath, entityType)
@@ -178,7 +193,7 @@ export class StaticDataGeneratorService {
 			}
 
 			return false
-		} catch (error) {
+		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Failed to fetch entity for caching: ${entityType}/${entityId}`)
 			return false
 		}
@@ -186,6 +201,8 @@ export class StaticDataGeneratorService {
 
 	/**
 	 * Process popular collections (cited works, related authors, etc.)
+	 * @param entityType
+	 * @param count
 	 */
 	private async processPopularCollections(
 		entityType: StaticEntityType,
@@ -214,6 +231,7 @@ export class StaticDataGeneratorService {
 
 	/**
 	 * Get completeness filters for entity type
+	 * @param entityType
 	 */
 	private getCompletenessFilters(entityType: StaticEntityType): string[] {
 		const filters: Record<StaticEntityType, string[]> = {
@@ -230,6 +248,7 @@ export class StaticDataGeneratorService {
 
 	/**
 	 * Get popular collection filters for entity type
+	 * @param entityType
 	 */
 	private getPopularCollectionFilters(entityType: StaticEntityType): string[] {
 		const filters: Record<StaticEntityType, string[]> = {
