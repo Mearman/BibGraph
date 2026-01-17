@@ -37,7 +37,7 @@ import {
   useSelectedBookmarks,
   useSelectionCount,
 } from "@/contexts/bookmark-selection-context";
-import { useUserInteractions } from "@/hooks/use-user-interactions";
+import { useUserInteractions } from "@/hooks/user-interactions";
 
 interface BookmarkManagerProps {
   onNavigate?: (url: string) => void;

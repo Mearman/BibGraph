@@ -6,7 +6,7 @@ import { EntityDetectionService, logger } from "@bibgraph/utils";
 import { useLocation } from "@tanstack/react-router";
 import { useEffect, useMemo,useRef } from "react";
 
-import { useAppActivityStore } from "@/stores/app-activity-store";
+import { useAppActivityStore } from "@/stores/app-activity";
 import { decodeEntityId, serializeSearch } from "@/utils/url-decoding";
 
 // PostHog type for window object

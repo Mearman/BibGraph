@@ -31,9 +31,9 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
-import { useEntityDisplayName } from "@/hooks/use-entity-display-name";
 import { useStorageProvider } from "@/contexts/storage-provider-context";
-import { useUserInteractions } from "@/hooks/use-user-interactions";
+import { useEntityDisplayName } from "@/hooks/use-entity-display-name";
+import { useUserInteractions } from "@/hooks/user-interactions";
 
 /** Non-entity pages that shouldn't trigger display name fetches */
 const NON_ENTITY_URL_PATTERNS = ["/about", "/settings", "/history", "/bookmarks", "/catalogue"];

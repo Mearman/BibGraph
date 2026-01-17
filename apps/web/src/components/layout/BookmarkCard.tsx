@@ -26,8 +26,8 @@ import { IconTrash } from "@tabler/icons-react";
 import { Link } from "@tanstack/react-router";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
-import { useEntityDisplayName } from "@/hooks/use-entity-display-name";
 import { useStorageProvider } from "@/contexts/storage-provider-context";
+import { useEntityDisplayName } from "@/hooks/use-entity-display-name";
 
 import * as styles from "./sidebar.css";
 

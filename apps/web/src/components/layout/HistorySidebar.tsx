@@ -27,7 +27,7 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { CARD_BORDER_STYLE, ICON_SIZE } from "@/config/style-constants";
-import { useUserInteractions } from "@/hooks/use-user-interactions";
+import { useUserInteractions } from "@/hooks/user-interactions";
 
 import { HistoryCard } from "./HistoryCard";
 import * as styles from "./sidebar.css";

@@ -5,9 +5,11 @@
  * Tests that unchanged file/directory entries are preserved to prevent unnecessary timestamp cascades
  */
 
-import { mkdir, writeFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, rm,writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import type { DirectoryIndex } from "@bibgraph/utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 // Import the internal helper functions we're testing
@@ -16,7 +18,6 @@ import {
   generateIndexForEntityType,
   getStaticDataIndex,
 } from "./static-data-index-generator";
-import type { DirectoryIndex } from "@bibgraph/utils";
 
 describe("static-data-index-generator - Change Detection", () => {
   let testDir: string;
@@ -151,7 +152,7 @@ describe("static-data-index-generator - Change Detection", () => {
   describe("Subdirectory Entry Preservation", () => {
     it("should preserve DirectoryEntry for unchanged subdirectory", async () => {
       // Create subdirectory with file
-      const subDir = join(entityDir, "queries");
+      const subDir = join(entityDir, "subdir");
       await mkdir(subDir, { recursive: true });
 
       const testFile = join(subDir, "filter=test.json");
@@ -161,7 +162,7 @@ describe("static-data-index-generator - Change Detection", () => {
       await generateIndexForEntityType(entityDir, "work", true);
 
       const index1 = await getStaticDataIndex(entityDir);
-      const initialLastModified = index1!.directories!["queries"].lastModified;
+      const initialLastModified = index1!.directories!["subdir"].lastModified;
 
       // Wait to ensure timestamp difference
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -170,7 +171,7 @@ describe("static-data-index-generator - Change Detection", () => {
       await generateIndexForEntityType(entityDir, "work", true);
 
       const index2 = await getStaticDataIndex(entityDir);
-      const updatedLastModified = index2!.directories!["queries"].lastModified;
+      const updatedLastModified = index2!.directories!["subdir"].lastModified;
 
       // Key assertion: lastModified should be identical (subdirectory unchanged)
       expect(updatedLastModified).toBe(initialLastModified);
@@ -181,7 +182,7 @@ describe("static-data-index-generator - Change Detection", () => {
 
     it("should update DirectoryEntry when subdirectory content changes", async () => {
       // Create subdirectory with file
-      const subDir = join(entityDir, "queries");
+      const subDir = join(entityDir, "subdir");
       await mkdir(subDir, { recursive: true });
 
       const testFile = join(subDir, "filter=test.json");
@@ -190,7 +191,7 @@ describe("static-data-index-generator - Change Detection", () => {
       await generateIndexForEntityType(entityDir, "work", true);
 
       const index1 = await getStaticDataIndex(entityDir);
-      const initialLastModified = index1!.directories!["queries"].lastModified;
+      const initialLastModified = index1!.directories!["subdir"].lastModified;
 
       // Wait to ensure timestamp difference
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -201,7 +202,7 @@ describe("static-data-index-generator - Change Detection", () => {
       await generateIndexForEntityType(entityDir, "work", true);
 
       const index2 = await getStaticDataIndex(entityDir);
-      const updatedLastModified = index2!.directories!["queries"].lastModified;
+      const updatedLastModified = index2!.directories!["subdir"].lastModified;
 
       // Key assertion: lastModified should be updated (subdirectory changed)
       expect(updatedLastModified).not.toBe(initialLastModified);

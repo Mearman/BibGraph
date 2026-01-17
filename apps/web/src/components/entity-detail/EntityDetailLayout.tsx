@@ -9,8 +9,8 @@ import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
 import { useQueryBookmarking } from "@/hooks/use-query-bookmarking";
 import { useResponsiveDesign } from "@/hooks/use-sprinkles";
 import { useThemeColors } from "@/hooks/use-theme-colors";
-import { useUserInteractions } from "@/hooks/use-user-interactions";
 import { useGraphList } from "@/hooks/useGraphList";
+import { useUserInteractions } from "@/hooks/user-interactions";
 
 import { AddToListModal } from "../catalogue/AddToListModal";
 import { EntityDataDisplay } from "../EntityDataDisplay";

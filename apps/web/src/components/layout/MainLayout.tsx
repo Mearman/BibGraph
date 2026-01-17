@@ -418,13 +418,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 </Menu.Item>
                 <Menu.Item
                   component={Link}
-                  to="/algorithms"
-                  leftSection={<IconSearch size={ICON_SIZE.MD} />}
-                >
-                  Algorithms
-                </Menu.Item>
-                <Menu.Item
-                  component={Link}
                   to="/graph"
                   leftSection={<IconSearch size={ICON_SIZE.MD} />}
                 >

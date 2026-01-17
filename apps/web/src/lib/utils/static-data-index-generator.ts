@@ -9,7 +9,7 @@ import {
   type FileEntry,
   generateContentHash,
   isValidOpenAlexEntity,
-} from "@bibgraph/utils/static-data/cache-utilities";
+} from "@bibgraph/utils/static-data/cache";
 
 // Local type definition (not exported from @bibgraph/client)
 type StaticEntityType = 'author' | 'work' | 'source' | 'institution' | 'topic' | 'publisher' | 'funder';

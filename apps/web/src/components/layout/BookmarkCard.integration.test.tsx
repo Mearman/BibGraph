@@ -5,6 +5,7 @@
  * with entity-based storage and backward compatibility for existing bookmarks.
  */
 
+import { InMemoryStorageProvider } from '@bibgraph/utils'
 import type { CatalogueEntity } from '@bibgraph/utils/storage/catalogue-db'
 import { SPECIAL_LIST_IDS } from '@bibgraph/utils/storage/catalogue-db'
 import { MantineProvider } from '@mantine/core'
@@ -13,10 +14,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { BookmarkCard } from '@/components/layout/BookmarkCard'
-import { useUserInteractions } from '@/hooks/use-user-interactions'
+import { StorageProviderWrapper } from '@/contexts/storage-provider-context'
+import { useUserInteractions } from '@/hooks/user-interactions'
 
 // Mock the hook to provide controlled test data
-vi.mock('@/hooks/use-user-interactions')
+vi.mock('@/hooks/user-interactions')
 const mockUseUserInteractions = vi.mocked(useUserInteractions)
 
 // Mock navigation
@@ -38,6 +40,9 @@ vi.mock('@tanstack/react-router', () => ({
   )
 }))
 
+// Shared storage provider for tests
+let testStorage: InMemoryStorageProvider
+
 // Test wrapper component
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const queryClient = new QueryClient({
@@ -49,9 +54,11 @@ const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <MantineProvider>
-        {children}
-      </MantineProvider>
+      <StorageProviderWrapper provider={testStorage}>
+        <MantineProvider>
+          {children}
+        </MantineProvider>
+      </StorageProviderWrapper>
     </QueryClientProvider>
   )
 }
@@ -97,9 +104,13 @@ describe('Bookmark Navigation Integration Tests', () => {
     position: 3
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockNavigate.mockClear()
     vi.clearAllMocks()
+
+    // Initialize storage provider for each test
+    testStorage = new InMemoryStorageProvider()
+    await testStorage.initializeSpecialLists()
   })
 
   afterEach(() => {

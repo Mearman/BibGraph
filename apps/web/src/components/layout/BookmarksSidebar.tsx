@@ -33,8 +33,8 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { ICON_SIZE } from "@/config/style-constants";
-import { useUserInteractions } from "@/hooks/use-user-interactions";
 import { useCatalogue } from "@/hooks/useCatalogue";
+import { useUserInteractions } from "@/hooks/user-interactions";
 
 import { BookmarkCard } from "./BookmarkCard";
 import { CatalogueListCard } from "./CatalogueListCard";

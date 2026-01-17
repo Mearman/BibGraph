@@ -61,6 +61,17 @@ vi.mock("@/config/style-constants", () => ({
   },
 }));
 
+// Mock the useSearchHistory hook to avoid requiring StorageProviderWrapper
+vi.mock("@/hooks/useSearchHistory", () => ({
+  useSearchHistory: () => ({
+    addSearchQuery: vi.fn(),
+    searchHistory: [],
+    clearSearchHistory: vi.fn(),
+    removeSearchQuery: vi.fn(),
+    isLoading: false,
+  }),
+}));
+
 const renderWithMantine = (component: React.ReactElement) => {
   return render(<MantineProvider>{component}</MantineProvider>);
 };

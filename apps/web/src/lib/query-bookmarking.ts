@@ -3,7 +3,7 @@
  * Handles bookmarking of complex API queries while excluding pagination parameters
  */
 
-import { createApiUrlRequest } from "@bibgraph/utils/storage/user-interactions-db";
+import { createApiUrlRequest } from "@bibgraph/utils/storage/user-interactions";
 
 import { type OpenAlexSearchParams } from "./route-schemas";
 

@@ -2,7 +2,7 @@
  * API Call Tracker component that logs OpenAlex API calls to activity store
  */
 
-import { useAppActivityStore } from "@/stores/app-activity-store";
+import { useAppActivityStore } from "@/stores/app-activity";
 
 export interface ApiCallTrackerProps {
   entityType: string;
