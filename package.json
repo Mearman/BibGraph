@@ -1,6 +1,6 @@
 {
   "name": "bibgraph",
-  "version": "24.9.0",
+  "version": "24.9.1",
   "type": "module",
   "private": true,
   "packageManager": "pnpm@10.18.3",

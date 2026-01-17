@@ -1,3 +1,7 @@
+## <small>24.9.1 (2026-01-17)</small>
+
+* fix(web): fix flaky smoke test content length assertion ([ea623c1](https://github.com/Mearman/BibGraph/commit/ea623c1))
+
 ## 24.9.0 (2026-01-17)
 
 * chore: add vitest to graph-core dependencies in lock file ([73c72b0](https://github.com/Mearman/BibGraph/commit/73c72b0))
