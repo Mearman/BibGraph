@@ -21,19 +21,15 @@ import {
   Box,
   Button,
   Card,
-  Container,
   Flex,
   Group,
-  Loader,
   SegmentedControl,
   Stack,
   Text,
   Title,
   Tooltip,
 } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
 import {
-  IconAlertTriangle,
   IconDownload,
   IconEye,
   IconFocus2,
@@ -50,9 +46,13 @@ import { type ForceGraphMethods } from 'react-force-graph-2d';
 
 import { ForceGraph3DVisualization } from '@/components/graph/3d/ForceGraph3DVisualization';
 import { GraphAnnotations } from '@/components/graph/annotations';
-import { GraphEmptyState } from '@/components/graph/GraphEmptyState';
 import { GraphLegend } from '@/components/graph/GraphLegend';
 import { GraphMiniMap } from '@/components/graph/GraphMiniMap';
+import {
+  GraphEmptyStateWithPanel,
+  GraphErrorState,
+  GraphLoadingState,
+} from '@/components/graph/GraphPageStates';
 import { GraphSourcePanel } from '@/components/graph/GraphSourcePanel';
 import { LayoutSelector } from '@/components/graph/LayoutSelector';
 import {
@@ -69,10 +69,10 @@ import { ICON_SIZE, LAYOUT } from '@/config/style-constants';
 import { useGraphVisualizationContext } from '@/contexts/GraphVisualizationContext';
 import { type GraphMethods, useFitToView } from '@/hooks/useFitToView';
 import { useGraphAnnotations } from '@/hooks/useGraphAnnotations';
-import { type GraphLayoutType,useGraphLayout } from '@/hooks/useGraphLayout';
+import { useGraphExport } from '@/hooks/useGraphExport';
+import { type GraphLayoutType, useGraphLayout } from '@/hooks/useGraphLayout';
 import { useNodeExpansion } from '@/lib/graph-index';
 import type { PathPreset } from '@/lib/path-presets';
-import { downloadGraphSVG } from '@/utils/exportUtils';
 
 /**
  * Entity Graph Page Component
@@ -148,13 +148,18 @@ const EntityGraphPage = () => {
 
   // Annotations state
   const [showAnnotations, setShowAnnotations] = useState(false);
-  const annotations = useGraphAnnotations(); // No graphId - annotations are local for now
+  const annotations = useGraphAnnotations();
 
   // Mini-map state
   const [cameraPosition, setCameraPosition] = useState({ zoom: 1, panX: 0, panY: 0 });
 
   // Path highlighting preset state
   const [pathPreset, setPathPreset] = useState<PathPreset>('shortest');
+
+  // Layout state
+  const [currentLayout, setCurrentLayout] = useState<GraphLayoutType>('force');
+  const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const layout = useGraphLayout(nodes, edges, currentLayout);
 
   // Fit-to-view operations (shared logic for 2D/3D)
   const { fitToViewAll, fitToViewSelected } = useFitToView({
@@ -163,10 +168,22 @@ const EntityGraphPage = () => {
     highlightedNodes,
   });
 
+  // Graph export functionality
+  const {
+    isExportingPNG,
+    isExportingSVG,
+    handleExportPNG,
+    handleExportSVG,
+  } = useGraphExport({
+    graphContainerRef,
+    nodes,
+    edges,
+    nodePositions,
+  });
+
   // Handler for when graph methods become available
   const handleGraphReady = useCallback(
     (methods: ForceGraphMethods | unknown) => {
-      // Cast to GraphMethods if it has the required zoomToFit method
       if (methods && typeof methods === 'object' && methods !== null && 'zoomToFit' in methods && typeof (methods as ForceGraphMethods).zoomToFit === 'function') {
         graphMethodsRef.current = methods as GraphMethods;
       }
@@ -177,7 +194,6 @@ const EntityGraphPage = () => {
   // Handle node right-click - show context menu
   const handleNodeRightClick = useCallback(
     (node: Parameters<typeof handleNodeClick>[0], event: MouseEvent) => {
-      // Close any existing menu and open at new position
       setContextMenu({
         opened: true,
         x: event.clientX,
@@ -217,21 +233,14 @@ const EntityGraphPage = () => {
     return counts;
   }, [nodes]);
 
-  // Layout state
-  const [currentLayout, setCurrentLayout] = useState<GraphLayoutType>('force');
-  const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(new Map());
-  const layout = useGraphLayout(nodes, edges, currentLayout);
-
   // Handle layout change
   const handleLayoutChange = useCallback((layoutType: GraphLayoutType) => {
     setCurrentLayout(layoutType);
 
     if (layoutType === 'force') {
-      // Clear manual positions, let force simulation handle it
       setNodePositions(new Map());
       setEnableSimulation(true);
     } else {
-      // Apply the selected layout
       const positions = layout.applyLayout(layoutType);
       setNodePositions(positions);
       setEnableSimulation(false);
@@ -249,14 +258,13 @@ const EntityGraphPage = () => {
 
   // Handle mini-map pan click
   const handleMiniMapPan = useCallback((x: number, y: number) => {
-    // Use the force graph methods to pan to the clicked position
     if (graphMethodsRef.current && typeof graphMethodsRef.current.centerAt === 'function') {
-      graphMethodsRef.current.centerAt(x, y, 500); // 500ms transition
+      graphMethodsRef.current.centerAt(x, y, 500);
     }
   }, []);
 
   // Handle load snapshot
-  const handleLoadSnapshot = useCallback((snapshot: {
+  const handleLoadSnapshot = useCallback((_snapshot: {
     nodes: GraphNode[];
     edges: string;
     zoom: number;
@@ -266,11 +274,8 @@ const EntityGraphPage = () => {
     nodePositions?: Map<string, { x: number; y: number }>;
     annotations?: unknown[];
   }) => {
-    // Update camera position from snapshot
-    setCameraPosition({ zoom: snapshot.zoom, panX: snapshot.panX, panY: snapshot.panY });
-
+    setCameraPosition({ zoom: _snapshot.zoom, panX: _snapshot.panX, panY: _snapshot.panY });
     // TODO: Update nodes, edges, layout, and annotations in context
-    // This requires extending the GraphVisualizationContext to support full state replacement
   }, []);
 
   // Handle path preset change
@@ -284,191 +289,45 @@ const EntityGraphPage = () => {
   // Count enabled sources with entities
   const enabledSourceCount = sources.filter(s => enabledSourceIds.has(s.source.id)).length;
 
-  // Export state
-  const [isExporting, setIsExporting] = useState(false);
-  const [isExportingSVG, setIsExportingSVG] = useState(false);
-
-  // Handle graph export as PNG
-  const handleExportPNG = useCallback(() => {
-    if (!graphContainerRef.current) {
-      notifications.show({
-        title: 'Export Failed',
-        message: 'Graph container is not ready for export.',
-        color: 'red',
-      });
-      return;
-    }
-
-    try {
-      setIsExporting(true);
-
-      // Find the canvas element within the graph container
-      const canvas = graphContainerRef.current.querySelector('canvas');
-      if (!canvas) {
-        throw new Error('Could not find graph canvas element');
-      }
-
-      // Convert canvas to data URL
-      const dataUrl = canvas.toDataURL('image/png');
-
-      // Create filename with timestamp
-      const date = new Date().toISOString().split('T')[0];
-      const time = new Date().toISOString().split('T')[1].split('.')[0].replaceAll(':', '-');
-      const filename = `graph-${date}-${time}.png`;
-
-      // Create download link
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = filename;
-      link.style.display = 'none';
-
-      document.body.append(link);
-      link.click();
-
-      // Cleanup
-      link.remove();
-      setIsExporting(false);
-
-      notifications.show({
-        title: 'Export Successful',
-        message: `Graph exported as ${filename}`,
-        color: 'green',
-      });
-    } catch (error) {
-      setIsExporting(false);
-      notifications.show({
-        title: 'Export Failed',
-        message: error instanceof Error ? error.message : 'Failed to export graph',
-        color: 'red',
-      });
-    }
-  }, []);
-
-  // Handle graph export as SVG
-  const handleExportSVG = useCallback(() => {
-    if (nodes.length === 0) {
-      notifications.show({
-        title: 'Export Failed',
-        message: 'Graph has no nodes to export.',
-        color: 'red',
-      });
-      return;
-    }
-
-    try {
-      setIsExportingSVG(true);
-
-      const width = graphContainerRef.current?.clientWidth ?? 1200;
-      const height = typeof window !== 'undefined' ? window.innerHeight * 0.55 : 600;
-
-      // Create filename with timestamp
-      const date = new Date().toISOString().split('T')[0];
-      const time = new Date().toISOString().split('T')[1].split('.')[0].replaceAll(':', '-');
-      const filename = `graph-${date}-${time}`;
-
-      // Download SVG
-      downloadGraphSVG(nodes, edges, {
-        width,
-        height,
-        padding: 50,
-        includeLegend: true,
-        nodePositions,
-      }, filename);
-
-      setIsExportingSVG(false);
-
-      notifications.show({
-        title: 'Export Successful',
-        message: `Graph exported as ${filename}.svg`,
-        color: 'green',
-      });
-    } catch (error) {
-      setIsExportingSVG(false);
-      notifications.show({
-        title: 'Export Failed',
-        message: error instanceof Error ? error.message : 'Failed to export graph',
-        color: 'red',
-      });
-    }
-  }, [nodes, edges, nodePositions]);
-
   // Loading state
   if (loading && sources.length === 0) {
-    return (
-      <Container size="xl" py="md">
-        <Stack align="center" justify="center" h="50vh" gap="md">
-          <Loader size="xl" />
-          <Text c="dimmed">Loading data sources...</Text>
-        </Stack>
-      </Container>
-    );
+    return <GraphLoadingState />;
   }
 
   // Error state
   if (error) {
-    return (
-      <Container size="xl" py="md">
-        <Alert icon={<IconAlertTriangle size={ICON_SIZE.MD} />} title="Error Loading Data" color="red">
-          <Stack gap="sm">
-            <Text>{error.message}</Text>
-            <Button
-              variant="outline"
-              color="red"
-              size="xs"
-              leftSection={<IconRefresh size={ICON_SIZE.SM} />}
-              onClick={refresh}
-            >
-              Retry
-            </Button>
-          </Stack>
-        </Alert>
-      </Container>
-    );
+    return <GraphErrorState error={error} onRetry={refresh} />;
   }
 
   // Empty state - no sources enabled or no entities
   if (isEmpty && enabledSourceCount === 0) {
     return (
-      <Flex h={`calc(100vh - ${LAYOUT.HEADER_HEIGHT}px)`}>
-        {/* Source Panel */}
-        <GraphSourcePanel
-          sources={sources}
-          enabledSourceIds={enabledSourceIds}
-          onToggleSource={toggleSource}
-          onEnableAll={enableAll}
-          onDisableAll={disableAll}
-          onRefresh={refresh}
-          loading={loading}
-        />
-
-        {/* Empty state content */}
-        <Container size="md" py="xl" flex={1}>
-          <GraphEmptyState variant="no-sources" availableSourceCount={sources.length} />
-        </Container>
-      </Flex>
+      <GraphEmptyStateWithPanel
+        variant="no-sources"
+        sources={sources}
+        enabledSourceIds={enabledSourceIds}
+        onToggleSource={toggleSource}
+        onEnableAll={enableAll}
+        onDisableAll={disableAll}
+        onRefresh={refresh}
+        loading={loading}
+      />
     );
   }
 
   // Empty state with sources enabled but no entities
   if (isEmpty) {
     return (
-      <Flex h={`calc(100vh - ${LAYOUT.HEADER_HEIGHT}px)`}>
-        {/* Source Panel */}
-        <GraphSourcePanel
-          sources={sources}
-          enabledSourceIds={enabledSourceIds}
-          onToggleSource={toggleSource}
-          onEnableAll={enableAll}
-          onDisableAll={disableAll}
-          onRefresh={refresh}
-          loading={loading}
-        />
-
-        {/* Empty state content */}
-        <Container size="md" py="xl" flex={1}>
-          <GraphEmptyState variant="no-entities" availableSourceCount={0} />
-        </Container>
-      </Flex>
+      <GraphEmptyStateWithPanel
+        variant="no-entities"
+        sources={sources}
+        enabledSourceIds={enabledSourceIds}
+        onToggleSource={toggleSource}
+        onEnableAll={enableAll}
+        onDisableAll={disableAll}
+        onRefresh={refresh}
+        loading={loading}
+      />
     );
   }
 
@@ -515,7 +374,7 @@ const EntityGraphPage = () => {
                 <ActionIcon
                   variant="light"
                   onClick={handleExportPNG}
-                  loading={isExporting}
+                  loading={isExportingPNG}
                   aria-label="Export graph as PNG"
                 >
                   <IconDownload size={ICON_SIZE.MD} />
@@ -546,7 +405,6 @@ const EntityGraphPage = () => {
               <Group justify="space-between">
                 <Group gap="xs">
                   <ViewModeToggle value={viewMode} onChange={setViewMode} />
-
                   <SegmentedControl
                     size="xs"
                     value={displayMode}
@@ -556,7 +414,6 @@ const EntityGraphPage = () => {
                       { label: 'Filter', value: 'filter' },
                     ]}
                   />
-
                   <PathHighlightingPresets
                     preset={pathPreset}
                     onPresetChange={handlePresetChange}
@@ -568,7 +425,6 @@ const EntityGraphPage = () => {
                     onHighlightPath={highlightPath}
                     onClearHighlights={clearHighlights}
                   />
-
                   <LayoutSelector
                     value={currentLayout}
                     onChange={handleLayoutChange}
@@ -578,64 +434,33 @@ const EntityGraphPage = () => {
                 </Group>
 
                 <Group gap="xs">
-                  {/* Fit to view controls */}
                   <Tooltip label="Fit all nodes to view">
-                    <ActionIcon
-                      variant="subtle"
-                      size="sm"
-                      onClick={fitToViewAll}
-                      aria-label="Fit all to view"
-                    >
+                    <ActionIcon variant="subtle" size="sm" onClick={fitToViewAll} aria-label="Fit all to view">
                       <IconFocusCentered size={ICON_SIZE.MD} />
                     </ActionIcon>
                   </Tooltip>
                   <Tooltip label={highlightedNodes.size > 0 ? "Fit selected nodes to view" : "Fit all to view (no selection)"}>
-                    <ActionIcon
-                      variant="subtle"
-                      size="sm"
-                      onClick={fitToViewSelected}
-                      aria-label="Fit selected to view"
-                      disabled={highlightedNodes.size === 0}
-                    >
+                    <ActionIcon variant="subtle" size="sm" onClick={fitToViewSelected} aria-label="Fit selected to view" disabled={highlightedNodes.size === 0}>
                       <IconFocus2 size={ICON_SIZE.MD} />
                     </ActionIcon>
                   </Tooltip>
-
-                  {/* Simulation toggle */}
                   <Tooltip label={enableSimulation ? 'Pause simulation' : 'Resume simulation'}>
-                    <ActionIcon
-                      variant={enableSimulation ? 'filled' : 'light'}
-                      onClick={() => setEnableSimulation(!enableSimulation)}
-                    >
+                    <ActionIcon variant={enableSimulation ? 'filled' : 'light'} onClick={() => setEnableSimulation(!enableSimulation)}>
                       <IconEye size={ICON_SIZE.MD} />
                     </ActionIcon>
                   </Tooltip>
-
-                  {/* Annotations toggle */}
                   <Tooltip label={showAnnotations ? 'Hide annotations' : 'Show annotations'}>
-                    <ActionIcon
-                      variant={showAnnotations ? 'filled' : 'light'}
-                      onClick={() => setShowAnnotations(!showAnnotations)}
-                    >
+                    <ActionIcon variant={showAnnotations ? 'filled' : 'light'} onClick={() => setShowAnnotations(!showAnnotations)}>
                       <IconPencil size={ICON_SIZE.MD} />
                     </ActionIcon>
                   </Tooltip>
-
-                  {/* Clear highlights */}
                   {highlightedNodes.size > 0 && (
                     <Button variant="subtle" size="xs" onClick={clearHighlights}>
                       Clear Selection ({highlightedNodes.size})
                     </Button>
                   )}
-
-                  {/* Expanding indicator */}
                   {expandingNodeIds.length > 0 && (
-                    <Badge
-                      variant="light"
-                      color="blue"
-                      size="sm"
-                      leftSection={<IconLoader size={ICON_SIZE.XS} className="animate-spin" />}
-                    >
+                    <Badge variant="light" color="blue" size="sm" leftSection={<IconLoader size={ICON_SIZE.XS} className="animate-spin" />}>
                       Expanding {expandingNodeIds.length} node{expandingNodeIds.length === 1 ? '' : 's'}...
                     </Badge>
                   )}
@@ -643,15 +468,7 @@ const EntityGraphPage = () => {
               </Group>
 
               {/* Graph Container */}
-              <Box
-                ref={graphContainerRef}
-                h={LAYOUT.GRAPH_VIEWPORT_HEIGHT}
-                mih={350}
-                style={{
-                  border: '1px solid var(--mantine-color-gray-2)',
-                  overflow: 'hidden',
-                }}
-              >
+              <Box ref={graphContainerRef} h={LAYOUT.GRAPH_VIEWPORT_HEIGHT} mih={350} style={{ border: '1px solid var(--mantine-color-gray-2)', overflow: 'hidden' }}>
                 {viewMode === '2D' ? (
                   <OptimizedForceGraphVisualization
                     nodes={nodes}
@@ -671,11 +488,7 @@ const EntityGraphPage = () => {
                     onZoom={handleZoomChange}
                     onPan={handlePanChange}
                     enableOptimizations={true}
-                    progressiveLoading={{
-                      enabled: true,
-                      batchSize: 50,
-                      batchDelayMs: 16,
-                    }}
+                    progressiveLoading={{ enabled: true, batchSize: 50, batchDelayMs: 16 }}
                   />
                 ) : (
                   <ForceGraph3DVisualization
@@ -695,7 +508,6 @@ const EntityGraphPage = () => {
                   />
                 )}
 
-                {/* Node Context Menu */}
                 <NodeContextMenu
                   state={contextMenu}
                   onClose={handleCloseContextMenu}
@@ -708,22 +520,16 @@ const EntityGraphPage = () => {
                   pathTarget={pathTarget}
                 />
 
-                {/* Annotations overlay (2D only) */}
                 {showAnnotations && viewMode === '2D' && (
                   <GraphAnnotations
                     width={graphContainerRef.current?.clientWidth ?? 800}
                     height={typeof window !== 'undefined' ? window.innerHeight * 0.55 : 500}
                     annotations={annotations.annotations}
-                    onAddAnnotation={async (annotation) => {
-                      await annotations.addAnnotation(annotation);
-                    }}
-                    onClearAnnotations={async () => {
-                      await annotations.clearAnnotations();
-                    }}
+                    onAddAnnotation={async (annotation) => { await annotations.addAnnotation(annotation); }}
+                    onClearAnnotations={async () => { await annotations.clearAnnotations(); }}
                   />
                 )}
 
-                {/* Mini-map (2D only, shows when graph has 100+ nodes) */}
                 {viewMode === '2D' && (
                   <GraphMiniMap
                     nodes={nodes}
@@ -736,12 +542,7 @@ const EntityGraphPage = () => {
                   />
                 )}
 
-                {/* Graph legend */}
-                <GraphLegend
-                  entityTypes={nodes.map(n => n.entityType)}
-                  showEdgeTypes={true}
-                  position="top-right"
-                />
+                <GraphLegend entityTypes={nodes.map(n => n.entityType)} showEdgeTypes={true} position="top-right" />
               </Box>
             </Stack>
           </Card>
@@ -749,9 +550,7 @@ const EntityGraphPage = () => {
           {/* Stats Summary */}
           <Group gap="md">
             {Object.entries(nodeTypeCounts).map(([type, count]) => (
-              <Badge key={type} variant="light" size="lg">
-                {type}: {count}
-              </Badge>
+              <Badge key={type} variant="light" size="lg">{type}: {count}</Badge>
             ))}
           </Group>
 
@@ -760,7 +559,7 @@ const EntityGraphPage = () => {
             <Alert icon={<IconInfoCircle size={ICON_SIZE.MD} />} color="blue" title="Path Selection">
               <Text size="sm">
                 {pathSource && !pathTarget && `Source selected: ${pathSource}. Click another node to set target.`}
-                {pathSource && pathTarget && `Source: ${pathSource} → Target: ${pathTarget}`}
+                {pathSource && pathTarget && `Source: ${pathSource} -> Target: ${pathTarget}`}
               </Text>
             </Alert>
           )}

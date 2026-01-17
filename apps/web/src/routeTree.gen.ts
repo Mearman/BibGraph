@@ -22,7 +22,6 @@ import { Route as CatalogueRouteImport } from './routes/catalogue'
 import { Route as CacheRouteImport } from './routes/cache'
 import { Route as BrowseRouteImport } from './routes/browse'
 import { Route as BookmarksRouteImport } from './routes/bookmarks'
-import { Route as AlgorithmsRouteImport } from './routes/algorithms'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as NotFoundRouteImport } from './routes/_not-found'
 import { Route as ExternalIdRouteImport } from './routes/$externalId'
@@ -137,11 +136,6 @@ const BookmarksRoute = BookmarksRouteImport.update({
   path: '/bookmarks',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/bookmarks.lazy').then((d) => d.Route))
-const AlgorithmsRoute = AlgorithmsRouteImport.update({
-  id: '/algorithms',
-  path: '/algorithms',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/algorithms.lazy').then((d) => d.Route))
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
@@ -442,7 +436,6 @@ export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute
   '/$externalId': typeof ExternalIdRoute
   '/about': typeof AboutRoute
-  '/algorithms': typeof AlgorithmsRoute
   '/bookmarks': typeof BookmarksRoute
   '/browse': typeof BrowseRoute
   '/cache': typeof CacheRoute
@@ -505,7 +498,6 @@ export interface FileRoutesByTo {
   '/$': typeof SplatRoute
   '/$externalId': typeof ExternalIdRoute
   '/about': typeof AboutRoute
-  '/algorithms': typeof AlgorithmsRoute
   '/bookmarks': typeof BookmarksRoute
   '/browse': typeof BrowseRoute
   '/cache': typeof CacheRoute
@@ -570,7 +562,6 @@ export interface FileRoutesById {
   '/$externalId': typeof ExternalIdRoute
   '/_not-found': typeof NotFoundRoute
   '/about': typeof AboutRoute
-  '/algorithms': typeof AlgorithmsRoute
   '/bookmarks': typeof BookmarksRoute
   '/browse': typeof BrowseRoute
   '/cache': typeof CacheRoute
@@ -635,7 +626,6 @@ export interface FileRouteTypes {
     | '/$'
     | '/$externalId'
     | '/about'
-    | '/algorithms'
     | '/bookmarks'
     | '/browse'
     | '/cache'
@@ -698,7 +688,6 @@ export interface FileRouteTypes {
     | '/$'
     | '/$externalId'
     | '/about'
-    | '/algorithms'
     | '/bookmarks'
     | '/browse'
     | '/cache'
@@ -762,7 +751,6 @@ export interface FileRouteTypes {
     | '/$externalId'
     | '/_not-found'
     | '/about'
-    | '/algorithms'
     | '/bookmarks'
     | '/browse'
     | '/cache'
@@ -827,7 +815,6 @@ export interface RootRouteChildren {
   ExternalIdRoute: typeof ExternalIdRoute
   NotFoundRoute: typeof NotFoundRoute
   AboutRoute: typeof AboutRoute
-  AlgorithmsRoute: typeof AlgorithmsRoute
   BookmarksRoute: typeof BookmarksRoute
   BrowseRoute: typeof BrowseRoute
   CacheRoute: typeof CacheRoute
@@ -967,13 +954,6 @@ declare module '@tanstack/react-router' {
       path: '/bookmarks'
       fullPath: '/bookmarks'
       preLoaderRoute: typeof BookmarksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/algorithms': {
-      id: '/algorithms'
-      path: '/algorithms'
-      fullPath: '/algorithms'
-      preLoaderRoute: typeof AlgorithmsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/about': {
@@ -1353,7 +1333,6 @@ const rootRouteChildren: RootRouteChildren = {
   ExternalIdRoute: ExternalIdRoute,
   NotFoundRoute: NotFoundRoute,
   AboutRoute: AboutRoute,
-  AlgorithmsRoute: AlgorithmsRoute,
   BookmarksRoute: BookmarksRoute,
   BrowseRoute: BrowseRoute,
   CacheRoute: CacheRoute,

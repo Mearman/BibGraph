@@ -17,7 +17,7 @@ import { PostHogProvider } from "@/components/PostHogProvider";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { StorageProviderWrapper } from "@/contexts/storage-provider-context";
 import { ThemeProvider } from "@/contexts/theme-context";
-import { AppActivityProvider } from "@/stores/app-activity-store";
+import { AppActivityProvider } from "@/stores/app-activity";
 import { LayoutProvider } from "@/stores/layout-store";
 import { initWebVitals } from "@/utils/web-vitals";
 
@@ -196,19 +196,16 @@ const isLocalhost = typeof window !== 'undefined' && (
 );
 
 if (isProduction) {
-  cachedOpenAlex.updateConfig({
-    staticCacheGitHubPagesUrl:
-      "https://mearman.github.io/BibGraph/data/openalex/",
-  });
+  cachedOpenAlex.setStaticCacheGitHubPagesUrl(
+    "https://mearman.github.io/BibGraph/data/openalex/"
+  );
   logger.debug("main", "Configured production static cache URL");
 } else if (isLocalhost) {
   // Configure local static cache for dev server and E2E preview server
   // This enables the static cache tier to use committed cache files
   // Dev: served from public/data/openalex/ via Vite
   // E2E preview: served from dist/data/openalex/ via vite preview
-  cachedOpenAlex.updateConfig({
-    staticCacheGitHubPagesUrl: "/data/openalex/",
-  });
+  cachedOpenAlex.setStaticCacheGitHubPagesUrl("/data/openalex/");
   logger.debug("main", "Configured local static cache URL for development/E2E");
 }
 

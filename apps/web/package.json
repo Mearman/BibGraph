@@ -24,10 +24,7 @@
     "typecheck": "nx run web:typecheck"
   },
   "dependencies": {
-    "@bibgraph/algorithms": "workspace:*",
     "@bibgraph/client": "workspace:*",
-    "@bibgraph/graph-core": "workspace:*",
-    "@bibgraph/graph-expansion": "workspace:*",
     "@bibgraph/types": "workspace:*",
     "@bibgraph/ui": "workspace:*",
     "@bibgraph/utils": "workspace:*",
