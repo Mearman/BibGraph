@@ -137,7 +137,7 @@ importers:
         specifier: 8.52.0
         version: 8.52.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       '@typescript-eslint/rule-tester':
-        specifier: ^8.53.0
+        specifier: 8.53.0
         version: 8.53.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       '@typescript-eslint/utils':
         specifier: 8.52.0
@@ -365,18 +365,9 @@ importers:
 
   apps/web:
     dependencies:
-      '@bibgraph/algorithms':
-        specifier: workspace:*
-        version: link:../../packages/algorithms
       '@bibgraph/client':
         specifier: workspace:*
         version: link:../../packages/client
-      '@bibgraph/graph-core':
-        specifier: workspace:*
-        version: link:../../packages/graph-core
-      '@bibgraph/graph-expansion':
-        specifier: workspace:*
-        version: link:../../packages/graph-expansion
       '@bibgraph/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -571,12 +562,6 @@ importers:
         specifier: 0.1.0
         version: 0.1.0(vitest@4.0.16)
 
-  packages/algorithms:
-    dependencies:
-      '@bibgraph/graph-expansion':
-        specifier: workspace:*
-        version: link:../graph-expansion
-
   packages/client:
     dependencies:
       '@bibgraph/types':
@@ -622,65 +607,6 @@ importers:
       vitest-axe:
         specifier: 0.1.0
         version: 0.1.0(vitest@4.0.16)
-
-  packages/evaluation:
-    dependencies:
-      '@bibgraph/types':
-        specifier: workspace:*
-        version: link:../types
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
-    devDependencies:
-      '@bibgraph/algorithms':
-        specifier: workspace:*
-        version: link:../algorithms
-      '@bibgraph/graph-expansion':
-        specifier: workspace:*
-        version: link:../graph-expansion
-      vite:
-        specifier: 7.3.1
-        version: 7.3.1(@types/node@25.0.6)(jiti@2.6.1)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
-      vitest:
-        specifier: 4.0.16
-        version: 4.0.16(@types/node@25.0.6)(@vitest/ui@4.0.16)(jiti@2.6.1)(jsdom@27.4.0)(msw@2.12.7(@types/node@25.0.6)(typescript@5.9.3))(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
-
-  packages/graph-core:
-    dependencies:
-      '@bibgraph/algorithms':
-        specifier: workspace:*
-        version: link:../algorithms
-      '@bibgraph/graph-expansion':
-        specifier: workspace:*
-        version: link:../graph-expansion
-    devDependencies:
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: 4.0.16
-        version: 4.0.16(@types/node@25.0.6)(@vitest/ui@4.0.16)(jiti@2.6.1)(jsdom@27.4.0)(msw@2.12.7(@types/node@25.0.6)(typescript@5.9.3))(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
-
-  packages/graph-expansion:
-    dependencies:
-      '@bibgraph/types':
-        specifier: workspace:*
-        version: link:../types
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
-    devDependencies:
-      '@bibgraph/graph-gen':
-        specifier: workspace:*
-        version: link:../graph-gen
-      vite:
-        specifier: 7.3.1
-        version: 7.3.1(@types/node@25.0.6)(jiti@2.6.1)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
-      vitest:
-        specifier: 4.0.16
-        version: 4.0.16(@types/node@25.0.6)(@vitest/ui@4.0.16)(jiti@2.6.1)(jsdom@27.4.0)(msw@2.12.7(@types/node@25.0.6)(typescript@5.9.3))(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
-
-  packages/graph-gen: {}
 
   packages/types:
     dependencies:
@@ -5729,6 +5655,7 @@ packages:
     resolution: {integrity: sha512-/baBXDqkfW8x0UlqfYAfRCkmVWiH8qFZ4uhT6yLVBLssiypDTbe78W6lNBse7huBFv1ipR5PG9evkxEnIXDxjA==}
     peerDependencies:
       eslint: '>= 5'
+    bundledDependencies: []
 
   eslint-plugin-es-x@7.8.0:
     resolution: {integrity: sha512-7Ds8+wAAoV3T+LAKeu39Y5BzXCrGKrcISfgKEqTS4BDN8SFEDQd0S43jiQ8vIa3wUKD07qitZdfzlenSi8/0qQ==}
@@ -11383,7 +11310,7 @@ snapshots:
   '@es-joy/jsdoccomment@0.79.0':
     dependencies:
       '@types/estree': 1.0.8
-      '@typescript-eslint/types': 8.52.0
+      '@typescript-eslint/types': 8.53.0
       comment-parser: 1.4.1
       esquery: 1.7.0
       jsdoc-type-pratt-parser: 7.0.0
@@ -11480,8 +11407,8 @@ snapshots:
   '@eslint-react/ast@2.5.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)':
     dependencies:
       '@eslint-react/eff': 2.5.4
-      '@typescript-eslint/types': 8.52.0
-      '@typescript-eslint/typescript-estree': 8.52.0(typescript@5.9.3)
+      '@typescript-eslint/types': 8.53.0
+      '@typescript-eslint/typescript-estree': 8.53.0(typescript@5.9.3)
       '@typescript-eslint/utils': 8.52.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       eslint: 9.39.2(jiti@2.6.1)
       string-ts: 2.3.1
@@ -11495,8 +11422,8 @@ snapshots:
       '@eslint-react/eff': 2.5.4
       '@eslint-react/shared': 2.5.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       '@eslint-react/var': 2.5.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
-      '@typescript-eslint/scope-manager': 8.52.0
-      '@typescript-eslint/types': 8.52.0
+      '@typescript-eslint/scope-manager': 8.53.0
+      '@typescript-eslint/types': 8.53.0
       '@typescript-eslint/utils': 8.52.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       birecord: 0.1.1
       eslint: 9.39.2(jiti@2.6.1)
@@ -11541,8 +11468,8 @@ snapshots:
     dependencies:
       '@eslint-react/ast': 2.5.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       '@eslint-react/eff': 2.5.4
-      '@typescript-eslint/scope-manager': 8.52.0
-      '@typescript-eslint/types': 8.52.0
+      '@typescript-eslint/scope-manager': 8.53.0
+      '@typescript-eslint/types': 8.53.0
       '@typescript-eslint/utils': 8.52.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       eslint: 9.39.2(jiti@2.6.1)
       ts-pattern: 5.9.0
@@ -14079,8 +14006,8 @@ snapshots:
 
   '@typescript-eslint/project-service@8.52.0(typescript@5.9.3)':
     dependencies:
-      '@typescript-eslint/tsconfig-utils': 8.52.0(typescript@5.9.3)
-      '@typescript-eslint/types': 8.52.0
+      '@typescript-eslint/tsconfig-utils': 8.53.0(typescript@5.9.3)
+      '@typescript-eslint/types': 8.53.0
       debug: 4.4.3
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -16350,8 +16277,8 @@ snapshots:
       '@eslint-react/eff': 2.5.4
       '@eslint-react/shared': 2.5.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       '@eslint-react/var': 2.5.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
-      '@typescript-eslint/scope-manager': 8.52.0
-      '@typescript-eslint/types': 8.52.0
+      '@typescript-eslint/scope-manager': 8.53.0
+      '@typescript-eslint/types': 8.53.0
       '@typescript-eslint/utils': 8.52.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       compare-versions: 6.1.1
       eslint: 9.39.2(jiti@2.6.1)
@@ -16368,9 +16295,9 @@ snapshots:
       '@eslint-react/eff': 2.5.4
       '@eslint-react/shared': 2.5.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       '@eslint-react/var': 2.5.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
-      '@typescript-eslint/scope-manager': 8.52.0
+      '@typescript-eslint/scope-manager': 8.53.0
       '@typescript-eslint/type-utils': 8.52.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
-      '@typescript-eslint/types': 8.52.0
+      '@typescript-eslint/types': 8.53.0
       '@typescript-eslint/utils': 8.52.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       eslint: 9.39.2(jiti@2.6.1)
       string-ts: 2.3.1
@@ -16397,9 +16324,9 @@ snapshots:
       '@eslint-react/eff': 2.5.4
       '@eslint-react/shared': 2.5.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       '@eslint-react/var': 2.5.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
-      '@typescript-eslint/scope-manager': 8.52.0
+      '@typescript-eslint/scope-manager': 8.53.0
       '@typescript-eslint/type-utils': 8.52.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
-      '@typescript-eslint/types': 8.52.0
+      '@typescript-eslint/types': 8.53.0
       '@typescript-eslint/utils': 8.52.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       compare-versions: 6.1.1
       eslint: 9.39.2(jiti@2.6.1)
@@ -16420,8 +16347,8 @@ snapshots:
       '@eslint-react/eff': 2.5.4
       '@eslint-react/shared': 2.5.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       '@eslint-react/var': 2.5.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
-      '@typescript-eslint/scope-manager': 8.52.0
-      '@typescript-eslint/types': 8.52.0
+      '@typescript-eslint/scope-manager': 8.53.0
+      '@typescript-eslint/types': 8.53.0
       '@typescript-eslint/utils': 8.52.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       eslint: 9.39.2(jiti@2.6.1)
       string-ts: 2.3.1
@@ -16437,9 +16364,9 @@ snapshots:
       '@eslint-react/eff': 2.5.4
       '@eslint-react/shared': 2.5.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       '@eslint-react/var': 2.5.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
-      '@typescript-eslint/scope-manager': 8.52.0
+      '@typescript-eslint/scope-manager': 8.53.0
       '@typescript-eslint/type-utils': 8.52.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
-      '@typescript-eslint/types': 8.52.0
+      '@typescript-eslint/types': 8.53.0
       '@typescript-eslint/utils': 8.52.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       compare-versions: 6.1.1
       eslint: 9.39.2(jiti@2.6.1)

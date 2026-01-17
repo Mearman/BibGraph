@@ -108,13 +108,6 @@ tools/          # Development tools
 ```mermaid
 flowchart LR
 
-    subgraph algorithms["algorithms"]
-        algorithms_build[["build"]]
-        algorithms_lint{{"lint"}}
-        algorithms_test(["test"])
-        algorithms_typecheck{{"typecheck"}}
-    end
-
     subgraph bibgraph["bibgraph"]
         bibgraph_build[["build"]]
     end
@@ -130,33 +123,6 @@ flowchart LR
         client_lint{{"lint"}}
         client_test(["test"])
         client_typecheck{{"typecheck"}}
-    end
-
-    subgraph evaluation["evaluation"]
-        evaluation_build[["build"]]
-        evaluation_lint{{"lint"}}
-        evaluation_test(["test"])
-        evaluation_typecheck{{"typecheck"}}
-    end
-
-    subgraph graph_core["graph-core"]
-        graph_core_build[["build"]]
-        graph_core_lint{{"lint"}}
-        graph_core_typecheck{{"typecheck"}}
-    end
-
-    subgraph graph_expansion["graph-expansion"]
-        graph_expansion_build[["build"]]
-        graph_expansion_lint{{"lint"}}
-        graph_expansion_test(["test"])
-        graph_expansion_typecheck{{"typecheck"}}
-    end
-
-    subgraph graph_gen["graph-gen"]
-        graph_gen_build[["build"]]
-        graph_gen_lint{{"lint"}}
-        graph_gen_test(["test"])
-        graph_gen_typecheck{{"typecheck"}}
     end
 
     subgraph tools["tools"]
@@ -192,11 +158,6 @@ flowchart LR
     end
 
     %% Task dependencies
-    algorithms_typecheck --> algorithms_build
-    graph_expansion_build --> algorithms_build
-    graph_gen_build --> algorithms_build
-    types_build --> algorithms_build
-    algorithms_typecheck --> algorithms_test
     client_build --> cli_test
     types_build --> cli_test
     utils_build --> cli_test
@@ -205,23 +166,6 @@ flowchart LR
     utils_build --> client_build
     types_build --> client_test
     utils_build --> client_test
-    evaluation_typecheck --> evaluation_build
-    algorithms_build --> evaluation_build
-    types_build --> evaluation_build
-    graph_expansion_build --> evaluation_build
-    algorithms_build --> evaluation_test
-    types_build --> evaluation_test
-    graph_expansion_build --> evaluation_test
-    graph_core_typecheck --> graph_core_build
-    algorithms_build --> graph_core_build
-    graph_expansion_build --> graph_core_build
-    graph_expansion_typecheck --> graph_expansion_build
-    graph_gen_build --> graph_expansion_build
-    types_build --> graph_expansion_build
-    graph_gen_build --> graph_expansion_test
-    types_build --> graph_expansion_test
-    graph_gen_typecheck --> graph_gen_build
-    graph_gen_typecheck --> graph_gen_test
     types_typecheck --> types_build
     ui_typecheck --> ui_build
     types_build --> ui_build
@@ -233,17 +177,11 @@ flowchart LR
     types_build --> utils_test
     web_typecheck --> web_build
     types_build --> web_build
-    algorithms_build --> web_build
     client_build --> web_build
-    graph_core_build --> web_build
-    graph_expansion_build --> web_build
     ui_build --> web_build
     utils_build --> web_build
     types_build --> web_test
-    algorithms_build --> web_test
     client_build --> web_test
-    graph_core_build --> web_test
-    graph_expansion_build --> web_test
     ui_build --> web_test
     utils_build --> web_test
 ```
