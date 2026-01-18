@@ -258,6 +258,26 @@ jobs:
           pnpm nx test:coverage web --skip-nx-cache --testNamePattern="\.unit\.test\." &
           wait
 
+      - name: Merge coverage reports
+        run: |
+          echo "=== Merging coverage reports from all packages ==="
+          mkdir -p coverage
+          # Copy all coverage directories to root
+          for dir in packages/*/coverage apps/*/coverage; do
+            if [ -d "$dir" ]; then
+              echo "Found coverage: $dir"
+              # Copy contents, not the directory itself
+              cp -r "$dir"/* coverage/ 2>/dev/null || true
+            fi
+          done
+          # List what we have
+          if [ -d "coverage" ] && [ "$(ls -A coverage 2>/dev/null)" ]; then
+            echo "✅ Coverage merged successfully"
+            ls -la coverage/
+          else
+            echo "⚠️ No coverage files found to merge"
+          fi
+
       - name: Verify build artifacts before upload
         run: |
           echo "=== Verifying build artifacts before upload ==="
