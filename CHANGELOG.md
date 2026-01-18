@@ -1,3 +1,7 @@
+## <small>24.9.2 (2026-01-18)</small>
+
+* fix(ci): merge coverage reports before upload ([eeb6b22](https://github.com/Mearman/BibGraph/commit/eeb6b22))
+
 ## <small>24.9.1 (2026-01-17)</small>
 
 * fix(web): fix flaky smoke test content length assertion ([ea623c1](https://github.com/Mearman/BibGraph/commit/ea623c1))
