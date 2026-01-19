@@ -21,7 +21,7 @@
   "devDependencies": {
     "eslint": "9.39.2",
     "typescript": "5.9.3",
-    "vitest": "4.0.16"
+    "vitest": "4.0.17"
   },
   "author": "Joe Mearman",
   "exports": {
