@@ -29,7 +29,7 @@
     "zod": "4.3.5"
   },
   "devDependencies": {
-    "@types/react": "19.2.8",
+    "@types/react": "19.2.9",
     "eslint": "9.39.2",
     "react": "19.2.3",
     "typescript": "5.9.3",
