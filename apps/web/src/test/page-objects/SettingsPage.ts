@@ -49,7 +49,7 @@ export class SettingsPage extends BaseSPAPageObject {
 	 * Toggle xpac works inclusion
 	 */
 	async toggleXpac(): Promise<void> {
-		const toggle = this.page.locator("[data-testid='xpac-toggle']").first();
+		const toggle = this.page.locator("[data-testid='xpac-toggle'] input").first();
 		await toggle.click();
 	}
 
@@ -57,7 +57,7 @@ export class SettingsPage extends BaseSPAPageObject {
 	 * Check if xpac works are enabled
 	 */
 	async isXpacEnabled(): Promise<boolean> {
-		const input = this.page.locator("[data-testid='xpac-toggle'] input[role='switch']");
+		const input = this.page.locator("[data-testid='xpac-toggle'] input");
 		return input.isChecked();
 	}
 

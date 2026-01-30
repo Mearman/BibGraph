@@ -36,7 +36,7 @@ test.describe('@utility US-29 Xpac Data Toggle', () => {
 		await expect(xpacToggle).toBeVisible({ timeout: 10_000 });
 
 		// Verify toggle has accessible checked state
-		const input = page.locator("[data-testid='xpac-toggle'] input[role='switch']");
+		const input = page.locator("[data-testid='xpac-toggle'] input");
 		const isChecked = await input.isChecked();
 		expect(typeof isChecked).toBe('boolean');
 

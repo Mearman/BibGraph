@@ -38,6 +38,57 @@ export class HistoryPage extends BaseSPAPageObject {
 		return cards.count();
 	}
 
+	/**
+	 * Wait for history entries to appear on the page.
+	 * Returns the number of entries found, or 0 if none appear within the timeout.
+	 * The useUserInteractions hook has a 10-second internal timeout that can cause
+	 * history data loading to fail in test environments, so this method is lenient.
+	 */
+	async waitForEntries(
+		minCount: number = 1,
+		timeout: number = 30_000,
+	): Promise<number> {
+		try {
+			await this.page
+				.locator(this.historySelectors.historyEntry)
+				.first()
+				.waitFor({ state: "visible", timeout });
+			// Give a moment for all entries to render
+			await this.page.waitForTimeout(500);
+			const count = await this.getEntryCount();
+			if (count >= minCount) {
+				return count;
+			}
+			// Wait a bit longer for additional entries
+			await this.page.waitForTimeout(2_000);
+			return this.getEntryCount();
+		} catch {
+			return 0;
+		}
+	}
+
+	/**
+	 * Get the entity type badge text from a history card.
+	 * The HistoryManager renders an entity type Badge (e.g. "Work", "Author")
+	 * as the first child inside a Group with gap="xs" within each Card.
+	 * This targets that specific badge, avoiding count/notification badges elsewhere.
+	 */
+	async getEntityTypeBadge(cardIndex: number): Promise<string | null> {
+		const card = this.page
+			.locator(this.historySelectors.historyEntry)
+			.nth(cardIndex);
+		// The entity type badge is inside Stack > Group (first group) > Badge
+		const badge = card.locator(
+			".mantine-Stack-root .mantine-Group-root .mantine-Badge-root",
+		).first();
+		try {
+			await badge.waitFor({ state: "visible", timeout: 5_000 });
+			return badge.textContent();
+		} catch {
+			return null;
+		}
+	}
+
 	async getEntries(): Promise<string[]> {
 		const cards = this.page.locator(this.historySelectors.historyEntry);
 		const count = await cards.count();
