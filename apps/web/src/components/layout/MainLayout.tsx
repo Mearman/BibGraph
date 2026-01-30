@@ -538,7 +538,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               <Box
                 role="slider"
                 aria-label="Resize left sidebar"
-                aria-orientation="vertical"
+                aria-orientation="horizontal"
                 aria-valuenow={leftSidebarWidth}
                 aria-valuemin={200}
                 aria-valuemax={600}
@@ -596,7 +596,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               <Box
                 role="slider"
                 aria-label="Resize right sidebar"
-                aria-orientation="vertical"
+                aria-orientation="horizontal"
                 aria-valuenow={rightSidebarWidth}
                 aria-valuemin={200}
                 aria-valuemax={600}
@@ -687,6 +687,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
       {/* Main Content Area */}
       <AppShell.Main
+        id="main-content"
         data-testid="main-content"
         className={sprinkles({ flexDirection: 'column', overflow: 'auto' })}
       >

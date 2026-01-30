@@ -479,7 +479,7 @@ export const HeaderSearchInput = () => {
         </Popover.Target>
 
         <Popover.Dropdown>
-          <Stack gap="xs" p="xs" miw="380" mah="400" style={{ overflowY: 'auto' }}>
+          <Stack gap="xs" p="xs" miw="380" mah="400" style={{ overflowY: 'auto' }} role="listbox">
             {/* Keyboard shortcuts help */}
             <Text size="xs" c="dimmed" ta="center">
               ↑↓ Navigate · Enter to select · Esc to close
@@ -580,6 +580,7 @@ export const HeaderSearchInput = () => {
                               e.stopPropagation();
                               handleSearch(suggestion.displayName);
                             }}
+                            aria-label={`Search for ${suggestion.displayName}`}
                           >
                             <IconArrowRight size={ICON_SIZE.XXS} />
                           </ActionIcon>
@@ -655,6 +656,7 @@ export const HeaderSearchInput = () => {
                           e.stopPropagation();
                           handleHistoryItemClick(historyQuery);
                         }}
+                        aria-label={`Search for ${historyQuery}`}
                       >
                         <IconArrowRight size={ICON_SIZE.XXS} />
                       </ActionIcon>

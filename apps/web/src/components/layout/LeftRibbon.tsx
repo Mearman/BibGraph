@@ -12,6 +12,7 @@ export const LeftRibbon = () => <Tooltip label="Left Ribbon (temporarily disable
         size="lg"
         c="dimmed"
         disabled
+        aria-label="Left Ribbon (temporarily disabled)"
       >
         <IconLayoutSidebar size={ICON_SIZE.LG} />
       </ActionIcon>

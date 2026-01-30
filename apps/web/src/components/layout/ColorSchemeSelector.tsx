@@ -117,6 +117,7 @@ export const ColorSchemeSelector = () => {
               resetThemeMode()
             }}
             title="Reset theme mode to auto"
+            aria-label="Reset theme mode to auto"
           >
             <IconRotate size={ICON_SIZE.XS} />
           </ActionIcon>
@@ -151,6 +152,7 @@ export const ColorSchemeSelector = () => {
               resetColorPalette()
             }}
             title="Reset color palette to default"
+            aria-label="Reset color palette to default"
           >
             <IconRotate size={ICON_SIZE.XS} />
           </ActionIcon>
@@ -211,6 +213,7 @@ export const ColorSchemeSelector = () => {
               resetComponentLibrary()
             }}
             title="Reset component library to mantine"
+            aria-label="Reset component library to mantine"
           >
             <IconRotate size={ICON_SIZE.XS} />
           </ActionIcon>
@@ -247,6 +250,7 @@ export const ColorSchemeSelector = () => {
               resetBorderRadius()
             }}
             title="Reset border radius to default"
+            aria-label="Reset border radius to default"
           >
             <IconRotate size={ICON_SIZE.XS} />
           </ActionIcon>

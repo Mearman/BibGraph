@@ -47,6 +47,8 @@ const NotificationBell = memo(({ onClick, unreadCount }: NotificationBellProps) 
           variant="subtle"
           color="gray"
           size="lg"
+          tabIndex={-1}
+          aria-hidden="true"
         >
           {unreadCount > 0 ? <IconBellRinging size={ICON_SIZE.MD} /> : <IconBell size={ICON_SIZE.MD} />}
         </ActionIcon>
