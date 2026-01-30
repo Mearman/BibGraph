@@ -123,6 +123,61 @@ export class SearchPage extends BaseSPAPageObject {
 		const noResultsMsg = this.page.locator(this.searchSelectors.noResults);
 		await expect(noResultsMsg).toBeVisible();
 	}
+
+	/**
+	 * Switch result view mode (list, card, or table)
+	 * @param mode - The view mode to switch to
+	 */
+	async switchViewMode(mode: "list" | "card" | "table"): Promise<void> {
+		const viewModeButton = this.page.locator(
+			`[data-testid='view-mode-${mode}'], [aria-label='${mode} view']`
+		);
+		await viewModeButton.click();
+		await this.waitForLoadingComplete();
+	}
+
+	/**
+	 * Get the currently active view mode
+	 */
+	async getCurrentViewMode(): Promise<string> {
+		const activeButton = this.page.locator(
+			"[data-testid^='view-mode-'][aria-pressed='true'], [data-testid^='view-mode-'].active"
+		);
+		const testId = await activeButton.getAttribute("data-testid");
+		return testId?.replace("view-mode-", "") ?? "list";
+	}
+
+	/**
+	 * Get the current page number in pagination
+	 */
+	async getPageNumber(): Promise<number> {
+		const activePage = this.page.locator(
+			"[data-testid='pagination'] [aria-current='page'], .mantine-Pagination-control[data-active='true']"
+		);
+		const text = await activePage.textContent();
+		return text ? Number.parseInt(text, 10) : 1;
+	}
+
+	/**
+	 * Navigate to the next page of results
+	 */
+	async goToNextPage(): Promise<void> {
+		const nextButton = this.page.locator(
+			"[data-testid='pagination-next'], [aria-label='next']"
+		);
+		await nextButton.click();
+		await this.waitForLoadingComplete();
+	}
+
+	/**
+	 * Get the total number of result pages
+	 */
+	async getTotalPages(): Promise<number> {
+		const pageButtons = this.page.locator(
+			"[data-testid='pagination'] button:not([aria-label]), .mantine-Pagination-control:not([data-dots])"
+		);
+		return pageButtons.count();
+	}
 }
 
 // Named export
