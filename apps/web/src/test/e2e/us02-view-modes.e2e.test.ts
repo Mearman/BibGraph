@@ -180,12 +180,26 @@ test.describe('@utility US-02 View Modes', () => {
 			return;
 		}
 
+		// Verify default view mode is table
+		const defaultMode = await searchPage.getCurrentViewMode();
+		expect(defaultMode).toBe('table');
+
 		// Switch to card view (from default table)
 		await searchPage.switchViewMode('card');
 
-		// Verify card view is active
+		// Wait for the SegmentedControl to reflect the change
+		await page.waitForTimeout(500);
+
+		// Verify card view is active after switching
 		const modeAfterSwitch = await searchPage.getCurrentViewMode();
 		expect(modeAfterSwitch).toBe('card');
+
+		// Switch to list view to further verify toggle works
+		await searchPage.switchViewMode('list');
+		await page.waitForTimeout(500);
+
+		const modeAfterSecondSwitch = await searchPage.getCurrentViewMode();
+		expect(modeAfterSecondSwitch).toBe('list');
 
 		// Navigate away from search page
 		await page.goto(page.url().replace(/\/search.*/, '/#/browse'));
@@ -201,10 +215,10 @@ test.describe('@utility US-02 View Modes', () => {
 			return;
 		}
 
-		// Verify the view mode is one of the valid values
-		// (may or may not persist depending on state management)
+		// View mode is local React state (useState) and is NOT persisted in URL
+		// or localStorage. After navigation, it resets to the default ("table").
 		const currentMode = await searchPage.getCurrentViewMode();
-		expect(['list', 'card', 'table']).toContain(currentMode);
+		expect(currentMode).toBe('table');
 	});
 
 	test('should show entity metadata (type, name, citations) in each mode', async ({ page }) => {

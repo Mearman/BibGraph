@@ -13,7 +13,8 @@
  * 3. This opens the ExportModal inside a Mantine Modal with title="Export List"
  * 4. ExportModal renders Radio.Group with 4 Radio options (json, compressed, csv, bibtex)
  * 5. Click the "Export" button inside ExportModal (also data-testid="export-list-button")
- * 6. On success, a notification with title="Export Successful" appears
+ * 6. On success, an Alert with text "Export Successful!" appears inside the modal,
+ *    a Mantine notification fires, and the button text changes to "Export Again"
  */
 
 import AxeBuilder from '@axe-core/playwright';
@@ -137,9 +138,9 @@ test.describe('@workflow US-20 Export', () => {
 		await exportSubmit.click();
 
 		// Verify export success - ExportModal shows an Alert with "Export Successful!"
-		// and a Mantine notification with title "Export Successful"
+		// and the export button text changes to "Export Again"
 		await expect(
-			page.locator('text="Export Successful"').first()
+			page.locator('[role="dialog"]').getByText('Export Successful!')
 		).toBeVisible({ timeout: 10_000 });
 	});
 
@@ -181,7 +182,7 @@ test.describe('@workflow US-20 Export', () => {
 			// If no download event fires, the export might use a different mechanism
 			// (e.g., Blob URL, clipboard). Verify success notification instead.
 			await expect(
-				page.locator('text="Export Successful"').first()
+				page.locator('[role="dialog"]').getByText('Export Successful!')
 			).toBeVisible({ timeout: 10_000 });
 		}
 	});
@@ -221,7 +222,7 @@ test.describe('@workflow US-20 Export', () => {
 
 		// Verify export completed successfully
 		await expect(
-			page.locator('text="Export Successful"').first()
+			page.locator('[role="dialog"]').getByText('Export Successful!')
 		).toBeVisible({ timeout: 10_000 });
 	});
 

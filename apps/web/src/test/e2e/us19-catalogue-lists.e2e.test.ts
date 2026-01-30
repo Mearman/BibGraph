@@ -65,14 +65,11 @@ const createNamedList = async (page: Page, listName: string, description?: strin
 	const listCard = page.locator('[data-testid^="list-card-"]').filter({ hasText: listName }).first();
 	await expect(listCard).toBeVisible({ timeout: 10_000 });
 
-	// Step 9: If the list was not auto-selected (SelectedListDetails not visible),
-	// click the list card to select it explicitly
+	// Step 9: Click the list card to select it (ensures the newly created list is selected,
+	// even if a different list was previously selected)
+	await listCard.click();
 	const selectedTitle = page.locator('[data-testid="selected-list-title"]').filter({ hasText: listName });
-	const isAlreadySelected = await selectedTitle.isVisible({ timeout: 3_000 }).catch(() => false);
-	if (!isAlreadySelected) {
-		await listCard.click();
-		await expect(selectedTitle).toBeVisible({ timeout: 10_000 });
-	}
+	await expect(selectedTitle).toBeVisible({ timeout: 10_000 });
 };
 
 test.describe('@workflow US-19 Catalogue Lists', () => {
@@ -112,7 +109,8 @@ test.describe('@workflow US-19 Catalogue Lists', () => {
 		).toBeVisible();
 
 		// Verify the description is shown in the selected list details
-		const descriptionElement = page.locator('text="Papers related to my PhD topic"');
+		// Use .first() because the description text may appear in both the card and the selected list details
+		const descriptionElement = page.locator('text="Papers related to my PhD topic"').first();
 		await expect(descriptionElement).toBeVisible({ timeout: 5_000 });
 	});
 
@@ -147,6 +145,13 @@ test.describe('@workflow US-19 Catalogue Lists', () => {
 		// Click "Save Changes" button
 		await page.getByRole('button', { name: /Save Changes/i }).click();
 		await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 10_000 });
+
+		// Wait for the card title to update with the new name
+		const renamedCard = page.locator('[data-testid^="list-card-"]').filter({ hasText: 'Renamed List' }).first();
+		await expect(renamedCard).toBeVisible({ timeout: 10_000 });
+
+		// Click the card to re-select it (selection may be lost after editing)
+		await renamedCard.click();
 
 		// Verify renamed title appears in the selected list details
 		await expect(

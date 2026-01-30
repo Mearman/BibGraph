@@ -83,8 +83,10 @@ test.describe('@utility US-22 Visit History', () => {
 		// Verify timestamps are displayed on history entries (rendered as Text elements
 		// with relative time like "Just now", "2h ago" inside each Mantine Card)
 		const entryCards = page.locator('.mantine-Card-root:has(.mantine-Badge-root)');
-		// Each entry card contains dimmed text elements; the last one is the timestamp
-		const timestampText = entryCards.first().locator('.mantine-Text-root[data-c="dimmed"]').last();
+		// Each entry card contains a timestamp text with relative time format
+		const timestampText = entryCards.first().locator('.mantine-Text-root').filter({
+			hasText: /Just now|\d+[hd] ago|\d{1,2}\/\d{1,2}\/\d{2,4}/,
+		}).first();
 		await expect.soft(timestampText).toBeVisible({ timeout: 10_000 });
 	});
 

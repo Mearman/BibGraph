@@ -194,10 +194,21 @@ test.describe('@entity US-07 Bidirectional Relationships', () => {
 				}
 			}
 
-			// Scroll the link into view before clicking to avoid timeout from
-			// off-screen elements or intercepted clicks.
-			await clickTarget.scrollIntoViewIfNeeded();
-			await clickTarget.click({ force: true });
+			// Use JavaScript to scroll the element into view, as
+			// scrollIntoViewIfNeeded can timeout if the element is hidden
+			// by overflow or inside a collapsed section.
+			try {
+				await clickTarget.scrollIntoViewIfNeeded({ timeout: 5_000 });
+			} catch {
+				// Fallback: use page.evaluate to scroll the element into view
+				await clickTarget.evaluate((el: Element) => {
+					el.scrollIntoView({ block: 'center', behavior: 'instant' });
+				});
+				await page.waitForTimeout(500);
+			}
+
+			// Click with force in case the element is covered by another element
+			await clickTarget.click({ force: true, timeout: 10_000 });
 			await page.locator('main').waitFor({ timeout: 20_000 });
 			await waitForAppReady(page);
 

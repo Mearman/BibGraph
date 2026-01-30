@@ -18,8 +18,6 @@ export class HistoryPage extends BaseSPAPageObject {
 		/** Only match history entry cards (which contain a Badge), not the empty state card */
 		historyEntry: ".mantine-Card-root:has(.mantine-Badge-root)",
 		historyEntryTitle: ".mantine-Card-root:has(.mantine-Badge-root) .mantine-Text-root",
-		historyEntryTimestamp:
-			".mantine-Card-root:has(.mantine-Badge-root) .mantine-Text-root[data-c='dimmed']",
 		clearAllButton: "button:has-text('Clear History')",
 		searchInput:
 			"input[placeholder='Search history...'], input[aria-label='Search navigation history']",
@@ -79,10 +77,8 @@ export class HistoryPage extends BaseSPAPageObject {
 		const card = this.page
 			.locator(this.historySelectors.historyEntry)
 			.nth(cardIndex);
-		// The entity type badge is inside Stack > Group (first group) > Badge
-		const badge = card.locator(
-			".mantine-Stack-root .mantine-Group-root .mantine-Badge-root",
-		).first();
+		// The entity type badge is the first Badge inside the Card
+		const badge = card.locator(".mantine-Badge-root").first();
 		try {
 			await badge.waitFor({ state: "visible", timeout: 5_000 });
 			return badge.textContent();
@@ -106,7 +102,23 @@ export class HistoryPage extends BaseSPAPageObject {
 	}
 
 	async clearAll(): Promise<void> {
-		await this.page.getByRole("button", { name: "Clear History" }).click();
+		const clearButton = this.page.getByRole("button", { name: "Clear History" });
+		// Wait for button to be enabled (history entries must be loaded first)
+		await clearButton.waitFor({ state: "visible", timeout: 10_000 });
+		await this.page.waitForFunction(
+			() => {
+				const buttons = document.querySelectorAll("button");
+				for (const btn of buttons) {
+					if (btn.textContent?.includes("Clear History") && !btn.disabled) {
+						return true;
+					}
+				}
+				return false;
+			},
+			undefined,
+			{ timeout: 15_000 },
+		);
+		await clearButton.click();
 		// The component opens a Mantine confirm modal with labels: { confirm: "Clear All" }
 		const confirmButton = this.page.locator(
 			'.mantine-Modal-root button:has-text("Clear All")',
@@ -127,15 +139,9 @@ export class HistoryPage extends BaseSPAPageObject {
 	async clickEntry(index: number): Promise<void> {
 		const card = this.page.locator(this.historySelectors.historyEntry).nth(index);
 		// The navigate ActionIcon has aria-label starting with "Navigate to"
-		const navigateButton = card.locator(
-			'button.mantine-ActionIcon-root[aria-label^="Navigate to"]',
-		);
-		if (await navigateButton.isVisible({ timeout: 3_000 }).catch(() => false)) {
-			await navigateButton.click();
-		} else {
-			// Fallback: click the first ActionIcon in the card
-			await card.locator("button.mantine-ActionIcon-root").first().click();
-		}
+		const navigateButton = card.getByRole("button", { name: /Navigate to/i });
+		await navigateButton.waitFor({ state: "visible", timeout: 5_000 });
+		await navigateButton.click();
 		await this.waitForLoadingComplete();
 	}
 
