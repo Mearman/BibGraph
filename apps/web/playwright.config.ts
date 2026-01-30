@@ -16,10 +16,9 @@ export default defineConfig({
   // Exclude manual tests from CI runs (they're too slow and comprehensive)
   testIgnore: process.env.CI ? ["**/manual/**"] : [],
 
-  // Run tests in parallel - E2E tests are browser-isolated
-  // With 4 shards in CI, each shard handles ~19 tests, so 3 workers per shard is efficient
-  fullyParallel: true,
-  workers: process.env.CI ? 3 : 4,
+  // Run tests serially - one at a time to reduce resource contention
+  fullyParallel: false,
+  workers: 1,
 
   // Fail the build on CI if you accidentally left test.only in the source code
   forbidOnly: !!process.env.CI,
