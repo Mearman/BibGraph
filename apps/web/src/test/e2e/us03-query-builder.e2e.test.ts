@@ -98,13 +98,13 @@ test.describe('@utility US-03 Query Builder', () => {
 
 		if (!hasExplicitOperators) {
 			// Operators may be supported via text input (user types AND/OR/NOT)
-			const searchInput = page.getByPlaceholder(/search for works, authors, institutions/i);
+			const searchInput = page.getByPlaceholder(/search academic works/i);
 			await searchInput.fill('machine learning AND cultural heritage');
 			await expect(searchInput).toHaveValue('machine learning AND cultural heritage');
 		}
 
 		// Verify a query with operators can be submitted
-		const searchInput = page.getByPlaceholder(/search for works, authors, institutions/i);
+		const searchInput = page.getByPlaceholder(/search academic works/i);
 		await searchInput.fill('machine learning AND cultural heritage');
 
 		const searchButton = page.getByRole('button', { name: /search/i }).first();
@@ -147,7 +147,7 @@ test.describe('@utility US-03 Query Builder', () => {
 			await expect(precedenceIndicators.first()).toBeVisible();
 		} else {
 			// Precedence may be shown via parentheses in the text input
-			const searchInput = page.getByPlaceholder(/search for works, authors, institutions/i);
+			const searchInput = page.getByPlaceholder(/search academic works/i);
 			await searchInput.fill('(machine learning OR deep learning) AND heritage');
 			await expect(searchInput).toHaveValue(
 				'(machine learning OR deep learning) AND heritage'
@@ -157,7 +157,7 @@ test.describe('@utility US-03 Query Builder', () => {
 
 	test('should produce user-friendly error on invalid query', async ({ page }) => {
 		// Enter an invalid query
-		const searchInput = page.getByPlaceholder(/search for works, authors, institutions/i);
+		const searchInput = page.getByPlaceholder(/search academic works/i);
 		await searchInput.fill('AND OR NOT');
 
 		// Submit the invalid query

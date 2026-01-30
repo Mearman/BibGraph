@@ -15,6 +15,13 @@ const DEFAULT_TIMEOUT = 45_000;
 export const waitForAppReady = async (page: Page, options?: WaitOptions): Promise<void> => {
 	const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
 
+	// Dismiss onboarding tour if present (prevents it from blocking interaction)
+	await page.evaluate(() => {
+		localStorage.setItem('bibgraph-onboarding-completed', 'true');
+	}).catch(() => {
+		// localStorage may not be available yet
+	});
+
 	// Wait for root element to exist and have children
 	try {
 		await page.waitForSelector('#root:has(*)', { timeout, state: 'attached' });

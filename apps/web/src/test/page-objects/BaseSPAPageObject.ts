@@ -59,6 +59,12 @@ export class BaseSPAPageObject extends BasePageObject {
 	 */
 	override async goto(path: string): Promise<void> {
 		await super.goto(path);
+		// Dismiss onboarding tour to prevent it from blocking interaction
+		await this.page.evaluate(() => {
+			localStorage.setItem('bibgraph-onboarding-completed', 'true');
+		}).catch(() => {
+			// localStorage may not be available yet
+		});
 		if (this.shouldWaitForAppReady) {
 			await this.waitForAppInitialized();
 		}

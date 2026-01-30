@@ -113,7 +113,7 @@ test.describe('@utility US-23 Search History', () => {
 		}
 
 		// Clear the search input to trigger recent searches display
-		const searchInput = page.getByPlaceholder(/search for works, authors, institutions/i);
+		const searchInput = page.getByPlaceholder(/search academic works/i);
 		await searchInput.clear();
 		await searchInput.focus();
 
@@ -164,7 +164,7 @@ test.describe('@utility US-23 Search History', () => {
 		}
 
 		// Clear search and focus input to reveal recent searches
-		const searchInput = page.getByPlaceholder(/search for works, authors, institutions/i);
+		const searchInput = page.getByPlaceholder(/search academic works/i);
 		await searchInput.clear();
 		await searchInput.focus();
 

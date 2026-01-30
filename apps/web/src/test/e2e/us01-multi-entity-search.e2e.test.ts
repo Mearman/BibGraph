@@ -37,7 +37,7 @@ test.describe('@utility US-01 Multi-Entity Search', () => {
 
 	test('should load search page with input accepting free-text queries', async ({ page }) => {
 		// Verify search input is visible and accepts text
-		const searchInput = page.getByPlaceholder(/search for works, authors, institutions/i);
+		const searchInput = page.getByPlaceholder(/search academic works/i);
 		await expect(searchInput).toBeVisible();
 
 		// Verify it accepts free-text input

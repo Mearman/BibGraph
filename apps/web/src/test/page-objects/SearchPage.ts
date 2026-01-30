@@ -16,8 +16,8 @@ import { BaseSPAPageObject } from "./BaseSPAPageObject";
 export class SearchPage extends BaseSPAPageObject {
 	// Search-specific selectors
 	private readonly searchSelectors = {
-		searchInput: "[data-testid='search-input'], input[type='search']",
-		searchButton: "[data-testid='search-button']",
+		searchInput: "[data-testid='search-input'], input[aria-label*='Search academic'], input[type='search']",
+		searchButton: "[data-testid='search-button'], button[aria-label='Execute search']",
 		searchResults: "[data-testid='search-results']",
 		searchResultItem: "[data-testid='search-result-item']",
 		entityTypeFilter: "[data-testid='entity-type-filter']",

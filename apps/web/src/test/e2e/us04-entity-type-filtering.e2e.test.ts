@@ -301,7 +301,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 				expect(filteredCount).toBeGreaterThanOrEqual(0);
 
 				// The search query should still be present
-				const searchInput = page.getByPlaceholder(/search for works, authors, institutions/i);
+				const searchInput = page.getByPlaceholder(/search academic works/i);
 				await expect(searchInput).toHaveValue(SEARCH_QUERY);
 			}
 		} else {
