@@ -16,9 +16,9 @@ import { BaseSPAPageObject } from "./BaseSPAPageObject";
 export class SettingsPage extends BaseSPAPageObject {
 	// Settings-specific selectors
 	private readonly settingsSelectors = {
-		settingsForm: "[data-testid='settings-form']",
+		settingsForm: "main",
 		themeToggle: "[data-testid='theme-toggle']",
-		xpacToggle: "[data-testid='xpac-toggle'], [data-testid='include-xpac']",
+		xpacToggle: "[data-testid='xpac-toggle'], switch[role='switch'], input[type='checkbox'][aria-label*='xpac' i]",
 		saveButton: "[data-testid='save-settings']",
 		resetButton: "[data-testid='reset-settings']",
 		successMessage: "[data-testid='settings-saved']",
@@ -49,20 +49,16 @@ export class SettingsPage extends BaseSPAPageObject {
 	 * Toggle xpac works inclusion
 	 */
 	async toggleXpac(): Promise<void> {
-		await this.click(this.settingsSelectors.xpacToggle);
+		const toggle = this.page.locator("[data-testid='xpac-toggle']").first();
+		await toggle.click();
 	}
 
 	/**
 	 * Check if xpac works are enabled
 	 */
 	async isXpacEnabled(): Promise<boolean> {
-		const toggle = this.page.locator(this.settingsSelectors.xpacToggle);
-		const isChecked = await toggle.getAttribute("aria-checked");
-		if (isChecked !== null) {
-			return isChecked === "true";
-		}
-		// Fallback: check if input is checked
-		return toggle.isChecked().catch(() => false);
+		const input = this.page.locator("[data-testid='xpac-toggle'] input[role='switch']");
+		return input.isChecked();
 	}
 
 	/**

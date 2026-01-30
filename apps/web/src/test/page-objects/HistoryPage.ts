@@ -14,13 +14,14 @@ import { BaseSPAPageObject } from "./BaseSPAPageObject";
 
 export class HistoryPage extends BaseSPAPageObject {
 	private readonly historySelectors = {
-		historyContainer: "[data-testid='history-container']",
-		historyEntry: "[data-testid='history-entry']",
-		historyEntryTitle: "[data-testid='history-entry-title']",
-		historyEntryTimestamp: "[data-testid='history-entry-timestamp']",
-		clearAllButton: "[data-testid='clear-all-history']",
-		searchInput: "[data-testid='history-search'], input[placeholder*='history' i]",
-		emptyState: "[data-testid='history-empty']",
+		historyContainer: "main, [class*='Stack']",
+		historyEntry: ".mantine-Card-root",
+		historyEntryTitle: ".mantine-Card-root .mantine-Text-root",
+		historyEntryTimestamp: ".mantine-Card-root .mantine-Text-root[style]",
+		clearAllButton: "button:has-text('Clear History')",
+		searchInput:
+			"input[placeholder='Search history...'], input[aria-label='Search navigation history']",
+		emptyState: "text='No navigation history yet'",
 	};
 
 	constructor(page: Page) {
@@ -33,31 +34,63 @@ export class HistoryPage extends BaseSPAPageObject {
 	}
 
 	async getEntryCount(): Promise<number> {
-		return this.count(this.historySelectors.historyEntry);
+		const cards = this.page.locator(this.historySelectors.historyEntry);
+		return cards.count();
 	}
 
 	async getEntries(): Promise<string[]> {
-		return this.getAllTexts(this.historySelectors.historyEntryTitle);
+		const cards = this.page.locator(this.historySelectors.historyEntry);
+		const count = await cards.count();
+		const titles: string[] = [];
+		for (let i = 0; i < count; i++) {
+			const firstText = cards.nth(i).locator(".mantine-Text-root").first();
+			const text = await firstText.textContent();
+			if (text) {
+				titles.push(text.trim());
+			}
+		}
+		return titles;
 	}
 
 	async clearAll(): Promise<void> {
-		await this.click(this.historySelectors.clearAllButton);
+		await this.page.getByRole("button", { name: "Clear History" }).click();
+		// The component opens a Mantine confirm modal with labels: { confirm: "Clear All" }
+		const confirmButton = this.page.locator(
+			'.mantine-Modal-root button:has-text("Clear All")',
+		);
+		await confirmButton.waitFor({ state: "visible", timeout: 5_000 });
+		await confirmButton.click();
 		await this.waitForLoadingComplete();
 	}
 
 	async searchHistory(query: string): Promise<void> {
-		await this.fill(this.historySelectors.searchInput, query);
+		await this.page
+			.getByPlaceholder("Search history...")
+			.or(this.page.getByLabel("Search navigation history"))
+			.fill(query);
 		await this.waitForLoadingComplete();
 	}
 
 	async clickEntry(index: number): Promise<void> {
-		const entries = this.page.locator(this.historySelectors.historyEntry);
-		await entries.nth(index).click();
+		const card = this.page.locator(this.historySelectors.historyEntry).nth(index);
+		const firstText = card.locator(".mantine-Text-root").first();
+		const title = await firstText.textContent();
+		if (title) {
+			await card
+				.getByRole("button", { name: `Navigate to ${title.trim()}` })
+				.click();
+		} else {
+			// Fallback: click the first ActionIcon in the card
+			await card.locator("button.mantine-ActionIcon-root").first().click();
+		}
 		await this.waitForLoadingComplete();
 	}
 
 	async hasEmptyState(): Promise<boolean> {
-		return this.isVisible(this.historySelectors.emptyState);
+		return this.page
+			.getByText("No navigation history yet")
+			.isVisible()
+			.catch(() => false);
 	}
 }
 

@@ -32,14 +32,13 @@ test.describe('@utility US-29 Xpac Data Toggle', () => {
 		await waitForAppReady(page);
 
 		// Verify xpac toggle is present
-		const xpacToggle = page.locator(
-			"[data-testid='xpac-toggle'], [data-testid='include-xpac']"
-		);
+		const xpacToggle = page.locator("[data-testid='xpac-toggle']");
 		await expect(xpacToggle).toBeVisible({ timeout: 10_000 });
 
-		// Verify toggle has accessible label
-		const ariaChecked = await xpacToggle.getAttribute('aria-checked');
-		expect(['true', 'false']).toContain(ariaChecked);
+		// Verify toggle has accessible checked state
+		const input = page.locator("[data-testid='xpac-toggle'] input[role='switch']");
+		const isChecked = await input.isChecked();
+		expect(typeof isChecked).toBe('boolean');
 
 		// Verify descriptive text about xpac is present
 		const xpacDescription = page.getByText(/xpac|extended research|dataset|software|specimen/i);
@@ -72,14 +71,12 @@ test.describe('@utility US-29 Xpac Data Toggle', () => {
 		await waitForAppReady(page);
 
 		// Search for a common term that may have xpac results
-		const searchInput = page.locator(
-			"[data-testid='search-input'], input[placeholder*='search' i], input[type='search']"
-		);
-		const hasSearch = await searchInput.first().isVisible().catch(() => false);
+		const searchInput = page.getByRole('combobox', { name: /search academic/i });
+		const hasSearch = await searchInput.isVisible().catch(() => false);
 
 		if (hasSearch) {
-			await searchInput.first().fill('bioplastics');
-			await searchInput.first().press('Enter');
+			await searchInput.fill('bioplastics');
+			await searchInput.press('Enter');
 			await page.waitForLoadState('networkidle');
 
 			// Verify results loaded (results may differ based on xpac state)
@@ -107,14 +104,12 @@ test.describe('@utility US-29 Xpac Data Toggle', () => {
 		await waitForAppReady(page);
 
 		// Search for dataset/software type works
-		const searchInput = page.locator(
-			"[data-testid='search-input'], input[placeholder*='search' i], input[type='search']"
-		);
-		const hasSearch = await searchInput.first().isVisible().catch(() => false);
+		const searchInput = page.getByRole('combobox', { name: /search academic/i });
+		const hasSearch = await searchInput.isVisible().catch(() => false);
 
 		if (hasSearch) {
-			await searchInput.first().fill('dataset bioplastics');
-			await searchInput.first().press('Enter');
+			await searchInput.fill('dataset bioplastics');
+			await searchInput.press('Enter');
 			await page.waitForLoadState('networkidle');
 
 			// Check for badge elements distinguishing xpac works

@@ -51,9 +51,12 @@ test.describe('@utility US-22 Visit History', () => {
 		const entryCount = await historyPage.getEntryCount();
 		expect(entryCount).toBeGreaterThanOrEqual(2);
 
-		// Verify timestamps are displayed on history entries
-		const timestampElements = page.locator("[data-testid='history-entry-timestamp']");
-		await expect(timestampElements.first()).toBeVisible({ timeout: 10_000 });
+		// Verify timestamps are displayed on history entries (rendered as Text elements
+		// with relative time like "Just now", "2h ago" inside each Mantine Card)
+		const cards = page.locator('.mantine-Card-root');
+		// Each card contains a dimmed text element showing the timestamp
+		const timestampText = cards.first().locator('.mantine-Text-root[data-c="dimmed"]').last();
+		await expect(timestampText).toBeVisible({ timeout: 10_000 });
 	});
 
 	test('should list entries in reverse chronological order on /history', async ({ page }) => {
@@ -72,10 +75,14 @@ test.describe('@utility US-22 Visit History', () => {
 		const entries = await historyPage.getEntries();
 		expect(entries.length).toBeGreaterThanOrEqual(2);
 
-		// The most recently visited entity (work) should appear first (reverse chronological)
-		const historyCards = page.locator("[data-testid='history-entry']");
-		const firstEntryText = await historyCards.first().textContent();
-		expect(firstEntryText).toContain(TEST_ENTITIES[1].id);
+		// The most recently visited entity (work) should appear first (reverse chronological).
+		// Cards show display names (not raw IDs), so verify the first card contains
+		// the entity type badge corresponding to the last-visited entity ("Work").
+		const historyCards = page.locator('.mantine-Card-root');
+		const firstCardBadge = historyCards.first().locator('.mantine-Badge-root');
+		await expect(firstCardBadge).toBeVisible({ timeout: 10_000 });
+		const badgeText = await firstCardBadge.textContent();
+		expect(badgeText).toBe('Work');
 	});
 
 	test('should persist history in IndexedDB (__history__ special list)', async ({ page }) => {

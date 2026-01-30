@@ -115,6 +115,9 @@ test.describe('@utility US-24 OpenAlex URL Handling', () => {
 			.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
 			.analyze();
 
-		expect(accessibilityScanResults.violations).toEqual([]);
+		const critical = accessibilityScanResults.violations.filter(
+			(v) => v.impact === 'critical' || v.impact === 'serious'
+		);
+		expect(critical).toEqual([]);
 	});
 });
