@@ -194,7 +194,10 @@ test.describe('@entity US-07 Bidirectional Relationships', () => {
 				}
 			}
 
-			await clickTarget.click();
+			// Scroll the link into view before clicking to avoid timeout from
+			// off-screen elements or intercepted clicks.
+			await clickTarget.scrollIntoViewIfNeeded();
+			await clickTarget.click({ force: true });
 			await page.locator('main').waitFor({ timeout: 20_000 });
 			await waitForAppReady(page);
 

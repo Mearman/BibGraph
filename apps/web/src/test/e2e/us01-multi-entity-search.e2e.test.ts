@@ -68,17 +68,25 @@ test.describe('@utility US-01 Multi-Entity Search', () => {
 			return;
 		}
 
+		// Wait for network to settle so results are fully rendered
+		await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+
 		// Verify results container is visible
 		const resultsContainer = page.locator('[data-testid="search-results"]');
 		await expect(resultsContainer).toBeVisible();
 
-		// Verify at least one result item is present
-		const resultItems = page.locator('[data-testid="search-result-item"]');
+		// Verify at least one result item is present.
+		// The search results render as Table.Tr rows (table view), Card elements (card view),
+		// or Paper elements (list view). None use data-testid="search-result-item".
+		// Match actual rendered result elements within the results container.
+		const resultItems = resultsContainer.locator(
+			'table tbody tr, .mantine-SimpleGrid-root .mantine-Card-root, .mantine-Paper-root[href]'
+		);
 		const resultCount = await resultItems.count();
 		expect(resultCount).toBeGreaterThan(0);
 
 		// Verify entity type indication is present in results
-		// Entity types should be shown as badges, labels, or text
+		// Entity types are shown as Mantine Badge components
 		const firstResult = resultItems.first();
 		const resultText = await firstResult.textContent();
 		expect(resultText).toBeTruthy();

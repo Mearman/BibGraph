@@ -28,6 +28,7 @@ import { StorageTestHelper } from '@/test/helpers/StorageTestHelper';
  * 4. Optionally fill description via #list-description
  * 5. Click the submit button ("Create List")
  * 6. Wait for modal to close and list to appear
+ * 7. If the list was not auto-selected, click the list card to select it
  */
 const createNamedList = async (page: Page, listName: string, description?: string): Promise<void> => {
 	// Step 1: Open the "Create New List" dropdown menu
@@ -60,10 +61,18 @@ const createNamedList = async (page: Page, listName: string, description?: strin
 	// Step 7: Wait for modal to close
 	await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 10_000 });
 
-	// Step 8: Verify the list appears in the selected list details
-	await expect(
-		page.locator('[data-testid="selected-list-title"]').filter({ hasText: listName })
-	).toBeVisible({ timeout: 10_000 });
+	// Step 8: Wait for the list card to appear in the catalogue grid
+	const listCard = page.locator('[data-testid^="list-card-"]').filter({ hasText: listName }).first();
+	await expect(listCard).toBeVisible({ timeout: 10_000 });
+
+	// Step 9: If the list was not auto-selected (SelectedListDetails not visible),
+	// click the list card to select it explicitly
+	const selectedTitle = page.locator('[data-testid="selected-list-title"]').filter({ hasText: listName });
+	const isAlreadySelected = await selectedTitle.isVisible({ timeout: 3_000 }).catch(() => false);
+	if (!isAlreadySelected) {
+		await listCard.click();
+		await expect(selectedTitle).toBeVisible({ timeout: 10_000 });
+	}
 };
 
 test.describe('@workflow US-19 Catalogue Lists', () => {

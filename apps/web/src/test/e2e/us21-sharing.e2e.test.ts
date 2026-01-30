@@ -59,10 +59,17 @@ const createShareableList = async (page: Page, listName: string): Promise<void> 
 	await page.click('button:has-text("Create List")');
 	await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 10_000 });
 
-	// Wait for the list to be selected
-	await expect(
-		page.locator('[data-testid="selected-list-title"]').filter({ hasText: listName })
-	).toBeVisible({ timeout: 10_000 });
+	// Wait for the list card to appear in the catalogue grid
+	const listCard = page.locator('[data-testid^="list-card-"]').filter({ hasText: listName }).first();
+	await expect(listCard).toBeVisible({ timeout: 10_000 });
+
+	// If the list was not auto-selected, click the card to select it
+	const selectedTitle = page.locator('[data-testid="selected-list-title"]').filter({ hasText: listName });
+	const isAlreadySelected = await selectedTitle.isVisible({ timeout: 3_000 }).catch(() => false);
+	if (!isAlreadySelected) {
+		await listCard.click();
+		await expect(selectedTitle).toBeVisible({ timeout: 10_000 });
+	}
 };
 
 test.describe('@workflow US-21 Sharing', () => {

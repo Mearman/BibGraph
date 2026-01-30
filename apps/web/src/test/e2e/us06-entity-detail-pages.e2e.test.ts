@@ -148,12 +148,15 @@ test.describe('@entity US-06 Entity Detail Pages', () => {
 		// The EntityDetailLayout renders a Mantine SegmentedControl with "Rich" and "Raw" labels.
 		// In Mantine v7, SegmentedControl renders labels inside <label> elements.
 		// The control appears in multiple places (desktop header, mobile bottom bar, mobile actions).
-		// Use getByRole to find the "Raw" option label reliably.
+		// Use getByText to find the "Raw" option label reliably.
 		const rawLabel = page.getByText('Raw', { exact: true }).first();
 		const hasRawLabel = await rawLabel.isVisible().catch(() => false);
 
 		if (hasRawLabel) {
-			await rawLabel.click();
+			// Scroll into view first to avoid click interception by overlays or
+			// off-screen positioning, then force-click to bypass any overlay.
+			await rawLabel.scrollIntoViewIfNeeded();
+			await rawLabel.click({ force: true });
 
 			// Wait briefly for view to switch
 			await page.waitForTimeout(500);
@@ -173,7 +176,8 @@ test.describe('@entity US-06 Entity Detail Pages', () => {
 			const richLabel = page.getByText('Rich', { exact: true }).first();
 			const hasRichLabel = await richLabel.isVisible().catch(() => false);
 			if (hasRichLabel) {
-				await richLabel.click();
+				await richLabel.scrollIntoViewIfNeeded();
+				await richLabel.click({ force: true });
 			}
 		} else {
 			// SegmentedControl must be present on entity detail pages

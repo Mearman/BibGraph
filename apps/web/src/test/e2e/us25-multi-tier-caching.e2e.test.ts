@@ -16,7 +16,9 @@ test.describe('@utility US-25 Multi-Tier Caching', () => {
 	const BASE_URL = process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173';
 
 	const TEST_ENTITY = { type: 'works', id: 'W2741809807' };
-	const OPENALEX_API_PATTERN = /api\.openalex\.org/;
+	// Match both direct API requests (api.openalex.org) and proxied requests
+	// through the Vite dev server (/api/openalex/) or preview server.
+	const OPENALEX_API_PATTERN = /api\.openalex\.org|\/api\/openalex/;
 
 	let storage: StorageTestHelper;
 

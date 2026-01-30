@@ -15,9 +15,11 @@ import { BaseSPAPageObject } from "./BaseSPAPageObject";
 export class HistoryPage extends BaseSPAPageObject {
 	private readonly historySelectors = {
 		historyContainer: "main, [class*='Stack']",
-		historyEntry: ".mantine-Card-root",
-		historyEntryTitle: ".mantine-Card-root .mantine-Text-root",
-		historyEntryTimestamp: ".mantine-Card-root .mantine-Text-root[style]",
+		/** Only match history entry cards (which contain a Badge), not the empty state card */
+		historyEntry: ".mantine-Card-root:has(.mantine-Badge-root)",
+		historyEntryTitle: ".mantine-Card-root:has(.mantine-Badge-root) .mantine-Text-root",
+		historyEntryTimestamp:
+			".mantine-Card-root:has(.mantine-Badge-root) .mantine-Text-root[data-c='dimmed']",
 		clearAllButton: "button:has-text('Clear History')",
 		searchInput:
 			"input[placeholder='Search history...'], input[aria-label='Search navigation history']",
@@ -124,12 +126,12 @@ export class HistoryPage extends BaseSPAPageObject {
 
 	async clickEntry(index: number): Promise<void> {
 		const card = this.page.locator(this.historySelectors.historyEntry).nth(index);
-		const firstText = card.locator(".mantine-Text-root").first();
-		const title = await firstText.textContent();
-		if (title) {
-			await card
-				.getByRole("button", { name: `Navigate to ${title.trim()}` })
-				.click();
+		// The navigate ActionIcon has aria-label starting with "Navigate to"
+		const navigateButton = card.locator(
+			'button.mantine-ActionIcon-root[aria-label^="Navigate to"]',
+		);
+		if (await navigateButton.isVisible({ timeout: 3_000 }).catch(() => false)) {
+			await navigateButton.click();
 		} else {
 			// Fallback: click the first ActionIcon in the card
 			await card.locator("button.mantine-ActionIcon-root").first().click();

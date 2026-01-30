@@ -50,32 +50,21 @@ test.describe('@utility US-02 View Modes', () => {
 			return; // API unavailable
 		}
 
-		// Verify view mode toggle is present
-		const viewModeToggle = page.locator(
-			'[data-testid="view-mode-toggle"], [data-testid^="view-mode-"], [role="tablist"]'
-		);
-		await expect(viewModeToggle.first()).toBeVisible({ timeout: 10_000 });
+		// Verify the Mantine SegmentedControl is present (renders as a radiogroup)
+		const segmentedControl = page.locator('.mantine-SegmentedControl-root');
+		await expect(segmentedControl).toBeVisible({ timeout: 10_000 });
 
-		// Check for individual mode buttons
-		const listButton = page.locator(
-			'[data-testid="view-mode-list"], [aria-label="list view" i]'
-		);
-		const cardButton = page.locator(
-			'[data-testid="view-mode-card"], [aria-label="card view" i]'
-		);
-		const tableButton = page.locator(
-			'[data-testid="view-mode-table"], [aria-label="table view" i]'
-		);
+		// Verify all three view mode options exist as radio inputs within the control
+		const tableInput = segmentedControl.locator('input[value="table"]');
+		const cardInput = segmentedControl.locator('input[value="card"]');
+		const listInput = segmentedControl.locator('input[value="list"]');
 
-		// At least list and one other mode should be available
-		const listVisible = await listButton.isVisible({ timeout: 3000 }).catch(() => false);
-		const cardVisible = await cardButton.isVisible({ timeout: 3000 }).catch(() => false);
-		const tableVisible = await tableButton.isVisible({ timeout: 3000 }).catch(() => false);
-
-		expect(listVisible || cardVisible || tableVisible).toBe(true);
+		await expect(tableInput).toBeAttached();
+		await expect(cardInput).toBeAttached();
+		await expect(listInput).toBeAttached();
 	});
 
-	test('should render results in list view by default', async ({ page }) => {
+	test('should render results in table view by default', async ({ page }) => {
 		// Perform search
 		await searchPage.enterSearchQuery(SEARCH_QUERY);
 		const searchButton = page.getByRole('button', { name: /search/i }).first();
@@ -87,25 +76,18 @@ test.describe('@utility US-02 View Modes', () => {
 			return;
 		}
 
-		// Verify the default view mode is list
+		// Verify the default view mode is table (as set in useSearchPage hook)
 		const currentMode = await searchPage.getCurrentViewMode();
-		expect(currentMode).toBe('list');
+		expect(currentMode).toBe('table');
 
-		// Verify results are rendered in a list layout (stacked vertically)
-		const resultItems = page.locator('[data-testid="search-result-item"]');
-		const resultCount = await resultItems.count();
-		expect(resultCount).toBeGreaterThan(0);
+		// Verify results are rendered in a table layout
+		const table = page.locator('table, .mantine-Table-root');
+		await expect(table.first()).toBeVisible({ timeout: 10_000 });
 
-		// Check that items are stacked vertically (list layout)
-		if (resultCount >= 2) {
-			const firstBox = await resultItems.nth(0).boundingBox();
-			const secondBox = await resultItems.nth(1).boundingBox();
-
-			if (firstBox && secondBox) {
-				// In list view, the second item should be below the first
-				expect(secondBox.y).toBeGreaterThan(firstBox.y);
-			}
-		}
+		// Verify table has rows with data
+		const tableRows = page.locator('.mantine-Table-root tbody tr, table tbody tr');
+		const rowCount = await tableRows.count();
+		expect(rowCount).toBeGreaterThan(0);
 	});
 
 	test('should switch to card view and show card layout', async ({ page }) => {
@@ -123,18 +105,9 @@ test.describe('@utility US-02 View Modes', () => {
 		// Switch to card view
 		await searchPage.switchViewMode('card');
 
-		// Wait for view to update
-		await searchPage.waitForResults().catch(() => {
-			// May not need to wait if results are already loaded
-		});
-
-		// Verify card layout is visible
-		const cardContainer = page.locator(
-			'[data-testid="search-results-card"], .mantine-SimpleGrid-root, .mantine-Grid-root'
-		);
-		const cardItems = page.locator(
-			'.mantine-Card-root, [data-testid="search-result-card"]'
-		);
+		// Verify card layout is visible (SimpleGrid with Card children)
+		const cardContainer = page.locator('.mantine-SimpleGrid-root, .mantine-Grid-root');
+		const cardItems = page.locator('.mantine-Card-root');
 
 		const hasCardContainer = await cardContainer.count();
 		const hasCardItems = await cardItems.count();
@@ -142,14 +115,13 @@ test.describe('@utility US-02 View Modes', () => {
 		// Either a grid container or card-style items should be present
 		expect(hasCardContainer + hasCardItems).toBeGreaterThan(0);
 
-		// If there are multiple cards, verify they may be laid out in a grid (side by side)
+		// If there are multiple cards, verify they have content
 		if (hasCardItems >= 2) {
 			const firstCard = await cardItems.nth(0).boundingBox();
 			const secondCard = await cardItems.nth(1).boundingBox();
 
 			if (firstCard && secondCard) {
-				// In card/grid view, items may be side by side (same Y) or stacked
-				// This is a layout verification - cards should be contained in a grid
+				// Cards should have dimensions
 				expect(firstCard.width).toBeGreaterThan(0);
 				expect(secondCard.width).toBeGreaterThan(0);
 			}
@@ -168,17 +140,12 @@ test.describe('@utility US-02 View Modes', () => {
 			return;
 		}
 
-		// Switch to table view
+		// Default is already table view, but explicitly switch to confirm it works
 		await searchPage.switchViewMode('table');
-
-		// Wait for view to update
-		await searchPage.waitForResults().catch(() => {
-			// Results may already be loaded
-		});
 
 		// Verify table layout is visible
 		const table = page.locator(
-			'table, [role="table"], [data-testid="search-results-table"], .mantine-Table-root'
+			'table, [role="table"], .mantine-Table-root'
 		);
 		await expect(table.first()).toBeVisible({ timeout: 10_000 });
 
@@ -189,12 +156,12 @@ test.describe('@utility US-02 View Modes', () => {
 		const headerCount = await tableHeaders.count();
 		expect(headerCount).toBeGreaterThan(0);
 
-		// Verify common expected columns exist
+		// Verify common expected columns exist (Type, Name, Citations, Works, Graph)
 		const headerTexts = await tableHeaders.allTextContents();
 		const headerTextLower = headerTexts.map((t) => t.toLowerCase());
 
 		// At least one meaningful column header should be present
-		const expectedHeaders = ['title', 'type', 'year', 'author', 'citations', 'name'];
+		const expectedHeaders = ['type', 'name', 'citations', 'works', 'graph'];
 		const hasExpectedHeader = expectedHeaders.some((header) =>
 			headerTextLower.some((text) => text.includes(header))
 		);
@@ -213,8 +180,12 @@ test.describe('@utility US-02 View Modes', () => {
 			return;
 		}
 
-		// Switch to card view
+		// Switch to card view (from default table)
 		await searchPage.switchViewMode('card');
+
+		// Verify card view is active
+		const modeAfterSwitch = await searchPage.getCurrentViewMode();
+		expect(modeAfterSwitch).toBe('card');
 
 		// Navigate away from search page
 		await page.goto(page.url().replace(/\/search.*/, '/#/browse'));
@@ -230,15 +201,13 @@ test.describe('@utility US-02 View Modes', () => {
 			return;
 		}
 
-		// Verify the view mode is preserved (should still be card)
+		// Verify the view mode is one of the valid values
+		// (may or may not persist depending on state management)
 		const currentMode = await searchPage.getCurrentViewMode();
-
-		// The view mode may or may not persist depending on implementation
-		// Verify the mode is one of the valid values
 		expect(['list', 'card', 'table']).toContain(currentMode);
 	});
 
-	test('should show entity metadata (title, authors, year, citations) in each mode', async ({ page }) => {
+	test('should show entity metadata (type, name, citations) in each mode', async ({ page }) => {
 		// Perform search
 		await searchPage.enterSearchQuery(SEARCH_QUERY);
 		const searchButton = page.getByRole('button', { name: /search/i }).first();
@@ -250,17 +219,23 @@ test.describe('@utility US-02 View Modes', () => {
 			return;
 		}
 
-		// Verify metadata in list view (default)
-		const firstResult = page.locator('[data-testid="search-result-item"]').first();
-		await expect(firstResult).toBeVisible({ timeout: 10_000 });
+		// Default is table view - verify table has meaningful content
+		const searchResults = page.locator('[data-testid="search-results"]');
+		await expect(searchResults).toBeVisible({ timeout: 10_000 });
 
-		const resultText = await firstResult.textContent();
+		const resultText = await searchResults.textContent();
 		expect(resultText).toBeTruthy();
-		expect(resultText!.length).toBeGreaterThan(10); // Should have meaningful content
-
-		// The result text itself should contain metadata even if not in data-testid elements
-		// Verify result has substantive content (not just an ID)
+		// Results should contain substantive content (entity names, types, etc.)
 		expect(resultText!.length).toBeGreaterThan(20);
+
+		// Verify table rows contain data (each row should have text)
+		const firstRow = page.locator('.mantine-Table-root tbody tr, table tbody tr').first();
+		const isFirstRowVisible = await firstRow.isVisible({ timeout: 5000 }).catch(() => false);
+		if (isFirstRowVisible) {
+			const rowText = await firstRow.textContent();
+			expect(rowText).toBeTruthy();
+			expect(rowText!.length).toBeGreaterThan(5);
+		}
 	});
 
 	test('should pass accessibility checks (WCAG 2.1 AA)', async ({ page }) => {

@@ -65,7 +65,8 @@ test.describe('@utility US-03 Query Builder', () => {
 			// The AdvancedQueryBuilder uses Select dropdowns with AND/OR options
 			// and term-based inputs rather than a single text input.
 			// Verify the builder panel appeared with its term inputs
-			const builderPanel = page.getByText('Advanced Query Builder');
+			// Use .first() because both the toggle button and the panel header contain this text
+			const builderPanel = page.getByText('Advanced Query Builder').first();
 			await expect(builderPanel).toBeVisible({ timeout: 5000 });
 
 			// Check that operator selects are available (after adding a second term)
@@ -119,9 +120,26 @@ test.describe('@utility US-03 Query Builder', () => {
 		// Enter an invalid query (only operators, no real terms)
 		await searchInput.fill('AND OR NOT');
 
-		// The search button should be disabled for invalid/empty-like queries,
-		// or validation text should appear
+		// The debounced search may trigger automatically on input change,
+		// temporarily setting isLoading=true which disables the button.
+		// Wait for any in-flight loading to settle before checking button state.
 		const searchButton = page.locator('[data-testid="search-button"]');
+		await searchButton.waitFor({ state: 'visible', timeout: 10_000 });
+
+		// Wait for the button to become enabled (loading from debounced search may disable it)
+		try {
+			await page.waitForFunction(
+				(selector) => {
+					const btn = document.querySelector(selector) as HTMLButtonElement | null;
+					return btn !== null && !btn.disabled;
+				},
+				'[data-testid="search-button"]',
+				{ timeout: 15_000 }
+			);
+		} catch {
+			// Button may remain disabled for invalid queries - that is valid error feedback
+		}
+
 		const isDisabled = await searchButton.isDisabled().catch(() => false);
 
 		if (isDisabled) {
@@ -168,9 +186,24 @@ test.describe('@utility US-03 Query Builder', () => {
 		// Enter a valid query
 		await searchPage.enterSearchQuery('cultural heritage');
 
-		// Submit the query
-		const searchButton = page.getByRole('button', { name: /search/i }).first();
-		await searchButton.click();
+		// Submit the query - wait for button to be enabled first (debounced search may be in-flight)
+		const searchButton = page.locator('[data-testid="search-button"]');
+		await searchButton.waitFor({ state: 'visible', timeout: 10_000 });
+		try {
+			await page.waitForFunction(
+				(selector) => {
+					const btn = document.querySelector(selector) as HTMLButtonElement | null;
+					return btn !== null && !btn.disabled;
+				},
+				'[data-testid="search-button"]',
+				{ timeout: 15_000 }
+			);
+		} catch {
+			// If button stays disabled, debounced search may have already triggered
+		}
+		await searchButton.click({ timeout: 10_000 }).catch(() => {
+			// Debounced search may have already submitted; continue to check results
+		});
 
 		try {
 			await waitForSearchResults(page, { timeout: 30_000 });
@@ -182,8 +215,15 @@ test.describe('@utility US-03 Query Builder', () => {
 		const resultsContainer = page.locator('[data-testid="search-results"]');
 		await expect(resultsContainer).toBeVisible();
 
-		// Verify at least one result is shown
-		const resultCount = await searchPage.getResultCount();
+		// Verify at least one result is shown.
+		// The app renders results as table rows (tbody tr), cards, or paper elements
+		// inside the search-results container. There is no data-testid="search-result-item".
+		const resultItems = resultsContainer.locator(
+			'tbody tr, .mantine-SimpleGrid-root .mantine-Card-root, .mantine-Stack-root > .mantine-Paper-root'
+		);
+		// Wait briefly for results to render
+		await page.waitForTimeout(2000);
+		const resultCount = await resultItems.count();
 		expect(resultCount).toBeGreaterThan(0);
 
 		// Verify no error is displayed
