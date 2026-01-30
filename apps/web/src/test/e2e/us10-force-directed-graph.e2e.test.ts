@@ -40,17 +40,20 @@ test.describe('@utility US-10 Force-Directed Graph', () => {
 		await expect(mainContent.first()).toBeVisible({ timeout: 10_000 });
 
 		// Check for graph heading or empty state
+		// The graph page shows "Entity Graph" when data is loaded,
+		// "Enable Data Sources to Explore" when no sources are enabled,
+		// or "No Entities to Display" when sources are enabled but empty
 		const graphHeading = page.getByText('Entity Graph');
-		const emptyState = page.locator('text=/no entities|empty|no data|add entities|start exploring|no sources/i');
+		const emptyState = page.getByText(/no entities|enable data sources|no data|loading data/i);
 
-		const hasHeading = await graphHeading.isVisible().catch(() => false);
-		const hasEmptyState = await emptyState.first().isVisible().catch(() => false);
+		const hasHeading = await graphHeading.isVisible({ timeout: 5000 }).catch(() => false);
+		const hasEmptyState = await emptyState.first().isVisible({ timeout: 5000 }).catch(() => false);
 
 		// Either the graph loaded or an empty state is shown -- both are valid
 		expect(hasHeading || hasEmptyState).toBeTruthy();
 
-		// Verify no error alerts
-		const errorAlert = page.locator('[role="alert"][color="red"], .mantine-Alert-root[data-color="red"]');
+		// Verify no error alerts (exclude yellow/info alerts, only check for red error alerts)
+		const errorAlert = page.locator('.mantine-Alert-root[data-color="red"]');
 		const errorCount = await errorAlert.count();
 		expect(errorCount).toBe(0);
 	});
@@ -64,23 +67,16 @@ test.describe('@utility US-10 Force-Directed Graph', () => {
 		const canvas = page.locator('canvas');
 		const hasCanvas = await canvas.first().isVisible({ timeout: 10_000 }).catch(() => false);
 
-		const emptyState = page.locator('text=/no entities|empty|no data|no sources/i');
-		const hasEmptyState = await emptyState.first().isVisible().catch(() => false);
+		// Empty state variants: "Enable Data Sources to Explore" or "No Entities to Display"
+		const emptyState = page.getByText(/no entities|enable data sources|no data|loading data/i);
+		const hasEmptyState = await emptyState.first().isVisible({ timeout: 5000 }).catch(() => false);
 
 		// Either canvas (graph loaded) or empty state (no data) is acceptable
 		expect(hasCanvas || hasEmptyState).toBeTruthy();
 	});
 
 	test('should run force simulation without freezing the UI', async ({ page }) => {
-		await page.goto('/#/graph');
-		await waitForAppReady(page);
-
-		// Verify the page remains responsive -- if the main thread were blocked
-		// by force simulation, this assertion would time out
-		const rootElement = page.locator('#root');
-		await expect(rootElement).toBeVisible({ timeout: 10_000 });
-
-		// Verify no critical errors occurred during rendering
+		// Set up critical error listener before navigation
 		const criticalErrors: string[] = [];
 		page.on('console', (msg) => {
 			if (msg.type() === 'error') {
@@ -94,6 +90,19 @@ test.describe('@utility US-10 Force-Directed Graph', () => {
 				}
 			}
 		});
+
+		await page.goto('/#/graph');
+		await waitForAppReady(page);
+
+		// Verify the page remains responsive -- if the main thread were blocked
+		// by force simulation, this assertion would time out
+		const rootElement = page.locator('#root');
+		await expect(rootElement).toBeVisible({ timeout: 10_000 });
+
+		// Verify the graph page rendered some content (heading or empty state)
+		const pageContent = page.getByText(/entity graph|enable data sources|no entities|loading data/i);
+		const hasContent = await pageContent.first().isVisible({ timeout: 10_000 }).catch(() => false);
+		expect(hasContent).toBeTruthy();
 
 		// Allow time for deferred errors to surface
 		await page.waitForTimeout(2000);

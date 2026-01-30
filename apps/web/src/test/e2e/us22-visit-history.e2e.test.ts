@@ -55,6 +55,11 @@ test.describe('@utility US-22 Visit History', () => {
 		storage = new StorageTestHelper(page);
 		await storage.clearAllStorage();
 
+		// Reload after clearing storage so the app reinitializes its
+		// IndexedDB-backed storage provider with a fresh connection.
+		await page.reload();
+		await waitForAppReady(page);
+
 		historyPage = new HistoryPage(page);
 	});
 

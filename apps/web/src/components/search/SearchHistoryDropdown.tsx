@@ -40,7 +40,7 @@ export const SearchHistoryDropdown: React.FC<SearchHistoryDropdownProps> = ({
     <Menu position="bottom-end" shadow="md" width={300} withinPortal>
       <Menu.Target>
         <Tooltip label="Search history" withinPortal>
-          <ActionIcon variant="subtle" size="input-lg">
+          <ActionIcon variant="subtle" size="input-lg" aria-label="Search history">
             <IconHistory size={ICON_SIZE.MD} />
           </ActionIcon>
         </Tooltip>
@@ -64,6 +64,7 @@ export const SearchHistoryDropdown: React.FC<SearchHistoryDropdownProps> = ({
                   color="red"
                   size="sm"
                   onClick={handleClearAll}
+                  aria-label="Clear all history"
                 >
                   <IconTrash size={ICON_SIZE.XS} />
                 </ActionIcon>

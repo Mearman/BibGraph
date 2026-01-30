@@ -204,7 +204,7 @@ const SearchPage = () => {
           />
         )}
 
-        {hasQuery && <Card style={{ border: BORDER_STYLE_GRAY_3 }}>{renderSearchResults()}</Card>}
+        {hasQuery && <Card data-testid="search-results" style={{ border: BORDER_STYLE_GRAY_3 }}>{renderSearchResults()}</Card>}
 
         {!hasQuery && <SearchEmptyStateRenderer onQuickSearch={handleQuickSearch} />}
       </Stack>

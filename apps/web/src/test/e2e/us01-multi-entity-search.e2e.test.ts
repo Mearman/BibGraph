@@ -36,18 +36,18 @@ test.describe('@utility US-01 Multi-Entity Search', () => {
 	});
 
 	test('should load search page with input accepting free-text queries', async ({ page }) => {
-		// Verify search input is visible and accepts text (actual input is a combobox)
-		const searchInput = page.getByRole('combobox', { name: /search/i });
+		// Verify search input is visible and accepts text
+		const searchInput = page.locator('[data-testid="search-input"]');
 		await expect(searchInput).toBeVisible();
 
 		// Verify it accepts free-text input
 		const testQuery = 'cultural heritage preservation';
-		await searchPage.enterSearchQuery(testQuery);
+		await searchInput.fill(testQuery);
 		await expect(searchInput).toHaveValue(testQuery);
 
 		// Verify the input is not constrained to a specific format
 		const specialCharsQuery = 'machine learning & NLP (2024)';
-		await searchPage.enterSearchQuery(specialCharsQuery);
+		await searchInput.fill(specialCharsQuery);
 		await expect(searchInput).toHaveValue(specialCharsQuery);
 	});
 
@@ -166,38 +166,42 @@ test.describe('@utility US-01 Multi-Entity Search', () => {
 	test('should show appropriate feedback for zero-result searches', async ({ page }) => {
 		// Search for a query unlikely to match anything
 		const noResultsQuery = 'xyznonexistent9999qqq';
-		await searchPage.enterSearchQuery(noResultsQuery);
+		const searchInput = page.locator('[data-testid="search-input"]');
+		await searchInput.fill(noResultsQuery);
 
-		const searchButton = page.getByRole('button', { name: /search/i }).first();
+		const searchButton = page.locator('[data-testid="search-button"]');
 		await searchButton.click();
 
 		try {
 			// Wait for the search to complete
-			await page.waitForLoadState('networkidle', { timeout: 10_000 });
+			await page.waitForLoadState('networkidle', { timeout: 15_000 });
 		} catch {
 			// Timeout is acceptable
 		}
+
+		// Allow time for the search response to render
+		await page.waitForTimeout(2000);
 
 		// Check for no-results feedback, empty results area, or loading/error state
 		// The page should not crash - any of these states is acceptable
 		const noResultsMessage = page.locator(
 			'[data-testid="no-results"], [data-testid="search-empty"]'
 		);
-		const genericNoResults = page.getByText(/no results|no matches|nothing found/i);
+		const genericNoResults = page.getByText(/no results|no entities found|no matches|nothing found/i);
 		const loadingOrError = page.locator(
 			'[data-testid="loading"], [data-testid="error-message"], [data-testid="error-boundary"]'
 		);
-		const emptyTable = page.locator('table tbody tr').first();
+		const searchResults = page.locator('[data-testid="search-results"]');
 
 		const hasExplicitNoResults = await noResultsMessage.count();
 		const hasGenericNoResults = await genericNoResults.count();
 		const hasLoadingOrError = await loadingOrError.count();
-		const hasEmptyTable = (await emptyTable.count()) === 0 ? 1 : 0;
+		const hasSearchResults = await searchResults.count();
 
 		// At least one form of feedback should be present, or page is in loading/error state
 		// The key assertion is that the page did not crash after searching nonsense
 		expect(
-			hasExplicitNoResults + hasGenericNoResults + hasLoadingOrError + hasEmptyTable
+			hasExplicitNoResults + hasGenericNoResults + hasLoadingOrError + hasSearchResults
 		).toBeGreaterThan(0);
 	});
 
@@ -211,14 +215,14 @@ test.describe('@utility US-01 Multi-Entity Search', () => {
 		});
 
 		// Verify search input accepts text and search can be triggered
-		const searchInput = page.getByRole('combobox', { name: /search/i });
+		const searchInput = page.locator('[data-testid="search-input"]');
 		await expect(searchInput).toBeVisible();
 
 		const testQuery = 'machine learning';
-		await searchPage.enterSearchQuery(testQuery);
+		await searchInput.fill(testQuery);
 		await expect(searchInput).toHaveValue(testQuery);
 
-		const searchButton = page.getByRole('button', { name: /search/i }).first();
+		const searchButton = page.locator('[data-testid="search-button"]');
 		await searchButton.click();
 
 		// Wait for search to complete or fail

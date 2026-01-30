@@ -42,6 +42,11 @@ test.describe('@utility US-23 Search History', () => {
 		await waitForAppReady(page);
 		await storageHelper.clearAllStorage();
 
+		// Reload after clearing storage so the app reinitializes its
+		// IndexedDB-backed storage provider with a fresh connection.
+		await page.reload();
+		await waitForAppReady(page);
+
 		// Navigate to search page
 		await searchPage.gotoSearch();
 		await waitForAppReady(page);
@@ -99,7 +104,7 @@ test.describe('@utility US-23 Search History', () => {
 	test('should display recent searches via SearchHistoryDropdown', async ({ page }) => {
 		// Perform a search to populate history
 		await searchPage.enterSearchQuery('machine learning');
-		const searchButton = page.getByRole('button', { name: /^search$/i }).first();
+		const searchButton = page.getByRole('button', { name: /search/i }).first();
 		await searchButton.click();
 
 		try {
@@ -132,7 +137,7 @@ test.describe('@utility US-23 Search History', () => {
 		// Perform a search first
 		const originalQuery = 'neural networks';
 		await searchPage.enterSearchQuery(originalQuery);
-		const searchButton = page.getByRole('button', { name: /^search$/i }).first();
+		const searchButton = page.getByRole('button', { name: /search/i }).first();
 		await searchButton.click();
 
 		try {
@@ -178,7 +183,7 @@ test.describe('@utility US-23 Search History', () => {
 	test('should delete individual search history entries', async ({ page }) => {
 		// Perform a search to populate history
 		await searchPage.enterSearchQuery('quantum computing');
-		const searchButton = page.getByRole('button', { name: /^search$/i }).first();
+		const searchButton = page.getByRole('button', { name: /search/i }).first();
 		await searchButton.click();
 
 		try {
@@ -221,7 +226,7 @@ test.describe('@utility US-23 Search History', () => {
 	test('should clear all search history', async ({ page }) => {
 		// Perform a search to populate history
 		await searchPage.enterSearchQuery('biology');
-		const searchButton = page.getByRole('button', { name: /^search$/i }).first();
+		const searchButton = page.getByRole('button', { name: /search/i }).first();
 		await searchButton.click();
 
 		try {

@@ -156,15 +156,30 @@ test.describe('@entity US-07 Bidirectional Relationships', () => {
 		await page.locator('main').waitFor({ timeout: 20_000 });
 		await waitForAppReady(page);
 
+		// Wait for entity detail layout to confirm data has loaded
+		await page.waitForSelector('[data-testid="entity-detail-layout"]', { timeout: 20_000 });
+
 		// Record the current URL
 		const originalUrl = page.url();
 
-		// The RelatedEntitiesSection does not use data-testid='relationship-item'.
-		// Instead, look for entity links in the page content. In a hash-router SPA,
-		// links may use href="/authors/..." (without the #) or href="/#/authors/..." format.
-		// TanStack Router typically renders links without the hash prefix in the href.
+		// The EntityDataDisplay component renders internal links using TanStack Router's
+		// <Link> component (via Mantine Anchor). These produce <a> elements with href
+		// attributes. With hash-based routing, hrefs may contain entity paths.
+		// Also look for links rendered in the entity detail layout itself.
+		// Wait a moment for relationship data to load (async queries).
+		await page.waitForTimeout(2000);
+
+		// Look for any anchor elements that point to entity detail pages.
+		// TanStack Router with hash routing renders hrefs like "/authors/A123" or "#/authors/A123".
 		const entityLinks = page.locator(
-			'a[href*="/authors/"], a[href*="/works/W"], a[href*="/sources/"], a[href*="/institutions/"]'
+			'[data-testid="entity-detail-layout"] a[href*="/authors/"], ' +
+			'[data-testid="entity-detail-layout"] a[href*="/works/W"], ' +
+			'[data-testid="entity-detail-layout"] a[href*="/sources/"], ' +
+			'[data-testid="entity-detail-layout"] a[href*="/institutions/"], ' +
+			'[data-testid="entity-detail-layout"] a[href*="/concepts/"], ' +
+			'[data-testid="entity-detail-layout"] a[href*="/topics/"], ' +
+			'[data-testid="entity-detail-layout"] a[href*="/publishers/"], ' +
+			'[data-testid="entity-detail-layout"] a[href*="/funders/"]'
 		);
 		const clickableCount = await entityLinks.count();
 
@@ -192,7 +207,8 @@ test.describe('@entity US-07 Bidirectional Relationships', () => {
 			expect(pageContent).not.toContain('Page not found');
 			expect(pageContent).not.toContain('Routing error');
 		} else {
-			// If no entity links found, the page content should still be valid
+			// If no entity links found in the detail layout, the entity data
+			// may not contain cross-references. Verify the page is still valid.
 			const pageContent = await page.locator('body').textContent() || '';
 			expect(pageContent).not.toContain('Page not found');
 		}

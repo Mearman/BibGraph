@@ -96,42 +96,87 @@ test.describe('@entity US-08 Relationship Filtering', () => {
 		// Record the current URL to verify no page reload occurs
 		const originalUrl = page.url();
 
-		// Get initial page content for comparison
-		const initialContent = await page.locator('body').textContent() || '';
+		// Wait for entity detail layout to confirm data has loaded
+		await page.waitForSelector('[data-testid="entity-detail-layout"]', { timeout: 20_000 });
+
+		// Wait for relationship data to load (async queries)
+		await page.waitForTimeout(2000);
 
 		// The RelatedEntitiesSection uses clickable Badge components for type filtering.
-		// Find clickable badges that serve as type filters.
-		const clickableBadges = page.locator('.mantine-Badge-root[style*="cursor: pointer"]');
-		const badgeCount = await clickableBadges.count();
+		// React inline styles are applied via DOM properties, not HTML attributes, so
+		// [style*="cursor: pointer"] does not work. Instead, find Badge elements that
+		// are adjacent to the search input (within the Related Entities section filters).
+		// The type filter badges are .mantine-Badge-root elements inside the filter Group
+		// that follows the search TextInput.
+		const relatedEntitiesHeader = page.getByText('Related Entities');
+		const hasRelatedEntities = await relatedEntitiesHeader.first().isVisible().catch(() => false);
 
-		if (badgeCount > 0) {
-			// Click the first badge to toggle a type filter
-			await clickableBadges.first().click();
+		if (hasRelatedEntities) {
+			// Find clickable badge filters by evaluating cursor style via JavaScript
+			const clickableBadgeCount = await page.evaluate(() => {
+				const badges = document.querySelectorAll('.mantine-Badge-root');
+				let count = 0;
+				badges.forEach((badge) => {
+					const style = window.getComputedStyle(badge);
+					if (style.cursor === 'pointer') {
+						count++;
+					}
+				});
+				return count;
+			});
 
-			// URL should not change (no page reload, filtering is client-side)
-			const currentUrl = page.url();
-			expect(currentUrl).toEqual(originalUrl);
+			if (clickableBadgeCount > 0) {
+				// Use evaluate to find and click the first badge with cursor: pointer
+				await page.evaluate(() => {
+					const badges = document.querySelectorAll('.mantine-Badge-root');
+					for (const badge of badges) {
+						const style = window.getComputedStyle(badge);
+						if (style.cursor === 'pointer') {
+							(badge as HTMLElement).click();
+							break;
+						}
+					}
+				});
 
-			// Content should still be present
-			const filteredContent = await page.locator('body').textContent() || '';
-			expect(filteredContent).toBeTruthy();
+				// URL should not change (no page reload, filtering is client-side)
+				const currentUrl = page.url();
+				expect(currentUrl).toEqual(originalUrl);
 
-			// Click again to deselect and restore
-			await clickableBadges.first().click();
+				// Content should still be present
+				const filteredContent = await page.locator('body').textContent() || '';
+				expect(filteredContent).toBeTruthy();
+
+				// Click again to deselect and restore
+				await page.evaluate(() => {
+					const badges = document.querySelectorAll('.mantine-Badge-root');
+					for (const badge of badges) {
+						const style = window.getComputedStyle(badge);
+						if (style.cursor === 'pointer') {
+							(badge as HTMLElement).click();
+							break;
+						}
+					}
+				});
+			} else {
+				// No type filter badges - use search input instead
+				const searchInput = page.getByPlaceholder('Search related entities...');
+				const hasSearchInput = await searchInput.isVisible().catch(() => false);
+
+				if (hasSearchInput) {
+					await searchInput.fill('test');
+					expect(page.url()).toEqual(originalUrl);
+					await searchInput.clear();
+				}
+			}
 		} else {
-			// If no type filter badges, the entity may have no or few relationships.
-			// Check that the search input is present instead.
+			// Related Entities section not visible - entity may have no relationships.
+			// Use search input if available.
 			const searchInput = page.getByPlaceholder('Search related entities...');
 			const hasSearchInput = await searchInput.isVisible().catch(() => false);
 
 			if (hasSearchInput) {
-				// Type a search query
 				await searchInput.fill('test');
-
-				// URL should not change
 				expect(page.url()).toEqual(originalUrl);
-
-				// Clear the search
 				await searchInput.clear();
 			}
 		}

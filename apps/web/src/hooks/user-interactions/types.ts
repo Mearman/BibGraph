@@ -100,5 +100,5 @@ export const USER_INTERACTIONS_LOGGER_CONTEXT = "user-interactions";
 /** Debounce time for history entries to prevent duplicates */
 export const HISTORY_DEBOUNCE_MS = 1000;
 
-/** Timeout for data loading operations */
-export const DATA_LOADING_TIMEOUT_MS = 10_000;
+/** Timeout for data loading operations (30s to accommodate IndexedDB initialization in test/CI environments) */
+export const DATA_LOADING_TIMEOUT_MS = 30_000;

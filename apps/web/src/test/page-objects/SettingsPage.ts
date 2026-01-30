@@ -46,18 +46,26 @@ export class SettingsPage extends BaseSPAPageObject {
 	}
 
 	/**
-	 * Toggle xpac works inclusion
+	 * Toggle xpac works inclusion.
+	 *
+	 * Mantine Switch places data-testid directly on the hidden <input> element.
+	 * Clicking the input's parent label triggers the toggle visually.
 	 */
 	async toggleXpac(): Promise<void> {
-		const toggle = this.page.locator("[data-testid='xpac-toggle'] input").first();
-		await toggle.click();
+		const input = this.page.locator("[data-testid='xpac-toggle']");
+		// Click the parent label/wrapper so the visual switch responds
+		const wrapper = input.locator("xpath=ancestor::label");
+		await wrapper.click();
 	}
 
 	/**
-	 * Check if xpac works are enabled
+	 * Check if xpac works are enabled.
+	 *
+	 * Mantine Switch renders data-testid on the native <input type="checkbox">,
+	 * so we can query checked state directly.
 	 */
 	async isXpacEnabled(): Promise<boolean> {
-		const input = this.page.locator("[data-testid='xpac-toggle'] input");
+		const input = this.page.locator("[data-testid='xpac-toggle']");
 		return input.isChecked();
 	}
 

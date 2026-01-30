@@ -185,6 +185,7 @@ export const SearchEmptyState = ({
         color="yellow"
         variant="light"
         className={className}
+        data-testid="no-results"
       >
         <Stack gap="md">
           <Text size="sm">

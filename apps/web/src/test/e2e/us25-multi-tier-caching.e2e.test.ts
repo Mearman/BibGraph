@@ -69,16 +69,25 @@ test.describe('@utility US-25 Multi-Tier Caching', () => {
 		// Clear all storage to ensure cold start
 		await storage.clearAllStorage();
 
-		// Track API requests
-		let apiRequestCount = 0;
-		await page.route(OPENALEX_API_PATTERN, async (route) => {
-			apiRequestCount++;
-			await route.continue();
+		// Use request event listener instead of route interception to avoid
+		// interfering with network timing. Track API requests passively.
+		const apiRequests: string[] = [];
+		page.on('request', (request) => {
+			if (OPENALEX_API_PATTERN.test(request.url())) {
+				apiRequests.push(request.url());
+			}
 		});
 
 		// First visit with empty cache: must go to API
 		await pageObject.goto(`${BASE_URL}/#/${TEST_ENTITY.type}/${TEST_ENTITY.id}`);
 		await waitForAppReady(page);
+
+		// Wait for entity detail layout to confirm data has loaded
+		try {
+			await page.waitForSelector('[data-testid="entity-detail-layout"]', { timeout: 30_000 });
+		} catch {
+			// Entity detail layout may not be present if data hasn't loaded
+		}
 
 		try {
 			await page.waitForLoadState('networkidle', { timeout: 30_000 });
@@ -88,9 +97,9 @@ test.describe('@utility US-25 Multi-Tier Caching', () => {
 
 		// Verify entity loaded via API (proves fallthrough to API worked)
 		// Use a longer timeout since cold-start cache miss requires API call
-		const heading = page.locator('h1, [data-testid="entity-title"]').first();
+		const heading = page.locator('h1, [data-testid="entity-title"], [data-testid="entity-detail-layout"] h1').first();
 		await expect(heading).toBeVisible({ timeout: 30_000 });
-		expect(apiRequestCount).toBeGreaterThanOrEqual(1);
+		expect(apiRequests.length).toBeGreaterThanOrEqual(1);
 
 		// Verify page rendered without errors after cache population
 		await pageObject.expectNoError();
@@ -182,9 +191,9 @@ test.describe('@utility US-25 Multi-Tier Caching', () => {
 		await storage.clearAllStorage();
 
 		// Track API requests to verify fallthrough
-		let apiCalled = false;
+		const apiCalls: string[] = [];
 		await page.route(OPENALEX_API_PATTERN, async (route) => {
-			apiCalled = true;
+			apiCalls.push(route.request().url());
 			await route.continue();
 		});
 
@@ -201,6 +210,9 @@ test.describe('@utility US-25 Multi-Tier Caching', () => {
 		// Entity data should load via API (longer timeout for cold cache)
 		const heading = page.locator('h1, [data-testid="entity-title"]').first();
 		await expect(heading).toBeVisible({ timeout: 30_000 });
+
+		// API should have been called (cache miss triggers API fallthrough)
+		expect(apiCalls.length).toBeGreaterThanOrEqual(1);
 
 		// No error should be displayed
 		await pageObject.expectNoError();

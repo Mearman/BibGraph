@@ -31,13 +31,16 @@ test.describe('@utility US-29 Xpac Data Toggle', () => {
 		await page.goto(`${BASE_URL}/#/settings`);
 		await waitForAppReady(page);
 
-		// Verify xpac toggle is present
+		// Verify xpac toggle input is present (Mantine Switch places data-testid on the hidden <input>)
 		const xpacToggle = page.locator("[data-testid='xpac-toggle']");
-		await expect(xpacToggle).toBeVisible({ timeout: 10_000 });
+		await expect(xpacToggle).toBeAttached({ timeout: 10_000 });
+
+		// Verify the visible switch wrapper (label ancestor) is visible
+		const switchLabel = xpacToggle.locator('xpath=ancestor::label');
+		await expect(switchLabel).toBeVisible({ timeout: 10_000 });
 
 		// Verify toggle has accessible checked state
-		const input = page.locator("[data-testid='xpac-toggle'] input");
-		const isChecked = await input.isChecked();
+		const isChecked = await xpacToggle.isChecked();
 		expect(typeof isChecked).toBe('boolean');
 
 		// Verify descriptive text about xpac is present

@@ -214,6 +214,7 @@ export const SearchInterface = ({
           <TextInput
             ref={searchInputRef}
             placeholder={placeholder}
+            data-testid="search-input"
             leftSection={
               isLoading ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16 }}>
@@ -262,6 +263,7 @@ export const SearchInterface = ({
             leftSection={<IconSearch size={ICON_SIZE.MD} />}
             disabled={!query.trim() || isLoading}
             aria-label="Execute search"
+            data-testid="search-button"
           >
             Search
           </Button>

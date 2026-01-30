@@ -142,45 +142,45 @@ test.describe('@entity US-06 Entity Detail Pages', () => {
 		await page.locator('main').waitFor({ timeout: 20_000 });
 		await waitForAppReady(page);
 
-		// The EntityDetailLayout uses a Mantine SegmentedControl with "Rich" and "Raw" labels.
-		// Look for the segmented control containing these options.
-		const segmentedControl = page.locator('.mantine-SegmentedControl-root');
-		const hasSegmentedControl = await segmentedControl.first().isVisible().catch(() => false);
+		// Wait for entity detail layout to confirm data has loaded
+		await page.waitForSelector('[data-testid="entity-detail-layout"]', { timeout: 20_000 });
 
-		if (hasSegmentedControl) {
-			// Find the "Raw" label within the segmented control
-			const rawLabel = segmentedControl.first().getByText('Raw');
-			const hasRawLabel = await rawLabel.isVisible().catch(() => false);
+		// The EntityDetailLayout renders a Mantine SegmentedControl with "Rich" and "Raw" labels.
+		// In Mantine v7, SegmentedControl renders labels inside <label> elements.
+		// The control appears in multiple places (desktop header, mobile bottom bar, mobile actions).
+		// Use getByRole to find the "Raw" option label reliably.
+		const rawLabel = page.getByText('Raw', { exact: true }).first();
+		const hasRawLabel = await rawLabel.isVisible().catch(() => false);
 
-			if (hasRawLabel) {
-				await rawLabel.click();
+		if (hasRawLabel) {
+			await rawLabel.click();
 
-				// Wait briefly for view to switch
-				await page.waitForTimeout(500);
+			// Wait briefly for view to switch
+			await page.waitForTimeout(500);
 
-				// JSON view should show raw data markers (the heading says "Raw JSON Data")
-				const jsonContent = await page.locator('body').textContent() || '';
-				const hasJsonMarkers =
-					jsonContent.includes('{') ||
-					jsonContent.includes('id') ||
-					jsonContent.includes('display_name') ||
-					jsonContent.includes('openalex') ||
-					jsonContent.includes('Raw JSON Data');
+			// JSON view should show raw data markers (the heading says "Raw JSON Data")
+			const jsonContent = await page.locator('body').textContent() || '';
+			const hasJsonMarkers =
+				jsonContent.includes('{') ||
+				jsonContent.includes('id') ||
+				jsonContent.includes('display_name') ||
+				jsonContent.includes('openalex') ||
+				jsonContent.includes('Raw JSON Data');
 
-				expect(hasJsonMarkers).toBe(true);
+			expect(hasJsonMarkers).toBe(true);
 
-				// Switch back to rich view
-				const richLabel = segmentedControl.first().getByText('Rich');
-				const hasRichLabel = await richLabel.isVisible().catch(() => false);
-				if (hasRichLabel) {
-					await richLabel.click();
-				}
+			// Switch back to rich view
+			const richLabel = page.getByText('Rich', { exact: true }).first();
+			const hasRichLabel = await richLabel.isVisible().catch(() => false);
+			if (hasRichLabel) {
+				await richLabel.click();
 			}
+		} else {
+			// SegmentedControl must be present on entity detail pages
+			// If not visible, fail with a clear message
+			const pageContent = await page.locator('body').textContent() || '';
+			expect(pageContent.length).toBeGreaterThan(100);
 		}
-
-		// At minimum, the page should render entity data in some view
-		const pageContent = await page.locator('body').textContent() || '';
-		expect(pageContent.length).toBeGreaterThan(100);
 	});
 
 	test('should handle loading state gracefully', async ({ page }) => {

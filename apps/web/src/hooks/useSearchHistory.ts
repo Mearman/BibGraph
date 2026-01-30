@@ -3,6 +3,9 @@
  *
  * Manages search query history with IndexedDB persistence via storage provider.
  * Stores up to 50 search queries with FIFO eviction.
+ *
+ * Uses a custom DOM event ('search-history-changed') to keep multiple hook
+ * instances synchronised (e.g. SearchInterface writes, SearchHistoryDropdown reads).
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -17,6 +20,14 @@ interface SearchHistoryEntry {
 
 const MAX_SEARCH_HISTORY = 50;
 
+/** Custom event name used to notify all useSearchHistory instances of changes */
+const SEARCH_HISTORY_CHANGED_EVENT = 'search-history-changed';
+
+/** Dispatch a notification that search history has been mutated */
+const notifySearchHistoryChanged = () => {
+  window.dispatchEvent(new CustomEvent(SEARCH_HISTORY_CHANGED_EVENT));
+};
+
 /**
  * Hook for managing search history
  * @returns Search history state and operations
@@ -26,7 +37,20 @@ export const useSearchHistory = () => {
   const [searchHistory, setSearchHistory] = useState<SearchHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load search history on mount
+  /** Reload history from the storage provider */
+  const reloadHistory = useCallback(async () => {
+    try {
+      const history = await storageProvider.getSearchHistory();
+      setSearchHistory(history);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Failed to load search history:', error);
+      setSearchHistory([]);
+      setIsLoading(false);
+    }
+  }, [storageProvider]);
+
+  // Load search history on mount and listen for cross-instance change events
   useEffect(() => {
     let mounted = true;
 
@@ -48,10 +72,19 @@ export const useSearchHistory = () => {
 
     void loadHistory();
 
+    // Listen for mutations from other hook instances
+    const handleChange = () => {
+      if (mounted) {
+        void loadHistory();
+      }
+    };
+    window.addEventListener(SEARCH_HISTORY_CHANGED_EVENT, handleChange);
+
     return () => {
       mounted = false;
+      window.removeEventListener(SEARCH_HISTORY_CHANGED_EVENT, handleChange);
     };
-  }, []);
+  }, [storageProvider]);
 
   /**
    * Add a search query to history
@@ -66,10 +99,13 @@ export const useSearchHistory = () => {
       // Reload history after adding
       const updatedHistory = await storageProvider.getSearchHistory();
       setSearchHistory(updatedHistory);
+
+      // Notify other hook instances
+      notifySearchHistoryChanged();
     } catch (error) {
       console.error('Failed to add search query:', error);
     }
-  }, []);
+  }, [storageProvider]);
 
   /**
    * Remove a search query from history
@@ -81,10 +117,13 @@ export const useSearchHistory = () => {
 
       // Update local state
       setSearchHistory(prev => prev.filter(entry => entry.id !== id));
+
+      // Notify other hook instances
+      notifySearchHistoryChanged();
     } catch (error) {
       console.error('Failed to remove search query:', error);
     }
-  }, []);
+  }, [storageProvider]);
 
   /**
    * Clear all search history
@@ -93,10 +132,13 @@ export const useSearchHistory = () => {
     try {
       await storageProvider.clearSearchHistory();
       setSearchHistory([]);
+
+      // Notify other hook instances
+      notifySearchHistoryChanged();
     } catch (error) {
       console.error('Failed to clear search history:', error);
     }
-  }, []);
+  }, [storageProvider]);
 
   return {
     searchHistory,
@@ -104,5 +146,6 @@ export const useSearchHistory = () => {
     addSearchQuery,
     removeSearchQuery,
     clearSearchHistory,
+    reloadHistory,
   };
 };
