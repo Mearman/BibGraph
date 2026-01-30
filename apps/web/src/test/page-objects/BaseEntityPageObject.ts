@@ -57,7 +57,7 @@ export class BaseEntityPageObject extends BaseSPAPageObject {
 		relationshipTypeFilter: "[data-testid='relationship-type-filter']",
 
 		// Actions
-		bookmarkButton: "[data-testid='bookmark-button']",
+		bookmarkButton: "[data-testid='entity-bookmark-button']",
 		shareButton: "[data-testid='share-button']",
 		exportButton: "[data-testid='export-button']",
 

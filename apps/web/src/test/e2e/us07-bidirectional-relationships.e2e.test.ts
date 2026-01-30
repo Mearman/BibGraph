@@ -159,40 +159,42 @@ test.describe('@entity US-07 Bidirectional Relationships', () => {
 		// Record the current URL
 		const originalUrl = page.url();
 
-		// Find clickable relationship items
-		const relationshipItems = page.locator("[data-testid='relationship-item'] a, [data-testid='relationship-item'][role='link']");
-		let clickableCount = await relationshipItems.count();
+		// The RelatedEntitiesSection does not use data-testid='relationship-item'.
+		// Instead, look for entity links in the page content. In a hash-router SPA,
+		// links may use href="/authors/..." (without the #) or href="/#/authors/..." format.
+		// TanStack Router typically renders links without the hash prefix in the href.
+		const entityLinks = page.locator(
+			'a[href*="/authors/"], a[href*="/works/W"], a[href*="/sources/"], a[href*="/institutions/"]'
+		);
+		const clickableCount = await entityLinks.count();
 
-		// If no data-testid relationship items, look for entity links in the page
-		if (clickableCount === 0) {
-			// Look for links that point to entity pages
-			const entityLinks = page.locator('a[href*="/#/authors/"], a[href*="/#/works/"], a[href*="/#/sources/"], a[href*="/#/institutions/"]');
-			clickableCount = await entityLinks.count();
-
-			if (clickableCount > 0) {
-				// Click the first related entity link
-				await entityLinks.first().click();
-				await page.locator('main').waitFor({ timeout: 20_000 });
-				await waitForAppReady(page);
-
-				// URL should have changed to a different entity page
-				const newUrl = page.url();
-				expect(newUrl).not.toEqual(originalUrl);
-
-				// Should be on an entity detail page
-				const pageContent = await page.locator('body').textContent() || '';
-				expect(pageContent).not.toContain('Page not found');
-				expect(pageContent).not.toContain('Routing error');
+		if (clickableCount > 0) {
+			// Find a link that navigates to a different entity (not the current one)
+			let clickTarget = entityLinks.first();
+			for (let i = 0; i < Math.min(clickableCount, 10); i++) {
+				const href = await entityLinks.nth(i).getAttribute('href');
+				if (href && !href.includes('W2741809807')) {
+					clickTarget = entityLinks.nth(i);
+					break;
+				}
 			}
-		} else {
-			// Click the first relationship item
-			await relationshipItems.first().click();
+
+			await clickTarget.click();
 			await page.locator('main').waitFor({ timeout: 20_000 });
 			await waitForAppReady(page);
 
-			// URL should have changed
+			// URL should have changed to a different entity page
 			const newUrl = page.url();
 			expect(newUrl).not.toEqual(originalUrl);
+
+			// Should be on an entity detail page
+			const pageContent = await page.locator('body').textContent() || '';
+			expect(pageContent).not.toContain('Page not found');
+			expect(pageContent).not.toContain('Routing error');
+		} else {
+			// If no entity links found, the page content should still be valid
+			const pageContent = await page.locator('body').textContent() || '';
+			expect(pageContent).not.toContain('Page not found');
 		}
 	});
 

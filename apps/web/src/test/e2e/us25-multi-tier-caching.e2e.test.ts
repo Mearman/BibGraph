@@ -42,9 +42,9 @@ test.describe('@utility US-25 Multi-Tier Caching', () => {
 
 		// Track API requests on second visit
 		const apiRequests: string[] = [];
-		await page.route(OPENALEX_API_PATTERN, (route) => {
+		await page.route(OPENALEX_API_PATTERN, async (route) => {
 			apiRequests.push(route.request().url());
-			return route.continue();
+			await route.continue();
 		});
 
 		// Second visit: should use cache
@@ -71,18 +71,25 @@ test.describe('@utility US-25 Multi-Tier Caching', () => {
 
 		// Track API requests
 		let apiRequestCount = 0;
-		await page.route(OPENALEX_API_PATTERN, (route) => {
+		await page.route(OPENALEX_API_PATTERN, async (route) => {
 			apiRequestCount++;
-			return route.continue();
+			await route.continue();
 		});
 
 		// First visit with empty cache: must go to API
 		await pageObject.goto(`${BASE_URL}/#/${TEST_ENTITY.type}/${TEST_ENTITY.id}`);
 		await waitForAppReady(page);
-		await page.waitForLoadState('networkidle');
+
+		try {
+			await page.waitForLoadState('networkidle', { timeout: 30_000 });
+		} catch {
+			// networkidle may not settle if background requests continue
+		}
 
 		// Verify entity loaded via API (proves fallthrough to API worked)
-		await expect(page.locator('h1')).toBeVisible({ timeout: 15_000 });
+		// Use a longer timeout since cold-start cache miss requires API call
+		const heading = page.locator('h1, [data-testid="entity-title"]').first();
+		await expect(heading).toBeVisible({ timeout: 30_000 });
 		expect(apiRequestCount).toBeGreaterThanOrEqual(1);
 
 		// Verify page rendered without errors after cache population
@@ -92,26 +99,31 @@ test.describe('@utility US-25 Multi-Tier Caching', () => {
 	test('should achieve measurable bandwidth savings on repeated access', async ({ page }) => {
 		const pageObject = new BaseSPAPageObject(page);
 
-		// Track bandwidth on first visit
-		let firstVisitBytes = 0;
-		await page.route(OPENALEX_API_PATTERN, (route) => {
-			firstVisitBytes += route.request().url().length;
-			return route.continue();
+		// Track API request count on first visit
+		let firstVisitRequestCount = 0;
+		await page.route(OPENALEX_API_PATTERN, async (route) => {
+			firstVisitRequestCount++;
+			await route.continue();
 		});
 
 		// First visit
 		await pageObject.goto(`${BASE_URL}/#/${TEST_ENTITY.type}/${TEST_ENTITY.id}`);
 		await waitForAppReady(page);
-		await page.waitForLoadState('networkidle');
-		await expect(page.locator('h1')).toBeVisible({ timeout: 15_000 });
+		try {
+			await page.waitForLoadState('networkidle', { timeout: 30_000 });
+		} catch {
+			// networkidle may not settle
+		}
+		const heading = page.locator('h1, [data-testid="entity-title"]').first();
+		await expect(heading).toBeVisible({ timeout: 30_000 });
 
 		// Remove route handler and set up new one for second visit
 		await page.unrouteAll();
 
-		let secondVisitBytes = 0;
-		await page.route(OPENALEX_API_PATTERN, (route) => {
-			secondVisitBytes += route.request().url().length;
-			return route.continue();
+		let secondVisitRequestCount = 0;
+		await page.route(OPENALEX_API_PATTERN, async (route) => {
+			secondVisitRequestCount++;
+			await route.continue();
 		});
 
 		// Navigate away and back
@@ -120,11 +132,15 @@ test.describe('@utility US-25 Multi-Tier Caching', () => {
 
 		await pageObject.goto(`${BASE_URL}/#/${TEST_ENTITY.type}/${TEST_ENTITY.id}`);
 		await waitForAppReady(page);
-		await page.waitForLoadState('networkidle');
-		await expect(page.locator('h1')).toBeVisible({ timeout: 15_000 });
+		try {
+			await page.waitForLoadState('networkidle', { timeout: 30_000 });
+		} catch {
+			// networkidle may not settle
+		}
+		await expect(heading).toBeVisible({ timeout: 30_000 });
 
-		// Second visit should use less bandwidth (or equal if fully cached)
-		expect(secondVisitBytes).toBeLessThanOrEqual(firstVisitBytes);
+		// Second visit should make fewer or equal API requests (cache hit)
+		expect(secondVisitRequestCount).toBeLessThanOrEqual(firstVisitRequestCount);
 	});
 
 	test('should refresh stale cache entries in background', async ({ page }) => {
@@ -138,9 +154,9 @@ test.describe('@utility US-25 Multi-Tier Caching', () => {
 
 		// Track background refresh requests
 		const backgroundRequests: string[] = [];
-		await page.route(OPENALEX_API_PATTERN, (route) => {
+		await page.route(OPENALEX_API_PATTERN, async (route) => {
 			backgroundRequests.push(route.request().url());
-			return route.continue();
+			await route.continue();
 		});
 
 		// Second visit: page should render from cache while background refresh may occur
@@ -167,18 +183,24 @@ test.describe('@utility US-25 Multi-Tier Caching', () => {
 
 		// Track API requests to verify fallthrough
 		let apiCalled = false;
-		await page.route(OPENALEX_API_PATTERN, (route) => {
+		await page.route(OPENALEX_API_PATTERN, async (route) => {
 			apiCalled = true;
-			return route.continue();
+			await route.continue();
 		});
 
 		// Visit entity with empty cache
 		await pageObject.goto(`${BASE_URL}/#/${TEST_ENTITY.type}/${TEST_ENTITY.id}`);
 		await waitForAppReady(page);
-		await page.waitForLoadState('networkidle');
 
-		// Entity data should load via API
-		await expect(page.locator('h1')).toBeVisible({ timeout: 15_000 });
+		try {
+			await page.waitForLoadState('networkidle', { timeout: 30_000 });
+		} catch {
+			// networkidle may not settle if background requests continue
+		}
+
+		// Entity data should load via API (longer timeout for cold cache)
+		const heading = page.locator('h1, [data-testid="entity-title"]').first();
+		await expect(heading).toBeVisible({ timeout: 30_000 });
 
 		// No error should be displayed
 		await pageObject.expectNoError();

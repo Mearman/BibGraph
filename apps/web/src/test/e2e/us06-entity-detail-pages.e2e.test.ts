@@ -142,30 +142,39 @@ test.describe('@entity US-06 Entity Detail Pages', () => {
 		await page.locator('main').waitFor({ timeout: 20_000 });
 		await waitForAppReady(page);
 
-		// Look for view toggle controls (rich/JSON)
-		const jsonToggle = page.getByText(/JSON|Raw|Source/i);
-		const richToggle = page.getByText(/Rich|Formatted|Detail/i);
+		// The EntityDetailLayout uses a Mantine SegmentedControl with "Rich" and "Raw" labels.
+		// Look for the segmented control containing these options.
+		const segmentedControl = page.locator('.mantine-SegmentedControl-root');
+		const hasSegmentedControl = await segmentedControl.first().isVisible().catch(() => false);
 
-		const hasJsonToggle = await jsonToggle.first().isVisible().catch(() => false);
-		const hasRichToggle = await richToggle.first().isVisible().catch(() => false);
+		if (hasSegmentedControl) {
+			// Find the "Raw" label within the segmented control
+			const rawLabel = segmentedControl.first().getByText('Raw');
+			const hasRawLabel = await rawLabel.isVisible().catch(() => false);
 
-		// If toggle exists, test switching between views
-		if (hasJsonToggle) {
-			await jsonToggle.first().click();
+			if (hasRawLabel) {
+				await rawLabel.click();
 
-			// JSON view should show raw data markers
-			const jsonContent = await page.locator('body').textContent() || '';
-			const hasJsonMarkers =
-				jsonContent.includes('{') ||
-				jsonContent.includes('id') ||
-				jsonContent.includes('display_name') ||
-				jsonContent.includes('openalex');
+				// Wait briefly for view to switch
+				await page.waitForTimeout(500);
 
-			expect(hasJsonMarkers).toBe(true);
+				// JSON view should show raw data markers (the heading says "Raw JSON Data")
+				const jsonContent = await page.locator('body').textContent() || '';
+				const hasJsonMarkers =
+					jsonContent.includes('{') ||
+					jsonContent.includes('id') ||
+					jsonContent.includes('display_name') ||
+					jsonContent.includes('openalex') ||
+					jsonContent.includes('Raw JSON Data');
 
-			// Switch back to rich view if possible
-			if (hasRichToggle) {
-				await richToggle.first().click();
+				expect(hasJsonMarkers).toBe(true);
+
+				// Switch back to rich view
+				const richLabel = segmentedControl.first().getByText('Rich');
+				const hasRichLabel = await richLabel.isVisible().catch(() => false);
+				if (hasRichLabel) {
+					await richLabel.click();
+				}
 			}
 		}
 
