@@ -31,7 +31,7 @@ export class GraphComparisonPage extends BaseSPAPageObject {
 	}
 
 	async gotoComparison(): Promise<void> {
-		await this.goto("/graph-comparison");
+		await this.goto("#/graph-comparison");
 		await this.waitForLoadingComplete();
 	}
 

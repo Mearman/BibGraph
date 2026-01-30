@@ -30,7 +30,7 @@ export class DomainsDetailPage extends BaseEntityPageObject {
 	 * @param domainId
 	 */
 	async gotoDomain(domainId: string): Promise<void> {
-		await this.goto(`/domains/${domainId}`);
+		await this.goto(`#/domains/${domainId}`);
 	}
 
 	/**

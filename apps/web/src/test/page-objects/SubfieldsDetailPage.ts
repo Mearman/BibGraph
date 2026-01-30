@@ -37,7 +37,7 @@ export class SubfieldsDetailPage extends BaseEntityPageObject {
 		const numericId = subfieldId.includes("/")
 			? subfieldId.split("/").pop() || subfieldId
 			: subfieldId;
-		await this.goto(`/subfields/${numericId}`);
+		await this.goto(`#/subfields/${numericId}`);
 	}
 
 	/**

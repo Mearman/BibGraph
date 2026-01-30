@@ -34,7 +34,7 @@ export class SearchPage extends BaseSPAPageObject {
 	 * @param query Optional search query to include in URL
 	 */
 	async gotoSearch(query?: string): Promise<void> {
-		const path = query ? `/search?q=${encodeURIComponent(query)}` : "/search";
+		const path = query ? `#/search?q=${encodeURIComponent(query)}` : "#/search";
 		await this.goto(path);
 		await this.expectSearchLoaded();
 	}

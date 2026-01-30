@@ -43,17 +43,17 @@ export class EvaluationPage extends BaseSPAPageObject {
 	}
 
 	async gotoDashboard(): Promise<void> {
-		await this.goto("/evaluation");
+		await this.goto("#/evaluation");
 		await this.waitForLoadingComplete();
 	}
 
 	async gotoDatasets(): Promise<void> {
-		await this.goto("/evaluation/datasets");
+		await this.goto("#/evaluation/datasets");
 		await this.waitForLoadingComplete();
 	}
 
 	async gotoResults(): Promise<void> {
-		await this.goto("/evaluation/results");
+		await this.goto("#/evaluation/results");
 		await this.waitForLoadingComplete();
 	}
 

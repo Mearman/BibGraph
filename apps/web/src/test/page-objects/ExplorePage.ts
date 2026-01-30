@@ -38,7 +38,7 @@ export class ExplorePage extends BaseSPAPageObject {
 	 * Navigate to the Explore page
 	 */
 	async gotoExplore(): Promise<void> {
-		await this.goto("/explore");
+		await this.goto("#/explore");
 		await this.waitForGraphReady();
 	}
 

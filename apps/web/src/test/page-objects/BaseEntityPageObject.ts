@@ -89,7 +89,7 @@ export class BaseEntityPageObject extends BaseSPAPageObject {
 	 * @param entityId
 	 */
 	async gotoEntity(entityId: string): Promise<void> {
-		await this.goto(`/${this.entityType}/${entityId}`);
+		await this.goto(`#/${this.entityType}/${entityId}`);
 	}
 
 	/**

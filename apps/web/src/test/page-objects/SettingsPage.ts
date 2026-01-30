@@ -32,7 +32,7 @@ export class SettingsPage extends BaseSPAPageObject {
 	 * Navigate to the Settings page
 	 */
 	async gotoSettings(): Promise<void> {
-		await this.goto("/settings");
+		await this.goto("#/settings");
 		await this.expectSettingsLoaded();
 	}
 

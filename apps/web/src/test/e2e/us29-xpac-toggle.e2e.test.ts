@@ -28,7 +28,7 @@ test.describe('@utility US-29 Xpac Data Toggle', () => {
 
 	test('should display Xpac toggle in /settings', async ({ page }) => {
 		// Navigate to settings
-		await page.goto(`${BASE_URL}/settings`);
+		await page.goto(`${BASE_URL}/#/settings`);
 		await waitForAppReady(page);
 
 		// Verify xpac toggle is present
@@ -50,7 +50,7 @@ test.describe('@utility US-29 Xpac Data Toggle', () => {
 		const pageObject = new BaseSPAPageObject(page);
 
 		// Navigate to settings and get initial xpac state
-		await page.goto(`${BASE_URL}/settings`);
+		await page.goto(`${BASE_URL}/#/settings`);
 		await waitForAppReady(page);
 
 		const initialState = await settingsPage.isXpacEnabled();
@@ -91,7 +91,7 @@ test.describe('@utility US-29 Xpac Data Toggle', () => {
 		const pageObject = new BaseSPAPageObject(page);
 
 		// Enable xpac if not already enabled
-		await page.goto(`${BASE_URL}/settings`);
+		await page.goto(`${BASE_URL}/#/settings`);
 		await waitForAppReady(page);
 
 		const isEnabled = await settingsPage.isXpacEnabled();
@@ -131,7 +131,7 @@ test.describe('@utility US-29 Xpac Data Toggle', () => {
 
 	test('should persist toggle state across sessions', async ({ page }) => {
 		// Navigate to settings
-		await page.goto(`${BASE_URL}/settings`);
+		await page.goto(`${BASE_URL}/#/settings`);
 		await waitForAppReady(page);
 
 		// Get initial state
@@ -154,7 +154,7 @@ test.describe('@utility US-29 Xpac Data Toggle', () => {
 		await waitForAppReady(page);
 
 		// Navigate back to settings
-		await page.goto(`${BASE_URL}/settings`);
+		await page.goto(`${BASE_URL}/#/settings`);
 		await waitForAppReady(page);
 
 		// Verify state persisted
@@ -165,7 +165,7 @@ test.describe('@utility US-29 Xpac Data Toggle', () => {
 
 	test('should pass accessibility checks (WCAG 2.1 AA)', async ({ page }) => {
 		// Navigate to settings page
-		await page.goto(`${BASE_URL}/settings`);
+		await page.goto(`${BASE_URL}/#/settings`);
 		await waitForAppReady(page);
 
 		// Run accessibility scan

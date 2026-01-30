@@ -32,7 +32,7 @@ export class CachePage extends BaseSPAPageObject {
 	}
 
 	async gotoCache(): Promise<void> {
-		await this.goto("/cache");
+		await this.goto("#/cache");
 		await this.waitForLoadingComplete();
 	}
 

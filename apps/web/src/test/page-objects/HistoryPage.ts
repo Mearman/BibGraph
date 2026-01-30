@@ -28,7 +28,7 @@ export class HistoryPage extends BaseSPAPageObject {
 	}
 
 	async gotoHistory(): Promise<void> {
-		await this.goto("/history");
+		await this.goto("#/history");
 		await this.waitForLoadingComplete();
 	}
 
