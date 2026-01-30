@@ -130,15 +130,13 @@ export class SearchPage extends BaseSPAPageObject {
 	 * @param mode - The view mode to switch to
 	 */
 	async switchViewMode(mode: "list" | "card" | "table"): Promise<void> {
-		// The SegmentedControl renders radio inputs with value matching the mode.
-		// Each option's label is wrapped in a Tooltip with "Table view", "Card view", "List view".
-		// Click the label element within the SegmentedControl for the target mode.
+		// In Mantine v7, SegmentedControl labels contain the inputs (not siblings)
 		const segmentedControl = this.page.locator('.mantine-SegmentedControl-root');
-		const targetInput = segmentedControl.locator(`input[value="${mode}"]`);
-		// Click the associated label (sibling) since the input may be visually hidden
-		const targetLabel = targetInput.locator('~ label');
+		// Click the label that wraps the input for the target mode
+		const targetLabel = segmentedControl.locator(`label:has(input[value="${mode}"])`);
 		await targetLabel.click();
-		await this.waitForLoadingComplete();
+		// Allow time for React state update and re-render
+		await this.page.waitForTimeout(500);
 	}
 
 	/**
@@ -147,7 +145,8 @@ export class SearchPage extends BaseSPAPageObject {
 	 */
 	async getCurrentViewMode(): Promise<string> {
 		const segmentedControl = this.page.locator('.mantine-SegmentedControl-root');
-		const checkedInput = segmentedControl.locator('input[data-checked]');
+		// Mantine v7 uses standard checked attribute on input
+		const checkedInput = segmentedControl.locator('input:checked');
 		const value = await checkedInput.getAttribute('value').catch(() => null);
 		return value ?? "table";
 	}

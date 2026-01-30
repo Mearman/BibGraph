@@ -104,6 +104,8 @@ export const waitForEntityData = async (page: Page, options?: WaitOptions): Prom
 
 /**
  * Wait for search results to be loaded and visible.
+ * Waits for the results container AND at least one result item or table row
+ * to ensure actual data has rendered (not just the empty container).
  * @param page - Playwright page object
  * @param options - Optional timeout configuration
  */
@@ -114,6 +116,18 @@ export const waitForSearchResults = async (page: Page, options?: WaitOptions): P
 		timeout,
 		state: 'visible',
 	});
+
+	// Wait for actual result content to appear inside the container.
+	// The SearchResultsHeader (with SegmentedControl) only renders when results exist.
+	await page.waitForSelector(
+		[
+			'[data-testid="search-results"] .mantine-Table-root tbody tr',
+			'[data-testid="search-results"] table tbody tr',
+			'[data-testid="search-results"] .mantine-Card-root',
+			'[data-testid="search-result-item"]',
+		].join(', '),
+		{ timeout, state: 'visible' },
+	);
 };
 
 /**

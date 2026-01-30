@@ -16,9 +16,9 @@ export default defineConfig({
   // Exclude manual tests from CI runs (they're too slow and comprehensive)
   testIgnore: process.env.CI ? ["**/manual/**"] : [],
 
-  // Run tests serially - one at a time to reduce resource contention
+  // Run test files in parallel but tests within each file sequentially
   fullyParallel: false,
-  workers: 1,
+  workers: process.env.CI ? 3 : 4,
 
   // Fail the build on CI if you accidentally left test.only in the source code
   forbidOnly: !!process.env.CI,
