@@ -29,9 +29,9 @@
     "zod": "4.3.5"
   },
   "devDependencies": {
-    "@types/react": "19.2.8",
+    "@types/react": "19.2.9",
     "eslint": "9.39.2",
-    "react": "19.2.3",
+    "react": "19.2.4",
     "typescript": "5.9.3",
     "vitest": "4.0.16"
   },
@@ -41,7 +41,7 @@
     "@tabler/icons-react": "3.36.1",
     "@tanstack/react-query": "5.90.16",
     "@tanstack/react-router": "1.147.3",
-    "react": "19.2.3"
+    "react": "19.2.4"
   },
   "author": "Joe Mearman",
   "exports": {

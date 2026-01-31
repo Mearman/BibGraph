@@ -27,8 +27,8 @@
     "@tabler/icons-react": "3.36.1",
     "@tanstack/react-table": "8.21.3",
     "@vanilla-extract/css": "1.18.0",
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@mantine/core": "8.3.12",
@@ -39,12 +39,12 @@
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.1",
     "@testing-library/user-event": "14.6.1",
-    "@types/react": "19.2.8",
+    "@types/react": "19.2.9",
     "@types/react-dom": "19.2.3",
     "@vanilla-extract/vite-plugin": "5.1.4",
     "eslint": "9.39.2",
     "eslint-plugin-storybook": "10.1.11",
-    "react": "19.2.3",
+    "react": "19.2.4",
     "storybook": "10.1.11",
     "typescript": "5.9.3",
     "vite": "7.3.1",
@@ -55,8 +55,8 @@
     "@mantine/core": "8.3.12",
     "@mantine/hooks": "8.3.12",
     "@mantine/notifications": "8.3.12",
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
   },
   "author": "Joe Mearman",
   "exports": {
