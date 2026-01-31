@@ -65,7 +65,7 @@ jobs:
           cache: "pnpm"
 
       - name: Setup Nx cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           # Cache full .nx dir (includes workspace-data DB) for cross-run cache sharing
           path: .nx
@@ -213,7 +213,7 @@ jobs:
           cache: "pnpm"
 
       - name: Setup Nx cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           # Cache full .nx dir (includes workspace-data DB) for cross-run cache sharing
           path: .nx
@@ -344,7 +344,7 @@ jobs:
           cache: "pnpm"
 
       - name: Setup Nx cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .nx
           key: ${{ runner.os }}-nx-v3-${{ hashFiles('.github/workflows/ci.yml', 'nx.json', '**/project.json', 'pnpm-lock.yaml', 'tsconfig*.json') }}
@@ -415,7 +415,7 @@ jobs:
   #         echo "Build artifacts validated successfully"
 
   #     - name: Cache Playwright browsers
-  #       uses: actions/cache@v4
+  #       uses: actions/cache@v5
   #       with:
   #         path: ~/.cache/ms-playwright
   #         key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -625,7 +625,7 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Nx cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .nx
           key: ${{ runner.os }}-nx-v3-${{ hashFiles('.github/workflows/ci.yml', 'nx.json', '**/project.json', 'pnpm-lock.yaml', 'tsconfig*.json') }}
@@ -688,7 +688,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Nx cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .nx
           key: ${{ runner.os }}-nx-v3-${{ hashFiles('.github/workflows/ci.yml', 'nx.json', '**/project.json', 'pnpm-lock.yaml', 'tsconfig*.json') }}
@@ -741,7 +741,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Nx cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .nx
           key: ${{ runner.os }}-nx-v3-${{ hashFiles('.github/workflows/ci.yml', 'nx.json', '**/project.json', 'pnpm-lock.yaml', 'tsconfig*.json') }}
@@ -797,7 +797,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Nx cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .nx
           key: ${{ runner.os }}-nx-v3-${{ hashFiles('.github/workflows/ci.yml', 'nx.json', '**/project.json', 'pnpm-lock.yaml', 'tsconfig*.json') }}
