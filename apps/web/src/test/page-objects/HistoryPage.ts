@@ -15,9 +15,9 @@ import { BaseSPAPageObject } from "./BaseSPAPageObject";
 export class HistoryPage extends BaseSPAPageObject {
 	private readonly historySelectors = {
 		historyContainer: "main, [class*='Stack']",
-		/** Only match history entry cards (which contain a Badge), not the empty state card */
-		historyEntry: ".mantine-Card-root:has(.mantine-Badge-root)",
-		historyEntryTitle: ".mantine-Card-root:has(.mantine-Badge-root) .mantine-Text-root",
+		/** Only match history entry cards within main content (not sidebar), which contain a Badge */
+		historyEntry: "main .mantine-Card-root:has(.mantine-Badge-root)",
+		historyEntryTitle: "main .mantine-Card-root:has(.mantine-Badge-root) .mantine-Text-root",
 		clearAllButton: "button:has-text('Clear History')",
 		searchInput:
 			"input[placeholder='Search history...'], input[aria-label='Search navigation history']",

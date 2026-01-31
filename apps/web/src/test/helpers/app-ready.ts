@@ -22,6 +22,16 @@ export const waitForAppReady = async (page: Page, options?: WaitOptions): Promis
 		// localStorage may not be available yet
 	});
 
+	// Close welcome dialog if it's already visible (race with React mount)
+	try {
+		const skipTourBtn = page.locator('button:has-text("Skip Tour")');
+		await skipTourBtn.waitFor({ state: 'visible', timeout: 2000 });
+		await skipTourBtn.click();
+		await page.waitForTimeout(300);
+	} catch {
+		// Dialog may not be present if localStorage was set early enough
+	}
+
 	// Wait for root element to exist and have children
 	try {
 		await page.waitForSelector('#root:has(*)', { timeout, state: 'attached' });
@@ -117,15 +127,10 @@ export const waitForSearchResults = async (page: Page, options?: WaitOptions): P
 		state: 'visible',
 	});
 
-	// Wait for actual result content to appear inside the container.
-	// The SearchResultsHeader (with SegmentedControl) only renders when results exist.
+	// Wait for the SearchResultsHeader SegmentedControl which only renders
+	// when actual results have loaded (not during skeleton/loading states).
 	await page.waitForSelector(
-		[
-			'[data-testid="search-results"] .mantine-Table-root tbody tr',
-			'[data-testid="search-results"] table tbody tr',
-			'[data-testid="search-results"] .mantine-Card-root',
-			'[data-testid="search-result-item"]',
-		].join(', '),
+		'[data-testid="search-results"] .mantine-SegmentedControl-root',
 		{ timeout, state: 'visible' },
 	);
 };
