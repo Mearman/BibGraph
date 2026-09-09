@@ -59,7 +59,7 @@
 		"lru-cache": "11.5.2",
 		"react": "19.2.8",
 		"storybook": "10.6.0",
-		"typescript": "6.0.3",
+		"typescript": "7.0.2",
 		"vite": "8.2.2",
 		"vite-plugin-dts": "5.1.0",
 		"vitest": "4.1.11"

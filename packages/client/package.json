@@ -44,7 +44,7 @@
 		"immer": "11.1.18",
 		"memfs": "4.71.0",
 		"msw": "2.15.0",
-		"typescript": "6.0.3",
+		"typescript": "7.0.2",
 		"vitest": "4.1.11",
 		"vitest-axe": "0.1.0"
 	},
