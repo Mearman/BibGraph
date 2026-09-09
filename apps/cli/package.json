@@ -2,8 +2,46 @@
 	"name": "@bibgraph/cli",
 	"description": "Command-line interface for OpenAlex data access",
 	"version": "0.0.0",
-	"type": "module",
+	"author": "Joe Mearman",
+	"bin": {
+		"openalex-cli": "./src/openalex-cli.ts"
+	},
+	"dependencies": {
+		"@bibgraph/client": "workspace:*",
+		"@bibgraph/types": "workspace:*",
+		"@bibgraph/utils": "workspace:*",
+		"commander": "15.0.0",
+		"zod": "4.5.4"
+	},
+	"devDependencies": {
+		"@testing-library/jest-dom": "7.0.1",
+		"@testing-library/user-event": "14.6.7",
+		"@types/node": "26.4.1",
+		"eslint": "10.10.0",
+		"msw": "2.15.0",
+		"tsx": "4.23.13",
+		"typescript": "7.0.2",
+		"vitest": "4.1.11"
+	},
+	"files": [
+		"src",
+		"README.md"
+	],
+	"keywords": [
+		"academic",
+		"cli",
+		"openalex",
+		"research",
+		"typescript"
+	],
+	"license": "MIT",
+	"nx": {
+		"includedScripts": []
+	},
 	"private": true,
+	"publishConfig": {
+		"access": "public"
+	},
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/Mearman/BibGraph.git",
@@ -26,43 +64,5 @@
 		"test:watch": "pnpm run _test:watch",
 		"typecheck": "pnpm run _typecheck"
 	},
-	"dependencies": {
-		"@bibgraph/client": "workspace:*",
-		"@bibgraph/types": "workspace:*",
-		"@bibgraph/utils": "workspace:*",
-		"commander": "15.0.0",
-		"zod": "4.5.4"
-	},
-	"devDependencies": {
-		"@testing-library/jest-dom": "7.0.1",
-		"@testing-library/user-event": "14.6.7",
-		"@types/node": "26.4.1",
-		"eslint": "10.10.0",
-		"msw": "2.15.0",
-		"tsx": "4.23.13",
-		"typescript": "7.0.2",
-		"vitest": "4.1.11"
-	},
-	"author": "Joe Mearman",
-	"bin": {
-		"openalex-cli": "./src/openalex-cli.ts"
-	},
-	"files": [
-		"src",
-		"README.md"
-	],
-	"keywords": [
-		"academic",
-		"cli",
-		"openalex",
-		"research",
-		"typescript"
-	],
-	"license": "MIT",
-	"nx": {
-		"includedScripts": []
-	},
-	"publishConfig": {
-		"access": "public"
-	}
+	"type": "module"
 }
