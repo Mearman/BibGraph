@@ -505,35 +505,23 @@ export default tseslint.config([
             "yml/no-empty-mapping-value": "off",
         },
     },
+
 	// Rules whose violations appear only under the eslint 10 / eslint-react 5 /
 	// unicorn 74 / sonarjs 4 / playwright major bumps. Disabling them keeps the
 	// dependency update free of a codebase-wide style rewrite; a dedicated
-	// enable-and-fix pass should shrink this list. Everything enforced before
-	// the bumps stays enforced above. Positioned last so plugin presets spread
-	// earlier in this array cannot re-enable them.
+	// enable-and-fix pass should shrink this list (issue #395 carries the
+	// measured volumes). Everything enforced before the bumps stays enforced
+	// above. Positioned last so plugin presets spread earlier in this array
+	// cannot re-enable them.
 	{
 		rules: {
-			"@eslint-react/dom-no-unsafe-iframe-sandbox": "off",
 			"@eslint-react/error-boundaries": "off",
-			"@eslint-react/exhaustive-deps": "off",
-			"@eslint-react/jsx-no-children-prop": "off",
-			"@eslint-react/naming-convention-ref-name": "off",
-			"@eslint-react/purity": "off",
 			"@eslint-react/rules-of-hooks": "off",
-			"@eslint-react/set-state-in-effect": "off",
 			"@eslint-react/static-components": "off",
 			"@eslint-react/use-memo": "off",
-			"@eslint-react/use-state": "off",
-			"@eslint-react/web-api-no-leaked-timeout": "off",
 			"import-x/no-default-export": "off",
-			"import-x/no-unresolved": "off",
-			"import/no-default-export": "off",
-			"import/no-relative-packages": "off",
-			"n/no-unsupported-features/node-builtins": "off",
 			"no-unassigned-vars": "off",
 			"no-useless-assignment": "off",
-			"playwright/prefer-hooks-on-top": "off",
-			"playwright/prefer-locator": "off",
 			"prefer-const": "off",
 			"preserve-caught-error": "off",
 			"sonarjs/assertions-in-tests": "off",

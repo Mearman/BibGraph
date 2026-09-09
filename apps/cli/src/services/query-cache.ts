@@ -64,8 +64,8 @@ export class QueryCacheService {
 			const content = await readFile(queryIndexPath, "utf-8")
 			const queryIndex = JSON.parse(content) as CLIQueryIndex
 
-			const queryEntry = queryIndex.queries.some((q) => q.url === queryUrl)
-			if (!queryEntry) {
+			const isQueryEntry = queryIndex.queries.some((q) => q.url === queryUrl)
+			if (!isQueryEntry) {
 				return undefined
 			}
 
