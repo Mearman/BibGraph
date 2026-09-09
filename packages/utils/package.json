@@ -2,8 +2,172 @@
 	"name": "@bibgraph/utils",
 	"description": "Shared utilities and helpers for BibGraph",
 	"version": "0.0.0",
-	"type": "module",
+	"author": "Joe Mearman",
+	"dependencies": {
+		"@bibgraph/types": "workspace:*",
+		"@types/pako": "3.0.0",
+		"@types/qrcode": "1.5.6",
+		"dexie": "4.4.5",
+		"pako": "3.0.1",
+		"qrcode": "1.5.4",
+		"zod": "4.5.4"
+	},
+	"devDependencies": {
+		"@types/react": "19.2.18",
+		"eslint": "10.10.0",
+		"react": "19.2.8",
+		"typescript": "7.0.2",
+		"vitest": "4.1.11"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"source": "./src/index.ts"
+		},
+		"./logger": {
+			"types": "./dist/logger.d.ts",
+			"import": "./dist/logger.js",
+			"source": "./src/logger.ts"
+		},
+		"./cache": {
+			"types": "./dist/cache/index.d.ts",
+			"import": "./dist/cache/index.js",
+			"source": "./src/cache/index.ts"
+		},
+		"./storage": {
+			"types": "./dist/storage/index.d.ts",
+			"import": "./dist/storage/index.js",
+			"source": "./src/storage/index.ts"
+		},
+		"./ui": {
+			"types": "./dist/ui.d.ts",
+			"import": "./dist/ui.js",
+			"source": "./src/ui/filter-base.tsx"
+		},
+		"./date-helpers": {
+			"types": "./dist/date-helpers.d.ts",
+			"import": "./dist/date-helpers.js",
+			"source": "./src/date-helpers.ts"
+		},
+		"./data-helpers": {
+			"types": "./dist/data.d.ts",
+			"import": "./dist/data.js",
+			"source": "./src/data.ts"
+		},
+		"./build-info": {
+			"types": "./dist/build-info.d.ts",
+			"import": "./dist/build-info.js",
+			"source": "./src/build-info.ts"
+		},
+		"./data-evaluation": {
+			"types": "./dist/data-evaluation.d.ts",
+			"import": "./dist/data-evaluation.js",
+			"source": "./src/data-evaluation.ts"
+		},
+		"./services": {
+			"types": "./dist/services.d.ts",
+			"import": "./dist/services.js",
+			"source": "./src/services.ts"
+		},
+		"./state": {
+			"types": "./dist/state/index.d.ts",
+			"import": "./dist/state/index.js",
+			"source": "./src/state/index.ts"
+		},
+		"./validation": {
+			"types": "./dist/validation.d.ts",
+			"import": "./dist/validation.js",
+			"source": "./src/validation.ts"
+		},
+		"./environment": {
+			"types": "./dist/environment/index.d.ts",
+			"import": "./dist/environment/index.js",
+			"source": "./src/environment/index.ts"
+		},
+		"./static-data/cache-utilities": {
+			"types": "./dist/static-data/cache-utilities.d.ts",
+			"import": "./dist/static-data/cache-utilities.js",
+			"source": "./src/static-data/cache/index.ts"
+		},
+		"./static-data/cache": {
+			"types": "./dist/static-data/cache.d.ts",
+			"import": "./dist/static-data/cache.js",
+			"source": "./src/static-data/cache/index.ts"
+		},
+		"./normalize-route": {
+			"types": "./dist/normalize-route.d.ts",
+			"import": "./dist/normalize-route.js",
+			"source": "./src/normalize-route.ts"
+		},
+		"./storage/catalogue-db": {
+			"types": "./dist/storage/catalogue-db.d.ts",
+			"import": "./dist/storage/catalogue-db.js",
+			"source": "./src/storage/catalogue-db.ts"
+		},
+		"./storage/user-interactions": {
+			"types": "./dist/storage/user-interactions/index.d.ts",
+			"import": "./dist/storage/user-interactions/index.js",
+			"source": "./src/storage/user-interactions/index.ts"
+		},
+		"./ui/filter-base": {
+			"types": "./dist/ui/filter-base.d.ts",
+			"import": "./dist/ui/filter-base.js",
+			"source": "./src/ui/filter-base.ts"
+		},
+		"./workers/messages": {
+			"types": "./dist/workers/messages.d.ts",
+			"import": "./dist/workers/messages.js",
+			"source": "./src/workers/messages.ts"
+		}
+	},
+	"files": [
+		"dist",
+		"src",
+		"README.md"
+	],
+	"keywords": [
+		"academic",
+		"helpers",
+		"research",
+		"typescript",
+		"utils"
+	],
+	"license": "MIT",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"nx": {
+		"includedScripts": []
+	},
+	"peerDependencies": {
+		"@mantine/core": "9.6.0",
+		"@mantine/hooks": "9.6.0",
+		"@tabler/icons-react": "3.46.0",
+		"@tanstack/react-query": "5.102.8",
+		"@tanstack/react-router": "1.170.32",
+		"react": "19.2.8"
+	},
+	"peerDependenciesMeta": {
+		"@mantine/core": {
+			"optional": true
+		},
+		"@mantine/hooks": {
+			"optional": true
+		},
+		"@tabler/icons-react": {
+			"optional": true
+		},
+		"@tanstack/react-query": {
+			"optional": true
+		},
+		"@tanstack/react-router": {
+			"optional": true
+		}
+	},
 	"private": true,
+	"publishConfig": {
+		"access": "public"
+	},
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/Mearman/BibGraph.git",
@@ -27,170 +191,6 @@
 		"test:watch": "pnpm run _test:watch",
 		"typecheck": "pnpm run _typecheck"
 	},
-	"dependencies": {
-		"@bibgraph/types": "workspace:*",
-		"@types/pako": "3.0.0",
-		"@types/qrcode": "1.5.6",
-		"dexie": "4.4.5",
-		"pako": "3.0.1",
-		"qrcode": "1.5.4",
-		"zod": "4.5.4"
-	},
-	"devDependencies": {
-		"@types/react": "19.2.18",
-		"eslint": "10.10.0",
-		"react": "19.2.8",
-		"typescript": "6.0.3",
-		"vitest": "4.1.11"
-	},
-	"peerDependencies": {
-		"@mantine/core": "9.6.0",
-		"@mantine/hooks": "9.6.0",
-		"@tabler/icons-react": "3.46.0",
-		"@tanstack/react-query": "5.102.8",
-		"@tanstack/react-router": "1.170.32",
-		"react": "19.2.8"
-	},
-	"author": "Joe Mearman",
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"source": "./src/index.ts",
-			"import": "./dist/index.js"
-		},
-		"./logger": {
-			"types": "./dist/logger.d.ts",
-			"source": "./src/logger.ts",
-			"import": "./dist/logger.js"
-		},
-		"./cache": {
-			"types": "./dist/cache/index.d.ts",
-			"source": "./src/cache/index.ts",
-			"import": "./dist/cache/index.js"
-		},
-		"./storage": {
-			"types": "./dist/storage/index.d.ts",
-			"source": "./src/storage/index.ts",
-			"import": "./dist/storage/index.js"
-		},
-		"./ui": {
-			"types": "./dist/ui.d.ts",
-			"source": "./src/ui/filter-base.tsx",
-			"import": "./dist/ui.js"
-		},
-		"./date-helpers": {
-			"types": "./dist/date-helpers.d.ts",
-			"source": "./src/date-helpers.ts",
-			"import": "./dist/date-helpers.js"
-		},
-		"./data-helpers": {
-			"types": "./dist/data.d.ts",
-			"source": "./src/data.ts",
-			"import": "./dist/data.js"
-		},
-		"./build-info": {
-			"types": "./dist/build-info.d.ts",
-			"source": "./src/build-info.ts",
-			"import": "./dist/build-info.js"
-		},
-		"./data-evaluation": {
-			"types": "./dist/data-evaluation.d.ts",
-			"source": "./src/data-evaluation.ts",
-			"import": "./dist/data-evaluation.js"
-		},
-		"./services": {
-			"types": "./dist/services.d.ts",
-			"source": "./src/services.ts",
-			"import": "./dist/services.js"
-		},
-		"./state": {
-			"types": "./dist/state/index.d.ts",
-			"source": "./src/state/index.ts",
-			"import": "./dist/state/index.js"
-		},
-		"./validation": {
-			"types": "./dist/validation.d.ts",
-			"source": "./src/validation.ts",
-			"import": "./dist/validation.js"
-		},
-		"./environment": {
-			"types": "./dist/environment/index.d.ts",
-			"source": "./src/environment/index.ts",
-			"import": "./dist/environment/index.js"
-		},
-		"./static-data/cache-utilities": {
-			"types": "./dist/static-data/cache-utilities.d.ts",
-			"source": "./src/static-data/cache/index.ts",
-			"import": "./dist/static-data/cache-utilities.js"
-		},
-		"./static-data/cache": {
-			"types": "./dist/static-data/cache.d.ts",
-			"source": "./src/static-data/cache/index.ts",
-			"import": "./dist/static-data/cache.js"
-		},
-		"./normalize-route": {
-			"types": "./dist/normalize-route.d.ts",
-			"source": "./src/normalize-route.ts",
-			"import": "./dist/normalize-route.js"
-		},
-		"./storage/catalogue-db": {
-			"types": "./dist/storage/catalogue-db.d.ts",
-			"source": "./src/storage/catalogue-db.ts",
-			"import": "./dist/storage/catalogue-db.js"
-		},
-		"./storage/user-interactions": {
-			"types": "./dist/storage/user-interactions/index.d.ts",
-			"source": "./src/storage/user-interactions/index.ts",
-			"import": "./dist/storage/user-interactions/index.js"
-		},
-		"./ui/filter-base": {
-			"types": "./dist/ui/filter-base.d.ts",
-			"source": "./src/ui/filter-base.ts",
-			"import": "./dist/ui/filter-base.js"
-		},
-		"./workers/messages": {
-			"types": "./dist/workers/messages.d.ts",
-			"source": "./src/workers/messages.ts",
-			"import": "./dist/workers/messages.js"
-		}
-	},
-	"files": [
-		"dist",
-		"src",
-		"README.md"
-	],
-	"keywords": [
-		"academic",
-		"helpers",
-		"research",
-		"typescript",
-		"utils"
-	],
-	"license": "MIT",
-	"main": "./dist/index.js",
-	"module": "./dist/index.js",
-	"nx": {
-		"includedScripts": []
-	},
-	"peerDependenciesMeta": {
-		"@mantine/core": {
-			"optional": true
-		},
-		"@mantine/hooks": {
-			"optional": true
-		},
-		"@tabler/icons-react": {
-			"optional": true
-		},
-		"@tanstack/react-query": {
-			"optional": true
-		},
-		"@tanstack/react-router": {
-			"optional": true
-		}
-	},
-	"publishConfig": {
-		"access": "public"
-	},
+	"type": "module",
 	"types": "./dist/index.d.ts"
 }

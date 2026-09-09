@@ -2,38 +2,25 @@
 	"name": "@bibgraph/types",
 	"description": "Type definitions, schemas, and type guards for BibGraph",
 	"version": "0.0.0",
-	"type": "module",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/Mearman/BibGraph.git",
-		"directory": "packages/types"
-	},
-	"scripts": {
-		"build": "nx run types:build",
-		"clean": "nx run types:clean",
-		"dev": "nx run types:dev",
-		"lint": "nx run types:lint",
-		"typecheck": "nx run types:typecheck"
-	},
+	"author": "Joe Mearman",
 	"dependencies": {
 		"zod": "4.5.4"
 	},
 	"devDependencies": {
 		"eslint": "10.10.0",
-		"typescript": "6.0.3",
+		"typescript": "7.0.2",
 		"vitest": "4.1.11"
 	},
-	"author": "Joe Mearman",
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
-			"source": "./src/index.ts",
-			"import": "./dist/index.js"
+			"import": "./dist/index.js",
+			"source": "./src/index.ts"
 		},
 		"./entities": {
 			"types": "./dist/index.d.ts",
-			"source": "./src/entities/index.ts",
-			"import": "./dist/index.js"
+			"import": "./dist/index.js",
+			"source": "./src/entities/index.ts"
 		}
 	},
 	"files": [
@@ -60,5 +47,18 @@
 	"publishConfig": {
 		"access": "public"
 	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Mearman/BibGraph.git",
+		"directory": "packages/types"
+	},
+	"scripts": {
+		"build": "nx run types:build",
+		"clean": "nx run types:clean",
+		"dev": "nx run types:dev",
+		"lint": "nx run types:lint",
+		"typecheck": "nx run types:typecheck"
+	},
+	"type": "module",
 	"types": "./dist/index.d.ts"
 }

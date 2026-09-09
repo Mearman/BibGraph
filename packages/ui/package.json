@@ -2,8 +2,98 @@
 	"name": "@bibgraph/ui",
 	"description": "Reusable UI components for BibGraph built with Mantine and XYFlow",
 	"version": "0.0.0",
-	"type": "module",
+	"author": "Joe Mearman",
+	"dependencies": {
+		"@bibgraph/types": "workspace:*",
+		"@tabler/icons-react": "3.46.0",
+		"@tanstack/react-table": "9.2.4",
+		"@tanstack/react-virtual": "3.14.10",
+		"@vanilla-extract/css": "1.21.2",
+		"react": "19.2.8",
+		"react-dom": "19.2.8"
+	},
+	"devDependencies": {
+		"@mantine/core": "9.6.0",
+		"@mantine/hooks": "9.6.0",
+		"@mantine/notifications": "9.6.0",
+		"@storybook/addon-docs": "10.6.0",
+		"@storybook/react-vite": "10.6.0",
+		"@testing-library/jest-dom": "7.0.1",
+		"@testing-library/react": "16.3.3",
+		"@testing-library/user-event": "14.6.7",
+		"@types/react": "19.2.18",
+		"@types/react-dom": "19.2.7",
+		"@vanilla-extract/vite-plugin": "5.2.6",
+		"eslint": "10.10.0",
+		"eslint-plugin-storybook": "10.6.0",
+		"lru-cache": "11.5.2",
+		"react": "19.2.8",
+		"storybook": "10.6.0",
+		"typescript": "7.0.2",
+		"vite": "8.2.2",
+		"vite-plugin-dts": "5.1.0",
+		"vitest": "4.1.11"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.es.js",
+			"require": "./dist/index.cjs.js",
+			"source": "./src/index.ts"
+		},
+		"./components/ViewToggle": {
+			"types": "./dist/components/ViewToggle.d.ts",
+			"import": "./dist/components/ViewToggle.js",
+			"source": "./src/components/ViewToggle.tsx"
+		},
+		"./components/entity-views": {
+			"types": "./dist/components/entity-views/index.d.ts",
+			"import": "./dist/components/entity-views/index.js",
+			"source": "./src/components/entity-views/index.ts"
+		},
+		"./components/entity-views/matchers/index": {
+			"types": "./dist/components/entity-views/matchers/index.d.ts",
+			"import": "./dist/components/entity-views/matchers/index.js",
+			"source": "./src/components/entity-views/matchers/index.ts"
+		}
+	},
+	"files": [
+		"dist",
+		"src",
+		"README.md"
+	],
+	"keywords": [
+		"academic",
+		"components",
+		"mantine",
+		"react",
+		"research",
+		"typescript",
+		"ui",
+		"xyflow"
+	],
+	"license": "MIT",
+	"main": "./dist/index.cjs.js",
+	"module": "./dist/index.es.js",
+	"nx": {
+		"includedScripts": []
+	},
+	"peerDependencies": {
+		"@mantine/core": "9.6.0",
+		"@mantine/hooks": "9.6.0",
+		"@mantine/notifications": "9.6.0",
+		"react": "19.2.8",
+		"react-dom": "19.2.8"
+	},
+	"peerDependenciesMeta": {
+		"@mantine/notifications": {
+			"optional": true
+		}
+	},
 	"private": true,
+	"publishConfig": {
+		"access": "public"
+	},
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/Mearman/BibGraph.git",
@@ -33,96 +123,6 @@
 		"test:watch": "pnpm run _test:watch",
 		"typecheck": "pnpm run _typecheck"
 	},
-	"dependencies": {
-		"@bibgraph/types": "workspace:*",
-		"@tabler/icons-react": "3.46.0",
-		"@tanstack/react-table": "9.2.4",
-		"@tanstack/react-virtual": "3.14.10",
-		"@vanilla-extract/css": "1.21.2",
-		"react": "19.2.8",
-		"react-dom": "19.2.8"
-	},
-	"devDependencies": {
-		"@mantine/core": "9.6.0",
-		"@mantine/hooks": "9.6.0",
-		"@mantine/notifications": "9.6.0",
-		"@storybook/addon-docs": "10.6.0",
-		"@storybook/react-vite": "10.6.0",
-		"@testing-library/jest-dom": "7.0.1",
-		"@testing-library/react": "16.3.3",
-		"@testing-library/user-event": "14.6.7",
-		"@types/react": "19.2.18",
-		"@types/react-dom": "19.2.7",
-		"@vanilla-extract/vite-plugin": "5.2.6",
-		"eslint": "10.10.0",
-		"eslint-plugin-storybook": "10.6.0",
-		"lru-cache": "11.5.2",
-		"react": "19.2.8",
-		"storybook": "10.6.0",
-		"typescript": "6.0.3",
-		"vite": "8.2.2",
-		"vite-plugin-dts": "5.1.0",
-		"vitest": "4.1.11"
-	},
-	"peerDependencies": {
-		"@mantine/core": "9.6.0",
-		"@mantine/hooks": "9.6.0",
-		"@mantine/notifications": "9.6.0",
-		"react": "19.2.8",
-		"react-dom": "19.2.8"
-	},
-	"author": "Joe Mearman",
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"source": "./src/index.ts",
-			"import": "./dist/index.es.js",
-			"require": "./dist/index.cjs.js"
-		},
-		"./components/ViewToggle": {
-			"types": "./dist/components/ViewToggle.d.ts",
-			"source": "./src/components/ViewToggle.tsx",
-			"import": "./dist/components/ViewToggle.js"
-		},
-		"./components/entity-views": {
-			"types": "./dist/components/entity-views/index.d.ts",
-			"source": "./src/components/entity-views/index.ts",
-			"import": "./dist/components/entity-views/index.js"
-		},
-		"./components/entity-views/matchers/index": {
-			"types": "./dist/components/entity-views/matchers/index.d.ts",
-			"source": "./src/components/entity-views/matchers/index.ts",
-			"import": "./dist/components/entity-views/matchers/index.js"
-		}
-	},
-	"files": [
-		"dist",
-		"src",
-		"README.md"
-	],
-	"keywords": [
-		"academic",
-		"components",
-		"mantine",
-		"react",
-		"research",
-		"typescript",
-		"ui",
-		"xyflow"
-	],
-	"license": "MIT",
-	"main": "./dist/index.cjs.js",
-	"module": "./dist/index.es.js",
-	"nx": {
-		"includedScripts": []
-	},
-	"peerDependenciesMeta": {
-		"@mantine/notifications": {
-			"optional": true
-		}
-	},
-	"publishConfig": {
-		"access": "public"
-	},
+	"type": "module",
 	"types": "./dist/index.d.ts"
 }
