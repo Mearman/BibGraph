@@ -70,7 +70,7 @@
 		"date-fns": "4.4.0",
 		"dexie": "4.4.5",
 		"idb": "8.0.3",
-		"posthog-js": "1.427.2",
+		"posthog-js": "1.428.3",
 		"qrcode": "1.5.4",
 		"r3f-forcegraph": "1.1.1",
 		"react": "19.2.8",
