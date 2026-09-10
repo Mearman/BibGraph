@@ -68,7 +68,7 @@
 		"@semantic-release/release-notes-generator": "14.1.1",
 		"@stylistic/eslint-plugin": "5.10.0",
 		"@swc-node/register": "1.12.1",
-		"@swc/core": "1.16.1",
+		"@swc/core": "1.16.2",
 		"@swc/helpers": "0.5.23",
 		"@tanstack/eslint-plugin-query": "5.102.8",
 		"@testing-library/jest-dom": "7.0.1",
