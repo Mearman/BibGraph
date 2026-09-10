@@ -416,8 +416,8 @@ importers:
         specifier: 9.6.0
         version: 9.6.0(@mantine/core@9.6.0(@mantine/hooks@9.6.0(react@19.2.8))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@mantine/hooks@9.6.0(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@posthog/react':
-        specifier: 1.10.5
-        version: 1.10.5(@types/react@19.2.18)(posthog-js@1.427.2(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)
+        specifier: 1.10.6
+        version: 1.10.6(@types/react@19.2.18)(posthog-js@1.427.2(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)
       '@react-three/drei':
         specifier: 10.7.8
         version: 10.7.8(@react-three/fiber@9.7.0(@types/react@19.2.18)(immer@11.1.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(three@0.185.1))(@types/react@19.2.18)(@types/three@0.185.4)(immer@11.1.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(three@0.185.1)
@@ -3062,8 +3062,8 @@ packages:
   '@posthog/core@1.51.0':
     resolution: {integrity: sha512-LilmmtjcrjV1LgaVNQXrAUt4IXcWIYMrwEtx6VJUUFDeBBdmeI99jshKGtAWugYeB3Wkcp9xQIVCrxIYRpNiRA==}
 
-  '@posthog/react@1.10.5':
-    resolution: {integrity: sha512-lehh9+mJwb6iEjRBkIvh8olnJ6RV+YgQgdgJ6fdTr+T7EMoml/G1k+q92Oil8vZPcA9Dzg+2n0xaLY5yZrY3YA==}
+  '@posthog/react@1.10.6':
+    resolution: {integrity: sha512-eXCxqrXT53MLU+xaiE1SeoIU7kMagQnWOhh/075cfckjfl4/K0yBpeQw8rn2yGFyDxEnXN+rxV/YGEELpnW3GA==}
     peerDependencies:
       '@types/react': '>=16.8.0'
       posthog-js: '>=1.257.2'
@@ -11893,7 +11893,7 @@ snapshots:
     dependencies:
       '@posthog/types': 1.409.1
 
-  '@posthog/react@1.10.5(@types/react@19.2.18)(posthog-js@1.427.2(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)':
+  '@posthog/react@1.10.6(@types/react@19.2.18)(posthog-js@1.427.2(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)':
     dependencies:
       posthog-js: 1.427.2(@types/react@19.2.18)(react@19.2.8)
       react: 19.2.8
