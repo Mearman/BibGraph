@@ -59,7 +59,7 @@
 		"@eslint/js": "10.0.1",
 		"@eslint/markdown": "8.0.3",
 		"@octokit/rest": "22.0.1",
-		"@playwright/test": "1.62.1",
+		"@playwright/test": "1.63.0",
 		"@semantic-release/changelog": "7.0.0",
 		"@semantic-release/commit-analyzer": "13.0.1",
 		"@semantic-release/git": "11.0.1",
