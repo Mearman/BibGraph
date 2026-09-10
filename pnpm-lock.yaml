@@ -417,7 +417,7 @@ importers:
         version: 9.6.0(@mantine/core@9.6.0(@mantine/hooks@9.6.0(react@19.2.8))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@mantine/hooks@9.6.0(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@posthog/react':
         specifier: 1.10.5
-        version: 1.10.5(@types/react@19.2.18)(posthog-js@1.427.2(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)
+        version: 1.10.5(@types/react@19.2.18)(posthog-js@1.428.3(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)
       '@react-three/drei':
         specifier: 10.7.8
         version: 10.7.8(@react-three/fiber@9.7.0(@types/react@19.2.18)(immer@11.1.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(three@0.185.1))(@types/react@19.2.18)(@types/three@0.185.4)(immer@11.1.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(three@0.185.1)
@@ -467,8 +467,8 @@ importers:
         specifier: 8.0.3
         version: 8.0.3
       posthog-js:
-        specifier: 1.427.2
-        version: 1.427.2(@types/react@19.2.18)(react@19.2.8)
+        specifier: 1.428.3
+        version: 1.428.3(@types/react@19.2.18)(react@19.2.8)
       qrcode:
         specifier: 1.5.4
         version: 1.5.4
@@ -3056,8 +3056,8 @@ packages:
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
 
-  '@posthog/browser-common@0.7.3':
-    resolution: {integrity: sha512-663KkV0SlP4SqrhdMZG0VumuXc8Aq602il6Z/M48ZUjIPMHZW65bzGIh1Sqfzd9ryjKOxdpOOQy9vCCL0zhXXQ==}
+  '@posthog/browser-common@0.8.2':
+    resolution: {integrity: sha512-8g7+ijrx8bfWmpDjmP07e0ZmdRnJoFqZ6PCcMQvfBTUrr422GRXvQWpQn7yD028zIJHIIn/rUTipKgUC5UkWpw==}
 
   '@posthog/core@1.51.0':
     resolution: {integrity: sha512-LilmmtjcrjV1LgaVNQXrAUt4IXcWIYMrwEtx6VJUUFDeBBdmeI99jshKGtAWugYeB3Wkcp9xQIVCrxIYRpNiRA==}
@@ -7884,8 +7884,8 @@ packages:
     resolution: {integrity: sha512-g50586zr4bZmwFiTlflMu8E0bDTb5I5gertgwAKmsdUlTQIhZtunzUlD1WSzwcVWPoAVpsrA6vlfCD7oXvRwgg==}
     engines: {node: ^10 || ^12 || >=14}
 
-  posthog-js@1.427.2:
-    resolution: {integrity: sha512-/jRg3ChHuxcHTTJ/xb+IbpXLYxiBKIWdjrsNNqY1tAwjnFoijmz58i4mIR4A2P5MWx+4R7LlpK9vQfBr8v292g==}
+  posthog-js@1.428.3:
+    resolution: {integrity: sha512-39BloFeL5koaAC8FmbDFx1RQGUwZkqO46M2d1wCi2vVkmiv+TrjC37t5hT9QjAszAeGn7gXeBX7E+MgND5Tygw==}
     peerDependencies:
       '@types/react': '>=16.8.0'
       react: '>=16.8.0'
@@ -11884,7 +11884,7 @@ snapshots:
 
   '@polka/url@1.0.0-next.29': {}
 
-  '@posthog/browser-common@0.7.3':
+  '@posthog/browser-common@0.8.2':
     dependencies:
       '@posthog/core': 1.51.0
       '@posthog/types': 1.409.1
@@ -11893,9 +11893,9 @@ snapshots:
     dependencies:
       '@posthog/types': 1.409.1
 
-  '@posthog/react@1.10.5(@types/react@19.2.18)(posthog-js@1.427.2(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)':
+  '@posthog/react@1.10.5(@types/react@19.2.18)(posthog-js@1.428.3(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)':
     dependencies:
-      posthog-js: 1.427.2(@types/react@19.2.18)(react@19.2.8)
+      posthog-js: 1.428.3(@types/react@19.2.18)(react@19.2.8)
       react: 19.2.8
     optionalDependencies:
       '@types/react': 19.2.18
@@ -17345,9 +17345,9 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  posthog-js@1.427.2(@types/react@19.2.18)(react@19.2.8):
+  posthog-js@1.428.3(@types/react@19.2.18)(react@19.2.8):
     dependencies:
-      '@posthog/browser-common': 0.7.3
+      '@posthog/browser-common': 0.8.2
       '@posthog/core': 1.51.0
       '@posthog/types': 1.409.1
       core-js: 3.50.0
