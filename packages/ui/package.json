@@ -2,37 +2,7 @@
 	"name": "@bibgraph/ui",
 	"description": "Reusable UI components for BibGraph built with Mantine and XYFlow",
 	"version": "0.0.0",
-	"type": "module",
-	"private": true,
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/Mearman/BibGraph.git",
-		"directory": "packages/ui"
-	},
-	"scripts": {
-		"_build": "vite build",
-		"_lint": "eslint . --cache",
-		"_storybook": "storybook dev",
-		"_storybook:build": "storybook build",
-		"_test": "vitest run",
-		"_test:component": "vitest run --config vitest.config.component.ts",
-		"_test:integration": "vitest run --config vitest.config.integration.ts",
-		"_test:unit": "vitest run --config vitest.config.unit.ts",
-		"_test:watch": "vitest",
-		"_typecheck": "tsc --noEmit",
-		"build": "pnpm run _build",
-		"build-storybook": "pnpm run _storybook:build",
-		"clean": "rm -rf dist",
-		"dev": "vite build --watch",
-		"lint": "pnpm run _lint",
-		"storybook": "pnpm run _storybook",
-		"test": "pnpm run _test",
-		"test:component": "pnpm run _test:component",
-		"test:integration": "pnpm run _test:integration",
-		"test:unit": "pnpm run _test:unit",
-		"test:watch": "pnpm run _test:watch",
-		"typecheck": "pnpm run _typecheck"
-	},
+	"author": "Joe Mearman",
 	"dependencies": {
 		"@bibgraph/types": "workspace:*",
 		"@tabler/icons-react": "3.46.0",
@@ -64,35 +34,27 @@
 		"vite-plugin-dts": "5.1.0",
 		"vitest": "4.1.11"
 	},
-	"peerDependencies": {
-		"@mantine/core": "9.6.0",
-		"@mantine/hooks": "9.6.0",
-		"@mantine/notifications": "9.6.0",
-		"react": "19.2.8",
-		"react-dom": "19.2.8"
-	},
-	"author": "Joe Mearman",
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
-			"source": "./src/index.ts",
 			"import": "./dist/index.es.js",
-			"require": "./dist/index.cjs.js"
+			"require": "./dist/index.cjs.js",
+			"source": "./src/index.ts"
 		},
 		"./components/ViewToggle": {
 			"types": "./dist/components/ViewToggle.d.ts",
-			"source": "./src/components/ViewToggle.tsx",
-			"import": "./dist/components/ViewToggle.js"
+			"import": "./dist/components/ViewToggle.js",
+			"source": "./src/components/ViewToggle.tsx"
 		},
 		"./components/entity-views": {
 			"types": "./dist/components/entity-views/index.d.ts",
-			"source": "./src/components/entity-views/index.ts",
-			"import": "./dist/components/entity-views/index.js"
+			"import": "./dist/components/entity-views/index.js",
+			"source": "./src/components/entity-views/index.ts"
 		},
 		"./components/entity-views/matchers/index": {
 			"types": "./dist/components/entity-views/matchers/index.d.ts",
-			"source": "./src/components/entity-views/matchers/index.ts",
-			"import": "./dist/components/entity-views/matchers/index.js"
+			"import": "./dist/components/entity-views/matchers/index.js",
+			"source": "./src/components/entity-views/matchers/index.ts"
 		}
 	},
 	"files": [
@@ -116,13 +78,51 @@
 	"nx": {
 		"includedScripts": []
 	},
+	"peerDependencies": {
+		"@mantine/core": "9.6.0",
+		"@mantine/hooks": "9.6.0",
+		"@mantine/notifications": "9.6.0",
+		"react": "19.2.8",
+		"react-dom": "19.2.8"
+	},
 	"peerDependenciesMeta": {
 		"@mantine/notifications": {
 			"optional": true
 		}
 	},
+	"private": true,
 	"publishConfig": {
 		"access": "public"
 	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Mearman/BibGraph.git",
+		"directory": "packages/ui"
+	},
+	"scripts": {
+		"_build": "vite build",
+		"_lint": "eslint . --cache",
+		"_storybook": "storybook dev",
+		"_storybook:build": "storybook build",
+		"_test": "vitest run",
+		"_test:component": "vitest run --config vitest.config.component.ts",
+		"_test:integration": "vitest run --config vitest.config.integration.ts",
+		"_test:unit": "vitest run --config vitest.config.unit.ts",
+		"_test:watch": "vitest",
+		"_typecheck": "tsc --noEmit",
+		"build": "pnpm run _build",
+		"build-storybook": "pnpm run _storybook:build",
+		"clean": "rm -rf dist",
+		"dev": "vite build --watch",
+		"lint": "pnpm run _lint",
+		"storybook": "pnpm run _storybook",
+		"test": "pnpm run _test",
+		"test:component": "pnpm run _test:component",
+		"test:integration": "pnpm run _test:integration",
+		"test:unit": "pnpm run _test:unit",
+		"test:watch": "pnpm run _test:watch",
+		"typecheck": "pnpm run _typecheck"
+	},
+	"type": "module",
 	"types": "./dist/index.d.ts"
 }
