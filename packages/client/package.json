@@ -2,34 +2,8 @@
 	"name": "@bibgraph/client",
 	"description": "TypeScript client for the OpenAlex API with extensive entity support and utilities",
 	"version": "0.0.0",
-	"type": "module",
-	"private": true,
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/Mearman/BibGraph.git",
-		"directory": "packages/client"
-	},
-	"scripts": {
-		"_build": "vite build",
-		"_lint": "eslint . --cache",
-		"_test": "vitest run",
-		"_test:coverage": "vitest run --coverage",
-		"_test:integration": "vitest run --config vitest.config.integration.ts",
-		"_test:unit": "vitest run --config vitest.config.unit.ts",
-		"_test:watch": "vitest",
-		"_typecheck": "tsc --noEmit",
-		"build": "pnpm run _build",
-		"clean": "rm -rf dist",
-		"dev": "vite build --watch",
-		"lint": "pnpm run _lint",
-		"prepublishOnly": "echo private package; exit 1",
-		"test": "pnpm run _test",
-		"test:coverage": "pnpm run _test:coverage",
-		"test:integration": "pnpm run _test:integration",
-		"test:unit": "pnpm run _test:unit",
-		"test:watch": "pnpm run _test:watch",
-		"typecheck": "pnpm run _typecheck"
-	},
+	"author": "BibGraph",
+	"bugs": "https://github.com/Mearman/BibGraph/issues",
 	"dependencies": {
 		"@bibgraph/types": "workspace:*",
 		"@bibgraph/utils": "workspace:*",
@@ -48,31 +22,29 @@
 		"vitest": "4.1.11",
 		"vitest-axe": "0.1.0"
 	},
-	"author": "BibGraph",
-	"bugs": "https://github.com/Mearman/BibGraph/issues",
 	"engines": {
 		"node": ">=18.0.0"
 	},
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
-			"source": "./src/index.ts",
-			"import": "./dist/index.js"
+			"import": "./dist/index.js",
+			"source": "./src/index.ts"
 		},
 		"./client": {
 			"types": "./dist/index.d.ts",
-			"source": "./src/client.ts",
-			"import": "./dist/index.js"
+			"import": "./dist/index.js",
+			"source": "./src/client.ts"
 		},
 		"./cached-client": {
 			"types": "./dist/index.d.ts",
-			"source": "./src/cached-client.ts",
-			"import": "./dist/index.js"
+			"import": "./dist/index.js",
+			"source": "./src/cached-client.ts"
 		},
 		"./internal/static-data-provider": {
 			"types": "./dist/index.d.ts",
-			"source": "./src/internal/static-data-provider.ts",
-			"import": "./dist/index.js"
+			"import": "./dist/index.js",
+			"source": "./src/internal/static-data-provider.ts"
 		}
 	},
 	"files": [
@@ -101,5 +73,33 @@
 	"nx": {
 		"includedScripts": []
 	},
+	"private": true,
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Mearman/BibGraph.git",
+		"directory": "packages/client"
+	},
+	"scripts": {
+		"_build": "vite build",
+		"_lint": "eslint . --cache",
+		"_test": "vitest run",
+		"_test:coverage": "vitest run --coverage",
+		"_test:integration": "vitest run --config vitest.config.integration.ts",
+		"_test:unit": "vitest run --config vitest.config.unit.ts",
+		"_test:watch": "vitest",
+		"_typecheck": "tsc --noEmit",
+		"build": "pnpm run _build",
+		"clean": "rm -rf dist",
+		"dev": "vite build --watch",
+		"lint": "pnpm run _lint",
+		"prepublishOnly": "echo private package; exit 1",
+		"test": "pnpm run _test",
+		"test:coverage": "pnpm run _test:coverage",
+		"test:integration": "pnpm run _test:integration",
+		"test:unit": "pnpm run _test:unit",
+		"test:watch": "pnpm run _test:watch",
+		"typecheck": "pnpm run _typecheck"
+	},
+	"type": "module",
 	"types": "./dist/src/index.d.ts"
 }
