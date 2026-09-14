@@ -1,4 +1,7 @@
-import js from "@eslint/js";
+// react: false -- this repo already has its own React/jsx-a11y setup below (via @eslint-react/eslint-plugin and eslint-plugin-jsx-a11y directly), and @exadev/eslint-config's default export auto-detects and adds its own eslint-plugin-react/jsx-a11y block whenever those packages are installed, which they are here (for the currently-unused eslint.config.react.ts). Left enabled, that auto-added block registers the jsx-a11y plugin a second time for the same .tsx files, which ESLint rejects outright ("Cannot redefine plugin \"jsx-a11y\"").
+//
+// This file stays on tseslint.config() (rather than migrating to defineConfig from eslint/config, as done elsewhere in this rollout) deliberately: this repo's own custom rules (tools/eslint-rules/*, built with @typescript-eslint/utils' RuleCreator) type-check cleanly against tseslint.config's own, more permissive Config type, but not against eslint/config's stricter native Plugin type -- defineConfig here produced a genuine tsc error (a RuleModuleWithName vs RuleDefinition mismatch on the custom plugin's own rules) with no legitimate fix short of rewriting the custom rules' own type signatures.
+import { exadevConfig } from "@exadev/eslint-config";
 import tseslint from "typescript-eslint";
 import globals from "globals";
 import importPlugin from "eslint-plugin-import-x";
@@ -20,6 +23,8 @@ import jsxA11yPlugin from "eslint-plugin-jsx-a11y";
 import playwrightPlugin from "eslint-plugin-playwright";
 import barrelFilesPlugin from "eslint-plugin-barrel-files";
 import { customRulesPlugin } from "./tools/eslint-rules/index.js";
+
+const exadev = exadevConfig({ react: false });
 
 /**
  * ESLint configuration using recommended presets where available
@@ -54,11 +59,9 @@ export default tseslint.config([
     },
     // Base configuration for all TypeScript files
     {
+        // @exadev/eslint-config (spread below, after this block, so its own rules win on any shared key) already
+        // supersedes js.configs.recommended + tseslint.configs.recommended with a strictTypeChecked + stylisticTypeChecked superset -- no local extends needed here any more.
         files: ["**/*.{ts,tsx}"],
-        extends: [
-            js.configs.recommended,
-            ...tseslint.configs.recommended,
-        ],
         languageOptions: {
             ecmaVersion: 2020,
             globals: {
@@ -147,7 +150,7 @@ export default tseslint.config([
             "regexp": regexpPlugin,
             "simple-import-sort": simpleImportSort,
             "prefer-arrow-functions": preferArrowFunctions,
-            "jsdoc": jsdoc,
+            // jsdoc is registered by @exadev/eslint-config (spread later in this file) -- registering it again here too throws "Cannot redefine plugin" once both config objects apply to the same files.
             "n": nodePlugin,
             "unicorn": unicornPlugin,
             "sonarjs": sonarjsPlugin,
@@ -344,6 +347,17 @@ export default tseslint.config([
                     "project": "./tsconfig.base.json",
                 },
             },
+        },
+    },
+    // @exadev/eslint-config, positioned after the base TS block above so its own rules win on any shared
+    // @typescript-eslint/* key, and before every specialised block below so those keep their own final say
+    // (matching the "positioned last so earlier presets cannot re-enable them" block at the very end of this file).
+    ...exadev,
+    // This monorepo genuinely has many legitimate index.ts barrels: each package's own public entry point (packages/*/src/index.ts) plus nested sub-directory barrels (e.g. packages/ui/src/hooks/index.ts) -- "siblings" mode (any index.ts may act as a re-export-only barrel, from direct siblings only) matches that layout; the default "banned" mode would ban every one of them.
+    {
+        files: ["**/*.{ts,tsx}"],
+        rules: {
+            "exadev/barrel-policy": ["error", { mode: "siblings" }],
         },
     },
     // Configuration for test files (using vitest recommended)
