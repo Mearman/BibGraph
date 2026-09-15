@@ -380,11 +380,26 @@ export class NetworkInterceptor {
    * Detect request type based on URL
    */
   private detectRequestType(url: string): NetworkRequest["entityType"] {
-    if (url.includes("openalex.org") || url.includes("/api/")) {
-      return "api";
-    }
-    if (url.includes("cache") || url.includes("IndexedDB")) {
-      return "cache";
+    try {
+      const parsed = new URL(url);
+      const isOpenAlex =
+        parsed.hostname === "openalex.org" ||
+        parsed.hostname.endsWith(".openalex.org") ||
+        parsed.hostname === "api.openalex.org";
+      const isApiPath = parsed.pathname.startsWith("/api/");
+      if (isOpenAlex || isApiPath) {
+        return "api";
+      }
+      if (parsed.pathname.includes("cache") || url.includes("IndexedDB")) {
+        return "cache";
+      }
+    } catch {
+      if (url.includes("/api/")) {
+        return "api";
+      }
+      if (url.includes("cache") || url.includes("IndexedDB")) {
+        return "cache";
+      }
     }
     if (url.includes("worker") || url.includes(".worker.")) {
       return "worker";

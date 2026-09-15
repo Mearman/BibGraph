@@ -119,12 +119,12 @@ const isExternalCanonicalId = (id: string): boolean => {
 	}
 
 	// ORCID patterns
-	if (id.includes("orcid.org/") || /^\d{4}-\d{4}-\d{4}-\d{3}[0-9X]$/i.test(id)) {
+	if (isExpectedHost(id, "orcid.org") || /^\d{4}-\d{4}-\d{4}-\d{3}[0-9X]$/i.test(id)) {
 		return true;
 	}
 
 	// ROR patterns
-	if (id.includes("ror.org/") || /^[0-9a-z]{9}$/i.test(id)) {
+	if (isExpectedHost(id, "ror.org") || /^[0-9a-z]{9}$/i.test(id)) {
 		return true;
 	}
 

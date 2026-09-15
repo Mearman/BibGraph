@@ -32,14 +32,8 @@ async function generateTestUrls() {
 			.map(
 				(url) =>
 					url
-						.replace(/\\_/g, "_") // Fix display\_name -> display_name
-						.replace(/\\%/g, "%") // Fix escaped percent signs
-						.replace(/\\\./g, ".") // Fix escaped dots
-						.replace(/\\:/g, ":") // Fix escaped colons
-						.replace(/\\-/g, "-") // Fix escaped hyphens
-						.replace(/\\&/g, "&") // Fix escaped ampersands
-						.replace(/\\\*/g, "*") // Fix escaped asterisks
-						.replace(/\\\\/g, "\\") // Fix double backslashes
+						// Markdown-unescape in a single left-to-right pass: each backslash-escaped character (\_, \%, \. etc., and \\ for a literal backslash) becomes the character itself
+						.replace(/\\(.)/g, "$1")
 						.replace(/group-by=/g, "group_by=") // Fix parameter naming: group-by -> group_by
 						.replace(/per-page=/g, "per_page=") // Fix parameter naming: per-page -> per_page
 						.replace(/%3E/g, ">") // Fix URL encoding: %3E -> >

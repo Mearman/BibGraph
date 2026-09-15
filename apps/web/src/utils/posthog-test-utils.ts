@@ -41,7 +41,13 @@ export const testPostHogConfiguration = (): {
 
   // Check if PostHog is enabled
   const hasApiKey = Boolean(POSTHOG_API_KEY && POSTHOG_API_KEY !== 'your-posthog-api-key');
-  const hasValidHost = POSTHOG_HOST.includes('posthog.com');
+  let posthogHostname = '';
+    try {
+      posthogHostname = new URL(POSTHOG_HOST).hostname;
+    } catch {
+      posthogHostname = '';
+    }
+    const hasValidHost = posthogHostname === 'posthog.com' || posthogHostname.endsWith('.posthog.com');
   const isConfigured = POSTHOG_ENABLED && hasApiKey && hasValidHost;
 
   if (!POSTHOG_ENABLED) {
@@ -57,7 +63,7 @@ export const testPostHogConfiguration = (): {
   }
 
   // Check privacy compliance
-  const isPrivacyCompliant = POSTHOG_HOST.includes('eu.posthog.com');
+  const isPrivacyCompliant = posthogHostname === 'eu.posthog.com';
   if (!isPrivacyCompliant && hasValidHost) {
     issues.push('Using non-EU PostHog host - may not be GDPR compliant');
   }
@@ -128,8 +134,15 @@ export const testPrivacyCompliance = (): {
 } => {
   const issues: string[] = [];
 
+  let posthogHostname = '';
+  try {
+    posthogHostname = new URL(POSTHOG_HOST).hostname;
+  } catch {
+    posthogHostname = '';
+  }
+
   // Check EU host
-  const usesEuHost = POSTHOG_HOST.includes('eu.posthog.com');
+  const usesEuHost = posthogHostname === 'eu.posthog.com';
   if (!usesEuHost) {
     issues.push('Using non-EU PostHog host - GDPR compliance concern');
   }
