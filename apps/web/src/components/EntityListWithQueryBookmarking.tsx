@@ -5,6 +5,7 @@
 
 import type { EntityType } from "@bibgraph/types";
 import { Group, Stack, Text,Title } from "@mantine/core";
+import type { ReactNode } from "react";
 
 import { useQueryBookmarking } from "@/hooks/use-query-bookmarking";
 
@@ -49,7 +50,8 @@ export const EntityListWithQueryBookmarking = ({
   // Check if this query has semantic parameters worth bookmarking
   const hasSemanticQuery = Object.keys(currentQueryParams).length > 0 || entityId !== undefined;
 
-  const renderHeader = async () => {
+  // React.ReactNode includes Promise (React 19 awaitable nodes), which trips promise-function-async without this explicit annotation
+  const renderHeader = (): ReactNode => {
     if (customHeader !== undefined) {
       return customHeader;
     }
