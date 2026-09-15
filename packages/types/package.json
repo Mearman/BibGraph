@@ -9,11 +9,14 @@
 		"directory": "packages/types"
 	},
 	"scripts": {
-		"build": "nx run types:build",
-		"clean": "nx run types:clean",
-		"dev": "nx run types:dev",
-		"lint": "nx run types:lint",
-		"typecheck": "nx run types:typecheck"
+		"_build": "vite build",
+		"build": "pnpm run _build",
+		"clean": "rm -rf dist",
+		"dev": "vite build --watch",
+		"_lint": "eslint . --cache",
+		"lint": "pnpm run _lint",
+		"_typecheck": "tsc --noEmit",
+		"typecheck": "pnpm run _typecheck"
 	},
 	"dependencies": {
 		"zod": "4.5.4"

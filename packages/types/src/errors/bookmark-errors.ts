@@ -92,7 +92,7 @@ export class BookmarkLimitExceededError extends BookmarkError {
 		metadata?: Record<string, unknown>,
 	) {
 		super(
-			`Bookmark limit exceeded: ${currentCount}/${limit}`,
+			`Bookmark limit exceeded: ${String(currentCount)}/${String(limit)}`,
 			BookmarkErrorCode.BOOKMARK_LIMIT_EXCEEDED,
 			{ currentCount, limit, ...metadata },
 		);
@@ -101,8 +101,7 @@ export class BookmarkLimitExceededError extends BookmarkError {
 
 /**
  * Validates bookmark metadata using Zod schema
- * @param metadata
- * @throws {BookmarkValidationError} If metadata is invalid
+ * @throws `BookmarkValidationError` If metadata is invalid
  */
 export const validateBookmarkMetadata = (metadata: unknown): void => {
 	const result = BookmarkMetadataSchema.safeParse(metadata);
@@ -122,8 +121,7 @@ export const validateBookmarkMetadata = (metadata: unknown): void => {
 
 /**
  * Validates a bookmark URL
- * @param url
- * @throws {BookmarkValidationError} If URL is invalid
+ * @throws `BookmarkValidationError` If URL is invalid
  */
 export const validateBookmarkUrl = (url: string): void => {
 	// Check if URL is empty or whitespace
@@ -165,7 +163,6 @@ export const validateBookmarkUrl = (url: string): void => {
 
 /**
  * Type guard to check if an error is a BookmarkError
- * @param error
  */
 export const isBookmarkError = (
 	error: unknown
@@ -173,8 +170,6 @@ export const isBookmarkError = (
 
 /**
  * Type guard to check if an error is a specific bookmark error type
- * @param error
- * @param code
  */
 export const isBookmarkErrorCode = (
 	error: unknown,

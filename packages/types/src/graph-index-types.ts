@@ -80,7 +80,7 @@ export interface GraphNodeRecord {
 
   /**
    * Optional metadata extracted from entity.
-   * @example { cited_by_count: 1247, publication_year: 2018 }
+   * @example `{ cited_by_count: 1247, publication_year: 2018 }`
    */
   metadata?: Record<string, unknown>;
 

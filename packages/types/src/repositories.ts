@@ -41,12 +41,10 @@ export interface RepositoryGraphEdge {
 
 /**
  * Helper function to create repository relationship edges
- * @param institutionId
- * @param repository
  */
 export const createRepositoryGraphEdge = (
 	institutionId: string,
-	repository: RepositoryRelationship
+	repository: Readonly<RepositoryRelationship>
 ): RepositoryGraphEdge => {
 	const sourceId = repository.id
 	return {
@@ -63,7 +61,6 @@ export const createRepositoryGraphEdge = (
 
 /**
  * Type guard for repository relationship data
- * @param data
  */
 export const isRepositoryRelationship = (data: unknown): data is RepositoryRelationship => typeof data === 'object' && data !== null &&
 		'id' in data &&

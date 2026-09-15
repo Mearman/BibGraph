@@ -4,7 +4,6 @@
 
 /**
  * Basic ID validation functions
- * @param id
  */
 export const isOpenAlexId = (id: string): boolean => /^https:\/\/openalex\.org\/[A-Z]\d+$/.test(id);
 

@@ -43,15 +43,29 @@ export interface RoleGraphEdge {
 }
 
 /**
+ * Infer target entity type from role name
+ */
+const inferEntityTypeFromRole = (role: string): EntityType => {
+	switch (role) {
+		case 'funder':
+			return 'funders'
+		case 'institution':
+			return 'institutions'
+		case 'publisher':
+			return 'publishers'
+		default:
+			// Default to works for unknown roles
+			return 'works'
+	}
+};
+
+/**
  * Helper function to create role relationship edges
- * @param sourceId
- * @param sourceEntityType
- * @param role
  */
 export const createRoleGraphEdge = (
 	sourceId: string,
 	sourceEntityType: EntityType,
-	role: RoleRelationship
+	role: Readonly<RoleRelationship>
 ): RoleGraphEdge => {
 	const targetId = role.id
 	return {
@@ -69,26 +83,7 @@ export const createRoleGraphEdge = (
 };
 
 /**
- * Infer target entity type from role name
- * @param role
- */
-const inferEntityTypeFromRole = (role: string): EntityType => {
-	switch (role) {
-		case 'funder':
-			return 'funders'
-		case 'institution':
-			return 'institutions'
-		case 'publisher':
-			return 'publishers'
-		default:
-			// Default to works for unknown roles
-			return 'works'
-	}
-};
-
-/**
  * Type guard for role relationship data
- * @param data
  */
 export const isRoleRelationship = (data: unknown): data is RoleRelationship => typeof data === 'object' && data !== null &&
 		'role' in data &&

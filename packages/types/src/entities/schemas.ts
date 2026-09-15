@@ -10,6 +10,9 @@ export const openAlexIdSchema = z.string().regex(/^https:\/\/openalex\.org\/[A-Z
 
 export const dateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
+const MAX_META_PER_PAGE = 200
+const MAX_CONCEPT_LEVEL = 5
+
 // Counts by year schema
 export const countsByYearSchema = z.object({
 	year: z.number().int(),
@@ -22,7 +25,7 @@ export const metaSchema = z.object({
 	count: z.number().int().min(0),
 	db_response_time_ms: z.number().min(0),
 	page: z.number().int().min(1),
-	per_page: z.number().int().min(1).max(200),
+	per_page: z.number().int().min(1).max(MAX_META_PER_PAGE),
 	groups_count: z.number().int().min(0).optional(),
 })
 
@@ -202,7 +205,7 @@ export const workSchema = baseEntitySchema.extend({
 // Concept schema
 export const conceptSchema = baseEntitySchema.extend({
 	wikidata: z.string().optional(),
-	level: z.number().int().min(0).max(5),
+	level: z.number().int().min(0).max(MAX_CONCEPT_LEVEL),
 	description: z.string().optional(),
 	works_count: z.number().int().min(0),
 	summary_stats: z
@@ -233,7 +236,7 @@ export const conceptSchema = baseEntitySchema.extend({
 				id: openAlexIdSchema,
 				wikidata: z.string().optional(),
 				display_name: z.string(),
-				level: z.number().int().min(0).max(5),
+				level: z.number().int().min(0).max(MAX_CONCEPT_LEVEL),
 			})
 		)
 		.optional(),
@@ -243,7 +246,7 @@ export const conceptSchema = baseEntitySchema.extend({
 				id: openAlexIdSchema,
 				wikidata: z.string().optional(),
 				display_name: z.string(),
-				level: z.number().int().min(0).max(5),
+				level: z.number().int().min(0).max(MAX_CONCEPT_LEVEL),
 				score: z.number().min(0),
 			})
 		)

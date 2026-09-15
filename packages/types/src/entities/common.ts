@@ -38,14 +38,14 @@ export interface OpenAlexResponse<T> {
 		per_page: number
 		groups_count?: number
 	}
-	group_by?: Array<{
+	group_by?: {
 		key: string
 		key_display_name: string
 		count: number
 		cited_by_count?: number
 		works_count?: number
 		h_index?: number
-	}>
+	}[]
 }
 
 // Query parameters - schema-based types
@@ -92,13 +92,21 @@ export const GroupParamsSchema = QueryParamsSchema.extend({
 
 export type GroupParams = z.infer<typeof GroupParamsSchema>
 
-// Autocomplete types - schema-based types
-export const AutocompleteResultSchema = z.object({
+// Autocomplete types - schema-based types Base result shape returned by the per-entity autocomplete endpoints (`autocomplete/works`, etc.), which omit entity_type because the requested entity type is implied by the endpoint itself
+export const AutocompleteBaseResultSchema = z.object({
 	id: z.string(),
 	display_name: z.string(),
 	hint: z.string().optional(),
 	cited_by_count: z.number().optional(),
 	works_count: z.number().optional(),
+	external_id: z.string().optional(),
+	filter_key: z.string().optional(),
+})
+
+export type AutocompleteBaseResult = z.infer<typeof AutocompleteBaseResultSchema>
+
+// Full result shape returned by the cross-entity `/autocomplete` endpoint, which tags every result with its entity type
+export const AutocompleteResultSchema = AutocompleteBaseResultSchema.extend({
 	entity_type: z.enum([
 		"work",
 		"author",
@@ -113,11 +121,32 @@ export const AutocompleteResultSchema = z.object({
 		"field",
 		"subfield",
 	]),
-	external_id: z.string().optional(),
-	filter_key: z.string().optional(),
 })
 
 export type AutocompleteResult = z.infer<typeof AutocompleteResultSchema>
+
+// Envelope schemas for the two autocomplete response shapes
+export const AutocompleteBaseResponseSchema = z.object({
+	results: z.array(AutocompleteBaseResultSchema),
+	meta: z
+		.object({
+			count: z.number().optional(),
+			page: z.number().optional(),
+			per_page: z.number().optional(),
+		})
+		.optional(),
+})
+
+export const AutocompleteResponseSchema = z.object({
+	results: z.array(AutocompleteResultSchema),
+	meta: z
+		.object({
+			count: z.number().optional(),
+			page: z.number().optional(),
+			per_page: z.number().optional(),
+		})
+		.optional(),
+})
 
 // N-grams types - schema-based types
 export const NGramSchema = z.object({
@@ -160,18 +189,63 @@ export const TextAnalysisSchema = z.object({
 
 export type TextAnalysis = z.infer<typeof TextAnalysisSchema>
 
+// Text analysis result types for the `/text` family of endpoints (`text`, `text/keywords`, `text/topics`, `text/concepts`)
+export const TextAnalysisNamedRefSchema = z.object({
+	id: z.string(),
+	display_name: z.string(),
+})
+
+export const TextAnalysisKeywordSchema = z.object({
+	id: z.string(),
+	display_name: z.string(),
+	score: z.number(),
+})
+
+export const TextAnalysisTopicSchema = TextAnalysisKeywordSchema.extend({
+	level: z.number().optional(),
+	subfield: TextAnalysisNamedRefSchema.optional(),
+	field: TextAnalysisNamedRefSchema.optional(),
+	domain: TextAnalysisNamedRefSchema.optional(),
+})
+
+export const TextAnalysisConceptSchema = TextAnalysisKeywordSchema.extend({
+	level: z.number(),
+	wikidata: z.string().optional(),
+})
+
+export const TextAnalysisResponseSchema = z.object({
+	keywords: z.array(TextAnalysisKeywordSchema),
+	topics: z.array(TextAnalysisTopicSchema),
+	concepts: z.array(TextAnalysisConceptSchema),
+	meta: z
+		.object({
+			keywords_count: z.number(),
+			topics_count: z.number(),
+			concepts_count: z.number(),
+			processing_time_ms: z.number().optional(),
+		})
+		.optional(),
+})
+
+export type TextAnalysisNamedRef = z.infer<typeof TextAnalysisNamedRefSchema>
+export type TextAnalysisKeyword = z.infer<typeof TextAnalysisKeywordSchema>
+export type TextAnalysisTopic = z.infer<typeof TextAnalysisTopicSchema>
+export type TextAnalysisConcept = z.infer<typeof TextAnalysisConceptSchema>
+export type TextAnalysisResponse = z.infer<typeof TextAnalysisResponseSchema>
+
 /**
  * Base autocomplete options schema
  */
+const MAX_AUTOCOMPLETE_PER_PAGE = 200
+
 export const BaseAutocompleteOptionsSchema = z.object({
-	per_page: z.number().min(1).max(200).optional(),
+	per_page: z.number().min(1).max(MAX_AUTOCOMPLETE_PER_PAGE).optional(),
 })
 
 export type BaseAutocompleteOptions = z.infer<typeof BaseAutocompleteOptionsSchema>
 
 /**
  * Generic grouped response schema factory
- * @param itemSchema
  */
 export const createGroupedResponseSchema = <T>(itemSchema: z.ZodType<T>) => z.object({
 		results: z.array(itemSchema),

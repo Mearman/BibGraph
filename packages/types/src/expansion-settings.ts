@@ -123,10 +123,10 @@ export interface PropertyDefinition {
 	/**
 	For enum types, the possible values
 	 */
-	enumValues?: Array<{
+	enumValues?: {
 		value: string
 		label: string
-	}>
+	}[]
 	/**
 	Optional description
 	 */
@@ -367,33 +367,20 @@ export const DEFAULT_EXPANSION_SETTINGS: Record<string, ExpansionSettings> = {
 
 /**
  * Helper function to get property definitions for a given target
- * @param target
  */
 export const getPropertiesForTarget = (target: ExpansionTarget): PropertyDefinition[] => {
 	// For relation types, use properties of the target entity type
 	// This is a simplified mapping - in practice you might want more sophisticated logic
-	const isRelationType = (value: string): value is RelationType => {
-		for (const relType of Object.values(RelationType)) {
-			if (relType === value) {
-				return true;
-			}
-		}
-		return false;
-	};
+	const relationTypeValues: readonly string[] = Object.values(RelationType);
+
+	const isRelationType = (value: string): value is RelationType => relationTypeValues.includes(value);
 
 	if (isRelationType(target)) {
 		// For now, return work properties as most relations involve works
-		return ENTITY_PROPERTIES["works"] ?? []
+		return ENTITY_PROPERTIES.works
 	}
 
-	const isEntityType = (value: string): value is EntityType => {
-		for (const relType of Object.values(RelationType)) {
-			if (relType === value) {
-				return false;
-			}
-		}
-		return typeof value === "string";
-	};
+	const isEntityType = (value: string): value is EntityType => !relationTypeValues.includes(value);
 
 	if (isEntityType(target)) {
 		return ENTITY_PROPERTIES[target] ?? []
@@ -404,7 +391,6 @@ export const getPropertiesForTarget = (target: ExpansionTarget): PropertyDefinit
 
 /**
  * Helper function to get default settings for a target
- * @param target
  */
 export const getDefaultSettingsForTarget = (target: ExpansionTarget): ExpansionSettings => {
 	const defaultSettings = DEFAULT_EXPANSION_SETTINGS[target] ?? { target }
@@ -418,7 +404,7 @@ export const getDefaultSettingsForTarget = (target: ExpansionTarget): ExpansionS
 		enabled: defaultSettings.enabled ?? true,
 	}
 
-	if (defaultSettings.name) {
+	if (defaultSettings.name !== undefined && defaultSettings.name !== "") {
 		result.name = defaultSettings.name
 	}
 
@@ -427,8 +413,6 @@ export const getDefaultSettingsForTarget = (target: ExpansionTarget): ExpansionS
 
 /**
  * Helper function to validate filter criteria
- * @param filter
- * @param property
  */
 export const validateFilterCriteria = (
 	filter: FilterCriteria,

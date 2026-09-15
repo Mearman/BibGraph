@@ -1,6 +1,6 @@
 /**
  * Core graph algorithm types.
- * These types are used by both @bibgraph/algorithms and @bibgraph/graph-expansion.
+ * These types are used by both `@bibgraph/algorithms` and `@bibgraph/graph-expansion`.
  */
 
 /**
@@ -32,9 +32,7 @@ export interface EdgeBase {
  * - Synchronous: No async overhead (dynamic loading handled separately)
  * - Simple return types: No Result/Option monads (null/array for not-found)
  * - String-based IDs: Universal identifier type
- *
- * @template N - Node type (must have id field)
- * @template E - Edge type (must have source, target fields)
+ * Type parameters: N is the node type (must have id field), E is the edge type (must have source, target fields).
  */
 export interface ReadableGraph<N extends NodeBase, E extends EdgeBase> {
   /**
@@ -42,33 +40,33 @@ export interface ReadableGraph<N extends NodeBase, E extends EdgeBase> {
    * @param id - Node ID to check
    * @returns true if node exists, false otherwise
    */
-  hasNode(id: string): boolean;
+  hasNode: (id: string) => boolean;
 
   /**
    * Get a node by ID.
    * @param id - Node ID to retrieve
    * @returns Node data or null if not found
    */
-  getNode(id: string): N | null;
+  getNode: (id: string) => N | null;
 
   /**
    * Get neighbor node IDs for a given node.
    * @param id - Node ID to get neighbors for
    * @returns Array of neighbor IDs (empty array if node not found)
    */
-  getNeighbors(id: string): string[];
+  getNeighbors: (id: string) => string[];
 
   /**
    * Get all nodes in the graph.
    * @returns Array of all nodes
    */
-  getAllNodes(): N[];
+  getAllNodes: () => N[];
 
   /**
    * Check if graph is directed.
    * @returns true if directed, false if undirected
    */
-  isDirected(): boolean;
+  isDirected: () => boolean;
 
   /**
    * Get outgoing edges from a node.
@@ -77,11 +75,10 @@ export interface ReadableGraph<N extends NodeBase, E extends EdgeBase> {
    * For undirected graphs: Returns edges where node is either source or target.
    *
    * Used by ego-network extraction to preserve edge metadata.
-   *
    * @param id - Node ID to get outgoing edges from
    * @returns Array of outgoing edges (empty array if node not found)
    */
-  getOutgoingEdges?(id: string): E[];
+  getOutgoingEdges?: (id: string) => E[];
 }
 
 /**
@@ -90,7 +87,6 @@ export interface ReadableGraph<N extends NodeBase, E extends EdgeBase> {
  *
  * id - Unique node identifier (must be unique within graph)
  * type - Discriminator field for runtime type narrowing
- *
  * @example
  * ```typescript
  * type WorkNode = {
@@ -131,7 +127,6 @@ export interface Node extends NodeBase {
  * target - ID of target node (must exist in graph)
  * type - Discriminator field for runtime type narrowing
  * weight - Optional edge weight (default: 1 if not specified)
- *
  * @example
  * ```typescript
  * type CitationEdge = {

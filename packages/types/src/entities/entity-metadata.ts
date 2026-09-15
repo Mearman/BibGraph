@@ -185,89 +185,7 @@ export const ENTITY_METADATA: Record<EntityType, EntityMetadataEntry> = {
 // ==================
 
 /**
- * Get complete metadata for an entity type
- * @param entityType
- */
-export const getEntityMetadata = (
-	entityType: EntityType
-): EntityMetadataEntry => ENTITY_METADATA[entityType];
-
-/**
- * Get the singular form of an entity type (for catalogue compatibility)
- * @param entityType
- */
-export const getEntitySingularForm = (
-	entityType: EntityType
-): string => ENTITY_METADATA[entityType].singularForm;
-
-/**
- * Get the ID prefix for an entity type
- * @param entityType
- */
-export const getEntityIdPrefix = (
-	entityType: EntityType
-): string => ENTITY_METADATA[entityType].idPrefix;
-
-/**
- * Get the route path for an entity type
- * @param entityType
- */
-export const getEntityRoutePath = (
-	entityType: EntityType
-): string => ENTITY_METADATA[entityType].routePath;
-
-/**
- * Get the icon name for an entity type
- * @param entityType
- */
-export const getEntityIcon = (entityType: EntityType): string => ENTITY_METADATA[entityType].icon;
-
-/**
- * Get the color for an entity type
- * @param entityType
- */
-export const getEntityColor = (entityType: EntityType): string => ENTITY_METADATA[entityType].color;
-
-/**
- * Get the display name for an entity type
- * @param entityType
- */
-export const getEntityDisplayName = (
-	entityType: EntityType
-): string => ENTITY_METADATA[entityType].displayName;
-
-/**
- * Get the plural form for an entity type
- * @param entityType
- */
-export const getEntityPlural = (
-	entityType: EntityType
-): string => ENTITY_METADATA[entityType].plural;
-
-/**
- * Convert singular form to plural EntityType
- * @param singularForm
- * @example toEntityType('work') => 'works'
- */
-export const toEntityType = (singularForm: string): EntityType | null => {
-	const entry = Object.entries(ENTITY_METADATA).find(
-		([, metadata]) => metadata.singularForm === singularForm
-	)
-	return entry ? (entry[0] as EntityType) : null
-};
-
-/**
- * Convert plural EntityType to singular form
- * @param entityType
- * @example toSingularForm('works') => 'work'
- */
-export const toSingularForm = (
-	entityType: EntityType
-): string => ENTITY_METADATA[entityType].singularForm;
-
-/**
  * Check if a string is a valid entity type (plural form)
- * @param value
  */
 export const isEntityType = (value: unknown): value is EntityType => {
 	if (typeof value !== "string") return false
@@ -275,8 +193,80 @@ export const isEntityType = (value: unknown): value is EntityType => {
 };
 
 /**
+ * Get complete metadata for an entity type
+ */
+export const getEntityMetadata = (
+	entityType: EntityType
+): EntityMetadataEntry => ENTITY_METADATA[entityType];
+
+/**
+ * Get the singular form of an entity type (for catalogue compatibility)
+ */
+export const getEntitySingularForm = (
+	entityType: EntityType
+): string => ENTITY_METADATA[entityType].singularForm;
+
+/**
+ * Get the ID prefix for an entity type
+ */
+export const getEntityIdPrefix = (
+	entityType: EntityType
+): string => ENTITY_METADATA[entityType].idPrefix;
+
+/**
+ * Get the route path for an entity type
+ */
+export const getEntityRoutePath = (
+	entityType: EntityType
+): string => ENTITY_METADATA[entityType].routePath;
+
+/**
+ * Get the icon name for an entity type
+ */
+export const getEntityIcon = (entityType: EntityType): string => ENTITY_METADATA[entityType].icon;
+
+/**
+ * Get the color for an entity type
+ */
+export const getEntityColor = (entityType: EntityType): string => ENTITY_METADATA[entityType].color;
+
+/**
+ * Get the display name for an entity type
+ */
+export const getEntityDisplayName = (
+	entityType: EntityType
+): string => ENTITY_METADATA[entityType].displayName;
+
+/**
+ * Get the plural form for an entity type
+ */
+export const getEntityPlural = (
+	entityType: EntityType
+): string => ENTITY_METADATA[entityType].plural;
+
+/**
+ * Convert singular form to plural EntityType
+ * @example `toEntityType('work') =\> 'works'`
+ */
+export const toEntityType = (singularForm: string): EntityType | null => {
+	const entry = Object.entries(ENTITY_METADATA).find(
+		([, metadata]) => metadata.singularForm === singularForm
+	)
+	if (entry === undefined) return null
+	const [key] = entry
+	return isEntityType(key) ? key : null
+};
+
+/**
+ * Convert plural EntityType to singular form
+ * @example `toSingularForm('works') =\> 'work'`
+ */
+export const toSingularForm = (
+	entityType: EntityType
+): string => ENTITY_METADATA[entityType].singularForm;
+
+/**
  * Check if a string is a valid singular entity form
- * @param value
  */
 export const isSingularEntityForm = (value: unknown): boolean => {
 	if (typeof value !== "string") return false
@@ -285,12 +275,13 @@ export const isSingularEntityForm = (value: unknown): boolean => {
 
 /**
  * Detect entity type from OpenAlex ID
- * @param openAlexId
- * @example detectEntityType('W123456') => 'works'
+ * @example `detectEntityType('W123456') =\> 'works'`
  */
 export const detectEntityType = (openAlexId: string): EntityType | null => {
 	const entry = Object.entries(ENTITY_METADATA).find(([, metadata]) =>
 		openAlexId.startsWith(metadata.idPrefix)
 	)
-	return entry ? (entry[0] as EntityType) : null
+	if (entry === undefined) return null
+	const [key] = entry
+	return isEntityType(key) ? key : null
 };
