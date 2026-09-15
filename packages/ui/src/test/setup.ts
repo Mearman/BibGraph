@@ -6,16 +6,15 @@ import { vi } from "vitest"
 let originalLruCache: unknown = null
 
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  originalLruCache = require('lru-cache')
+  originalLruCache = await import('lru-cache')
 } catch {
   console.warn('lru-cache module not available during setup')
 }
 
 // Create a compatible LRUCache class that works in both CommonJS and ES module contexts
 class CompatibleLRUCache<K = unknown, V = unknown> {
-  private cache = new Map<K, V>()
-  private maxSize: number
+  private readonly cache = new Map<K, V>()
+  private readonly maxSize: number
 
   constructor(maxSize = 1000) {
     this.maxSize = maxSize
@@ -63,12 +62,8 @@ const isLruCacheModule = (value: unknown): value is LruCacheModule => typeof val
 
 // Patch the lru-cache module globally before any tests run
 if (isLruCacheModule(originalLruCache)) {
-  if (!originalLruCache.LRUCache && originalLruCache.default) {
-    originalLruCache.LRUCache = originalLruCache.default
-  }
-  if (!originalLruCache.LRUCache) {
-    originalLruCache.LRUCache = CompatibleLRUCache
-  }
+  originalLruCache.LRUCache ??= originalLruCache.default
+  originalLruCache.LRUCache ??= CompatibleLRUCache
 } else {
   vi.mock('lru-cache', () => ({
     LRUCache: CompatibleLRUCache,
@@ -91,7 +86,6 @@ vi.mock('@asamuzakjp/css-color', () => ({
 
 vi.mock('@asamuzakjp/dom-selector', () => ({
   DOMSelector: class MockDOMSelector {
-    constructor() {}
     select() { return [] }
     selectOne() { return null }
   },
@@ -103,29 +97,44 @@ vi.mock('cssstyle', () => ({
 }))
 
 // Mock IntersectionObserver for tests
-global.IntersectionObserver = class IntersectionObserver {
-	root = null
+class MockIntersectionObserver implements IntersectionObserver {
+	root: Element | Document | null = null
 	rootMargin = ""
-	thresholds = []
-	observe() {}
-	disconnect() {}
-	unobserve() {}
+	scrollMargin = ""
+	thresholds: readonly number[] = []
+	observe(_target: Element) {
+		// Test double: intentionally a no-op, no real intersection tracking in tests.
+	}
+	disconnect() {
+		// Test double: intentionally a no-op, nothing to tear down.
+	}
+	unobserve(_target: Element) {
+		// Test double: intentionally a no-op, no real intersection tracking in tests.
+	}
 	takeRecords() {
 		return []
 	}
-} as unknown as typeof IntersectionObserver
+}
+global.IntersectionObserver = MockIntersectionObserver
 
 // Mock ResizeObserver for tests
-global.ResizeObserver = class ResizeObserver {
-	observe() {}
-	unobserve() {}
-	disconnect() {}
+class MockResizeObserver implements ResizeObserver {
+	observe(_target: Element) {
+		// Test double: intentionally a no-op, no real resize tracking in tests.
+	}
+	unobserve(_target: Element) {
+		// Test double: intentionally a no-op, no real resize tracking in tests.
+	}
+	disconnect() {
+		// Test double: intentionally a no-op, nothing to tear down.
+	}
 }
+global.ResizeObserver = MockResizeObserver
 
 // Mock window.matchMedia for Mantine components
 Object.defineProperty(window, "matchMedia", {
 	writable: true,
-	value: vi.fn().mockImplementation((query) => ({
+	value: vi.fn().mockImplementation((query: string) => ({
 		matches: false,
 		media: query,
 		onchange: null,
@@ -140,7 +149,9 @@ Object.defineProperty(window, "matchMedia", {
 // Mock clipboard API
 Object.defineProperty(navigator, "clipboard", {
 	value: {
-		writeText: vi.fn(async () => {}),
+		writeText: vi.fn(async () => {
+			// Test double: resolves immediately, no real clipboard write in tests.
+		}),
 		readText: vi.fn().mockResolvedValue(""),
 	},
 })

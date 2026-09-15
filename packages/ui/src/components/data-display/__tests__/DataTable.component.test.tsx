@@ -1,6 +1,4 @@
-/**
- * @vitest-environment jsdom
- */
+// @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 
 import { MantineProvider } from "@mantine/core";
@@ -38,11 +36,13 @@ interface TestData {
 	value: number;
 }
 
+const TEST_VALUE_STEP = 10;
+
 const generateTestData = (count: number): TestData[] =>
 	Array.from({ length: count }, (_, index) => ({
-		id: `item-${index}`,
-		name: `Item ${index}`,
-		value: index * 10,
+		id: `item-${String(index)}`,
+		name: `Item ${String(index)}`,
+		value: index * TEST_VALUE_STEP,
 	}));
 
 const columns: DataTableColumnDef<TestData>[] = [
@@ -50,10 +50,12 @@ const columns: DataTableColumnDef<TestData>[] = [
 	{ accessorKey: "value", header: "Value" },
 ];
 
+const DEFAULT_TEST_ROW_COUNT = 10;
+
 const renderTable = (properties: Partial<Parameters<typeof DataTable<TestData>>[0]> = {}) =>
 	render(
 		<MantineProvider>
-			<DataTable data={generateTestData(10)} columns={columns} {...properties} />
+			<DataTable data={generateTestData(DEFAULT_TEST_ROW_COUNT)} columns={columns} {...properties} />
 		</MantineProvider>,
 	);
 
@@ -119,9 +121,10 @@ describe("DataTable", () => {
 	});
 
 	it("virtualises large datasets instead of paginating", async () => {
+		const LARGE_TEST_ROW_COUNT = 500;
 		render(
 			<MantineProvider>
-				<DataTable data={generateTestData(500)} columns={columns} enableVirtualization estimateSize={40} />
+				<DataTable data={generateTestData(LARGE_TEST_ROW_COUNT)} columns={columns} enableVirtualization estimateSize={40} />
 			</MantineProvider>,
 		);
 		// Virtual mode replaces pagination and keeps the sortable header

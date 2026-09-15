@@ -9,7 +9,7 @@ export interface EntityCardProps {
   worksCount?: number;
   citedByCount?: number;
   description?: string;
-  tags?: Array<{ label: string; color?: string }>;
+  tags?: { label: string; color?: string }[];
   onClick?: () => void;
   onNavigate?: (path: string) => void;
 }
@@ -33,7 +33,7 @@ export const EntityCard = ({
 
     const handleCardClick = (e: React.MouseEvent) => {
       // Don't trigger card click if clicking on the anchor link
-      if ((e.target as HTMLElement).closest('a')) {
+      if (e.target instanceof Element && e.target.closest('a')) {
         return;
       }
 
@@ -58,7 +58,7 @@ export const EntityCard = ({
       // Otherwise, let the default anchor behavior work
     };
 
-    const isClickable = onClick || onNavigate;
+    const isClickable = onClick ?? onNavigate;
 
     return (
       <Card
@@ -93,7 +93,7 @@ export const EntityCard = ({
             </Badge>
           </Group>
 
-          {description && (
+          {description !== undefined && description !== "" && (
             <Text size="sm" c="dimmed" lineClamp={3}>
               {description}
             </Text>
@@ -119,7 +119,7 @@ export const EntityCard = ({
               {tags.map((tag) => (
                 <Badge
                   key={tag.label}
-                  color={tag.color || "gray"}
+                  color={tag.color ?? "gray"}
                   variant="dot"
                   size="sm"
                 >

@@ -27,14 +27,12 @@ export interface BackgroundStrategySelectorProps {
 	onChange: (value: BackgroundStrategy) => void;
 
 	/**
-	 * Optional custom label text
-	 * @default "Background Processing Strategy"
+	 * Optional custom label text. Defaults to "Background Processing Strategy".
 	 */
 	label?: string;
 
 	/**
-	 * Whether to show the description text
-	 * @default true
+	 * Whether to show the description text. Defaults to `true`.
 	 */
 	showDescription?: boolean;
 
@@ -78,12 +76,6 @@ const STRATEGY_OPTIONS: StrategyOption[] = [
  *
  * A select dropdown for choosing the background processing strategy used for
  * auto-population tasks like label resolution and relationship discovery.
- * @param root0
- * @param root0.value
- * @param root0.onChange
- * @param root0.label
- * @param root0.showDescription
- * @param root0."data-testid"
  * @example
  * ```tsx
  * // Basic usage
@@ -100,6 +92,8 @@ const STRATEGY_OPTIONS: StrategyOption[] = [
  * />
  * ```
  */
+const isBackgroundStrategy = (value: string): value is BackgroundStrategy => ['idle', 'scheduler', 'worker', 'sync'].includes(value);
+
 export const BackgroundStrategySelector = ({
 	value,
 	onChange,
@@ -108,7 +102,7 @@ export const BackgroundStrategySelector = ({
 	"data-testid": dataTestId = "background-strategy-selector",
 }: BackgroundStrategySelectorProps) => {
 	const handleChange = (newValue: string | null) => {
-		if (newValue && isBackgroundStrategy(newValue)) {
+		if (newValue !== null && isBackgroundStrategy(newValue)) {
 			onChange(newValue);
 		}
 	};
@@ -135,5 +129,3 @@ export const BackgroundStrategySelector = ({
 		</Stack>
 	);
 };
-
-const isBackgroundStrategy = (value: string): value is BackgroundStrategy => ['idle', 'scheduler', 'worker', 'sync'].includes(value);

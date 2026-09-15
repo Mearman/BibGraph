@@ -12,9 +12,12 @@ import {
 import type { ReactNode } from "react";
 
 const DEFAULT_ERROR_SUGGESTIONS: ErrorSuggestion[] = [];
+const MS_PER_SECOND = 1000;
+const MAX_RETRY_DELAY_MS = 30000;
+const RETRY_PROGRESS_PERCENTAGE_MULTIPLIER = 100;
 
 export interface ErrorRecoveryProps {
-  error: Error | unknown;
+  error: unknown;
   onRetry?: () => void;
   onRetryWithExponentialBackoff?: () => void;
   onGoHome?: () => void;
@@ -39,7 +42,7 @@ export interface ErrorSuggestion {
   onAction: () => void;
 }
 
-const getErrorType = (error: Error | unknown): {
+const getErrorType = (error: unknown): {
   type: 'network' | 'server' | 'timeout' | 'rate-limit' | 'database' | 'unknown';
   title: string;
   description: string;
@@ -109,13 +112,13 @@ const getErrorType = (error: Error | unknown): {
 
 const getRetryDelay = (retryCount: number): number => {
   // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s
-  return Math.min(Math.pow(2, retryCount) * 1000, 30000);
+  return Math.min(Math.pow(2, retryCount) * MS_PER_SECOND, MAX_RETRY_DELAY_MS);
 };
 
 const getRetryText = (retryCount: number, maxRetries: number): string => {
   if (retryCount === 0) return 'Retry';
   if (retryCount >= maxRetries) return 'Retry Limit Reached';
-  return `Retry (${retryCount}/${maxRetries})`;
+  return `Retry (${String(retryCount)}/${String(maxRetries)})`;
 };
 
 export const ErrorRecovery = ({
@@ -136,8 +139,8 @@ export const ErrorRecovery = ({
   const canRetry = retryCount < maxRetries;
   const shouldShowExponentialRetry = ['timeout', 'server', 'rate-limit'].includes(errorInfo.type);
 
-  const formatErrorMessage = (error: Error | unknown): string => {
-    if (error instanceof Error) {
+  const formatErrorMessage = (err: unknown): string => {
+    if (err instanceof Error) {
       // Only show user-friendly error messages, hide technical details
       const technicalPatterns = [
         /at /,
@@ -147,14 +150,14 @@ export const ErrorRecovery = ({
         /internal server error/i
       ];
 
-      const isTechnical = technicalPatterns.some(pattern => pattern.test(error.message));
+      const isTechnical = technicalPatterns.some(pattern => pattern.test(err.message));
       if (isTechnical) {
         return 'A technical error occurred. Please try again.';
       }
 
-      return error.message;
+      return err.message;
     }
-    return String(error);
+    return String(err);
   };
 
   const renderRetrySection = () => {
@@ -193,27 +196,27 @@ export const ErrorRecovery = ({
             {retryCount > 0 && (
               <Text size="xs" c="dimmed">
                 {shouldShowExponentialRetry
-                  ? `Next retry will wait ${retryDelay / 1000}s to avoid overwhelming the server.`
-                  : `${retryCount} retry attempt${retryCount > 1 ? 's' : ''} made.`
+                  ? `Next retry will wait ${String(retryDelay / MS_PER_SECOND)}s to avoid overwhelming the server.`
+                  : `${String(retryCount)} retry attempt${retryCount > 1 ? 's' : ''} made.`
                 }
               </Text>
             )}
-
-            {!canRetry && (
-              <Alert variant="light" color="orange">
-                <Text size="sm">
-                  Maximum retry attempts reached. Please try again later or contact support if the problem persists.
-                </Text>
-              </Alert>
-            )}
           </>
+        )}
+
+        {!canRetry && (
+          <Alert variant="light" color="orange">
+            <Text size="sm">
+              Maximum retry attempts reached. Please try again later or contact support if the problem persists.
+            </Text>
+          </Alert>
         )}
 
         {retryCount > 0 && (
           <div>
             <Text size="xs" c="dimmed" mb="xs">Retry Progress</Text>
             <Progress
-              value={(retryCount / maxRetries) * 100}
+              value={(retryCount / maxRetries) * RETRY_PROGRESS_PERCENTAGE_MULTIPLIER}
               color={canRetry ? "blue" : "orange"}
               size="xs"
             />
@@ -230,19 +233,19 @@ export const ErrorRecovery = ({
       <Card p="md" radius="md" bg="var(--mantine-color-gray-0)" style={{ border: '1px solid var(--mantine-color-gray-2)' }}>
         <Stack gap="xs">
           <Text size="sm" fw={600} c="dimmed">Context</Text>
-          {context.operation && (
+          {context.operation !== undefined && context.operation !== "" && (
             <Group gap="xs">
               <Text size="xs" c="dimmed" miw={80}>Operation:</Text>
               <Text size="xs">{context.operation}</Text>
             </Group>
           )}
-          {context.entity && (
+          {context.entity !== undefined && context.entity !== "" && (
             <Group gap="xs">
               <Text size="xs" c="dimmed" miw={80}>Entity:</Text>
               <Text size="xs">{context.entity}</Text>
             </Group>
           )}
-          {context.entityId && (
+          {context.entityId !== undefined && context.entityId !== "" && (
             <Group gap="xs">
               <Text size="xs" c="dimmed" miw={80}>ID:</Text>
               <Text size="xs" style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
@@ -361,7 +364,7 @@ export const ErrorRecovery = ({
         {renderSuggestions()}
 
         {/* Technical Details (for debugging) */}
-        {process.env.NODE_ENV === 'development' && error instanceof Error && error.stack && (
+        {process.env.NODE_ENV === 'development' && error instanceof Error && error.stack !== undefined && error.stack !== "" && (
           <Card p="md" radius="md" bg="var(--mantine-color-gray-0)" style={{ border: '1px solid var(--mantine-color-gray-2)' }}>
             <Stack gap="xs">
               <Text size="xs" fw={600} c="dimmed">Technical Details (Development Only)</Text>

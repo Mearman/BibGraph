@@ -10,7 +10,7 @@
  * - User Story 3: Organize and Search Bookmarks
  */
 
-import type { EntityType } from "@bibgraph/types";
+import { ENTITY_TYPES, type EntityType } from "@bibgraph/types";
 import { ActionIcon, Group, Select, Stack, TextInput, Tooltip } from "@mantine/core";
 import { IconFilter, IconSearch, IconX } from "@tabler/icons-react";
 import { useState } from "react";
@@ -46,7 +46,7 @@ export interface BookmarkSearchFiltersProps {
 	/**
 	 * Callback when tag filters change
 	 */
-	onTagFiltersChange: (tags: string[]) => void;
+	onTagFiltersChange: (tags: readonly string[]) => void;
 
 	/**
 	 * Available tags for filtering
@@ -95,6 +95,9 @@ const ENTITY_TYPE_OPTIONS: { value: EntityType | "all"; label: string }[] = [
 	{ value: "keywords", label: "Keywords" },
 ];
 
+const ENTITY_TYPE_SET = new Set<string>(ENTITY_TYPES);
+const isEntityType = (value: string): value is EntityType => ENTITY_TYPE_SET.has(value);
+
 /**
  * Bookmark Search and Filter Component
  *
@@ -105,19 +108,6 @@ const ENTITY_TYPE_OPTIONS: { value: EntityType | "all"; label: string }[] = [
  * - Clear all filters button
  * - Result count display
  * - AND/OR logic toggle for tags
- * @param root0
- * @param root0.searchQuery
- * @param root0.onSearchChange
- * @param root0.entityTypeFilter
- * @param root0.onEntityTypeChange
- * @param root0.tagFilters
- * @param root0.onTagFiltersChange
- * @param root0.availableTags
- * @param root0.resultCount
- * @param root0.totalCount
- * @param root0.matchAllTags
- * @param root0.onMatchAllTagsChange
- * @param root0."data-testid"
  * @example
  * ```tsx
  * <BookmarkSearchFilters
@@ -164,10 +154,10 @@ export const BookmarkSearchFilters = ({
 
 	// Handle entity type change
 	const handleEntityTypeChange = (value: string | null) => {
-		if (!value || value === "all") {
+		if (value === null || value === "all") {
 			onEntityTypeChange(null);
-		} else {
-			onEntityTypeChange(value as EntityType);
+		} else if (isEntityType(value)) {
+			onEntityTypeChange(value);
 		}
 	};
 
@@ -195,14 +185,14 @@ export const BookmarkSearchFilters = ({
 				<TextInput
 					placeholder="Search bookmarks..."
 					value={searchQuery}
-					onChange={(event) => onSearchChange(event.currentTarget.value)}
+					onChange={(event) => { onSearchChange(event.currentTarget.value); }}
 					leftSection={<IconSearch size={16} />}
 					rightSection={
 						searchQuery && (
 							<ActionIcon
 								variant="subtle"
 								color="gray"
-								onClick={() => onSearchChange("")}
+								onClick={() => { onSearchChange(""); }}
 								size="sm"
 								aria-label="Clear search"
 							>
@@ -218,7 +208,7 @@ export const BookmarkSearchFilters = ({
 				<Select
 					placeholder="Entity Type"
 					data={ENTITY_TYPE_OPTIONS}
-					value={entityTypeFilter || "all"}
+					value={entityTypeFilter ?? "all"}
 					onChange={handleEntityTypeChange}
 					clearable
 					style={{ minWidth: 150 }}
@@ -230,7 +220,7 @@ export const BookmarkSearchFilters = ({
 					<ActionIcon
 						variant={showFilters ? "filled" : "light"}
 						color={tagFilters.length > 0 ? "blue" : "gray"}
-						onClick={() => setShowFilters(!showFilters)}
+						onClick={() => { setShowFilters(!showFilters); }}
 						size="lg"
 						aria-label="Toggle filters"
 						data-testid="toggle-filters-button"
@@ -270,14 +260,14 @@ export const BookmarkSearchFilters = ({
 									variant="filled"
 									size="sm"
 									removable
-									onRemove={() => handleTagRemove(tag)}
+									onRemove={() => { handleTagRemove(tag); }}
 									data-testid={`active-tag-${tag}`}
 								/>
 							))}
 							<ActionIcon
 								variant="subtle"
 								size="xs"
-								onClick={() => onMatchAllTagsChange(!matchAllTags)}
+								onClick={() => { onMatchAllTagsChange(!matchAllTags); }}
 								aria-label={matchAllTags ? "Switch to ANY tag" : "Switch to ALL tags"}
 								data-testid="tag-logic-toggle"
 							>
@@ -300,7 +290,7 @@ export const BookmarkSearchFilters = ({
 									variant="light"
 									size="sm"
 									clickable
-									onClick={() => handleTagClick(tag)}
+									onClick={() => { handleTagClick(tag); }}
 									data-testid={`filter-tag-chip-${tag}`}
 								/>
 							))}
@@ -313,8 +303,8 @@ export const BookmarkSearchFilters = ({
 				<Group gap="xs" justify="space-between">
 					<span style={{ fontSize: "0.875rem", color: "var(--mantine-color-dimmed)" }}>
 						{hasActiveFilters
-							? `Showing ${resultCount} of ${totalCount} bookmarks`
-							: `${totalCount} bookmarks`}
+							? `Showing ${String(resultCount)} of ${String(totalCount)} bookmarks`
+							: `${String(totalCount)} bookmarks`}
 					</span>
 				</Group>
 			)}

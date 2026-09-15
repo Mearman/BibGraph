@@ -37,7 +37,7 @@ const getDifferenceColor = (difference: number): string => {
 
 const formatDifference = (difference: number): string => {
   if (difference === 0) return "No change";
-  return difference > 0 ? `+${difference}` : difference.toString();
+  return difference > 0 ? `+${String(difference)}` : difference.toString();
 };
 
 export const VersionComparisonIndicator: React.FC<
@@ -54,8 +54,8 @@ export const VersionComparisonIndicator: React.FC<
     ? "Data Version 2 (current)"
     : "Data Version 2 (default)");
 
-  const hasReferences = referencesCount && referencesCount.difference !== 0;
-  const hasLocations = locationsCount && locationsCount.difference !== 0;
+  const hasReferences = referencesCount !== undefined && referencesCount.difference !== 0;
+  const hasLocations = locationsCount !== undefined && locationsCount.difference !== 0;
   const hasDifferences = hasReferences || hasLocations;
 
   if (!hasDifferences) {
@@ -88,9 +88,9 @@ export const VersionComparisonIndicator: React.FC<
       </Group>
 
       <Group gap="sm">
-        {hasReferences && referencesCount && (
+        {hasReferences && (
           <Tooltip
-            label={`References: ${referencesCount.v1 ?? 0} (v1) → ${referencesCount.v2 ?? 0} (v2)`}
+            label={`References: ${String(referencesCount.v1 ?? 0)} (v1) → ${String(referencesCount.v2 ?? 0)} (v2)`}
             position="bottom"
           >
             <Badge
@@ -105,9 +105,9 @@ export const VersionComparisonIndicator: React.FC<
           </Tooltip>
         )}
 
-        {hasLocations && locationsCount && (
+        {hasLocations && (
           <Tooltip
-            label={`Locations: ${locationsCount.v1 ?? 0} (v1) → ${locationsCount.v2 ?? 0} (v2)`}
+            label={`Locations: ${String(locationsCount.v1 ?? 0)} (v1) → ${String(locationsCount.v2 ?? 0)} (v2)`}
             position="bottom"
           >
             <Badge

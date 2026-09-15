@@ -13,20 +13,17 @@ export interface BookmarkListProps {
 	bookmarks: Bookmark[];
 
 	/**
-	 * Whether to group bookmarks by entity type
-	 * @default false
+	 * Whether to group bookmarks by entity type. Defaults to false.
 	 */
 	groupByType?: boolean;
 
 	/**
-	 * Field to sort bookmarks by
-	 * @default "date"
+	 * Field to sort bookmarks by. Defaults to "date".
 	 */
 	sortBy?: "date" | "title" | "type";
 
 	/**
-	 * Sort order
-	 * @default "desc"
+	 * Sort order. Defaults to "desc".
 	 */
 	sortOrder?: "asc" | "desc";
 
@@ -43,17 +40,15 @@ export interface BookmarkListProps {
 	/**
 	 * Callback fired when bookmark tags are updated
 	 */
-	onUpdateTags?: (bookmarkId: string, tags: string[]) => void | Promise<void>;
+	onUpdateTags?: (bookmarkId: string, tags: readonly string[]) => void | Promise<void>;
 
 	/**
-	 * Whether the list is in a loading state
-	 * @default false
+	 * Whether the list is in a loading state. Defaults to false.
 	 */
 	loading?: boolean;
 
 	/**
-	 * Message to display when there are no bookmarks
-	 * @default "No bookmarks yet"
+	 * Message to display when there are no bookmarks. Defaults to "No bookmarks yet".
 	 */
 	emptyMessage?: string;
 
@@ -72,17 +67,6 @@ export interface BookmarkListProps {
 /**
  * Main bookmark list component for displaying all bookmarks.
  * Supports grouping by entity type, sorting, and empty states.
- * @param root0
- * @param root0.bookmarks
- * @param root0.groupByType
- * @param root0.sortBy
- * @param root0.sortOrder
- * @param root0.onDeleteBookmark
- * @param root0.onNavigate
- * @param root0.onUpdateTags
- * @param root0.loading
- * @param root0.emptyMessage
- * @param root0.className
  * @example
  * ```tsx
  * <BookmarkList
@@ -144,7 +128,7 @@ export const BookmarkList = ({
 		const groups = new Map<EntityType, Bookmark[]>();
 
 		for (const bookmark of sortedBookmarks) {
-			const existing = groups.get(bookmark.entityType) || [];
+			const existing = groups.get(bookmark.entityType) ?? [];
 			groups.set(bookmark.entityType, [...existing, bookmark]);
 		}
 

@@ -5,6 +5,7 @@
  */
 
 // Re-export all component subdirectories
+export * from './data-display';
 export * from './feedback';
 export * from './indicators';
 export * from './layout';
@@ -14,4 +15,4 @@ export * from './settings';
 export * from './SkeletonScreens';
 
 // Export utility functions
-export { convertToRelativeUrl } from './entity-views/matchers/entity-matchers';
+export { convertToRelativeUrl } from './entity-views';

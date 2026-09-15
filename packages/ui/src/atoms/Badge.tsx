@@ -64,13 +64,6 @@ const VARIANT_COLORS: Record<NonNullable<BadgeProps["variant"]>, MantineColor> =
  * - Customizable size and style
  * - Color override capability
  * - Consistent styling with Mantine theme
- * @param root0
- * @param root0.variant
- * @param root0.children
- * @param root0.size
- * @param root0.style
- * @param root0.color
- * @param root0."data-testid"
  * @example
  * ```tsx
  * // Success badge for improvements

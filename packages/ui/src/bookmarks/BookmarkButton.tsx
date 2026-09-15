@@ -19,14 +19,12 @@ export interface BookmarkButtonProps {
 	onToggle: () => void | Promise<void>
 
 	/**
-	 * Size of the button
-	 * @default "md"
+	 * Size of the button. Defaults to "md".
 	 */
 	size?: "xs" | "sm" | "md" | "lg" | "xl"
 
 	/**
-	 * Visual variant of the button
-	 * @default "subtle"
+	 * Visual variant of the button. Defaults to "subtle".
 	 */
 	variant?: "filled" | "light" | "outline" | "subtle"
 
@@ -44,13 +42,6 @@ export interface BookmarkButtonProps {
 /**
  * A button component for toggling bookmark state on entities.
  * Uses Mantine ActionIcon with visual feedback for bookmark state.
- * @param root0
- * @param root0.isBookmarked
- * @param root0.loading
- * @param root0.onToggle
- * @param root0.size
- * @param root0.variant
- * @param root0.className
  * @example
  * ```tsx
  * <BookmarkButton
@@ -92,7 +83,7 @@ export const BookmarkButton = ({
 				variant={variant}
 				color={color}
 				size={size}
-				onClick={onToggle}
+				onClick={() => { void onToggle(); }}
 				disabled={loading}
 				aria-label={tooltipLabel}
 				aria-pressed={isBookmarked}

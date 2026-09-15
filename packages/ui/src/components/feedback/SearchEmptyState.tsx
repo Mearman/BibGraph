@@ -9,6 +9,8 @@ export interface SearchEmptyStateProps {
   className?: string;
 }
 
+const SEARCH_TIPS_LIMIT = 3;
+
 interface QuickSearchItem {
   query: string;
   label: string;
@@ -96,7 +98,7 @@ export const SearchEmptyState = ({
   };
 
   // Helper function to render category items
-  const renderCategoryItems = (items: typeof QUICK_SEARCHES[0][]) => {
+  const renderCategoryItems = (items: readonly typeof QUICK_SEARCHES[0][]) => {
     return items.map((item) => (
       <Button
         key={item.query}
@@ -121,7 +123,7 @@ export const SearchEmptyState = ({
             color={item.color}
             size="sm"
             leftSection={item.icon}
-            onClick={() => handleQuickSearch(item.query)}
+            onClick={() => { handleQuickSearch(item.query); }}
             style={{ flex: '0 0 auto' }}
           >
             {item.label}
@@ -132,13 +134,13 @@ export const SearchEmptyState = ({
   );
 
   const renderSearchCategories = () => {
-    const categories = QUICK_SEARCHES.reduce((accumulator, item) => {
-      if (!accumulator[item.category]) {
+    const categories = QUICK_SEARCHES.reduce<Record<string, QuickSearchItem[]>>((accumulator, item) => {
+      if (!Object.prototype.hasOwnProperty.call(accumulator, item.category)) {
         accumulator[item.category] = [];
       }
       accumulator[item.category].push(item);
       return accumulator;
-    }, {} as Record<string, QuickSearchItem[]>);
+    }, {});
 
     return (
       <Stack gap="md">
@@ -165,7 +167,7 @@ export const SearchEmptyState = ({
         <Text size="sm" fw={600} c="blue">
           Pro Search Tips
         </Text>
-        {SEARCH_TIPS.slice(0, 3).map((tip, index) => (
+        {SEARCH_TIPS.slice(0, SEARCH_TIPS_LIMIT).map((tip, index) => (
           <Text key={index} size="xs" c="var(--mantine-color-blue-8)">
             • {tip}
           </Text>
@@ -177,7 +179,7 @@ export const SearchEmptyState = ({
     </Card>
   );
 
-  if (variant === "no-results" && query) {
+  if (variant === "no-results" && query !== undefined && query !== "") {
     return (
       <Alert
         icon={<IconBook size={16} />}
@@ -199,7 +201,7 @@ export const SearchEmptyState = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleQuickSearch('')}
+              onClick={() => { handleQuickSearch(''); }}
             >
               Clear Search
             </Button>

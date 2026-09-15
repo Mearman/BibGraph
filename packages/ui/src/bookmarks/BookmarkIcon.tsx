@@ -19,8 +19,8 @@ export const BookmarkIcon = ({
 				display: "inline-flex",
 				alignItems: "center",
 				justifyContent: "center",
-				width: typeof size === "number" ? `${size}px` : size,
-				height: typeof size === "number" ? `${size}px` : size,
+				width: typeof size === "number" ? `${String(size)}px` : size,
+				height: typeof size === "number" ? `${String(size)}px` : size,
 			}}
 			className={className}
 		>

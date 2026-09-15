@@ -7,7 +7,7 @@ export interface SectionKitProps {
 
 export const SectionKit: FC<SectionKitProps> = ({ children, title }) => (
 	<section>
-		{title && <h2>{title}</h2>}
+		{title !== undefined && title !== "" && <h2>{title}</h2>}
 		{children}
 	</section>
 )

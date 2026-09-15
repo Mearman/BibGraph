@@ -27,14 +27,12 @@ export interface DataVersionSelectorProps {
 	onChange: (value: "1" | "2" | undefined) => void;
 
 	/**
-	 * Optional custom label text
-	 * @default "OpenAlex Data Version"
+	 * Optional custom label text. Defaults to "OpenAlex Data Version".
 	 */
 	label?: string;
 
 	/**
-	 * Whether to show the description text about version availability
-	 * @default true
+	 * Whether to show the description text about version availability. Defaults to `true`.
 	 */
 	showDescription?: boolean;
 
@@ -56,12 +54,6 @@ export interface DataVersionSelectorProps {
  * - Customizable label text
  * - Accessible Select component from Mantine
  * - Proper handling of undefined/null values
- * @param root0
- * @param root0.value
- * @param root0.onChange
- * @param root0.label
- * @param root0.showDescription
- * @param root0."data-testid"
  * @example
  * ```tsx
  * // Basic usage
@@ -90,10 +82,8 @@ export const DataVersionSelector: React.FC<DataVersionSelectorProps> = ({
 		if (selectedValue === "1" || selectedValue === "2") {
 			onChange(selectedValue);
 		} else {
-			// selectedValue is "undefined" or null - map to undefined value
-			// Note: undefined is a meaningful value here, not an optional parameter
-			const versionValue: "1" | "2" | undefined = undefined;
-			onChange(versionValue);
+			// selectedValue is "undefined" or null - map to undefined value Note: undefined is a meaningful value here, not an optional parameter
+			onChange(undefined);
 		}
 	};
 
@@ -101,7 +91,7 @@ export const DataVersionSelector: React.FC<DataVersionSelectorProps> = ({
 		<Stack gap="xs">
 			<Select
 				label={label}
-				value={value === undefined ? "undefined" : value}
+				value={value ?? "undefined"}
 				onChange={handleChange}
 				data={[
 					{ value: "undefined", label: "Auto (v2 default)" },

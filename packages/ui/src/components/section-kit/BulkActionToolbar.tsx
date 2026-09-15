@@ -41,21 +41,6 @@ export interface BulkActionToolbarProps {
 /**
  * A toolbar component for bulk actions including selection, visibility toggles, and graph operations.
  * Provides controls for managing selected items and performing graph-related operations.
- * @param root0
- * @param root0.totalItems
- * @param root0.selectedItems
- * @param root0.onSelectAll
- * @param root0.onClearSelection
- * @param root0.showVisible
- * @param root0.showHidden
- * @param root0.onToggleVisible
- * @param root0.onToggleHidden
- * @param root0.onFocusSelection
- * @param root0.onZoomToSelection
- * @param root0.onCreateSubgraph
- * @param root0.onExpandSelection
- * @param root0.additionalActions
- * @param root0.className
  * @example
  * ```tsx
  * <BulkActionToolbar
@@ -95,8 +80,8 @@ export const BulkActionToolbar = ({
 	const isIndeterminate = selectedCount > 0 && selectedCount < totalItems
 
 	const hasGraphOperations =
-		onFocusSelection || onZoomToSelection || onCreateSubgraph || onExpandSelection
-	const hasVisibilityToggles = onToggleVisible || onToggleHidden
+		onFocusSelection ?? onZoomToSelection ?? onCreateSubgraph ?? onExpandSelection
+	const hasVisibilityToggles = onToggleVisible ?? onToggleHidden
 
 	return (
 		<Group justify="space-between" wrap="nowrap" className={className} {...restProps}>
@@ -109,8 +94,8 @@ export const BulkActionToolbar = ({
 					label={
 						<Text size="sm" fw={500}>
 							{selectedCount === 0
-								? `Select all (${totalItems})`
-								: `${selectedCount} of ${totalItems} selected`}
+								? `Select all (${String(totalItems)})`
+								: `${String(selectedCount)} of ${String(totalItems)} selected`}
 						</Text>
 					}
 				/>
@@ -179,7 +164,7 @@ export const BulkActionToolbar = ({
 							</Tooltip>
 						)}
 
-						{(onCreateSubgraph || onExpandSelection) && (
+						{(onCreateSubgraph ?? onExpandSelection) && (
 							<Menu shadow="md" width={200}>
 								<Menu.Target>
 									<ActionIcon variant="subtle" size="sm">

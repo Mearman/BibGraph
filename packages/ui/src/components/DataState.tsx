@@ -58,7 +58,7 @@ export const DataState = <T,>({
     )
   }
 
-  if (!data) {
+  if (data === null) {
     if (EmptyComponent) {
       return <EmptyComponent message={emptyMessage} />
     }

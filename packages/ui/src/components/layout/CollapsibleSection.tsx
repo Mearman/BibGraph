@@ -16,6 +16,8 @@ export interface CollapsibleSectionProps {
 	onToggle?: (expanded: boolean) => void;
 }
 
+const isBoolean = (value: unknown): value is boolean => typeof value === "boolean";
+
 export const CollapsibleSection: FC<CollapsibleSectionProps> = ({
 	title,
 	icon,
@@ -24,11 +26,13 @@ export const CollapsibleSection: FC<CollapsibleSectionProps> = ({
 	storageKey,
 	onToggle,
 }) => {
-	const [isExpanded, setIsExpanded] = useState(() => {
-		if (storageKey && typeof window !== "undefined") {
+	const [isExpanded, setIsExpanded] = useState<boolean>(() => {
+		if (storageKey !== undefined && storageKey !== "" && typeof window !== "undefined") {
 			try {
 				const stored = localStorage.getItem(`collapsible-section-${storageKey}`);
-				return stored ? JSON.parse(stored) : defaultExpanded;
+				if (stored === null) return defaultExpanded;
+				const parsed: unknown = JSON.parse(stored);
+				return isBoolean(parsed) ? parsed : defaultExpanded;
 			} catch {
 				return defaultExpanded;
 			}
@@ -41,7 +45,7 @@ export const CollapsibleSection: FC<CollapsibleSectionProps> = ({
 		setIsExpanded(isNewExpanded);
 
 		// Persist to localStorage if storageKey is provided
-		if (storageKey && typeof window !== "undefined") {
+		if (storageKey !== undefined && storageKey !== "" && typeof window !== "undefined") {
 			try {
 				localStorage.setItem(`collapsible-section-${storageKey}`, JSON.stringify(isNewExpanded));
 			} catch {
