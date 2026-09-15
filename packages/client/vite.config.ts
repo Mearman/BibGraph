@@ -1,7 +1,7 @@
-import { createLibConfig } from "../../vite.config.lib";
+import { createLibConfig } from "../../vite.config.lib.ts";
 
 export default createLibConfig({
-  root: __dirname,
+  root: import.meta.dirname,
   name: "BibGraphClient",
   external: ["axios", "axios-rate-limit", "axios-retry", "p-retry"],
 });

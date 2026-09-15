@@ -2,18 +2,18 @@
 import * as path from "node:path";
 
 import { viteStaticCopy } from "vite-plugin-static-copy";
-import tsConfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-	root: __dirname,
+	root: import.meta.dirname,
 	cacheDir: "../../node_modules/.vite/packages/client",
-	plugins: [tsConfigPaths(), viteStaticCopy({ targets: [{ src: "*.md", dest: "." }] })],
+	plugins: [viteStaticCopy({ targets: [{ src: "*.md", dest: "." }] })],
 	resolve: {
+      tsconfigPaths: true,
 		alias: {
-			"@bibgraph/types/entities": path.resolve(__dirname, "../../packages/types/src/entities/index.ts"),
-			"@bibgraph/types": path.resolve(__dirname, "../../packages/types/src/index.ts"),
-			"@bibgraph/utils": path.resolve(__dirname, "../../packages/utils/src/index.ts"),
+			"@bibgraph/types/entities": path.resolve(import.meta.dirname, "../../packages/types/src/entities/index.ts"),
+			"@bibgraph/types": path.resolve(import.meta.dirname, "../../packages/types/src/index.ts"),
+			"@bibgraph/utils": path.resolve(import.meta.dirname, "../../packages/utils/src/index.ts"),
 		},
 	},
 	test: {

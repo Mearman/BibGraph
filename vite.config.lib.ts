@@ -1,5 +1,4 @@
 /// <reference types="vitest" />
-import tsConfigPaths from "vite-tsconfig-paths";
 import dts from "vite-plugin-dts";
 import { defineConfig, type UserConfig } from "vite";
 import { resolve } from "node:path";
@@ -18,8 +17,8 @@ export function createLibConfig(options: {
 
   return defineConfig({
     root,
+    resolve: { tsconfigPaths: true },
     plugins: [
-      tsConfigPaths(),
       dts({
         include: ["src/**/*"],
         exclude: ["**/*.test.ts", "**/*.spec.ts"],

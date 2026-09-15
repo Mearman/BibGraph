@@ -1,24 +1,22 @@
 /// <reference types="vitest" />
-import tsConfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vite";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 // Workspace-level Vite configuration with Nx best practices
 // This provides common configuration for all projects in the monorepo
 export default defineConfig({
   // Nx TypeScript paths plugin for proper module resolution
-  plugins: [tsConfigPaths()],
 
   
   // Path aliases for absolute imports
   // Note: This is resolved dynamically relative to this config file
   resolve: {
+      tsconfigPaths: true,
     alias: {
-      "@": resolve(__dirname, "apps/web/src"),
+      "@": resolve(import.meta.dirname, "apps/web/src"),
     },
     extensions: [".ts", ".tsx", ".js", ".jsx", ".json"],
   },

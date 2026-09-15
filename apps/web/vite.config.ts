@@ -3,7 +3,6 @@ import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import tsConfigPaths from "vite-tsconfig-paths";
 import { tanstackRouter } from '@tanstack/router-vite-plugin';
 import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin';
 import react from '@vitejs/plugin-react';
@@ -13,9 +12,8 @@ import { defineConfig, type UserConfig, type PluginOption } from 'vite';
 
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const appRoot = resolve(__dirname, "..");
-const monorepoRoot = resolve(__dirname, "../..");
+const appRoot = resolve(import.meta.dirname, "..");
+const monorepoRoot = resolve(import.meta.dirname, "../..");
 
 /**
  * Get build information from git and package.json
@@ -93,12 +91,11 @@ function createWebConfig(): UserConfig {
 
     // Plugins configuration
     plugins: [
-      tsConfigPaths(),
       // TanStack Router Plugin - must come before React plugin
       // Use absolute paths to avoid issues during Nx project graph generation
       tanstackRouter({
-        routesDirectory: resolve(__dirname, 'src/routes'),
-        generatedRouteTree: resolve(__dirname, 'src/routeTree.gen.ts'),
+        routesDirectory: resolve(import.meta.dirname, 'src/routes'),
+        generatedRouteTree: resolve(import.meta.dirname, 'src/routeTree.gen.ts'),
       }),
       // OpenAlex Cache Plugin - disabled due to missing plugin file
       // openalexCachePlugin({
@@ -165,8 +162,9 @@ function createWebConfig(): UserConfig {
 
     // Resolve configuration
     resolve: {
+      tsconfigPaths: true,
       alias: {
-        '@': resolve(__dirname, 'src'),
+        '@': resolve(import.meta.dirname, 'src'),
       },
       dedupe: ['react', 'react-dom', '@tanstack/react-virtual', 'react-force-graph-2d', 'react-force-graph-3d', 'three', '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
     },

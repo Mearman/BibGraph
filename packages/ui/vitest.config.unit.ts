@@ -1,11 +1,11 @@
 /// <reference types='vitest' />
-import tsConfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-	root: __dirname,
+	root: import.meta.dirname,
 	cacheDir: "../../node_modules/.vite/packages/ui",
-	plugins: [tsConfigPaths()],
+	
+	resolve: { tsconfigPaths: true },
 	define: {
 		global: "globalThis",
 	},
