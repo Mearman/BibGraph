@@ -27,10 +27,23 @@ import type { ErrorInfo, ReactNode } from "react"
 import * as React from "react";
 import { Component } from "react";
 
+/**
+ * Radix used when converting the random error identifier to a compact base-36 string.
+ */
+const ERROR_ID_RADIX = 36
+/**
+ * Drops the "0." prefix `Math.random().toString(36)` always produces, keeping only the fractional digits as the error identifier.
+ */
+const ERROR_ID_SLICE_START = 7
+/**
+ * How long the "Copied!" tooltip state is shown after debug data is copied to the clipboard.
+ */
+const COPIED_STATE_RESET_DELAY_MS = 2000
+
 export interface ErrorBoundaryProps {
 	children: ReactNode
 	fallback?: ReactNode
-	onError?: (error: Error, errorInfo: ErrorInfo) => void
+	onError?: (error: Error, errorInfo: Readonly<ErrorInfo>) => void
 	onReset?: () => void
 	onClearCache?: () => Promise<void>
 	reportUrl?: string
@@ -100,8 +113,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, State> {
 		}
 	}
 
-	componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-		const errorId = Math.random().toString(36).slice(7)
+	componentDidCatch(error: Error, errorInfo: Readonly<ErrorInfo>): void {
+		const errorId = Math.random().toString(ERROR_ID_RADIX).slice(ERROR_ID_SLICE_START)
 
 		// Generate debug info
 		const debugInfo: DebugInfo = {
@@ -219,7 +232,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, State> {
 
 			this.copyTimeout = setTimeout(() => {
 				this.setState({ copied: false })
-			}, 2000)
+			}, COPIED_STATE_RESET_DELAY_MS)
 		} catch {
 			notifications.show({
 				title: "Copy failed",
@@ -239,7 +252,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, State> {
 	render(): ReactNode {
 		if (this.state.hasError) {
 			// Custom fallback UI
-			if (this.props.fallback) {
+			if (this.props.fallback !== undefined) {
 				return this.props.fallback
 			}
 
@@ -320,7 +333,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, State> {
 											Clear Cache
 										</Button>
 									)}
-									{reportUrl && (
+									{reportUrl !== undefined && reportUrl !== "" && (
 										<Button
 											leftSection={<IconExternalLink size={16} />}
 											component="a"
@@ -351,7 +364,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, State> {
 
 									<Divider />
 
-									{error?.stack && (
+									{error?.stack !== undefined && error.stack !== "" && (
 										<div>
 											<Text fw={500} size="sm" mb="xs">
 												Error Stack:
@@ -364,7 +377,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, State> {
 										</div>
 									)}
 
-									{this.state.errorInfo?.componentStack && (
+									{this.state.errorInfo?.componentStack !== undefined && this.state.errorInfo.componentStack !== "" && (
 										<div>
 											<Text fw={500} size="sm" mb="xs">
 												Component Stack:
@@ -405,7 +418,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, State> {
 										• <strong>Clear cache</strong> - Remove cached data that might be causing issues
 									</Text>
 								)}
-								{reportUrl && (
+								{reportUrl !== undefined && reportUrl !== "" && (
 									<Text size="sm">
 										• <strong>Report the issue</strong> - Help us improve by reporting this error
 									</Text>

@@ -1,6 +1,7 @@
 import {
   Box,
   Group,
+  type MantineColor,
   Progress,
   Stack,
   Text,
@@ -12,6 +13,9 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { useCallback,useEffect, useState } from "react";
+
+const ANIMATION_DELAY_MS = 100;
+const PROGRESS_PERCENTAGE_MULTIPLIER = 100;
 
 interface ProgressStep {
   id: string;
@@ -26,7 +30,7 @@ interface ProgressIndicatorProperties {
   showProgress?: boolean;
   orientation?: "horizontal" | "vertical";
   size?: "sm" | "md" | "lg";
-  color?: string;
+  color?: MantineColor;
   animated?: boolean;
   className?: string;
   style?: React.CSSProperties;
@@ -48,14 +52,16 @@ export const ProgressIndicator = ({
 
   // Animate progress changes
   useEffect(() => {
-    if (animated) {
-      const timer = setTimeout(() => {
-        setAnimatedProgress(currentStep);
-      }, 100);
-      return () => clearTimeout(timer);
+    if (!animated) {
+      return undefined;
     }
-    setAnimatedProgress(currentStep);
+    const timer = setTimeout(() => {
+      setAnimatedProgress(currentStep);
+    }, ANIMATION_DELAY_MS);
+    return () => { clearTimeout(timer); };
   }, [currentStep, animated]);
+
+  const displayProgress = animated ? animatedProgress : currentStep;
 
   const getStepIcon = useCallback((status: ProgressStep["status"]) => {
     switch (status) {
@@ -79,7 +85,7 @@ export const ProgressIndicator = ({
       case "error":
         return theme.colors.red[6];
       case "active":
-        return theme.colors[color]?.[6] || theme.colors.blue[6];
+        return theme.colors[color][6];
       case "pending":
         return theme.colors.gray[4];
       default:
@@ -94,7 +100,7 @@ export const ProgressIndicator = ({
       case "error":
         return theme.colors.red[0];
       case "active":
-        return theme.colors[color]?.[0] || theme.colors.blue[0];
+        return theme.colors[color][0];
       case "pending":
         return theme.colors.gray[0];
       default:
@@ -116,6 +122,7 @@ export const ProgressIndicator = ({
           icon: "text-lg",
           text: "text-sm",
         };
+      case "md":
       default:
         return {
           container: "py-2 px-3",
@@ -125,7 +132,7 @@ export const ProgressIndicator = ({
     }
   }, [size]);
 
-  const progressPercentage = Math.round((animatedProgress / (steps.length - 1)) * 100);
+  const progressPercentage = Math.round((displayProgress / (steps.length - 1)) * PROGRESS_PERCENTAGE_MULTIPLIER);
 
   const renderHorizontal = () => (
     <Stack gap="sm" className={className} style={style}>
@@ -171,7 +178,7 @@ export const ProgressIndicator = ({
                     fontSize: "12px",
                   }}
                 >
-                  {getStepIcon(step.status) || (
+                  {getStepIcon(step.status) ?? (
                     <Text
                       style={{
                         color: getStepColor(step.status, index),
@@ -266,7 +273,7 @@ export const ProgressIndicator = ({
                   flexShrink: 0,
                 }}
               >
-                {getStepIcon(step.status) || (
+                {getStepIcon(step.status) ?? (
                   <Text
                     style={{
                       color: getStepColor(step.status, index),
@@ -329,8 +336,8 @@ export const ProgressIndicator = ({
                 left: "0",
                 top: "0",
                 height: "100%",
-                width: `${progressPercentage}%`,
-                backgroundColor: theme.colors[color]?.[6] || theme.colors.blue[6],
+                width: `${String(progressPercentage)}%`,
+                backgroundColor: theme.colors[color][6],
                 transition: animated ? "width 0.3s ease" : "none",
               }}
             />
@@ -344,7 +351,7 @@ export const ProgressIndicator = ({
 };
 
 // Quick preset for common progress scenarios
-export const ProgressPresets = {
+export const ProgressPresets: Record<"dataLoading" | "searchWorkflow" | "fileUpload", ProgressStep[]> = {
   // Data loading
   dataLoading: [
     { id: "1", label: "Fetching data", status: "active", description: "Loading from OpenAlex API" },
@@ -397,7 +404,7 @@ export const useProgressIndicator = (
     setSteps(previous =>
       previous.map(step =>
         step.id === stepId
-          ? { ...step, status: "error" as const, description: error || step.description }
+          ? { ...step, status: "error" as const, description: error ?? step.description }
           : step
       )
     );
@@ -419,13 +426,13 @@ export const useProgressIndicator = (
   return {
     steps,
     currentStep,
-    progress: Math.round((currentStep / (steps.length - 1)) * 100),
+    progress: Math.round((currentStep / (steps.length - 1)) * PROGRESS_PERCENTAGE_MULTIPLIER),
     nextStep,
     resetProgress,
     markStepCompleted,
     markStepError,
     markStepActive,
-    updateStep: (stepId: string, updates: Partial<ProgressStep>) => {
+    updateStep: (stepId: string, updates: Readonly<Partial<ProgressStep>>) => {
       setSteps(previous =>
         previous.map(step =>
           step.id === stepId ? { ...step, ...updates } : step

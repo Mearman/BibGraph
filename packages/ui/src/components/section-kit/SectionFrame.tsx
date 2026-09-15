@@ -22,19 +22,6 @@ export interface SectionFrameProps {
 /**
  * A framed section component that provides a structured container for content
  * with optional title, subtitle, icon, actions, and collapsible functionality.
- * @param root0
- * @param root0.children
- * @param root0.title
- * @param root0.subtitle
- * @param root0.icon
- * @param root0.actions
- * @param root0.defaultExpanded
- * @param root0.storageKey
- * @param root0.onToggle
- * @param root0.withShadow
- * @param root0.withBorder
- * @param root0.padding
- * @param root0.className
  * @example
  * ```tsx
  * <SectionFrame
@@ -48,6 +35,8 @@ export interface SectionFrameProps {
  * </SectionFrame>
  * ```
  */
+const SUBTITLE_MARGIN_BOTTOM = 4
+
 export const SectionFrame: FC<SectionFrameProps> = ({
 	children,
 	title,
@@ -63,11 +52,13 @@ export const SectionFrame: FC<SectionFrameProps> = ({
 	className,
 	...restProps
 }) => {
-	const [isExpanded, setIsExpanded] = useState(() => {
-		if (storageKey && typeof window !== "undefined") {
+	const [isExpanded, setIsExpanded] = useState<boolean>(() => {
+		if (storageKey !== undefined && typeof window !== "undefined") {
 			try {
 				const stored = localStorage.getItem(`section-frame-${storageKey}`)
-				return stored ? JSON.parse(stored) : defaultExpanded
+				if (stored === null) return defaultExpanded
+				const parsed: unknown = JSON.parse(stored)
+				return typeof parsed === "boolean" ? parsed : defaultExpanded
 			} catch {
 				return defaultExpanded
 			}
@@ -81,7 +72,7 @@ export const SectionFrame: FC<SectionFrameProps> = ({
 		setIsExpanded(isNewExpanded)
 
 		// Persist to localStorage if storageKey is provided
-		if (storageKey && typeof window !== "undefined") {
+		if (storageKey !== undefined && typeof window !== "undefined") {
 			try {
 				localStorage.setItem(`section-frame-${storageKey}`, JSON.stringify(isNewExpanded))
 			} catch {
@@ -93,7 +84,11 @@ export const SectionFrame: FC<SectionFrameProps> = ({
 		onToggle?.(isNewExpanded)
 	}
 
-	const hasHeader = title || subtitle || icon || actions
+	const hasTitle = title !== undefined && title !== ""
+	const hasSubtitle = subtitle !== undefined && subtitle !== ""
+	const hasIcon = icon !== undefined && icon !== null
+	const hasActions = actions !== undefined && actions !== null
+	const hasHeader = hasTitle || hasSubtitle || hasIcon || hasActions
 
 	return (
 		<Paper
@@ -120,14 +115,14 @@ export const SectionFrame: FC<SectionFrameProps> = ({
 							fullWidth
 						>
 							<Group gap="xs" wrap="nowrap" style={{ width: "100%" }}>
-								{icon && <span style={{ display: "flex", alignItems: "center" }}>{icon}</span>}
+								{hasIcon && <span style={{ display: "flex", alignItems: "center" }}>{icon}</span>}
 								<Box style={{ flex: 1, minWidth: 0 }}>
-									{title && (
-										<Title order={4} mb={subtitle ? 4 : 0}>
+									{hasTitle && (
+										<Title order={4} mb={hasSubtitle ? SUBTITLE_MARGIN_BOTTOM : 0}>
 											{title}
 										</Title>
 									)}
-									{subtitle && (
+									{hasSubtitle && (
 										<Text size="sm" c="dimmed">
 											{subtitle}
 										</Text>
@@ -136,7 +131,7 @@ export const SectionFrame: FC<SectionFrameProps> = ({
 							</Group>
 						</Button>
 
-						{actions && <Box style={{ flexShrink: 0 }}>{actions}</Box>}
+						{hasActions && <Box style={{ flexShrink: 0 }}>{actions}</Box>}
 					</Group>
 				</Box>
 			)}

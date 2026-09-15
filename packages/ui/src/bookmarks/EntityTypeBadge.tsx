@@ -10,10 +10,6 @@ export interface EntityTypeBadgeProps {
 
 /**
  * Badge component for displaying entity types with color-coding
- * @param root0
- * @param root0.entityType
- * @param root0.size
- * @param root0.variant
  * @example
  * ```tsx
  * <EntityTypeBadge entityType="works" />

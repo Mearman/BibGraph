@@ -3,8 +3,8 @@ import { IconSearch, IconX } from "@tabler/icons-react"
 import type { ReactNode } from "react"
 import { useEffect,useMemo, useState } from "react";
 
-// Stable default values to prevent infinite render loops
-const EMPTY_SEARCH_KEYS: Array<string> = [];
+// Stable default values to prevent infinite render loops `never[]` (rather than `string[]`) is assignable to `(keyof T)[]` for any T, since an empty array trivially satisfies any element type.
+const EMPTY_SEARCH_KEYS: never[] = [];
 const EMPTY_FILTERS: FilterChip[] = [];
 const EMPTY_ACTIVE_FILTERS: string[] = [];
 
@@ -19,10 +19,10 @@ export interface EntityCollectionListProps<T = Record<string, unknown>> {
 	renderItem: (item: T, index: number) => ReactNode
 	getItemKey?: (item: T, index: number) => string | number
 	searchPlaceholder?: string
-	searchKeys?: Array<keyof T>
+	searchKeys?: (keyof T)[]
 	filters?: FilterChip[]
 	activeFilters?: string[]
-	onFiltersChange?: (filters: string[]) => void
+	onFiltersChange?: (filters: readonly string[]) => void
 	emptyState?: {
 		title: string
 		description?: string
@@ -54,19 +54,6 @@ const useDebounce = <T,>({ value, delay }: { value: T; delay: number }): T => {
 /**
  * A collection list component with search, filtering, and empty states.
  * Handles ScrollArea, search functionality, filter chips, and customizable empty states.
- * @param root0
- * @param root0.items
- * @param root0.renderItem
- * @param root0.getItemKey
- * @param root0.searchPlaceholder
- * @param root0.searchKeys
- * @param root0.filters
- * @param root0.activeFilters
- * @param root0.onFiltersChange
- * @param root0.emptyState
- * @param root0.loading
- * @param root0.height
- * @param root0.className
  * @example
  * ```tsx
  * <EntityCollectionList
@@ -92,7 +79,7 @@ export const EntityCollectionList = <T,>({
 	renderItem,
 	getItemKey,
 	searchPlaceholder = "Search...",
-	searchKeys = EMPTY_SEARCH_KEYS as Array<keyof T>,
+	searchKeys = EMPTY_SEARCH_KEYS,
 	filters = EMPTY_FILTERS,
 	activeFilters = EMPTY_ACTIVE_FILTERS,
 	onFiltersChange,
@@ -115,7 +102,7 @@ export const EntityCollectionList = <T,>({
 			filtered = filtered.filter((item) =>
 				searchKeys.some((key) => {
 					const value = item[key]
-					return value && String(value).toLowerCase().includes(query)
+					return String(value).toLowerCase().includes(query)
 				})
 			)
 		}
@@ -126,8 +113,10 @@ export const EntityCollectionList = <T,>({
 			// Example: assume items have a 'status' property that matches filter values
 			filtered = filtered.filter((item) =>
 				activeFilters.some((filter) => {
-					const { status } = item as Record<string, unknown>
-					return status === filter
+					if (typeof item !== "object" || item === null || !("status" in item)) {
+						return false
+					}
+					return item.status === filter
 				})
 			)
 		}
@@ -171,7 +160,7 @@ export const EntityCollectionList = <T,>({
 					<Text size="sm" fw={500}>
 						{emptyState.title}
 					</Text>
-					{emptyState.description && (
+					{emptyState.description !== undefined && (
 						<Text size="xs" c="dimmed">
 							{emptyState.description}
 						</Text>

@@ -21,7 +21,7 @@ export const ViewToggle = ({
 			<Button
 				size={size}
 				variant={viewMode === "compact" ? "filled" : variant}
-				onClick={() => onViewModeChange("compact")}
+				onClick={() => { onViewModeChange("compact"); }}
 				disabled={disabled}
 				leftSection={<IconList size={14} />}
 			>
@@ -30,7 +30,7 @@ export const ViewToggle = ({
 			<Button
 				size={size}
 				variant={viewMode === "detailed" ? "filled" : variant}
-				onClick={() => onViewModeChange("detailed")}
+				onClick={() => { onViewModeChange("detailed"); }}
 				disabled={disabled}
 				leftSection={<IconLayoutGrid size={14} />}
 			>
@@ -39,7 +39,7 @@ export const ViewToggle = ({
 			<Button
 				size={size}
 				variant={viewMode === "raw" ? "filled" : variant}
-				onClick={() => onViewModeChange("raw")}
+				onClick={() => { onViewModeChange("raw"); }}
 				disabled={disabled}
 				leftSection={<IconCode size={14} />}
 			>

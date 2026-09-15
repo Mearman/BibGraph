@@ -1,6 +1,6 @@
 import { Group, Loader, Stack, Text } from "@mantine/core";
 import { IconLoader } from "@tabler/icons-react";
-import React from "react";
+import React, { useState } from "react";
 
 export interface LoadingSpinnerProps {
   size?: "xs" | "sm" | "md" | "lg";
@@ -34,7 +34,7 @@ export const LoadingSpinner = ({
           </Text>
         )}
       </Group>
-      {message && (
+      {message !== undefined && message !== "" && (
         <Text size={size} c="dimmed" ta="center">
           {message}
         </Text>
@@ -62,7 +62,8 @@ export const SearchLoadingSpinner = ({
     "Preparing results display"
   ];
 
-  const currentStep = step || searchSteps[Math.floor(Math.random() * searchSteps.length)];
+  const [randomStep] = useState(() => searchSteps[Math.floor(Math.random() * searchSteps.length)]);
+  const currentStep = step ?? randomStep;
 
   return (
     <>

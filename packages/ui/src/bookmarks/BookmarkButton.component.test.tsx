@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { BookmarkButton } from "./BookmarkButton"
 
+const ASYNC_TOGGLE_DELAY_MS = 100
+
 // Wrapper with Mantine provider
 const TestWrapper = ({ children }: { children: React.ReactNode }) => <MantineProvider>{children}</MantineProvider>;
 
@@ -108,7 +110,7 @@ describe("BookmarkButton", () => {
 
 	it("should handle async onToggle", () => {
 		const onToggle = vi.fn(async () => {
-			await new Promise((resolve) => setTimeout(resolve, 100))
+			await new Promise((resolve) => { setTimeout(resolve, ASYNC_TOGGLE_DELAY_MS); })
 		})
 
 		render(

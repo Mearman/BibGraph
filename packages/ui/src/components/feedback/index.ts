@@ -4,7 +4,7 @@
  * User feedback and error handling components
  */
 
-export * from './ErrorBoundary/ErrorBoundary';
+export * from './ErrorBoundary';
 export * from './LoadingSpinner';
 export * from './ErrorRecovery';
 export * from './SearchEmptyState';

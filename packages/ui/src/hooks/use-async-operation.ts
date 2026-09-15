@@ -18,7 +18,7 @@ export interface UseAsyncOperationOptions {
   onSuccess?: (data: unknown) => void
 }
 
-export const useAsyncOperation = <T = unknown>(options: UseAsyncOperationOptions = {}): AsyncOperationResult<T> => {
+export const useAsyncOperation = <T = unknown>(options: Readonly<UseAsyncOperationOptions> = {}): AsyncOperationResult<T> => {
   const { retryCount = 0, retryDelay = 0, onError, onSuccess } = options
 
   const [state, setState] = useState<AsyncOperationState<T>>({
@@ -43,7 +43,7 @@ export const useAsyncOperation = <T = unknown>(options: UseAsyncOperationOptions
           lastError = error instanceof Error ? error : new Error(String(error))
 
           if (attempt < retryCount && retryDelay > 0) {
-            await new Promise(resolve => setTimeout(resolve, retryDelay))
+            await new Promise(resolve => { setTimeout(resolve, retryDelay) })
           }
         }
       }

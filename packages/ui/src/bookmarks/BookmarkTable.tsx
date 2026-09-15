@@ -1,9 +1,9 @@
 import type { Bookmark, EntityType } from "@bibgraph/types";
 import { ActionIcon, Badge, Text, Tooltip } from "@mantine/core";
 import { IconTrash } from "@tabler/icons-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
-import type { DataTableColumnDef } from "../components/data-display/DataTable";
+import type { DataTableColumnDef, DataTableRow } from "../components/data-display/DataTable";
 import { DataTable } from "../components/data-display/DataTable";
 import { TagList } from "./TagBadge";
 
@@ -14,9 +14,9 @@ export interface BookmarkTableProps {
 	bookmarks: Bookmark[];
 
 	/**
-	 * Callback fired when a bookmark should be deleted
+	 * Callback fired when a bookmark should be deleted. Can be async for remote operations.
 	 */
-	onDeleteBookmark: (bookmarkId: string) => void;
+	onDeleteBookmark: (bookmarkId: string) => void | Promise<void>;
 
 	/**
 	 * Callback fired when navigating to a bookmark
@@ -24,14 +24,12 @@ export interface BookmarkTableProps {
 	onNavigate: (url: string) => void;
 
 	/**
-	 * Whether the list is in a loading state
-	 * @default false
+	 * Whether the list is in a loading state. Defaults to false.
 	 */
 	loading?: boolean;
 
 	/**
-	 * Message to display when there are no bookmarks
-	 * @default "No bookmarks yet"
+	 * Message to display when there are no bookmarks. Defaults to "No bookmarks yet".
 	 */
 	emptyMessage?: string;
 
@@ -43,13 +41,11 @@ export interface BookmarkTableProps {
 
 /**
  * Get a display-friendly label for entity type
- * @param entityType
  */
 const getEntityTypeLabel = (entityType: EntityType): string => entityType.charAt(0).toUpperCase() + entityType.slice(1);
 
 /**
  * Get a color for entity type badges
- * @param entityType
  */
 const getEntityTypeColor = (entityType: EntityType): string => {
 	const colorMap: Record<EntityType, string> = {
@@ -71,10 +67,17 @@ const getEntityTypeColor = (entityType: EntityType): string => {
 
 /**
  * Format a date as relative time
- * @param date
  */
-const formatRelativeTime = (date: Date): string => {
-	if (!date || Number.isNaN(date.getTime())) {
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const DAYS_PER_WEEK = 7;
+const DAYS_PER_MONTH = 30;
+const DAYS_PER_YEAR = 365;
+const JUST_NOW_THRESHOLD_SECONDS = 10;
+
+const formatRelativeTime = (date: Readonly<Date>): string => {
+	if (Number.isNaN(date.getTime())) {
 		return "Invalid date";
 	}
 
@@ -87,50 +90,44 @@ const formatRelativeTime = (date: Date): string => {
 	}
 
 	const SECOND = 1000;
-	const MINUTE = 60 * SECOND;
-	const HOUR = 60 * MINUTE;
-	const DAY = 24 * HOUR;
-	const WEEK = 7 * DAY;
-	const MONTH = 30 * DAY;
-	const YEAR = 365 * DAY;
+	const MINUTE = SECONDS_PER_MINUTE * SECOND;
+	const HOUR = MINUTES_PER_HOUR * MINUTE;
+	const DAY = HOURS_PER_DAY * HOUR;
+	const WEEK = DAYS_PER_WEEK * DAY;
+	const MONTH = DAYS_PER_MONTH * DAY;
+	const YEAR = DAYS_PER_YEAR * DAY;
 
-	if (diffMs < 10 * SECOND) return "just now";
+	if (diffMs < JUST_NOW_THRESHOLD_SECONDS * SECOND) return "just now";
 	if (diffMs < MINUTE) {
 		const seconds = Math.floor(diffMs / SECOND);
-		return `${seconds}s ago`;
+		return `${String(seconds)}s ago`;
 	}
 	if (diffMs < HOUR) {
 		const minutes = Math.floor(diffMs / MINUTE);
-		return `${minutes}m ago`;
+		return `${String(minutes)}m ago`;
 	}
 	if (diffMs < DAY) {
 		const hours = Math.floor(diffMs / HOUR);
-		return `${hours}h ago`;
+		return `${String(hours)}h ago`;
 	}
 	if (diffMs < WEEK) {
 		const days = Math.floor(diffMs / DAY);
-		return `${days}d ago`;
+		return `${String(days)}d ago`;
 	}
 	if (diffMs < MONTH) {
 		const weeks = Math.floor(diffMs / WEEK);
-		return `${weeks}w ago`;
+		return `${String(weeks)}w ago`;
 	}
 	if (diffMs < YEAR) {
 		const months = Math.floor(diffMs / MONTH);
-		return `${months}mo ago`;
+		return `${String(months)}mo ago`;
 	}
 	const years = Math.floor(diffMs / YEAR);
-	return `${years}y ago`;
+	return `${String(years)}y ago`;
 };
 
 /**
  * Table view for displaying bookmarks with sortable columns, search, and pagination
- * @param root0
- * @param root0.bookmarks
- * @param root0.onDeleteBookmark
- * @param root0.onNavigate
- * @param root0.loading
- * @param root0.emptyMessage
  */
 export const BookmarkTable = ({
 	bookmarks,
@@ -142,7 +139,7 @@ export const BookmarkTable = ({
 }: BookmarkTableProps) => {
 	const [deletingId, setDeletingId] = useState<string | null>(null);
 
-	const handleDelete = async (event: React.MouseEvent, bookmarkId: string) => {
+	const handleDelete = useCallback(async (event: React.MouseEvent, bookmarkId: string) => {
 		event.stopPropagation();
 		setDeletingId(bookmarkId);
 		try {
@@ -150,7 +147,7 @@ export const BookmarkTable = ({
 		} finally {
 			setDeletingId(null);
 		}
-	};
+	}, [onDeleteBookmark]);
 
 	const columns = useMemo<DataTableColumnDef<Bookmark>[]>(
 		() => [
@@ -195,7 +192,7 @@ export const BookmarkTable = ({
 						<span>{formatRelativeTime(row.original.addedAt)}</span>
 					</Tooltip>
 				),
-				sortingFn: (rowA, rowB) => rowA.original.addedAt.getTime() - rowB.original.addedAt.getTime(),
+				sortingFn: (rowA: DataTableRow<Bookmark>, rowB: DataTableRow<Bookmark>) => rowA.original.addedAt.getTime() - rowB.original.addedAt.getTime(),
 			},
 			{
 				id: "actions",
@@ -204,14 +201,14 @@ export const BookmarkTable = ({
 				enableSorting: false,
 				cell: ({ row }) => {
 					const bookmarkId = row.original.id;
-					if (!bookmarkId) return null;
+					if (bookmarkId === undefined) return null;
 					return (
 						<Tooltip label="Delete bookmark" withinPortal>
 							<ActionIcon
 								variant="subtle"
 								color="red"
 								size="sm"
-								onClick={(e) => handleDelete(e, bookmarkId)}
+								onClick={(e) => { void handleDelete(e, bookmarkId); }}
 								loading={deletingId === bookmarkId}
 								disabled={deletingId === bookmarkId}
 								aria-label="Delete bookmark"
@@ -223,7 +220,7 @@ export const BookmarkTable = ({
 				},
 			},
 		],
-		[deletingId, onDeleteBookmark],
+		[deletingId, handleDelete],
 	);
 
 	const navigateToBookmark = (bookmark: Bookmark) => {

@@ -1,5 +1,29 @@
 import type { OpenAlexEntity } from "@bibgraph/types";
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
+
+/**
+ * Look up an entity property by an arbitrary field name without a type assertion.
+ * @param entity - The entity to read the field from
+ * @param field - The field name to look up
+ * @returns The field's value, or undefined if the entity has no such field
+ */
+const getEntityFieldValue = (entity: Readonly<OpenAlexEntity>, field: string): unknown => {
+	const match = Object.entries(entity).find(([key]) => key === field);
+	return match?.[1];
+};
+
+/**
+ * Format an arbitrary field value for display, without relying on Object's default stringification
+ * @param value - The value to format
+ * @returns A human-readable string representation of the value
+ */
+const formatFieldValue = (value: unknown): string => {
+	if (value === undefined || value === null) return "N/A";
+	if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+		return String(value);
+	}
+	return JSON.stringify(value);
+};
 
 export interface RichEntityViewProps {
 	entity: OpenAlexEntity;
@@ -23,29 +47,25 @@ export const RichEntityView = ({
 	children,
 }: RichEntityViewProps) => {
 	if (loading) {
-		return <div className={`rich-entity-view loading ${className || ""}`}>Loading...</div>;
+		return <div className={`rich-entity-view loading ${className ?? ""}`}>Loading...</div>;
 	}
 
-	if (error) {
-		return <div className={`rich-entity-view error ${className || ""}`}>Error: {error}</div>;
-	}
-
-	if (!entity) {
-		return <div className={`rich-entity-view empty ${className || ""}`}>No entity data</div>;
+	if (error !== null && error !== "") {
+		return <div className={`rich-entity-view error ${className ?? ""}`}>Error: {error}</div>;
 	}
 
 	return (
-		<div className={`rich-entity-view ${viewMode} ${className || ""}`}>
+		<div className={`rich-entity-view ${viewMode} ${className ?? ""}`}>
 			<div className="entity-header">
-				<h2>{entity.display_name || ("title" in entity ? entity.title : null) || "Unknown Entity"}</h2>
+				<h2>{entity.display_name || (("title" in entity ? entity.title : null) ?? "Unknown Entity")}</h2>
 				<span className="entity-type">{entityType}</span>
 			</div>
 
 			<div className="entity-content">
 				{viewMode === "compact" && (
 					<div className="compact-view">
-						{entity.display_name && <p>{entity.display_name}</p>}
-						{"description" in entity && entity.description && <p>{entity.description}</p>}
+						{entity.display_name !== "" && <p>{entity.display_name}</p>}
+						{"description" in entity && entity.description !== undefined && entity.description !== "" && <p>{entity.description}</p>}
 					</div>
 				)}
 
@@ -54,7 +74,7 @@ export const RichEntityView = ({
 						{fields.map(field => (
 							<div key={field} className="field">
 								<span className="field-label">{field}:</span>
-								<span className="field-value">{String(field in entity ? entity[field as keyof typeof entity] : "N/A")}</span>
+								<span className="field-value">{formatFieldValue(getEntityFieldValue(entity, field))}</span>
 							</div>
 						))}
 					</div>

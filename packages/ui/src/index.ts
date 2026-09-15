@@ -10,12 +10,6 @@ export * from './atoms';
 export * from './components';
 export * from './hooks';
 
-// Re-export data display components
-export * from './components/data-display';
-
 // Re-export bookmark components
-export * from './bookmarks/BookmarkGrid';
-export * from './bookmarks/BookmarkList';
-export * from './bookmarks/BookmarkSearchFilters';
-export * from './bookmarks/BookmarkTable';
+export * from './bookmarks';
 

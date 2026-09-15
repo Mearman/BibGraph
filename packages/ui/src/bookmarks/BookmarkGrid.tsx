@@ -12,9 +12,9 @@ export interface BookmarkGridProps {
 	bookmarks: Bookmark[];
 
 	/**
-	 * Callback fired when a bookmark should be deleted
+	 * Callback fired when a bookmark should be deleted. Can be async for remote operations.
 	 */
-	onDeleteBookmark: (bookmarkId: string) => void;
+	onDeleteBookmark: (bookmarkId: string) => void | Promise<void>;
 
 	/**
 	 * Callback fired when navigating to a bookmark
@@ -22,26 +22,22 @@ export interface BookmarkGridProps {
 	onNavigate: (url: string) => void;
 
 	/**
-	 * Number of columns in the grid
-	 * @default 3
+	 * Number of columns in the grid. Defaults to 3.
 	 */
 	cols?: number;
 
 	/**
-	 * Grid spacing
-	 * @default "md"
+	 * Grid spacing. Defaults to "md".
 	 */
 	spacing?: "xs" | "sm" | "md" | "lg" | "xl";
 
 	/**
-	 * Whether the list is in a loading state
-	 * @default false
+	 * Whether the list is in a loading state. Defaults to false.
 	 */
 	loading?: boolean;
 
 	/**
-	 * Message to display when there are no bookmarks
-	 * @default "No bookmarks yet"
+	 * Message to display when there are no bookmarks. Defaults to "No bookmarks yet".
 	 */
 	emptyMessage?: string;
 
@@ -53,13 +49,11 @@ export interface BookmarkGridProps {
 
 /**
  * Get a display-friendly label for entity type
- * @param entityType
  */
 const getEntityTypeLabel = (entityType: EntityType): string => entityType.charAt(0).toUpperCase() + entityType.slice(1);
 
 /**
  * Get a color for entity type badges
- * @param entityType
  */
 const getEntityTypeColor = (entityType: EntityType): string => {
 	const colorMap: Record<EntityType, string> = {
@@ -81,10 +75,17 @@ const getEntityTypeColor = (entityType: EntityType): string => {
 
 /**
  * Format a date as relative time
- * @param date
  */
-const formatRelativeTime = (date: Date): string => {
-	if (!date || Number.isNaN(date.getTime())) {
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const DAYS_PER_WEEK = 7;
+const DAYS_PER_MONTH = 30;
+const DAYS_PER_YEAR = 365;
+const JUST_NOW_THRESHOLD_SECONDS = 10;
+
+const formatRelativeTime = (date: Readonly<Date>): string => {
+	if (Number.isNaN(date.getTime())) {
 		return "Invalid date";
 	}
 
@@ -97,45 +98,45 @@ const formatRelativeTime = (date: Date): string => {
 	}
 
 	const SECOND = 1000;
-	const MINUTE = 60 * SECOND;
-	const HOUR = 60 * MINUTE;
-	const DAY = 24 * HOUR;
-	const WEEK = 7 * DAY;
-	const MONTH = 30 * DAY;
-	const YEAR = 365 * DAY;
+	const MINUTE = SECONDS_PER_MINUTE * SECOND;
+	const HOUR = MINUTES_PER_HOUR * MINUTE;
+	const DAY = HOURS_PER_DAY * HOUR;
+	const WEEK = DAYS_PER_WEEK * DAY;
+	const MONTH = DAYS_PER_MONTH * DAY;
+	const YEAR = DAYS_PER_YEAR * DAY;
 
-	if (diffMs < 10 * SECOND) return "just now";
+	if (diffMs < JUST_NOW_THRESHOLD_SECONDS * SECOND) return "just now";
 	if (diffMs < MINUTE) {
 		const seconds = Math.floor(diffMs / SECOND);
-		return `${seconds} ${seconds === 1 ? "second" : "seconds"} ago`;
+		return `${String(seconds)} ${seconds === 1 ? "second" : "seconds"} ago`;
 	}
 	if (diffMs < HOUR) {
 		const minutes = Math.floor(diffMs / MINUTE);
-		return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
+		return `${String(minutes)} ${minutes === 1 ? "minute" : "minutes"} ago`;
 	}
 	if (diffMs < DAY) {
 		const hours = Math.floor(diffMs / HOUR);
-		return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+		return `${String(hours)} ${hours === 1 ? "hour" : "hours"} ago`;
 	}
 	if (diffMs < WEEK) {
 		const days = Math.floor(diffMs / DAY);
-		return `${days} ${days === 1 ? "day" : "days"} ago`;
+		return `${String(days)} ${days === 1 ? "day" : "days"} ago`;
 	}
 	if (diffMs < MONTH) {
 		const weeks = Math.floor(diffMs / WEEK);
-		return `${weeks} ${weeks === 1 ? "week" : "weeks"} ago`;
+		return `${String(weeks)} ${weeks === 1 ? "week" : "weeks"} ago`;
 	}
 	if (diffMs < YEAR) {
 		const months = Math.floor(diffMs / MONTH);
-		return `${months} ${months === 1 ? "month" : "months"} ago`;
+		return `${String(months)} ${months === 1 ? "month" : "months"} ago`;
 	}
 	const years = Math.floor(diffMs / YEAR);
-	return `${years} ${years === 1 ? "year" : "years"} ago`;
+	return `${String(years)} ${years === 1 ? "year" : "years"} ago`;
 };
 
 interface BookmarkCardProperties {
 	bookmark: Bookmark;
-	onDelete: (bookmarkId: string) => void;
+	onDelete: (bookmarkId: string) => void | Promise<void>;
 	onNavigate: (url: string) => void;
 }
 
@@ -144,7 +145,7 @@ const BookmarkCard = ({ bookmark, onDelete, onNavigate }: BookmarkCardProperties
 
 	const handleDelete = async (event: React.MouseEvent) => {
 		event.stopPropagation();
-		if (!bookmark.id) return;
+		if (bookmark.id === undefined) return;
 
 		setIsDeleting(true);
 		try {
@@ -193,7 +194,7 @@ const BookmarkCard = ({ bookmark, onDelete, onNavigate }: BookmarkCardProperties
 							variant="subtle"
 							color="red"
 							size="sm"
-							onClick={handleDelete}
+							onClick={(event) => { void handleDelete(event); }}
 							disabled={isDeleting}
 							loading={isDeleting}
 							aria-label="Delete bookmark"
@@ -226,14 +227,6 @@ const BookmarkCard = ({ bookmark, onDelete, onNavigate }: BookmarkCardProperties
 
 /**
  * Grid view for displaying bookmarks as cards in a responsive grid layout
- * @param root0
- * @param root0.bookmarks
- * @param root0.onDeleteBookmark
- * @param root0.onNavigate
- * @param root0.cols
- * @param root0.spacing
- * @param root0.loading
- * @param root0.emptyMessage
  */
 export const BookmarkGrid = ({
 	bookmarks,

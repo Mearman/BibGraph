@@ -78,7 +78,7 @@ describe("SectionFrame", () => {
   });
 
   it("calls onToggle when expansion changes", () => {
-    const mockOnToggle = vi.fn();
+    const mockOnToggle = vi.fn<(expanded: boolean) => void>();
     render(
       <TestWrapper>
         <SectionFrame title="Test Title" onToggle={mockOnToggle}>

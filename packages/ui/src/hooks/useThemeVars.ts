@@ -11,7 +11,6 @@ export const useThemeVars = () => {
 
   /**
    * Get a shadcn theme variable value
-   * @param variableName
    */
   const getThemeVariable = (variableName: string): string => {
     return `var(--shadcn-${variableName})`;
@@ -19,7 +18,6 @@ export const useThemeVars = () => {
 
   /**
    * Get academic entity color mapping
-   * @param entityType
    */
   const getEntityColor = (entityType: string): string => {
     const entityColors: Record<string, string> = {
@@ -39,7 +37,6 @@ export const useThemeVars = () => {
 
   /**
    * Get semantic color with fallback
-   * @param colorType
    */
   const getSemanticColor = (colorType: 'primary' | 'secondary' | 'muted' | 'destructive' | 'success' | 'warning'): string => {
     return getThemeVariable(colorType);

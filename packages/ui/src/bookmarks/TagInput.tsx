@@ -23,7 +23,7 @@ export interface TagInputProps {
 	/**
 	 * Callback when tags change
 	 */
-	onChange: (tags: string[]) => void;
+	onChange: (tags: readonly string[]) => void;
 
 	/**
 	 * Placeholder text
@@ -67,15 +67,6 @@ export interface TagInputProps {
  * - Case-insensitive tag matching
  * - Maximum tag limit
  * - Empty tag validation
- * @param root0
- * @param root0.value
- * @param root0.onChange
- * @param root0.placeholder
- * @param root0.maxTags
- * @param root0.suggestions
- * @param root0.disabled
- * @param root0.error
- * @param root0."data-testid"
  * @example
  * ```tsx
  * <TagInput
@@ -98,8 +89,8 @@ export const TagInput = ({
 	"data-testid": dataTestId = "tag-input",
 }: TagInputProps) => {
 	const combobox = useCombobox({
-		onDropdownClose: () => combobox.resetSelectedOption(),
-		onDropdownOpen: () => combobox.updateSelectedOptionIndex("active"),
+		onDropdownClose: () => { combobox.resetSelectedOption(); },
+		onDropdownOpen: () => { combobox.updateSelectedOptionIndex("active"); },
 	});
 
 	const [search, setSearch] = useState("");
@@ -113,7 +104,6 @@ export const TagInput = ({
 
 	/**
 	 * Handle tag addition
-	 * @param tag
 	 */
 	const handleAddTag = (tag: string) => {
 		const trimmedTag = tag.trim();
@@ -124,7 +114,7 @@ export const TagInput = ({
 		}
 
 		// Check max tags limit
-		if (maxTags && value.length >= maxTags) {
+		if (maxTags !== undefined && value.length >= maxTags) {
 			return;
 		}
 
@@ -141,7 +131,6 @@ export const TagInput = ({
 
 	/**
 	 * Handle tag removal
-	 * @param tagToRemove
 	 */
 	const handleRemoveTag = (tagToRemove: string) => {
 		onChange(value.filter((tag) => tag !== tagToRemove));
@@ -149,7 +138,6 @@ export const TagInput = ({
 
 	/**
 	 * Handle key down events
-	 * @param event
 	 */
 	const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
 		if (event.key === "Enter" && search.trim()) {
@@ -158,15 +146,12 @@ export const TagInput = ({
 		} else if (event.key === "Backspace" && !search && value.length > 0) {
 			// Remove last tag on backspace if input is empty
 			const lastTag = value[value.length - 1];
-			if (lastTag !== undefined) {
-				handleRemoveTag(lastTag);
-			}
+			handleRemoveTag(lastTag);
 		}
 	};
 
 	/**
 	 * Handle suggestion selection
-	 * @param suggestion
 	 */
 	const handleSuggestionSelect = (suggestion: string) => {
 		handleAddTag(suggestion);
@@ -175,7 +160,7 @@ export const TagInput = ({
 
 	// Render tag pills
 	const pills = value.map((tag) => (
-		<Pill key={tag} withRemoveButton onRemove={() => handleRemoveTag(tag)} data-testid={`tag-pill-${tag}`}>
+		<Pill key={tag} withRemoveButton onRemove={() => { handleRemoveTag(tag); }} data-testid={`tag-pill-${tag}`}>
 			{tag}
 		</Pill>
 	));
@@ -196,7 +181,7 @@ export const TagInput = ({
 		>
 			<Combobox.DropdownTarget>
 				<PillsInput
-					onClick={() => combobox.openDropdown()}
+					onClick={() => { combobox.openDropdown(); }}
 					data-testid={dataTestId}
 					disabled={disabled}
 					error={error}
@@ -214,8 +199,8 @@ export const TagInput = ({
 									combobox.openDropdown();
 								}}
 								onKeyDown={handleKeyDown}
-								onFocus={() => combobox.openDropdown()}
-								onBlur={() => combobox.closeDropdown()}
+								onFocus={() => { combobox.openDropdown(); }}
+								onBlur={() => { combobox.closeDropdown(); }}
 								disabled={disabled || (maxTags !== undefined && value.length >= maxTags)}
 								data-testid={`${dataTestId}-field`}
 							/>

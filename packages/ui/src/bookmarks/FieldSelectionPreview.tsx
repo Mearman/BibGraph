@@ -21,6 +21,8 @@ import { IconListDetails } from "@tabler/icons-react";
 // Stable default values to prevent infinite render loops
 const EMPTY_SELECT_FIELDS: string[] = [];
 
+const FIELD_LIST_PREVIEW_MAX_LENGTH = 100;
+
 export interface FieldSelectionPreviewProps {
 	/**
 	 * Array of selected field names
@@ -28,26 +30,22 @@ export interface FieldSelectionPreviewProps {
 	selectFields?: string[];
 
 	/**
-	 * Display variant: 'badge', 'text', 'detailed', 'smart'
-	 * @default 'badge'
+	 * Display variant: 'badge', 'text', 'detailed', 'smart'. Defaults to 'badge'.
 	 */
 	variant?: "badge" | "text" | "detailed" | "smart";
 
 	/**
-	 * Size of the component
-	 * @default 'sm'
+	 * Size of the component. Defaults to 'sm'.
 	 */
 	size?: "xs" | "sm" | "md" | "lg";
 
 	/**
-	 * Whether to show a tooltip with full field list
-	 * @default true
+	 * Whether to show a tooltip with full field list. Defaults to true.
 	 */
 	showTooltip?: boolean;
 
 	/**
-	 * Maximum number of fields to show in detailed view
-	 * @default 3
+	 * Maximum number of fields to show in detailed view. Defaults to 3.
 	 */
 	maxFieldsToShow?: number;
 
@@ -61,13 +59,6 @@ export interface FieldSelectionPreviewProps {
  * FieldSelectionPreview Component
  *
  * Displays a visual preview of custom field selections for bookmarks.
- * @param root0
- * @param root0.selectFields
- * @param root0.variant
- * @param root0.size
- * @param root0.showTooltip
- * @param root0.maxFieldsToShow
- * @param root0."data-testid"
  * @example
  * ```tsx
  * // Badge variant (default)
@@ -95,7 +86,7 @@ export const FieldSelectionPreview = ({
 	"data-testid": dataTestId = "field-selection-preview",
 }: FieldSelectionPreviewProps) => {
 	// If no fields or empty array, show "default fields"
-	if (!selectFields || selectFields.length === 0) {
+	if (selectFields.length === 0) {
 		return (
 			<Badge
 				size={size}
@@ -125,7 +116,7 @@ export const FieldSelectionPreview = ({
 			<Text size="sm" fw={600}>
 				Custom field selection:
 			</Text>
-			<Text size="sm">{generateFieldListPreview(selectFields, 100)}</Text>
+			<Text size="sm">{generateFieldListPreview(selectFields, FIELD_LIST_PREVIEW_MAX_LENGTH)}</Text>
 		</Stack>
 	) : null;
 
@@ -224,9 +215,6 @@ export const FieldSelectionPreview = ({
  *
  * A compact badge-only variant for displaying field count.
  * Useful for space-constrained UIs.
- * @param root0
- * @param root0.selectFields
- * @param root0.size
  * @example
  * ```tsx
  * <CompactFieldBadge selectFields={['id', 'title', 'doi']} />
@@ -242,7 +230,7 @@ export const CompactFieldBadge = ({
 	"data-testid"?: string;
 }) => {
 	const summary = generateCompactFieldSummary(selectFields);
-	const tooltipLabel = selectFields.length > 0 ? generateFieldListPreview(selectFields, 100) : null;
+	const tooltipLabel = selectFields.length > 0 ? generateFieldListPreview(selectFields, FIELD_LIST_PREVIEW_MAX_LENGTH) : null;
 
 	const badge = (
 		<Badge
@@ -255,7 +243,7 @@ export const CompactFieldBadge = ({
 		</Badge>
 	);
 
-	if (tooltipLabel) {
+	if (tooltipLabel !== null) {
 		return (
 			<Tooltip label={tooltipLabel} multiline w={300}>
 				{badge}

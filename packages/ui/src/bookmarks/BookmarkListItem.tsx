@@ -33,7 +33,7 @@ export interface BookmarkListItemProps {
 	 * @param bookmarkId - ID of the bookmark to update
 	 * @param tags - New tags array
 	 */
-	onUpdateTags?: (bookmarkId: string, tags: string[]) => void | Promise<void>;
+	onUpdateTags?: (bookmarkId: string, tags: readonly string[]) => void | Promise<void>;
 
 	/**
 	 * Optional test ID for E2E testing
@@ -43,7 +43,6 @@ export interface BookmarkListItemProps {
 
 /**
  * Get a display-friendly label for entity type
- * @param entityType
  */
 const getEntityTypeLabel = (entityType: EntityType): string => entityType.charAt(0).toUpperCase() + entityType.slice(1);
 
@@ -65,7 +64,7 @@ const PROVENANCE_LINE_PATTERN = /^[A-Z]+\s+from\s+\S+/i;
  * @returns Cleaned notes without technical metadata
  */
 const filterNotesForDisplay = (notes: string | undefined): string | undefined => {
-	if (!notes) return undefined;
+	if (notes === undefined || notes === "") return undefined;
 	const filteredLines = notes
 		.split("\n")
 		.filter(line => {
@@ -87,7 +86,6 @@ const filterNotesForDisplay = (notes: string | undefined): string | undefined =>
 
 /**
  * Get a color for entity type badges
- * @param entityType
  */
 const getEntityTypeColor = (entityType: EntityType): string => {
 	const colorMap: Record<EntityType, string> = {
@@ -109,11 +107,18 @@ const getEntityTypeColor = (entityType: EntityType): string => {
 
 /**
  * Format a date as relative time (e.g., "2 hours ago", "3 days ago")
- * @param date
  */
-const formatRelativeTime = (date: Date): string => {
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const DAYS_PER_WEEK = 7;
+const DAYS_PER_MONTH = 30;
+const DAYS_PER_YEAR = 365;
+const JUST_NOW_THRESHOLD_SECONDS = 10;
+
+const formatRelativeTime = (date: Readonly<Date>): string => {
 	// Handle invalid dates
-	if (!date || Number.isNaN(date.getTime())) {
+	if (Number.isNaN(date.getTime())) {
 		return "Invalid date";
 	}
 
@@ -127,57 +132,57 @@ const formatRelativeTime = (date: Date): string => {
 	}
 
 	const SECOND = 1000;
-	const MINUTE = 60 * SECOND;
-	const HOUR = 60 * MINUTE;
-	const DAY = 24 * HOUR;
-	const WEEK = 7 * DAY;
-	const MONTH = 30 * DAY;
-	const YEAR = 365 * DAY;
+	const MINUTE = SECONDS_PER_MINUTE * SECOND;
+	const HOUR = MINUTES_PER_HOUR * MINUTE;
+	const DAY = HOURS_PER_DAY * HOUR;
+	const WEEK = DAYS_PER_WEEK * DAY;
+	const MONTH = DAYS_PER_MONTH * DAY;
+	const YEAR = DAYS_PER_YEAR * DAY;
 
 	// Just now (< 10 seconds)
-	if (diffMs < 10 * SECOND) {
+	if (diffMs < JUST_NOW_THRESHOLD_SECONDS * SECOND) {
 		return "just now";
 	}
 
 	// Seconds (< 1 minute)
 	if (diffMs < MINUTE) {
 		const seconds = Math.floor(diffMs / SECOND);
-		return `${seconds} ${seconds === 1 ? "second" : "seconds"} ago`;
+		return `${String(seconds)} ${seconds === 1 ? "second" : "seconds"} ago`;
 	}
 
 	// Minutes (< 1 hour)
 	if (diffMs < HOUR) {
 		const minutes = Math.floor(diffMs / MINUTE);
-		return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
+		return `${String(minutes)} ${minutes === 1 ? "minute" : "minutes"} ago`;
 	}
 
 	// Hours (< 1 day)
 	if (diffMs < DAY) {
 		const hours = Math.floor(diffMs / HOUR);
-		return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+		return `${String(hours)} ${hours === 1 ? "hour" : "hours"} ago`;
 	}
 
 	// Days (< 1 week)
 	if (diffMs < WEEK) {
 		const days = Math.floor(diffMs / DAY);
-		return `${days} ${days === 1 ? "day" : "days"} ago`;
+		return `${String(days)} ${days === 1 ? "day" : "days"} ago`;
 	}
 
 	// Weeks (< 1 month)
 	if (diffMs < MONTH) {
 		const weeks = Math.floor(diffMs / WEEK);
-		return `${weeks} ${weeks === 1 ? "week" : "weeks"} ago`;
+		return `${String(weeks)} ${weeks === 1 ? "week" : "weeks"} ago`;
 	}
 
 	// Months (< 1 year)
 	if (diffMs < YEAR) {
 		const months = Math.floor(diffMs / MONTH);
-		return `${months} ${months === 1 ? "month" : "months"} ago`;
+		return `${String(months)} ${months === 1 ? "month" : "months"} ago`;
 	}
 
 	// Years
 	const years = Math.floor(diffMs / YEAR);
-	return `${years} ${years === 1 ? "year" : "years"} ago`;
+	return `${String(years)} ${years === 1 ? "year" : "years"} ago`;
 };
 
 /**
@@ -190,11 +195,6 @@ const formatRelativeTime = (date: Date): string => {
  * - Delete button with confirmation tooltip
  * - Clickable card to navigate to bookmarked page
  * - Hover effects for interactivity
- * @param root0
- * @param root0.bookmark
- * @param root0.onDelete
- * @param root0.onNavigate
- * @param root0.onUpdateTags
  * @example
  * ```tsx
  * <BookmarkListItem
@@ -213,7 +213,7 @@ export const BookmarkListItem = ({
 }: BookmarkListItemProps) => {
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [isEditingTags, setIsEditingTags] = useState(false);
-	const [editedTags, setEditedTags] = useState<string[]>(bookmark.metadata.tags || []);
+	const [editedTags, setEditedTags] = useState<string[]>(bookmark.metadata.tags ?? []);
 
 	// Handle card click (navigate to bookmark)
 	const handleCardClick = () => {
@@ -224,7 +224,7 @@ export const BookmarkListItem = ({
 	const handleDeleteClick = async (event: React.MouseEvent) => {
 		event.stopPropagation();
 
-		if (!bookmark.id) {
+		if (bookmark.id === undefined) {
 			return;
 		}
 
@@ -240,13 +240,13 @@ export const BookmarkListItem = ({
 	const handleEditTagsClick = (event: React.MouseEvent) => {
 		event.stopPropagation();
 		setIsEditingTags(true);
-		setEditedTags(bookmark.metadata.tags || []);
+		setEditedTags(bookmark.metadata.tags ?? []);
 	};
 
 	// Handle save tags
 	const handleSaveTags = async (event: React.MouseEvent) => {
 		event.stopPropagation();
-		if (onUpdateTags && bookmark.id) {
+		if (onUpdateTags && bookmark.id !== undefined) {
 			try {
 				await onUpdateTags(bookmark.id, editedTags);
 				setIsEditingTags(false);
@@ -260,7 +260,7 @@ export const BookmarkListItem = ({
 	const handleCancelTagEdit = (event: React.MouseEvent) => {
 		event.stopPropagation();
 		setIsEditingTags(false);
-		setEditedTags(bookmark.metadata.tags || []);
+		setEditedTags(bookmark.metadata.tags ?? []);
 	};
 
 	// Format timestamp
@@ -270,7 +270,7 @@ export const BookmarkListItem = ({
 	const maxNotesLength = 150;
 	const cleanedNotes = filterNotesForDisplay(bookmark.notes);
 	const truncatedNotes =
-		cleanedNotes && cleanedNotes.length > maxNotesLength
+		cleanedNotes !== undefined && cleanedNotes.length > maxNotesLength
 			? `${cleanedNotes.slice(0, maxNotesLength)}...`
 			: cleanedNotes;
 
@@ -315,7 +315,7 @@ export const BookmarkListItem = ({
 							variant="subtle"
 							color="red"
 							size="sm"
-							onClick={handleDeleteClick}
+							onClick={(event) => { void handleDeleteClick(event); }}
 							disabled={isDeleting}
 							loading={isDeleting}
 							aria-label="Delete bookmark"
@@ -331,7 +331,7 @@ export const BookmarkListItem = ({
 				</Text>
 
 				{/* Notes (if available) */}
-				{truncatedNotes && (
+				{truncatedNotes !== undefined && (
 					<Text size="sm" c="dimmed" lineClamp={3} fs="italic">
 						{truncatedNotes}
 					</Text>
@@ -339,15 +339,15 @@ export const BookmarkListItem = ({
 
 				{/* Tags Section */}
 				{isEditingTags ? (
-					<Stack gap="xs" onClick={(e) => e.stopPropagation()}>
+					<Stack gap="xs" onClick={(e) => { e.stopPropagation(); }}>
 						<TagInput
 							value={editedTags}
-							onChange={setEditedTags}
+							onChange={(tags) => { setEditedTags([...tags]); }}
 							placeholder="Add tags..."
 							data-testid="bookmark-tag-input"
 						/>
 						<Group gap="xs">
-							<Button size="xs" variant="filled" leftSection={<IconCheck size={14} />} onClick={handleSaveTags}>
+							<Button size="xs" variant="filled" leftSection={<IconCheck size={14} />} onClick={(event) => { void handleSaveTags(event); }}>
 								Save
 							</Button>
 							<Button

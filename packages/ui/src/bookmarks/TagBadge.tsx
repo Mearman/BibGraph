@@ -67,16 +67,6 @@ export interface TagBadgeProps {
  * - Optional click handler for filtering
  * - Customizable color, size, and variant
  * - Hover effects for interactivity
- * @param root0
- * @param root0.tag
- * @param root0.onRemove
- * @param root0.onClick
- * @param root0.color
- * @param root0.size
- * @param root0.variant
- * @param root0.clickable
- * @param root0.removable
- * @param root0."data-testid"
  * @example
  * ```tsx
  * // Basic tag badge
@@ -255,8 +245,8 @@ export const TagList = ({
 	"data-testid": dataTestId = "tag-list",
 }: TagListProps) => {
 	// Determine which tags to display
-	const visibleTags = maxVisible ? tags.slice(0, maxVisible) : tags;
-	const hiddenCount = maxVisible ? Math.max(0, tags.length - maxVisible) : 0;
+	const visibleTags = maxVisible !== undefined ? tags.slice(0, maxVisible) : tags;
+	const hiddenCount = maxVisible !== undefined ? Math.max(0, tags.length - maxVisible) : 0;
 
 	return (
 		<Group gap={gap} wrap="wrap" data-testid={dataTestId}>
@@ -269,8 +259,8 @@ export const TagList = ({
 					variant={variant}
 					clickable={clickable}
 					removable={removable}
-					onClick={onClick ? () => onClick(tag) : undefined}
-					onRemove={onRemove ? () => onRemove(tag) : undefined}
+					onClick={onClick ? () => { onClick(tag); } : undefined}
+					onRemove={onRemove ? () => { onRemove(tag); } : undefined}
 					data-testid={`${dataTestId}-item-${tag}`}
 				/>
 			))}

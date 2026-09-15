@@ -25,19 +25,21 @@ interface TableSkeletonProperties {
   columns?: number;
 }
 
+const PERCENTAGE_TOTAL = 100;
+
 export const PackageTableSkeleton = ({ rows = 10, columns = 4 }: TableSkeletonProperties) => (
   <Stack gap="xs">
     {/* Header */}
     <Group gap="sm" p="xs">
       {Array.from({ length: columns }).map((_, index) => (
-        <Skeleton key={index} height={20} width={`${100 / columns}%`} radius="sm" />
+        <Skeleton key={index} height={20} width={`${String(PERCENTAGE_TOTAL / columns)}%`} radius="sm" />
       ))}
     </Group>
 
     {/* Rows */}
     {Array.from({ length: rows }).map((_, rowIndex) => (
       <Group key={rowIndex} gap="sm" p="xs">
-        {Array.from({ length: columns }).map((_, colIndex) => (
+        {Array.from({ length: columns }).map((_row, colIndex) => (
           <Skeleton
             key={colIndex}
             height={16}
