@@ -4,6 +4,7 @@
  */
 
 import type { EntityType } from "@bibgraph/types";
+import { AutocompleteResponseSchema } from "@bibgraph/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { OpenAlexBaseClient } from "../../client";
@@ -76,7 +77,7 @@ describe("CompleteAutocompleteApi", () => {
 
       expect(mockClient.get).toHaveBeenCalledWith("autocomplete", {
         q: "machine learning",
-      });
+      }, AutocompleteResponseSchema);
       expect(results).toHaveLength(WORKS_MOCK_COUNT);
       expect(results[0]).toHaveProperty("display_name");
       expect(results[0]).toHaveProperty("entity_type");
@@ -90,7 +91,7 @@ describe("CompleteAutocompleteApi", () => {
 
       expect(mockClient.get).toHaveBeenCalledWith("autocomplete", {
         q: "test query",
-      });
+      }, AutocompleteResponseSchema);
     });
 
     it("should handle empty results", async () => {
@@ -323,7 +324,7 @@ describe("CompleteAutocompleteApi", () => {
 
       expect(mockClient.get).toHaveBeenCalledWith("autocomplete", {
         q: "test",
-      });
+      }, AutocompleteResponseSchema);
     });
 
     it("should not include format parameter", async () => {
@@ -345,7 +346,7 @@ describe("CompleteAutocompleteApi", () => {
       expect(mockClient.get).toHaveBeenCalledWith("autocomplete", {
         q: "test",
         per_page: 10,
-      });
+      }, AutocompleteResponseSchema);
     });
   });
 
@@ -358,7 +359,7 @@ describe("CompleteAutocompleteApi", () => {
 
       expect(mockClient.get).toHaveBeenCalledWith("autocomplete", {
         q: "test & search",
-      });
+      }, AutocompleteResponseSchema);
     });
 
     it("should handle queries with unicode characters", async () => {
@@ -369,7 +370,7 @@ describe("CompleteAutocompleteApi", () => {
 
       expect(mockClient.get).toHaveBeenCalledWith("autocomplete", {
         q: "日本語",
-      });
+      }, AutocompleteResponseSchema);
     });
 
     it("should handle queries with quotes", async () => {
@@ -380,7 +381,7 @@ describe("CompleteAutocompleteApi", () => {
 
       expect(mockClient.get).toHaveBeenCalledWith("autocomplete", {
         q: '"exact phrase"',
-      });
+      }, AutocompleteResponseSchema);
     });
   });
 });
