@@ -29,8 +29,13 @@ export const internalPathToApiUrl = (internalPath: string): string => {
  * @returns Internal application path (e.g., "/authors/A5017898742")
  */
 export const apiUrlToInternalPath = (apiUrl: string): string => {
-	if (apiUrl.startsWith('https://api.openalex.org')) {
-		return apiUrl.replace('https://api.openalex.org', '')
+	try {
+		const parsed = new URL(apiUrl)
+		if (parsed.hostname === 'api.openalex.org') {
+			return `${parsed.pathname}${parsed.search}${parsed.hash}`
+		}
+	} catch {
+		// Not a parseable absolute URL; fall through and return it unchanged
 	}
 
 	return apiUrl

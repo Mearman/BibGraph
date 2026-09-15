@@ -52,9 +52,15 @@ export const setupResponseCacheInterceptor = (): void => {
     const response = await originalFetch(...arguments_);
 
     // Only cache successful OpenAlex API responses
+    let isOpenAlexResponse = false;
+    try {
+      isOpenAlexResponse = new URL(urlString).hostname === 'api.openalex.org';
+    } catch {
+      isOpenAlexResponse = false;
+    }
     if (
       response.ok &&
-      urlString.includes('api.openalex.org') &&
+      isOpenAlexResponse &&
       response.headers.get('content-type')?.includes('application/json') === true
     ) {
       try {
