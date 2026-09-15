@@ -62,10 +62,10 @@ export interface WorkMetadata extends BaseEntityMetadata {
   primaryLocation?: {
     source?: { displayName: string };
   };
-  authorships?: Array<{
+  authorships?: {
     author: { displayName: string };
-    institutions: Array<{ displayName: string }>;
-  }>;
+    institutions: { displayName: string }[];
+  }[];
   openAccess?: {
     isOa: boolean;
     oaStatus: string;
@@ -162,12 +162,12 @@ export interface ExportFormat {
     entityCount: number;
     isBibliography: boolean;
   };
-  entities: Array<{
+  entities: {
     entityId: string;
     type: EntityType;
     position: number;
     note?: string;
     addedAt: string;
     metadata: EntityMetadata | MinimalExportMetadata;
-  }>;
+  }[];
 }

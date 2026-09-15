@@ -2,6 +2,16 @@
  * Accessibility utilities for enhanced screen reader and keyboard navigation support
  */
 
+// How long a screen-reader announcement element stays in the DOM before removal
+const SCREEN_READER_ANNOUNCEMENT_CLEANUP_MS = 1000;
+
+// Radix and length used when generating a random suffix for accessibility element IDs
+const RANDOM_ID_RADIX = 36;
+const RANDOM_ID_LENGTH = 11;
+
+// Multiplier to convert a 0-1 ratio into a whole percentage
+const PERCENTAGE_MULTIPLIER = 100;
+
 // Announce messages to screen readers
 export const announceToScreenReader = (message: string, priority: 'polite' | 'assertive' = 'polite') => {
   const announcement = document.createElement('div');
@@ -19,14 +29,14 @@ export const announceToScreenReader = (message: string, priority: 'polite' | 'as
   // Remove after announcement
   setTimeout(() => {
     announcement.remove();
-  }, 1000);
+  }, SCREEN_READER_ANNOUNCEMENT_CLEANUP_MS);
 };
 
 // Focus trap utility for modals
 export const createFocusTrap = (container: HTMLElement) => {
-  const focusableElements = container.querySelectorAll(
+  const focusableElements = container.querySelectorAll<HTMLElement>(
     'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-  ) as NodeListOf<HTMLElement>;
+  );
 
   const firstElement = focusableElements[0];
   const lastElement = focusableElements[focusableElements.length - 1];
@@ -36,12 +46,12 @@ export const createFocusTrap = (container: HTMLElement) => {
 
     if (e.shiftKey) {
       if (document.activeElement === firstElement) {
-        lastElement?.focus();
+        lastElement.focus();
         e.preventDefault();
       }
     } else {
       if (document.activeElement === lastElement) {
-        firstElement?.focus();
+        firstElement.focus();
         e.preventDefault();
       }
     }
@@ -81,7 +91,7 @@ export const createSkipLinks = () => {
 
 // Generate unique IDs for accessibility attributes
 export const generateId = (prefix: string) => {
-  return `${prefix}-${Math.random().toString(36).slice(2, 11)}`;
+  return `${prefix}-${Math.random().toString(RANDOM_ID_RADIX).slice(2, RANDOM_ID_LENGTH)}`;
 };
 
 // Check if user prefers reduced motion
@@ -109,18 +119,18 @@ export const createValueSearchAriaLabel = (placeholder: string): string => {
 };
 
 export const createButtonAriaLabel = (action: string, description?: string) => {
-  return description ? `${action}: ${description}` : action;
+  return description !== undefined && description !== '' ? `${action}: ${description}` : action;
 };
 
 export const createResultAriaLabel = (title: string, type: string, index: number, total: number) => {
-  return `${title}, ${type}, ${index} of ${total} results`;
+  return `${title}, ${type}, ${String(index)} of ${String(total)} results`;
 };
 
 // Enhanced focus management
-export const manageFocus = (element: HTMLElement, options: {
+export const manageFocus = (element: HTMLElement, options: Readonly<{
   preventScroll?: boolean;
   focusVisible?: boolean;
-} = {}) => {
+}> = {}) => {
   const { preventScroll = false, focusVisible = true } = options;
 
   // Add focus-visible class if needed
@@ -144,7 +154,7 @@ export const manageFocus = (element: HTMLElement, options: {
 // Keyboard navigation utilities
 export const handleKeyboardNavigation = (
   event: KeyboardEvent,
-  items: HTMLElement[],
+  items: readonly HTMLElement[],
   currentIndex: number,
   orientation: 'horizontal' | 'vertical' = 'vertical'
 ): number => {
@@ -187,7 +197,7 @@ export const handleKeyboardNavigation = (
       break;
   }
 
-  if (newIndex !== currentIndex && items[newIndex]) {
+  if (newIndex !== currentIndex) {
     manageFocus(items[newIndex]);
   }
 
@@ -195,7 +205,7 @@ export const handleKeyboardNavigation = (
 };
 
 // Semantic HTML enhancements
-export const enhanceSemantics = (element: HTMLElement, semantics: {
+interface ElementSemantics {
   role?: string;
   label?: string;
   description?: string;
@@ -203,10 +213,18 @@ export const enhanceSemantics = (element: HTMLElement, semantics: {
   atomic?: boolean;
   relevant?: 'additions' | 'removals' | 'text' | 'all';
   busy?: boolean;
-}) => {
-  for (const [key, value] of Object.entries(semantics)) {
+}
+
+// Listed explicitly (rather than iterated via Object.entries) because TS's Object.entries
+// typing loses the `| undefined` that each optional property here actually carries,
+// which would make the `value === undefined` guard below appear dead when it is not.
+const SEMANTIC_KEYS = ['role', 'label', 'description', 'live', 'atomic', 'relevant', 'busy'] as const;
+
+export const enhanceSemantics = (element: HTMLElement, semantics: Readonly<ElementSemantics>) => {
+  for (const key of SEMANTIC_KEYS) {
+    const value = semantics[key];
     if (value === undefined) {
-    	continue;
+      continue;
     }
 
     const ariaKey = key === 'role' ? 'role' : `aria-${key}`;
@@ -216,19 +234,19 @@ export const enhanceSemantics = (element: HTMLElement, semantics: {
 
 // Progress announcement for screen readers
 export const announceProgress = (current: number, total: number, description: string) => {
-  const percentage = Math.round((current / total) * 100);
-  announceToScreenReader(`${description}: ${current} of ${total} (${percentage}%)`, 'polite');
+  const percentage = Math.round((current / total) * PERCENTAGE_MULTIPLIER);
+  announceToScreenReader(`${description}: ${String(current)} of ${String(total)} (${String(percentage)}%)`, 'polite');
 };
 
 // Error announcement for screen readers
 export const announceError = (error: string, context?: string) => {
-  const message = context ? `Error in ${context}: ${error}` : `Error: ${error}`;
+  const message = context !== undefined && context !== '' ? `Error in ${context}: ${error}` : `Error: ${error}`;
   announceToScreenReader(message, 'assertive');
 };
 
 // Success announcement for screen readers
 export const announceSuccess = (message: string, context?: string) => {
-  const fullMessage = context ? `${context}: ${message}` : message;
+  const fullMessage = context !== undefined && context !== '' ? `${context}: ${message}` : message;
   announceToScreenReader(fullMessage, 'polite');
 };
 
@@ -239,8 +257,8 @@ export const validateAccessibility = (element: HTMLElement) => {
   // Check for missing alt text on images
   const images = element.querySelectorAll('img');
   images.forEach((img, index) => {
-    if (!img.alt && !img.getAttribute('aria-label')) {
-      issues.push(`Image ${index + 1} missing alt text or aria-label`);
+    if (!img.alt && img.getAttribute('aria-label') === null) {
+      issues.push(`Image ${String(index + 1)} missing alt text or aria-label`);
     }
   });
 
@@ -253,10 +271,13 @@ export const validateAccessibility = (element: HTMLElement) => {
       const labels = element.querySelectorAll('label');
       hasLabel = [...labels].some(label => label.getAttribute('for') === input.id);
     }
-    const hasAriaLabel = input.getAttribute('aria-label') || input.getAttribute('aria-labelledby');
+    const ariaLabel = input.getAttribute('aria-label');
+    const ariaLabelledBy = input.getAttribute('aria-labelledby');
+    // An empty aria-label/aria-labelledby is treated the same as a missing one - it gives a screen reader nothing to announce - so this checks for non-empty content explicitly.
+    const hasAriaLabel = (ariaLabel !== null && ariaLabel !== '') || (ariaLabelledBy !== null && ariaLabelledBy !== '');
 
     if (!hasLabel && !hasAriaLabel) {
-      issues.push(`Form input ${index + 1} missing label or aria-label`);
+      issues.push(`Form input ${String(index + 1)} missing label or aria-label`);
     }
   });
 
@@ -266,7 +287,7 @@ export const validateAccessibility = (element: HTMLElement) => {
   headings.forEach((heading, index) => {
     const level = Number.parseInt(heading.tagName.slice(1));
     if (level > lastLevel + 1) {
-      issues.push(`Heading ${index + 1} skips heading levels (from h${lastLevel} to h${level})`);
+      issues.push(`Heading ${String(index + 1)} skips heading levels (from h${String(lastLevel)} to h${String(level)})`);
     }
     lastLevel = level;
   });

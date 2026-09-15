@@ -1,13 +1,14 @@
 /**
  * PostHog Analytics Provider for BibGraph
  *
- * Integrates official @posthog/react provider with custom privacy-compliant configuration
+ * Integrates official `@posthog/react` provider with custom privacy-compliant configuration
  * Uses EU hosting, cookieless mode, and GDPR-compliant settings
  */
 
 import { logger } from '@bibgraph/utils'
 import { PostHogProvider as PostHogReactProvider } from '@posthog/react'
-import React, { ReactNode } from 'react'
+import type { ReactNode } from 'react';
+import React from 'react'
 
 import {
   POSTHOG_API_KEY,
@@ -19,8 +20,9 @@ import {
 /**
  * PostHog Provider Component
  *
- * Wraps the official @posthog/react PostHogProvider with BibGraph's
- * privacy-compliant configuration.
+ * Wraps the official `@posthog/react` PostHogProvider with BibGraph's
+ * privacy-compliant configuration. `children` are the React components that
+ * will have access to PostHog analytics.
  *
  * Features:
  * - Automatic error tracking via PostHog exception autocapture
@@ -28,8 +30,6 @@ import {
  * - Cookieless mode (no consent required)
  * - Manual event capture for academic workflow analytics
  * - Anonymous user identification
- * @param children - React components that will have access to PostHog analytics
- * @param children.children
  */
 export const PostHogProvider = ({ children }: { children: ReactNode }) => {
   // Only initialize PostHog if enabled and configured

@@ -8,6 +8,9 @@ import { Skeleton, Text, type TextProps } from "@mantine/core";
 
 import { useEntityDisplayName } from "@/hooks/use-entity-display-name";
 
+const SKELETON_HEIGHT_XS = 14;
+const SKELETON_HEIGHT_DEFAULT = 16;
+
 interface EntityDisplayNameProperties extends Omit<TextProps, "children"> {
   entityId: string;
   entityType: EntityType;
@@ -28,12 +31,6 @@ interface EntityDisplayNameProperties extends Omit<TextProps, "children"> {
 /**
  * Renders an entity's display name, automatically fetching it from OpenAlex if needed.
  * Handles loading and error states gracefully.
- * @param root0
- * @param root0.entityId
- * @param root0.entityType
- * @param root0.fallback
- * @param root0.showSkeleton
- * @param root0.lineClamp
  */
 export const EntityDisplayName = ({
   entityId,
@@ -69,7 +66,12 @@ export const EntityDisplayName = ({
 
   // Show skeleton while loading if requested
   if (isLoading && showSkeleton) {
-    return <Skeleton height={textProps.size === "xs" ? 14 : 16} width="80%" />;
+    return (
+      <Skeleton
+        height={textProps.size === "xs" ? SKELETON_HEIGHT_XS : SKELETON_HEIGHT_DEFAULT}
+        width="80%"
+      />
+    );
   }
 
   // Use display name if available, otherwise fallback

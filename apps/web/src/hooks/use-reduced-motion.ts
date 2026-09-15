@@ -18,7 +18,7 @@ export const useReducedMotion = (): boolean => {
 
   useEffect(() => {
     // Return early if window is not available (SSR)
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") return undefined;
 
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -29,7 +29,9 @@ export const useReducedMotion = (): boolean => {
 
     // Use addEventListener (modern browsers support this)
     mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
   }, []);
 
   return prefersReducedMotion;

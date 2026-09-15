@@ -23,7 +23,7 @@ import {
   Transition,
 } from "@mantine/core";
 import { IconBookmark, IconExternalLink, IconInfoCircle } from "@tabler/icons-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { ICON_SIZE } from "@/config/style-constants";
 
@@ -47,7 +47,7 @@ interface SearchResultPreviewProperties {
   /**
   Optional bookmark handler
    */
-  onBookmark?: (entity: AutocompleteResult) => Promise<void>;
+  onBookmark?: (entity: Readonly<AutocompleteResult>) => Promise<void>;
   /**
   Whether the entity is currently bookmarked
    */
@@ -56,49 +56,52 @@ interface SearchResultPreviewProperties {
 
 const HOVER_DELAY = 600; // ms before showing hover card
 const HIDE_DELAY = 200; // ms before hiding hover card
+const VIEWPORT_EDGE_GAP = 8; // px gap kept between the hover card and the target/viewport edge
 
 
 /**
  * Generate entity-specific description based on type and available data
- * @param entity
  */
-const generateEntityDescription = (entity: AutocompleteResult): string => {
+const generateEntityDescription = (entity: Readonly<AutocompleteResult>): string => {
   const entityType = toEntityType(entity.entity_type);
-  if (!entityType) return entity.hint || '';
+  const hint = entity.hint ?? '';
+  if (entityType === null) return hint;
+
+  const worksCount = entity.works_count ?? 0;
+  const citedByCount = entity.cited_by_count ?? 0;
 
   switch (entity.entity_type) {
     case 'work':
-      return entity.hint || 'Academic publication';
+      return hint !== '' ? hint : 'Academic publication';
     case 'author':
-      return `${entity.works_count || 0} works • ${formatLargeNumber(entity.cited_by_count || 0)} citations`;
+      return `${String(worksCount)} works • ${formatLargeNumber(citedByCount)} citations`;
     case 'source':
-      return entity.hint || `Academic venue • ${entity.works_count || 0} works`;
+      return hint !== '' ? hint : `Academic venue • ${String(worksCount)} works`;
     case 'institution':
-      return entity.hint || `Research institution • ${entity.works_count || 0} works`;
+      return hint !== '' ? hint : `Research institution • ${String(worksCount)} works`;
     case 'topic':
-      return entity.hint || `Research topic • ${entity.works_count || 0} works`;
+      return hint !== '' ? hint : `Research topic • ${String(worksCount)} works`;
     case 'publisher':
-      return entity.hint || `Academic publisher • ${entity.works_count || 0} works`;
+      return hint !== '' ? hint : `Academic publisher • ${String(worksCount)} works`;
     case 'funder':
-      return entity.hint || `Funding organization • ${entity.works_count || 0} works`;
+      return hint !== '' ? hint : `Funding organization • ${String(worksCount)} works`;
     case 'concept':
-      return entity.hint || `Research concept`;
+      return hint !== '' ? hint : 'Research concept';
     case 'keyword':
-      return entity.hint || `Search keyword`;
+      return hint !== '' ? hint : 'Search keyword';
+    case 'domain':
+      return hint !== '' ? hint : 'Research domain';
+    case 'field':
+      return hint !== '' ? hint : 'Research field';
+    case 'subfield':
+      return hint !== '' ? hint : 'Research subfield';
     default:
-      return entity.hint || '';
+      return hint;
   }
 };
 
 /**
  * Hover card component for search results with rich entity information
- * @param root0
- * @param root0.entity
- * @param root0.opened
- * @param root0.onToggle
- * @param root0.targetElement
- * @param root0.onBookmark
- * @param root0.isBookmarked
  */
 export const SearchResultPreview = ({
   entity,
@@ -110,16 +113,19 @@ export const SearchResultPreview = ({
 }: SearchResultPreviewProperties) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [isBookmarkedLocal, setIsBookmarkedLocal] = useState(isBookmarked);
-  const cardReference = useRef<HTMLDivElement>(null);
+  const [previousIsBookmarked, setPreviousIsBookmarked] = useState(isBookmarked);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const lastPositionRef = useRef({ top: 0, left: 0 });
   const entityUrl = convertToRelativeUrl(entity.id);
   const entityType = toEntityType(entity.entity_type);
   const entityColor = entityType ? ENTITY_METADATA[entityType].color : 'gray';
   const description = generateEntityDescription(entity);
 
-  // Update local bookmark state when prop changes
-  useEffect(() => {
+  // Adjust local bookmark state when the prop changes (React-recommended "adjust state during render" pattern, avoiding a useEffect round-trip)
+  if (isBookmarked !== previousIsBookmarked) {
+    setPreviousIsBookmarked(isBookmarked);
     setIsBookmarkedLocal(isBookmarked);
-  }, [isBookmarked]);
+  }
 
   // Calculate and update position relative to target element
   const updatePosition = useCallback(() => {
@@ -130,36 +136,40 @@ export const SearchResultPreview = ({
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
-    let left = targetRect.right + 8; // Position to the right with small gap
+    let left = targetRect.right + VIEWPORT_EDGE_GAP; // Position to the right with small gap
     let top = targetRect.top;
 
     // Adjust if card would overflow viewport right edge
     if (left + cardWidth > viewportWidth) {
-      left = targetRect.left - cardWidth - 8; // Position to the left
+      left = targetRect.left - cardWidth - VIEWPORT_EDGE_GAP; // Position to the left
       // If left would also overflow, position below
       if (left < 0) {
-        left = Math.max(8, viewportWidth - cardWidth - 8);
-        top = targetRect.bottom + 8;
+        left = Math.max(VIEWPORT_EDGE_GAP, viewportWidth - cardWidth - VIEWPORT_EDGE_GAP);
+        top = targetRect.bottom + VIEWPORT_EDGE_GAP;
       }
     }
 
     // Adjust vertical position if needed
     const cardHeight = 200; // Estimated card height
     if (top + cardHeight > viewportHeight) {
-      top = Math.max(8, viewportHeight - cardHeight - 8);
+      top = Math.max(VIEWPORT_EDGE_GAP, viewportHeight - cardHeight - VIEWPORT_EDGE_GAP);
     }
 
-    setPosition({ top, left });
+    // Skip the state update (and the re-render it would trigger) when the computed position hasn't actually changed since the last measurement.
+    if (top !== lastPositionRef.current.top || left !== lastPositionRef.current.left) {
+      lastPositionRef.current = { top, left };
+      setPosition({ top, left });
+    }
   }, [targetElement, opened]);
 
-  // Update position on scroll/resize
-  useEffect(() => {
-    if (!opened) return;
+  // Update position on scroll/resize (layout effect: reads DOM measurements and must set position synchronously before paint to avoid flicker)
+  useLayoutEffect(() => {
+    if (!opened) return undefined;
 
     updatePosition();
 
-    const handleScroll = () => updatePosition();
-    const handleResize = () => updatePosition();
+    const handleScroll = () => { updatePosition(); };
+    const handleResize = () => { updatePosition(); };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('resize', handleResize, { passive: true });
@@ -185,7 +195,7 @@ export const SearchResultPreview = ({
 
   // Close on escape key
   useEffect(() => {
-    if (!opened) return;
+    if (!opened) return undefined;
 
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -194,21 +204,21 @@ export const SearchResultPreview = ({
     };
 
     document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    return () => { document.removeEventListener('keydown', handleEscape); };
   }, [opened, onToggle]);
 
   // Close on click outside
   useEffect(() => {
-    if (!opened) return;
+    if (!opened) return undefined;
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (cardReference.current && !cardReference.current.contains(e.target as Node)) {
+      if (cardRef.current && e.target instanceof Node && !cardRef.current.contains(e.target)) {
         onToggle(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => { document.removeEventListener('mousedown', handleClickOutside); };
   }, [opened, onToggle]);
 
   return (
@@ -221,7 +231,7 @@ export const SearchResultPreview = ({
       >
         {(styles) => (
           <Box
-            ref={cardReference}
+            ref={cardRef}
             style={{
               position: 'fixed',
               top: position.top,
@@ -263,7 +273,9 @@ export const SearchResultPreview = ({
                           size="sm"
                           variant={isBookmarkedLocal ? "filled" : "subtle"}
                           color={isBookmarkedLocal ? "yellow" : "gray"}
-                          onClick={handleBookmark}
+                          onClick={(e) => {
+                            void handleBookmark(e);
+                          }}
                           aria-label={isBookmarkedLocal ? "Remove bookmark" : "Add bookmark"}
                         >
                           <IconBookmark
@@ -340,7 +352,7 @@ export const SearchResultPreview = ({
                 )}
 
                 {/* External ID */}
-                {entity.external_id && (
+                {entity.external_id !== undefined && entity.external_id !== "" && (
                   <Text size="xs" c="dimmed" tt="uppercase">
                     ID: {entity.external_id}
                   </Text>
@@ -364,49 +376,45 @@ export const SearchResultPreview = ({
 
 /**
  * Hook to manage hover card state with delays
- * @param _entity
- * @param _onBookmark
- * @param _isBookmarked
  */
 export const useSearchResultHover = (
-  _entity: AutocompleteResult,
-  _onBookmark?: (entity: AutocompleteResult) => Promise<void>,
+  _entity: Readonly<AutocompleteResult>,
+  _onBookmark?: (entity: Readonly<AutocompleteResult>) => Promise<void>,
   _isBookmarked?: boolean
 ) => {
   const [opened, setOpened] = useState(false);
   const [targetElement, setTargetElement] = useState<HTMLElement | null>(null);
-  const hoverTimeoutReference = useRef<NodeJS.Timeout | null>(null);
-  const hideTimeoutReference = useRef<NodeJS.Timeout | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleMouseEnter = useCallback((e: React.MouseEvent) => {
-    const element = e.currentTarget as HTMLElement;
-    setTargetElement(element);
+  const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    setTargetElement(e.currentTarget);
 
     // Clear any pending timeouts
-    if (hoverTimeoutReference.current) {
-      clearTimeout(hoverTimeoutReference.current);
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
     }
-    if (hideTimeoutReference.current) {
-      clearTimeout(hideTimeoutReference.current);
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
     }
 
     // Show hover card after delay
-    hoverTimeoutReference.current = setTimeout(() => {
+    hoverTimeoutRef.current = setTimeout(() => {
       setOpened(true);
     }, HOVER_DELAY);
   }, []);
 
   const handleMouseLeave = useCallback(() => {
     // Clear hover timeout if still pending
-    if (hoverTimeoutReference.current) {
-      clearTimeout(hoverTimeoutReference.current);
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
     }
 
     // Hide with shorter delay
-    if (hideTimeoutReference.current) {
-      clearTimeout(hideTimeoutReference.current);
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
     }
-    hideTimeoutReference.current = setTimeout(() => {
+    hideTimeoutRef.current = setTimeout(() => {
       setOpened(false);
     }, HIDE_DELAY);
   }, []);
@@ -414,11 +422,11 @@ export const useSearchResultHover = (
   // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
-      if (hoverTimeoutReference.current) {
-        clearTimeout(hoverTimeoutReference.current);
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
       }
-      if (hideTimeoutReference.current) {
-        clearTimeout(hideTimeoutReference.current);
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
       }
     };
   }, []);

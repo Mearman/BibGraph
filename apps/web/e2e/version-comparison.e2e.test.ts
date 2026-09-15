@@ -20,6 +20,9 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect,test } from '@playwright/test';
 
+const SCROLL_DISTANCE_PX = 300;
+const MAX_INDICATOR_TOP_OFFSET_PX = 1500;
+
 test.describe('Version Metadata Comparison Display', () => {
   test('should display version comparison indicator for Works with differences', async ({ page }) => {
     // Mock system time to November 2025 (comparison active period)
@@ -47,7 +50,7 @@ test.describe('Version Metadata Comparison Display', () => {
       expect(boundingBox!.width).toBeGreaterThan(0);
       expect(boundingBox!.height).toBeGreaterThan(0);
 
-      console.log(`✅ Indicator rendered with dimensions: ${boundingBox!.width}x${boundingBox!.height}px`);
+      console.log(`✅ Indicator rendered with dimensions: ${String(boundingBox!.width)}x${String(boundingBox!.height)}px`);
     } else {
       console.log('ℹ️ Version comparison indicator not visible (expected if no differences or not in November)');
     }
@@ -67,7 +70,7 @@ test.describe('Version Metadata Comparison Display', () => {
     if (isLabelExists) {
       // Get the version label text
       const labelText = await versionLabel.first().textContent();
-      console.log(`Version label: "${labelText}"`);
+      console.log(`Version label: "${String(labelText)}"`);
 
       // Should show either "Data Version 1 (legacy)", "Data Version 2 (current)", or "Data Version 2 (default)"
       expect(labelText).toMatch(/Data Version\s+[12]/i);
@@ -91,7 +94,7 @@ test.describe('Version Metadata Comparison Display', () => {
 
     if (isBadgeExists) {
       const badgeText = await referencesBadge.textContent();
-      console.log(`References badge text: "${badgeText}"`);
+      console.log(`References badge text: "${String(badgeText)}"`);
 
       // Verify badge text follows expected format: "References: +N", "References: -N", or "References: No change"
       expect(badgeText).toMatch(/References:\s+(\+\d+|-\d+|No change)/);
@@ -120,7 +123,7 @@ test.describe('Version Metadata Comparison Display', () => {
 
     if (isBadgeExists) {
       const badgeText = await locationsBadge.textContent();
-      console.log(`Locations badge text: "${badgeText}"`);
+      console.log(`Locations badge text: "${String(badgeText)}"`);
 
       // Verify badge text follows expected format: "Locations: +N", "Locations: -N", or "Locations: No change"
       expect(badgeText).toMatch(/Locations:\s+(\+\d+|-\d+|No change)/);
@@ -149,7 +152,7 @@ test.describe('Version Metadata Comparison Display', () => {
 
     if (isReferenceBadgeVisible) {
       const referenceText = await referencesBadge.textContent();
-      const isPositive = referenceText?.includes('+');
+      const isPositive = referenceText?.includes('+') ?? false;
 
       if (isPositive) {
         // Get computed styles to verify green color
@@ -181,7 +184,7 @@ test.describe('Version Metadata Comparison Display', () => {
 
     if (isLocBadgeVisible) {
       const locText = await locationsBadge.textContent();
-      const isNegative = locText?.includes('-') && !locText?.includes('difference');
+      const isNegative = (locText?.includes('-') ?? false) && !(locText?.includes('difference') ?? false);
 
       if (isNegative) {
         // Get computed styles to verify color is applied
@@ -215,8 +218,8 @@ test.describe('Version Metadata Comparison Display', () => {
         const badge = badges.nth(index);
         const badgeText = await badge.textContent();
 
-        if (badgeText?.includes('No change')) {
-          console.log(`✅ Found "No change" format: "${badgeText}"`);
+        if (badgeText?.includes('No change') ?? false) {
+          console.log(`✅ Found "No change" format: "${String(badgeText)}"`);
           expect(badgeText).toMatch(/No change/);
         }
       }
@@ -248,7 +251,7 @@ test.describe('Version Metadata Comparison Display', () => {
 
       if (isTooltipVisible) {
         const tooltipText = await tooltip.textContent();
-        console.log(`Tooltip text: "${tooltipText}"`);
+        console.log(`Tooltip text: "${String(tooltipText)}"`);
 
         // Tooltip should show version counts
         // Expected format: "References: X (v1) → Y (v2)"
@@ -280,7 +283,7 @@ test.describe('Version Metadata Comparison Display', () => {
       const iconCount = await infoIcon.count();
 
       if (iconCount > 0) {
-        console.log(`✅ Info icon rendered (${iconCount} icon(s) found)`);
+        console.log(`✅ Info icon rendered (${String(iconCount)} icon(s) found)`);
 
         // Verify the icon is visible
         const firstIcon = infoIcon.first();
@@ -309,11 +312,11 @@ test.describe('Version Metadata Comparison Display', () => {
       const isHelperTextExists = await helperText.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (isHelperTextExists) {
-        const text = helperText;
-        console.log(`Helper text: "${text}"`);
+        
+        console.log(`Helper text: "${String(helperText)}"`);
 
         // Should guide users on what the comparison means
-        await expect(text).not.toBeEmpty();
+        await expect(helperText).not.toBeEmpty();
         console.log('✅ Helper text displayed');
       } else {
         console.log('ℹ️ Helper text not visible');
@@ -344,7 +347,7 @@ test.describe('Version Metadata Comparison Display', () => {
         for (let index = 0; index < badgeCount; index++) {
           const badge = badgeElements.nth(index);
           const text = await badge.textContent();
-          if (text) {
+          if (text !== null && text !== '') {
             badgeTexts.push(text);
           }
         }
@@ -387,7 +390,7 @@ test.describe('Version Metadata Comparison Display', () => {
       expect(violations).toHaveLength(0);
 
       console.log('✅ Version comparison indicator passes accessibility tests');
-      console.log(`Checked: ${accessibilityScanResults.passes.length} passing rules, ${accessibilityScanResults.violations.length} violations total`);
+      console.log(`Checked: ${String(accessibilityScanResults.passes.length)} passing rules, ${String(accessibilityScanResults.violations.length)} violations total`);
     } else {
       console.log('ℹ️ Comparison indicator not visible - skipping accessibility check');
     }
@@ -409,7 +412,7 @@ test.describe('Version Metadata Comparison Display', () => {
       expect(initialBox).toBeTruthy();
 
       // Scroll the page
-      await page.evaluate(() => window.scrollBy(0, 300));
+      await page.evaluate((scrollDistancePx) => { window.scrollBy(0, scrollDistancePx); }, SCROLL_DISTANCE_PX);
       // Removed: waitForTimeout - use locator assertions instead
       // Check if indicator is still visible or position adjusted
       const afterScrollBox = await indicator.boundingBox();
@@ -418,7 +421,7 @@ test.describe('Version Metadata Comparison Display', () => {
       expect(afterScrollBox).toBeTruthy();
 
       console.log(
-        `✅ Indicator positioning maintained: y-offset before=${initialBox!.y}, after=${afterScrollBox!.y}`
+        `✅ Indicator positioning maintained: y-offset before=${String(initialBox!.y)}, after=${String(afterScrollBox!.y)}`
       );
     } else {
       console.log('ℹ️ Comparison indicator not visible');
@@ -441,12 +444,12 @@ test.describe('Version Metadata Comparison Display', () => {
       expect(boundingBox).toBeTruthy();
 
       // Should be near top of the page (typically in metadata section)
-      expect(boundingBox!.y).toBeLessThan(1500);
+      expect(boundingBox!.y).toBeLessThan(MAX_INDICATOR_TOP_OFFSET_PX);
       // Should be visible from left edge
       expect(boundingBox!.x).toBeGreaterThanOrEqual(0);
 
       console.log(
-        `✅ Indicator positioned at (x=${boundingBox!.x}, y=${boundingBox!.y}) within work detail layout`
+        `✅ Indicator positioned at (x=${String(boundingBox!.x)}, y=${String(boundingBox!.y)}) within work detail layout`
       );
     } else {
       console.log('ℹ️ Comparison indicator not visible');
@@ -513,7 +516,7 @@ test.describe('Version Metadata Comparison Display', () => {
       const iconCount = await icons.count();
 
       if (iconCount > 0) {
-        console.log(`✅ Badge has ${iconCount} icon(s) indicating difference direction`);
+        console.log(`✅ Badge has ${String(iconCount)} icon(s) indicating difference direction`);
 
         // Verify icon is visible
         const firstIcon = icons.first();

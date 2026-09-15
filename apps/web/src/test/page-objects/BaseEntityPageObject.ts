@@ -81,14 +81,13 @@ export class BaseEntityPageObject extends BaseSPAPageObject {
 		citedByCountBadge: "[data-testid='cited-by-count']",
 	};
 
-	constructor(page: Page, options: EntityPageObjectOptions) {
+	constructor(page: Page, options: Readonly<EntityPageObjectOptions>) {
 		super(page, options);
 		this.entityType = options.entityType;
 	}
 
 	/**
 	 * Navigate to an entity detail page
-	 * @param entityId
 	 */
 	async gotoEntity(entityId: string): Promise<void> {
 		await this.goto(`#/${this.entityType}/${entityId}`);
@@ -138,7 +137,7 @@ export class BaseEntityPageObject extends BaseSPAPageObject {
 		const countText = await this.getText(
 			`${this.entitySelectors.incomingRelationships} ${this.entitySelectors.relationshipCount}`
 		);
-		return countText ? Number.parseInt(countText, 10) : 0;
+		return countText !== null ? Number.parseInt(countText, 10) : 0;
 	}
 
 	/**
@@ -148,7 +147,7 @@ export class BaseEntityPageObject extends BaseSPAPageObject {
 		const countText = await this.getText(
 			`${this.entitySelectors.outgoingRelationships} ${this.entitySelectors.relationshipCount}`
 		);
-		return countText ? Number.parseInt(countText, 10) : 0;
+		return countText !== null ? Number.parseInt(countText, 10) : 0;
 	}
 
 	/**
@@ -160,7 +159,6 @@ export class BaseEntityPageObject extends BaseSPAPageObject {
 
 	/**
 	 * Click a relationship item
-	 * @param index
 	 */
 	async clickRelationship(index: number): Promise<void> {
 		const items = this.page.locator(this.entitySelectors.relationshipItem);
@@ -170,7 +168,6 @@ export class BaseEntityPageObject extends BaseSPAPageObject {
 
 	/**
 	 * Filter relationships by type
-	 * @param type
 	 */
 	async filterRelationshipsByType(type: string): Promise<void> {
 		await this.click(this.entitySelectors.relationshipTypeFilter);
@@ -196,7 +193,6 @@ export class BaseEntityPageObject extends BaseSPAPageObject {
 
 	/**
 	 * Get metadata field value by label
-	 * @param label
 	 */
 	async getMetadataValue(label: string): Promise<string | null> {
 		const fields = this.page.locator(this.entitySelectors.metadataField);
@@ -207,7 +203,7 @@ export class BaseEntityPageObject extends BaseSPAPageObject {
 			const fieldLabel = await field
 				.locator(this.entitySelectors.metadataLabel)
 				.textContent();
-			if (fieldLabel?.includes(label)) {
+			if (fieldLabel?.includes(label) === true) {
 				return field
 					.locator(this.entitySelectors.metadataValue)
 					.textContent();
@@ -225,7 +221,6 @@ export class BaseEntityPageObject extends BaseSPAPageObject {
 
 	/**
 	 * Assert entity title is displayed
-	 * @param title
 	 */
 	async expectEntityTitle(title: string): Promise<void> {
 		await expect(

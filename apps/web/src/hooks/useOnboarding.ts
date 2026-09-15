@@ -12,6 +12,8 @@ import {
   resetOnboarding,
 } from '@/components/onboarding';
 
+const ONBOARDING_DISPLAY_DELAY_MS = 1000;
+
 export interface UseOnboardingReturn {
   /**
   Whether to show the onboarding tutorial
@@ -48,10 +50,13 @@ export const useOnboarding = (): UseOnboardingReturn => {
       // Small delay to allow app to load
       const timer = setTimeout(() => {
         setShowOnboarding(true);
-      }, 1000);
+      }, ONBOARDING_DISPLAY_DELAY_MS);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }
+    return undefined;
   }, []);
 
   const closeOnboarding = () => {

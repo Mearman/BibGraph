@@ -10,7 +10,9 @@ import { waitForAppReady } from '@/test/helpers/app-ready';
 import { BaseSPAPageObject } from '@/test/page-objects/BaseSPAPageObject';
 
 test.describe('@utility History Page', () => {
-	const BASE_URL = process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173';
+	const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+	const BASE_URL = IS_CI ? 'http://localhost:4173' : 'http://localhost:5173';
+	const FILTER_APPLY_WAIT_MS = 500;
 
 	// Test entities to visit for populating history
 	const TEST_ENTITIES = [
@@ -137,7 +139,7 @@ test.describe('@utility History Page', () => {
 		const cardText = await cardContent.textContent();
 		// Should contain either the entity ID or type information
 		expect(
-			cardText?.includes(entity.id) || cardText?.includes(entity.type)
+			cardText?.includes(entity.id) ?? cardText?.includes(entity.type)
 		).toBe(true);
 	});
 
@@ -206,7 +208,7 @@ test.describe('@utility History Page', () => {
 		// Search for a specific entity type
 		const searchTerm = TEST_ENTITIES[0].type;
 		await searchInput.fill(searchTerm);
-		await page.waitForTimeout(500); // Allow time for filter to apply
+		await page.waitForTimeout(FILTER_APPLY_WAIT_MS); // Allow time for filter to apply
 
 		// Verify search filtered the results
 		const filteredCards = page.locator('.mantine-Card-root');
@@ -225,8 +227,8 @@ test.describe('@utility History Page', () => {
 			// Removed: waitForTimeout - use locator assertions instead
 			// Should show all entries again
 			const clearedCards = page.locator('.mantine-Card-root');
-			const clearedCount = clearedCards;
-			await expect(clearedCount).toHaveCount(initialCount);
+			
+			await expect(clearedCards).toHaveCount(initialCount);
 		}
 	});
 

@@ -30,18 +30,20 @@ import {
 
 /**
  * Type guard to check if value is a record object
- * @param value
  */
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 };
 
 /**
- * Generate content hash for cache invalidation
- * Excludes volatile metadata fields for stable hashing
- * @param data
+ * Length, in hex characters, that a content hash is truncated to.
  */
-const generateContentHash = async (data: unknown): Promise<string> => {
+const CONTENT_HASH_LENGTH = 16;
+
+/**
+ * Generate content hash for cache invalidation Excludes volatile metadata fields for stable hashing
+ */
+const generateContentHash = (data: unknown): string => {
   try {
     let cleanContent: unknown = data;
 
@@ -56,7 +58,7 @@ const generateContentHash = async (data: unknown): Promise<string> => {
       ? Object.keys(cleanContent).sort()
       : [];
     const jsonString = JSON.stringify(cleanContent, sortedKeys);
-    return createHash("sha256").update(jsonString).digest("hex").slice(0, 16);
+    return createHash("sha256").update(jsonString).digest("hex").slice(0, CONTENT_HASH_LENGTH);
   } catch (error) {
     logger.warn("general", "Failed to generate content hash", { error });
     return "hash-error";
@@ -64,124 +66,100 @@ const generateContentHash = async (data: unknown): Promise<string> => {
 };
 
 /**
- * Load unified index for an entity type
- * @param dataPath
- * @param entityType
+ * Insert or update a cleaned index entry, keeping whichever version has the most recent lastModified timestamp.
  */
-export const loadUnifiedIndex = async (
-  dataPath: string,
-  entityType: string,
-): Promise<Record<string, ExtendedIndexEntry>> => {
-  const indexPath = join(dataPath, entityType, "index.json");
+const upsertCleanedEntry = (
+  cleaned: Record<string, ExtendedIndexEntry>,
+  canonicalKey: string,
+  cleanEntry: Readonly<IndexEntry>,
+): void => {
+  if (!(canonicalKey in cleaned)) {
+    cleaned[canonicalKey] = indexEntryToUnified(cleanEntry);
+    return;
+  }
 
-  try {
-    const indexContent = await readFile(indexPath, "utf-8");
-    const parsed: unknown = JSON.parse(indexContent);
+  const existingLastModified = cleaned[canonicalKey].lastModified;
+  const isNewer =
+    cleanEntry.lastModified !== undefined &&
+    cleanEntry.lastModified !== "" &&
+    (existingLastModified === undefined ||
+      existingLastModified === "" ||
+      cleanEntry.lastModified > existingLastModified);
 
-    // Try parsing as requests wrapper format first
-    const requestsWrapper = RequestsWrapperSchema.safeParse(parsed);
-    if (requestsWrapper.success) {
-      // Clean and normalize existing unified format from requests
-      const cleaned: Record<string, ExtendedIndexEntry> = {};
-      for (const [key, entry] of Object.entries(
-        requestsWrapper.data.requests,
-      )) {
-        // Validate entry structure
-        const validatedEntry = IndexEntrySchema.safeParse(entry);
-        if (!validatedEntry.success) continue;
-
-        // Parse the key and get its canonical form
-        const parsedKey = parseIndexKey(key);
-        if (parsedKey && parsedKey.type === "entity") {
-          // Only include entity entries in the entity index
-          // Normalize the canonical URL to decoded form
-          const canonicalKey = normalizeUrlForDeduplication(
-            parsedKey.canonicalUrl,
-          );
-          const cleanEntry: IndexEntry = {};
-          if (validatedEntry.data.lastModified) {
-            cleanEntry.lastModified = validatedEntry.data.lastModified;
-          }
-          if (validatedEntry.data.contentHash) {
-            cleanEntry.contentHash = validatedEntry.data.contentHash;
-          }
-
-          // Merge with existing entry if duplicate canonical keys exist
-          if (cleaned[canonicalKey]) {
-            // Keep the most recent lastModified
-            if (
-              cleanEntry.lastModified &&
-              (!cleaned[canonicalKey].lastModified ||
-                cleanEntry.lastModified >
-                  (cleaned[canonicalKey].lastModified ?? ""))
-            ) {
-              cleaned[canonicalKey] = indexEntryToUnified(cleanEntry);
-            }
-          } else {
-            cleaned[canonicalKey] = indexEntryToUnified(cleanEntry);
-          }
-        }
-        // Skip query entries - they will be handled by the separate query index
-      }
-      return cleaned;
-    }
-
-    // Try parsing as flat index format
-    const flatIndex = FlatIndexSchema.safeParse(parsed);
-    if (flatIndex.success) {
-      logger.debug(
-        "general",
-        "Converting flat index format to requests wrapper format",
-      );
-      // Clean and normalize existing unified format from flat structure
-      const cleaned: Record<string, ExtendedIndexEntry> = {};
-      for (const [key, entry] of Object.entries(flatIndex.data)) {
-        // Parse the key and get its canonical form
-        const parsedKey = parseIndexKey(key);
-        if (parsedKey) {
-          // Normalize the canonical URL to decoded form
-          const canonicalKey = normalizeUrlForDeduplication(
-            parsedKey.canonicalUrl,
-          );
-          const cleanEntry: IndexEntry = {};
-          if (entry.lastModified) {
-            cleanEntry.lastModified = entry.lastModified;
-          }
-          if (entry.contentHash) {
-            cleanEntry.contentHash = entry.contentHash;
-          }
-
-          // Merge with existing entry if duplicate canonical keys exist
-          if (cleaned[canonicalKey]) {
-            // Keep the most recent lastModified
-            if (
-              cleanEntry.lastModified &&
-              (!cleaned[canonicalKey].lastModified ||
-                cleanEntry.lastModified >
-                  (cleaned[canonicalKey].lastModified ?? ""))
-            ) {
-              cleaned[canonicalKey] = indexEntryToUnified(cleanEntry);
-            }
-          } else {
-            cleaned[canonicalKey] = indexEntryToUnified(cleanEntry);
-          }
-        }
-      }
-      return cleaned;
-    }
-
-    // Convert from old format if needed
-    logger.debug("general", "Converting old index format to unified format");
-    return convertOldIndexToUnified(parsed);
-  } catch {
-    logger.debug("general", "Creating new unified index");
-    return {};
+  if (isNewer) {
+    cleaned[canonicalKey] = indexEntryToUnified(cleanEntry);
   }
 };
 
 /**
+ * Generate canonical query key from a query definition
+ */
+const generateCanonicalQueryKey = (
+  query: unknown,
+  entityType: string,
+): string | null => {
+  const parsed = QueryDefinitionSchema.safeParse(query);
+  if (!parsed.success) {
+    return null;
+  }
+
+  const { params, url } = parsed.data;
+
+  if (params) {
+    // Generate canonical query URL
+    const searchParameters = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (Array.isArray(value)) {
+        searchParameters.set(key, value.join(","));
+      } else {
+        searchParameters.set(key, String(value));
+      }
+    }
+    return `https://api.openalex.org/${entityType}?${searchParameters.toString()}`;
+  }
+
+  if (url?.startsWith("https://api.openalex.org/") === true) {
+    return url;
+  }
+
+  return null;
+};
+
+/**
+ * Generate canonical query key from old entry format
+ */
+const generateCanonicalQueryKeyFromEntry = (
+  entry: unknown,
+  entityType: string,
+): string | null => {
+  const parsed = QueryDefinitionSchema.safeParse(entry);
+  if (!parsed.success) {
+    return null;
+  }
+
+  const { params, url } = parsed.data;
+
+  if (params) {
+    const searchParameters = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (Array.isArray(value)) {
+        searchParameters.set(key, value.join(","));
+      } else {
+        searchParameters.set(key, String(value));
+      }
+    }
+    return `https://api.openalex.org/${entityType}?${searchParameters.toString()}`;
+  }
+
+  if (url?.startsWith("https://api.openalex.org/") === true) {
+    return url;
+  }
+
+  return null;
+};
+
+/**
  * Convert old index formats to unified format
- * @param oldIndex
  */
 const convertOldIndexToUnified = (oldIndex: unknown): UnifiedIndex => {
   const unified: UnifiedIndex = {};
@@ -217,7 +195,7 @@ const convertOldIndexToUnified = (oldIndex: unknown): UnifiedIndex => {
           queryEntry.query,
           entityType,
         );
-        if (canonicalKey) {
+        if (canonicalKey !== null && canonicalKey !== "") {
           const cleanEntry: IndexEntry = {
             lastModified: queryEntry.lastModified,
             contentHash: queryEntry.contentHash,
@@ -236,15 +214,15 @@ const convertOldIndexToUnified = (oldIndex: unknown): UnifiedIndex => {
           entry,
           entityType,
         );
-        if (canonicalKey) {
+        if (canonicalKey !== null && canonicalKey !== "") {
           // Parse the entry with Zod to ensure type safety
           const parsedEntry = QueryDefinitionSchema.safeParse(entry);
           if (parsedEntry.success) {
             const cleanEntry: IndexEntry = {};
-            if (parsedEntry.data.lastModified) {
+            if (parsedEntry.data.lastModified !== undefined && parsedEntry.data.lastModified !== "") {
               cleanEntry.lastModified = parsedEntry.data.lastModified;
             }
-            if (parsedEntry.data.contentHash) {
+            if (parsedEntry.data.contentHash !== undefined && parsedEntry.data.contentHash !== "") {
               cleanEntry.contentHash = parsedEntry.data.contentHash;
             }
             unified[canonicalKey] = indexEntryToUnified(
@@ -261,81 +239,145 @@ const convertOldIndexToUnified = (oldIndex: unknown): UnifiedIndex => {
 };
 
 /**
- * Generate canonical query key from a query definition
- * @param query
- * @param entityType
+ * Load unified index for an entity type
  */
-const generateCanonicalQueryKey = (
-  query: unknown,
+export const loadUnifiedIndex = async (
+  dataPath: string,
   entityType: string,
-): string | null => {
-  const parsed = QueryDefinitionSchema.safeParse(query);
-  if (!parsed.success) {
-    return null;
-  }
+): Promise<Record<string, ExtendedIndexEntry>> => {
+  const indexPath = join(dataPath, entityType, "index.json");
 
-  const { params, url } = parsed.data;
+  try {
+    const indexContent = await readFile(indexPath, "utf-8");
+    const parsed: unknown = JSON.parse(indexContent);
 
-  if (params) {
-    // Generate canonical query URL
-    const searchParameters = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (Array.isArray(value)) {
-        searchParameters.set(key, value.join(","));
-      } else {
-        searchParameters.set(key, String(value));
+    // Try parsing as requests wrapper format first
+    const requestsWrapper = RequestsWrapperSchema.safeParse(parsed);
+    if (requestsWrapper.success) {
+      // Clean and normalize existing unified format from requests
+      const cleaned: Record<string, ExtendedIndexEntry> = {};
+      for (const [key, entry] of Object.entries(
+        requestsWrapper.data.requests,
+      )) {
+        // Validate entry structure
+        const validatedEntry = IndexEntrySchema.safeParse(entry);
+        if (!validatedEntry.success) continue;
+
+        // Parse the key and get its canonical form
+        const parsedKey = parseIndexKey(key);
+        if (parsedKey?.type === "entity") {
+          // Only include entity entries in the entity index Normalize the canonical URL to decoded form
+          const canonicalKey = normalizeUrlForDeduplication(
+            parsedKey.canonicalUrl,
+          );
+          const cleanEntry: IndexEntry = {};
+          if (validatedEntry.data.lastModified !== undefined && validatedEntry.data.lastModified !== "") {
+            cleanEntry.lastModified = validatedEntry.data.lastModified;
+          }
+          if (validatedEntry.data.contentHash !== undefined && validatedEntry.data.contentHash !== "") {
+            cleanEntry.contentHash = validatedEntry.data.contentHash;
+          }
+
+          // Merge with existing entry if duplicate canonical keys exist
+          upsertCleanedEntry(cleaned, canonicalKey, cleanEntry);
+        }
+        // Skip query entries - they will be handled by the separate query index
       }
+      return cleaned;
     }
-    return `https://api.openalex.org/${entityType}?${searchParameters.toString()}`;
-  }
 
-  if (url?.startsWith("https://api.openalex.org/")) {
-    return url;
-  }
+    // Try parsing as flat index format
+    const flatIndex = FlatIndexSchema.safeParse(parsed);
+    if (flatIndex.success) {
+      logger.debug(
+        "general",
+        "Converting flat index format to requests wrapper format",
+      );
+      // Clean and normalize existing unified format from flat structure
+      const cleaned: Record<string, ExtendedIndexEntry> = {};
+      for (const [key, entry] of Object.entries(flatIndex.data)) {
+        // Parse the key and get its canonical form
+        const parsedKey = parseIndexKey(key);
+        if (parsedKey) {
+          // Normalize the canonical URL to decoded form
+          const canonicalKey = normalizeUrlForDeduplication(
+            parsedKey.canonicalUrl,
+          );
+          const cleanEntry: IndexEntry = {};
+          if (entry.lastModified !== undefined && entry.lastModified !== "") {
+            cleanEntry.lastModified = entry.lastModified;
+          }
+          if (entry.contentHash !== undefined && entry.contentHash !== "") {
+            cleanEntry.contentHash = entry.contentHash;
+          }
 
-  return null;
+          // Merge with existing entry if duplicate canonical keys exist
+          upsertCleanedEntry(cleaned, canonicalKey, cleanEntry);
+        }
+      }
+      return cleaned;
+    }
+
+    // Convert from old format if needed
+    logger.debug("general", "Converting old index format to unified format");
+    return convertOldIndexToUnified(parsed);
+  } catch {
+    logger.debug("general", "Creating new unified index");
+    return {};
+  }
 };
 
 /**
- * Generate canonical query key from old entry format
- * @param entry
- * @param entityType
+ * Matches a non-prefixed entity URL's trailing `{entityType}/{entityId}` path segments.
  */
-const generateCanonicalQueryKeyFromEntry = (
-  entry: unknown,
+const NON_PREFIXED_ENTITY_URL_PATTERN = /https:\/\/api\.openalex\.org\/[^/]+\/([^?]+)$/;
+
+/**
+ * Remove duplicate entries where both prefixed and non-prefixed versions exist Keep the prefixed version (canonical) and remove the non-prefixed version
+ */
+const deduplicateIndexEntries = (
+  index: UnifiedIndex,
   entityType: string,
-): string | null => {
-  const parsed = QueryDefinitionSchema.safeParse(entry);
-  if (!parsed.success) {
-    return null;
+): UnifiedIndex => {
+  const prefix = getEntityPrefix(entityType);
+  const keysToRemove: string[] = [];
+
+  // Skip if no prefix for this entity type
+  if (!prefix) {
+    return index;
   }
 
-  const { params, url } = parsed.data;
+  for (const key of Object.keys(index)) {
+    // Check if this is a non-prefixed entity URL
+    const match = NON_PREFIXED_ENTITY_URL_PATTERN.exec(key);
+    if (match) {
+      const entityId = match[1];
 
-  if (params) {
-    const searchParameters = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (Array.isArray(value)) {
-        searchParameters.set(key, value.join(","));
-      } else {
-        searchParameters.set(key, String(value));
+      // If this ID doesn't start with the expected prefix
+      if (!entityId.startsWith(prefix)) {
+        // Check if the prefixed version exists
+        const prefixedKey = key.replace(entityId, `${prefix}${entityId}`);
+        if (prefixedKey in index) {
+          // Both versions exist, mark the non-prefixed one for removal
+          keysToRemove.push(key);
+          logger.debug("general", "Removing duplicate non-prefixed entry", {
+            entityId,
+            keeping: `${prefix}${entityId}`,
+          });
+        }
       }
     }
-    return `https://api.openalex.org/${entityType}?${searchParameters.toString()}`;
   }
 
-  if (url?.startsWith("https://api.openalex.org/")) {
-    return url;
-  }
-
-  return null;
+  // Remove the duplicate entries by creating new object
+  const filteredEntries = Object.entries(index).filter(
+    ([key]) => !keysToRemove.includes(key),
+  );
+  return Object.fromEntries(filteredEntries);
 };
 
 /**
  * Update unified index with both entity and query file metadata
- * @param dataPath
- * @param entityType
- * @param index
  */
 export const updateUnifiedIndex = async (
   dataPath: string,
@@ -381,7 +423,7 @@ export const updateUnifiedIndex = async (
       try {
         const fileStat = await stat(filePath);
         const fileContent = await readFile(filePath, "utf-8");
-        const contentHash = await generateContentHash(
+        const contentHash = generateContentHash(
           JSON.parse(fileContent),
         );
 
@@ -392,7 +434,7 @@ export const updateUnifiedIndex = async (
           const parsed: unknown = JSON.parse(fileContent);
           if (
             Array.isArray(parsed) ||
-            (parsed &&
+            (parsed !== null &&
               typeof parsed === "object" &&
               "results" in parsed &&
               Array.isArray(parsed.results))
@@ -415,7 +457,7 @@ export const updateUnifiedIndex = async (
           const canonicalUrl = decodeEntityFilename(entityId, entityType);
 
           // Use canonical URL as index key
-          if (index[canonicalUrl]) {
+          if (canonicalUrl in index) {
             // Merge properties
             index[canonicalUrl] = { ...index[canonicalUrl], ...metadata };
           } else {
@@ -428,7 +470,7 @@ export const updateUnifiedIndex = async (
             entityId,
             fileContent,
           );
-          if (canonicalQueryUrl) {
+          if (canonicalQueryUrl !== null && canonicalQueryUrl !== "") {
             // Use canonical URL as index key
 
             // Check for duplicates with same content hash
@@ -447,7 +489,7 @@ export const updateUnifiedIndex = async (
             }
 
             if (!isDuplicate) {
-              if (index[canonicalQueryUrl]) {
+              if (canonicalQueryUrl in index) {
                 // Merge properties
                 index[canonicalQueryUrl] = {
                   ...index[canonicalQueryUrl],
@@ -487,57 +529,7 @@ export const updateUnifiedIndex = async (
 };
 
 /**
- * Remove duplicate entries where both prefixed and non-prefixed versions exist
- * Keep the prefixed version (canonical) and remove the non-prefixed version
- * @param index
- * @param entityType
- */
-const deduplicateIndexEntries = (
-  index: UnifiedIndex,
-  entityType: string,
-): UnifiedIndex => {
-  const prefix = getEntityPrefix(entityType);
-  const keysToRemove: string[] = [];
-
-  // Skip if no prefix for this entity type
-  if (!prefix) {
-    return index;
-  }
-
-  for (const key of Object.keys(index)) {
-    // Check if this is a non-prefixed entity URL
-    const match = key.match(/https:\/\/api\.openalex\.org\/[^/]+\/([^?]+)$/);
-    if (match) {
-      const entityId = match[1];
-
-      // If this ID doesn't start with the expected prefix
-      if (!entityId.startsWith(prefix)) {
-        // Check if the prefixed version exists
-        const prefixedKey = key.replace(entityId, `${prefix}${entityId}`);
-        if (index[prefixedKey]) {
-          // Both versions exist, mark the non-prefixed one for removal
-          keysToRemove.push(key);
-          logger.debug("general", "Removing duplicate non-prefixed entry", {
-            entityId,
-            keeping: `${prefix}${entityId}`,
-          });
-        }
-      }
-    }
-  }
-
-  // Remove the duplicate entries by creating new object
-  const filteredEntries = Object.entries(index).filter(
-    ([key]) => !keysToRemove.includes(key),
-  );
-  return Object.fromEntries(filteredEntries);
-};
-
-/**
  * Save unified index to file with requests wrapper
- * @param dataPath
- * @param entityType
- * @param index
  */
 export const saveUnifiedIndex = async (
   dataPath: string,
@@ -580,7 +572,6 @@ export const saveUnifiedIndex = async (
 
 /**
  * Generate the main OpenAlex index with JSON $ref structure
- * @param dataPath
  */
 export const generateMainIndex = async (dataPath: string): Promise<void> => {
   const mainIndexPath = join(dataPath, "index.json");
@@ -628,7 +619,7 @@ export const generateMainIndex = async (dataPath: string): Promise<void> => {
   try {
     const existingContent = await readFile(mainIndexPath, "utf-8");
     const parsed: unknown = JSON.parse(existingContent);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
       // Safe property access without type assertion
       const hasLastModified = "lastModified" in parsed;
       const lastModifiedValue =

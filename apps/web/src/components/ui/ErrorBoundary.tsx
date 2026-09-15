@@ -7,7 +7,8 @@
 
 import { ActionIcon, Alert, Button, Container, Group, Paper, Stack, Text, Title, Tooltip } from '@mantine/core';
 import { IconAlertTriangle, IconCopy, IconHome, IconKeyboard,IconRefresh } from '@tabler/icons-react';
-import { Component, ErrorInfo, ReactNode } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
+import { Component } from 'react';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -19,7 +20,7 @@ interface ErrorBoundaryState {
 interface ErrorBoundaryProperties {
   children: ReactNode;
   fallback?: (error: Error, errorId: string, reset: () => void) => ReactNode;
-  onError?: (error: Error, errorInfo: ErrorInfo, errorId: string) => void;
+  onError?: (error: Error, errorInfo: Readonly<ErrorInfo>, errorId: string) => void;
   showRetry?: boolean;
   showDetails?: boolean;
   title?: string;
@@ -27,15 +28,62 @@ interface ErrorBoundaryProperties {
 }
 
 /**
+ * Enhanced error reporting with context aggregation
+ */
+interface ErrorReport {
+  errorId: string;
+  error: Error;
+  errorInfo?: ErrorInfo;
+  userAgent: string;
+  url: string;
+  timestamp: number;
+  context?: string;
+  componentStack?: string;
+}
+
+const ERROR_STORAGE_KEY = 'bibgraph_errors';
+const MAX_STORED_ERRORS = 10;
+const RANDOM_ID_RADIX = 36;
+const RANDOM_ID_LENGTH = 11;
+const COPY_FEEDBACK_RESET_DELAY_MS = 2000;
+
+/**
+Generates a unique, timestamp-prefixed error identifier for correlating a boundary catch with its stored report.
+ */
+const generateErrorId = (): string =>
+  `err_${String(Date.now())}_${Math.random().toString(RANDOM_ID_RADIX).slice(2, RANDOM_ID_LENGTH)}`;
+
+const isErrorReportArray = (value: unknown): value is ErrorReport[] => Array.isArray(value);
+
+/**
+Reads the persisted error report list from localStorage, defaulting to an empty list on missing or malformed data.
+ */
+const readStoredErrors = (): ErrorReport[] => {
+  try {
+    const raw = localStorage.getItem(ERROR_STORAGE_KEY) ?? '[]';
+    const parsed: unknown = JSON.parse(raw);
+    return isErrorReportArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+/**
+Appends a report to the persisted error list, trimming to the most recent entries to bound storage growth.
+ */
+const appendStoredError = (report: ErrorReport): void => {
+  try {
+    const existingErrors = readStoredErrors();
+    existingErrors.push(report);
+    const recentErrors = existingErrors.slice(-MAX_STORED_ERRORS);
+    localStorage.setItem(ERROR_STORAGE_KEY, JSON.stringify(recentErrors));
+  } catch (storageError) {
+    console.warn('Failed to store error report:', storageError);
+  }
+};
+
+/**
  * Error Boundary component that catches and handles React errors gracefully
- * @param root0
- * @param root0.children
- * @param root0.fallback
- * @param root0.onError
- * @param root0.showRetry
- * @param root0.showDetails
- * @param root0.title
- * @param root0.description
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProperties, ErrorBoundaryState> {
   constructor(properties: ErrorBoundaryProperties) {
@@ -52,11 +100,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProperties, ErrorBound
     return {
       hasError: true,
       error,
-      errorId: `err_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
+      errorId: generateErrorId(),
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+  componentDidCatch(error: Error, errorInfo: Readonly<ErrorInfo>): void {
     this.setState({
       error,
       errorInfo,
@@ -70,19 +118,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProperties, ErrorBound
       userAgent: navigator.userAgent,
       url: window.location.href,
       timestamp: Date.now(),
-      componentStack: errorInfo?.componentStack || undefined,
+      componentStack: errorInfo.componentStack ?? undefined,
     };
 
     // Store error for debugging
-    try {
-      const existingErrors = JSON.parse(localStorage.getItem('bibgraph_errors') || '[]');
-      existingErrors.push(errorReport);
-      // Keep only last 10 errors to prevent storage bloat
-      const recentErrors = existingErrors.slice(-10);
-      localStorage.setItem('bibgraph_errors', JSON.stringify(recentErrors));
-    } catch (storageError) {
-      console.warn('Failed to store error report:', storageError);
-    }
+    appendStoredError(errorReport);
 
     // Call error handler if provided
     if (this.props.onError) {
@@ -132,9 +172,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProperties, ErrorBound
       document.title = 'Error details copied!';
       setTimeout(() => {
         document.title = originalText;
-      }, 2000);
+      }, COPY_FEEDBACK_RESET_DELAY_MS);
       return undefined; // Explicit return for promise chain
-    }).catch((error) => {
+    }).catch((error: unknown) => {
       console.error('Failed to copy error details:', error);
     });
   };
@@ -150,7 +190,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProperties, ErrorBound
   }
 
   componentWillUnmount(): void {
-    if (this.state.hasError && this.handleKeyPress) {
+    if (this.state.hasError) {
       window.removeEventListener('keydown', this.handleKeyPress);
     }
   }
@@ -183,14 +223,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProperties, ErrorBound
               <IconAlertTriangle size={48} color="red" />
 
               <Title order={2} c="red" ta="center">
-                {this.props.title || 'Something went wrong'}
+                {this.props.title ?? 'Something went wrong'}
               </Title>
 
               <Text c="dimmed" ta="center" size="lg">
-                {this.props.description || 'An unexpected error occurred while loading this component.'}
+                {this.props.description ?? 'An unexpected error occurred while loading this component.'}
               </Text>
 
-              {this.props.showDetails && process.env.NODE_ENV === 'development' && (
+              {this.props.showDetails === true && process.env.NODE_ENV === 'development' && (
                 <Alert
                   variant="light"
                   color="red"
@@ -209,7 +249,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProperties, ErrorBound
                     }}>
                       {this.state.error.message}
                     </Text>
-                    {this.state.error.stack && (
+                    {this.state.error.stack !== undefined && (
                       <Text size="sm" component="pre" style={{
                         whiteSpace: 'pre-wrap',
                         wordBreak: 'break-word',
@@ -224,7 +264,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProperties, ErrorBound
               )}
 
               <Group gap="sm">
-                {this.props.showRetry && (
+                {this.props.showRetry === true && (
                   <Button
                     leftSection={<IconRefresh size={16} />}
                     onClick={this.handleReset}
@@ -274,26 +314,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProperties, ErrorBound
 }
 
 /**
- * Enhanced error reporting with context aggregation
- */
-interface ErrorReport {
-  errorId: string;
-  error: Error;
-  errorInfo?: ErrorInfo;
-  userAgent: string;
-  url: string;
-  timestamp: number;
-  context?: string;
-  componentStack?: string;
-}
-
-/**
  * Error handler utility for functional components to handle errors within their scope
  */
 export const createErrorHandler = () => {
   const reportError = (error: Error, context?: string) => {
     const errorReport: ErrorReport = {
-      errorId: `err_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
+      errorId: generateErrorId(),
       error,
       userAgent: navigator.userAgent,
       url: window.location.href,
@@ -301,33 +327,18 @@ export const createErrorHandler = () => {
       context,
     };
 
-    console.error(`Error in ${context || 'component'}:`, errorReport);
+    console.error(`Error in ${context ?? 'component'}:`, errorReport);
 
     // Store in localStorage for debugging
-    try {
-      const existingErrors = JSON.parse(localStorage.getItem('bibgraph_errors') || '[]');
-      existingErrors.push(errorReport);
-      // Keep only last 10 errors
-      const recentErrors = existingErrors.slice(-10);
-      localStorage.setItem('bibgraph_errors', JSON.stringify(recentErrors));
-    } catch (storageError) {
-      console.warn('Failed to store error report:', storageError);
-    }
+    appendStoredError(errorReport);
 
-    // Here you could add integration with error reporting services
-    // like Sentry, LogRocket, PostHog, etc.
+    // Here you could add integration with error reporting services like Sentry, LogRocket, PostHog, etc.
   };
 
-  const getStoredErrors = (): ErrorReport[] => {
-    try {
-      return JSON.parse(localStorage.getItem('bibgraph_errors') || '[]');
-    } catch {
-      return [];
-    }
-  };
+  const getStoredErrors = (): ErrorReport[] => readStoredErrors();
 
   const clearStoredErrors = (): void => {
-    localStorage.removeItem('bibgraph_errors');
+    localStorage.removeItem(ERROR_STORAGE_KEY);
   };
 
   return { reportError, getStoredErrors, clearStoredErrors };
@@ -375,7 +386,7 @@ export const InlineErrorBoundary = ({
           </Stack>
         </Alert>
       )}
-      onError={onError ? (error, _errorInfo, _errorId) => onError(error) : undefined}
+      onError={onError ? (error, _errorInfo, _errorId) => { onError(error); } : undefined}
       showRetry={true}
       showDetails={false}
       title=""
@@ -388,8 +399,6 @@ export const InlineErrorBoundary = ({
 
 /**
  * Error boundary specifically for async components
- * @param root0
- * @param root0.children
  */
 export const AsyncErrorBoundary = ({
   children,

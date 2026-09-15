@@ -117,7 +117,7 @@ export const ActivityFeed = memo(({ maxItems = 20, filter }: ActivityFeedPropert
   // Limit to maxItems
   const displayedActivities = filteredActivities.slice(0, maxItems);
 
-  const activityCount = filter?.categories && filter.categories.length === 1
+  const activityCount = filter?.categories?.length === 1
     ? getActivityCount(filter.categories[0])
     : getActivityCount();
 

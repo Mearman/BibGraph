@@ -1,11 +1,11 @@
+// @vitest-environment jsdom
+
 /**
  * Component tests for EntityList component
- * @vitest-environment jsdom
  */
 
 import "@testing-library/jest-dom";
 
-import { cachedOpenAlex } from "@bibgraph/client";
 import type {
   Funder,
   OpenAlexResponse,
@@ -18,42 +18,39 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EntityList, type EntityListColumnConfig } from "./EntityList";
 
+// Declared up front via vi.hoisted (so the vi.mock factory below can reference them) and injected into that factory (rather than extracted from the mocked module afterwards) so nothing here ever tears a method reference off its containing object: `getMultiple`/`getSources` are real class methods with an implicit `this` on the unmocked client, so the extraction pattern trips `no-unbound-method` even though these particular references are always called as plain `vi.fn()` mocks, never as class methods.
+const { mockFundersGetMultiple, mockPublishersGetMultiple, mockSourcesGetSources } = vi.hoisted(() => ({
+  mockFundersGetMultiple: vi.fn(),
+  mockPublishersGetMultiple: vi.fn(),
+  mockSourcesGetSources: vi.fn(),
+}));
+
 // Mock the cached OpenAlex client
 vi.mock("@bibgraph/client", () => ({
   cachedOpenAlex: {
     client: {
       funders: {
-        getMultiple: vi.fn(),
+        getMultiple: mockFundersGetMultiple,
       },
       publishers: {
-        getMultiple: vi.fn(),
+        getMultiple: mockPublishersGetMultiple,
       },
       sources: {
-        getSources: vi.fn(),
+        getSources: mockSourcesGetSources,
       },
     },
   },
 }));
 
-const mockCachedOpenAlex = vi.mocked(cachedOpenAlex);
-const mockFundersGetMultiple = vi.mocked(
-  mockCachedOpenAlex.client.funders.getMultiple,
-);
-const mockPublishersGetMultiple = vi.mocked(
-  mockCachedOpenAlex.client.publishers.getMultiple,
-);
-const mockSourcesGetSources = vi.mocked(
-  mockCachedOpenAlex.client.sources.getSources,
-);
 // Test wrapper with MantineProvider
 const TestWrapper = ({ children }: { children: React.ReactNode }) => (
   <MantineProvider>{children}</MantineProvider>
 );
 
 const createMockResponse = <T extends Funder | Publisher | Source>(
-  entities: T[],
+  entities: readonly T[],
 ): OpenAlexResponse<T> => ({
-  results: entities,
+  results: [...entities],
   meta: {
     count: entities.length,
     db_response_time_ms: 50,
@@ -210,6 +207,9 @@ const mockSourcesData = createMockResponse<Source>([
   },
 ]);
 
+// Each mock dataset above has 2 entities, plus 1 header row.
+const EXPECTED_TABLE_ROW_COUNT = 3;
+
 const baseColumns: EntityListColumnConfig[] = [
   { key: "id", header: "ID" },
   { key: "display_name", header: "Name" },
@@ -222,7 +222,8 @@ describe("EntityList", () => {
 
   it("renders loading state initially", () => {
     // Mock the API call to never resolve so it stays in loading state
-    mockFundersGetMultiple.mockImplementation(() => new Promise(() => {}));
+    // Empty executor is deliberate: the promise must never resolve so the component stays in its loading state.
+    mockFundersGetMultiple.mockImplementation(async () => new Promise(() => { /* never resolves */ }));
 
     act(() => {
       render(
@@ -260,7 +261,7 @@ describe("EntityList", () => {
 
     // Check for table data within the rendered component only
     const table = within(container).getByRole("table");
-    expect(within(table).getAllByRole("row")).toHaveLength(3); // header + 2 rows
+    expect(within(table).getAllByRole("row")).toHaveLength(EXPECTED_TABLE_ROW_COUNT);
   });
 
   it("renders publishers data successfully", async () => {
@@ -283,7 +284,7 @@ describe("EntityList", () => {
     });
 
     const tablePub = within(containerPub).getByRole("table");
-    expect(within(tablePub).getAllByRole("row")).toHaveLength(3);
+    expect(within(tablePub).getAllByRole("row")).toHaveLength(EXPECTED_TABLE_ROW_COUNT);
   });
 
   it("renders sources data successfully", async () => {
@@ -306,10 +307,10 @@ describe("EntityList", () => {
     });
 
     const tableSource = within(containerSource).getByRole("table");
-    expect(within(tableSource).getAllByRole("row")).toHaveLength(3);
+    expect(within(tableSource).getAllByRole("row")).toHaveLength(EXPECTED_TABLE_ROW_COUNT);
   });
 
-  it("renders error state on fetch failure", async () => {
+  it("renders error state on fetch failure", () => {
     // Test error state more directly by checking that the component handles errors
     // We'll verify the error display without waiting for retries
 
@@ -351,7 +352,7 @@ describe("EntityList", () => {
   });
 
   it("handles empty data gracefully", async () => {
-    const emptyResponse: OpenAlexResponse<any> = {
+    const emptyResponse: OpenAlexResponse<Funder> = {
       results: [],
       meta: { count: 0, db_response_time_ms: 0, per_page: 50, page: 1 },
     };

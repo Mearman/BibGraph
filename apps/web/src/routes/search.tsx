@@ -3,7 +3,7 @@ import { lazy } from "react";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const SearchPage = lazy(() => import("./search.lazy"));
+const SearchPage = lazy(async () => import("./search.lazy"));
 
 export const Route = createFileRoute("/search")({
   component: () => (
@@ -15,9 +15,9 @@ export const Route = createFileRoute("/search")({
     // Handle the case where q parameter might be a full OpenAlex URL
     // e.g., ?q=https://api.openalex.org/autocomplete/works?filter=...&search=...
     return {
-      q: (search.q as string) || "",
-      filter: (search.filter as string) || undefined,
-      search: (search.search as string) || undefined,
+      q: typeof search.q === "string" && search.q !== "" ? search.q : "",
+      filter: typeof search.filter === "string" && search.filter !== "" ? search.filter : undefined,
+      search: typeof search.search === "string" && search.search !== "" ? search.search : undefined,
     };
   },
 });

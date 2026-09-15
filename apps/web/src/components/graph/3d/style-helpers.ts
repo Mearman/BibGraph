@@ -5,28 +5,17 @@
  * highlighting state, and community assignments.
  */
 
-import type { EntityType } from '@bibgraph/types';
-
-import { ENTITY_TYPE_COLORS as HASH_BASED_ENTITY_COLORS } from '../../../styles/hash-colors';
+import { ENTITY_TYPE_COLORS } from '../../../styles/hash-colors';
 import { COLORS_3D, LINK, NODE } from '../constants';
 import { getEdgeStyle } from '../edge-styles';
 import type { LinkStyle, NodeStyle } from '../types';
 import type { ForceGraphLink, ForceGraphNode } from './types';
 
 /**
- * Entity type colors using hash-based generation for deterministic, consistent coloring
- */
-export const ENTITY_TYPE_COLORS: Record<EntityType, string> = HASH_BASED_ENTITY_COLORS;
-
-/**
  * Get default node styling based on entity type and highlighting
  *
  * Uses entity type colors with community color override if available.
  * Adjusts size based on highlight state.
- * @param node
- * @param isHighlighted
- * @param communityId
- * @param communityColors
  */
 export const getDefaultNodeStyle = (
   node: ForceGraphNode,
@@ -34,10 +23,10 @@ export const getDefaultNodeStyle = (
   communityId?: number,
   communityColors?: Map<number, string>
 ): NodeStyle => {
-  let color = ENTITY_TYPE_COLORS[node.entityType] ?? COLORS_3D.DEFAULT_FALLBACK;
+  let color = ENTITY_TYPE_COLORS[node.entityType];
 
   // Use community color if available
-  if (communityId !== undefined && communityColors?.has(communityId)) {
+  if (communityId !== undefined && communityColors?.has(communityId) === true) {
     color = communityColors.get(communityId) ?? color;
   }
 
@@ -53,9 +42,6 @@ export const getDefaultNodeStyle = (
  *
  * Uses edge-styles module for consistent visual distinction between
  * outbound and inbound relationships.
- * @param link
- * @param isHighlighted
- * @param isPathHighlightMode
  */
 export const getDefaultLinkStyle = (
   link: ForceGraphLink,

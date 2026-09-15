@@ -1,6 +1,5 @@
 /**
- * Topic Evolution Chart component
- * Displays topic/concept prevalence and evolution over time
+ * Topic Evolution Chart component Displays topic/concept prevalence and evolution over time
  *
  * Shows:
  * - Stacked area chart: topic distribution over time
@@ -52,14 +51,58 @@ interface TopicInfo {
 
 type TimeRange = 'all' | '5years' | '10years' | '20years';
 
+const TIME_RANGES: ReadonlySet<string> = new Set<TimeRange>(["all", "5years", "10years", "20years"]);
+const isTimeRange = (value: string): value is TimeRange => TIME_RANGES.has(value);
+
+// Time-range filter cutoffs, in years back from the current year.
+const RECENT_YEARS_SHORT = 5;
+const RECENT_YEARS_MEDIUM = 10;
+const RECENT_YEARS_LONG = 20;
+
+const DEFAULT_AREA_COLOR = '#666';
+const AREA_FILL_OPACITY = '0.7';
+
+// Exported SVG dimensions and layout.
+const EXPORT_WIDTH = 800;
+const EXPORT_HEIGHT = 400;
+const EXPORT_PADDING = 60;
+const PADDING_SIDES = 2;
+const EXPORT_TITLE_Y = 30;
+const EXPORT_TITLE_FONT_SIZE = 18;
+const EXPORT_AXIS_STROKE_WIDTH = 1;
+// Sample a year-axis label every N years.
+const EXPORT_YEAR_LABEL_STEP = 5;
+const EXPORT_YEAR_LABEL_FONT_SIZE = 12;
+const EXPORT_YEAR_LABEL_Y_OFFSET = 20;
+// The Y-axis is labeled at this many equal divisions between 0 and the max value.
+const EXPORT_Y_AXIS_TICK_DIVISIONS = 5;
+const EXPORT_Y_AXIS_LABEL_X_OFFSET = 10;
+const EXPORT_Y_AXIS_LABEL_Y_NUDGE = 4;
+
+// Inline (on-screen) chart layout constants.
+const CHART_GROUP_TRANSLATE_X = 60;
+const CHART_GROUP_TRANSLATE_Y = 40;
+const CHART_AREA_WIDTH = 680;
+const CHART_AREA_HEIGHT = 300;
+const CHART_AREA_PADDING = 40;
+const CHART_TITLE_FONT_SIZE = 16;
+const GRID_TICK_COUNT = 5;
+const GRID_TICKS: readonly number[] = Array.from({ length: GRID_TICK_COUNT }, (_, index) => index / (GRID_TICK_COUNT - 1));
+const GRID_STROKE_DASH = "4";
+const AXIS_STROKE_WIDTH = 1;
+const YEAR_LABEL_FONT_SIZE = 12;
+const YEAR_LABEL_Y_OFFSET = 20;
+// Aim for roughly this many year labels along the axis, spaced evenly.
+const YEAR_LABEL_TARGET_COUNT = 10;
+const Y_AXIS_LABEL_FONT_SIZE = 12;
+const Y_AXIS_LABEL_X_OFFSET = 10;
+const Y_AXIS_LABEL_Y_NUDGE = 4;
+
 /**
- * Group entities by year and topic (entityType as proxy)
- * NOTE: Since CatalogueEntity doesn't include full topic/concept data,
- * this uses entityType as a proxy for topics and addedAt for publication year
- * In production, would fetch actual topic data from OpenAlex API
+ * Group entities by year and topic (entityType as proxy) NOTE: Since CatalogueEntity doesn't include full topic/concept data, this uses entityType as a proxy for topics and addedAt for publication year In production, would fetch actual topic data from OpenAlex API
  * @param entities - The catalogue entities to analyze
  */
-const groupByYearAndTopic = (entities: CatalogueEntity[]): TopicData[] => {
+const groupByYearAndTopic = (entities: readonly CatalogueEntity[]): TopicData[] => {
   const yearMap = new Map<number, Map<string, number>>();
 
   for (const entity of entities) {
@@ -72,7 +115,7 @@ const groupByYearAndTopic = (entities: CatalogueEntity[]): TopicData[] => {
 
     const topicMap = yearMap.get(year);
     if (topicMap) {
-      topicMap.set(topic, (topicMap.get(topic) || 0) + 1);
+      topicMap.set(topic, (topicMap.get(topic) ?? 0) + 1);
     }
   }
 
@@ -86,7 +129,7 @@ const groupByYearAndTopic = (entities: CatalogueEntity[]): TopicData[] => {
  * Get all unique topics from data
  * @param data - Topic data array
  */
-const getAllTopics = (data: TopicData[]): string[] => {
+const getAllTopics = (data: readonly TopicData[]): string[] => {
   const topicSet = new Set<string>();
 
   for (const { topics } of data) {
@@ -103,12 +146,12 @@ const getAllTopics = (data: TopicData[]): string[] => {
  * @param data - Topic data array
  * @returns Array of topic info with colors and totals
  */
-const getTopicInfo = (data: TopicData[]): TopicInfo[] => {
+const getTopicInfo = (data: readonly TopicData[]): TopicInfo[] => {
   const topicCounts = new Map<string, number>();
 
   for (const { topics } of data) {
     for (const [topic, count] of topics) {
-      topicCounts.set(topic, (topicCounts.get(topic) || 0) + count);
+      topicCounts.set(topic, (topicCounts.get(topic) ?? 0) + count);
     }
   }
 
@@ -128,22 +171,19 @@ const getTopicInfo = (data: TopicData[]): TopicInfo[] => {
  * @param topicInfo - Topic information with colors
  */
 const generateSVG = (
-  data: TopicData[],
+  data: readonly TopicData[],
   visibleTopics: Set<string>,
-  topicInfo: TopicInfo[]
+  topicInfo: readonly TopicInfo[]
 ): string => {
-  const width = 800;
-  const height = 400;
-  const padding = 60;
-  const chartWidth = width - padding * 2;
-  const chartHeight = height - padding * 2;
+  const chartWidth = EXPORT_WIDTH - EXPORT_PADDING * PADDING_SIDES;
+  const chartHeight = EXPORT_HEIGHT - EXPORT_PADDING * PADDING_SIDES;
 
   if (data.length === 0) return '';
 
   const years = data.map(d => d.year);
   const minYear = Math.min(...years);
   const maxYear = Math.max(...years);
-  const yearRange = maxYear - minYear || 1;
+  const yearSpan = maxYear - minYear || 1;
 
   // Calculate max stacked value
   let maxStacked = 0;
@@ -157,8 +197,8 @@ const generateSVG = (
     maxStacked = Math.max(maxStacked, sum);
   }
 
-  const getX = (year: number) => padding + ((year - minYear) / yearRange) * chartWidth;
-  const getY = (value: number) => height - padding - (value / maxStacked) * chartHeight;
+  const getX = (year: number) => EXPORT_PADDING + ((year - minYear) / yearSpan) * chartWidth;
+  const getY = (value: number) => EXPORT_HEIGHT - EXPORT_PADDING - (value / maxStacked) * chartHeight;
 
   let svgContent = '';
 
@@ -166,7 +206,7 @@ const generateSVG = (
   const topicColorMap = new Map(topicInfo.map(t => [t.name, t.color]));
 
   for (const topic of visibleTopics) {
-    const color = topicColorMap.get(topic) || '#666';
+    const color = topicColorMap.get(topic) ?? DEFAULT_AREA_COLOR;
 
     // Build points for stacked area
     let cumulative = 0;
@@ -174,9 +214,9 @@ const generateSVG = (
 
     // Top edge of area
     for (const { year, topics } of data) {
-      const count = topics.get(topic) || 0;
+      const count = topics.get(topic) ?? 0;
       cumulative += count;
-      points.push(`${getX(year)},${getY(cumulative)}`);
+      points.push(`${String(getX(year))},${String(getY(cumulative))}`);
     }
 
     // Bottom edge of area (reverse order)
@@ -191,55 +231,55 @@ const generateSVG = (
         }
       }
 
-      points.push(`${getX(year)},${getY(bottomCumulative)}`);
+      points.push(`${String(getX(year))},${String(getY(bottomCumulative))}`);
     }
 
     svgContent += `<polygon
       points="${points.join(' ')}"
       fill="${color}"
-      fill-opacity="0.7"
+      fill-opacity="${AREA_FILL_OPACITY}"
       stroke="white"
       stroke-width="1"
     />`;
   }
 
   // Axes
-  const xAxisY = height - padding;
-  svgContent += `<line x1="${padding}" y1="${xAxisY}" x2="${width - padding}" y2="${xAxisY}" stroke="#666" stroke-width="1"/>`;
-  svgContent += `<line x1="${padding}" y1="${padding}" x2="${padding}" y2="${xAxisY}" stroke="#666" stroke-width="1"/>`;
+  const xAxisY = EXPORT_HEIGHT - EXPORT_PADDING;
+  svgContent += `<line x1="${String(EXPORT_PADDING)}" y1="${String(xAxisY)}" x2="${String(EXPORT_WIDTH - EXPORT_PADDING)}" y2="${String(xAxisY)}" stroke="#666" stroke-width="${String(EXPORT_AXIS_STROKE_WIDTH)}"/>`;
+  svgContent += `<line x1="${String(EXPORT_PADDING)}" y1="${String(EXPORT_PADDING)}" x2="${String(EXPORT_PADDING)}" y2="${String(xAxisY)}" stroke="#666" stroke-width="${String(EXPORT_AXIS_STROKE_WIDTH)}"/>`;
 
-  // Year labels (every 5 years)
-  for (let year = minYear; year <= maxYear; year += 5) {
+  // Year labels (every EXPORT_YEAR_LABEL_STEP years)
+  for (let year = minYear; year <= maxYear; year += EXPORT_YEAR_LABEL_STEP) {
     svgContent += `
       <text
-        x="${getX(year)}"
-        y="${height - padding + 20}"
+        x="${String(getX(year))}"
+        y="${String(EXPORT_HEIGHT - EXPORT_PADDING + EXPORT_YEAR_LABEL_Y_OFFSET)}"
         text-anchor="middle"
-        font-size="12"
+        font-size="${String(EXPORT_YEAR_LABEL_FONT_SIZE)}"
         fill="#666"
-      >${year}</text>
+      >${String(year)}</text>
     `;
   }
 
   // Y-axis labels
-  for (let index = 0; index <= 5; index++) {
-    const value = Math.round((maxStacked / 5) * index);
+  for (let index = 0; index <= EXPORT_Y_AXIS_TICK_DIVISIONS; index++) {
+    const value = Math.round((maxStacked / EXPORT_Y_AXIS_TICK_DIVISIONS) * index);
     const y = getY(value);
     svgContent += `
       <text
-        x="${padding - 10}"
-        y="${y + 4}"
+        x="${String(EXPORT_PADDING - EXPORT_Y_AXIS_LABEL_X_OFFSET)}"
+        y="${String(y + EXPORT_Y_AXIS_LABEL_Y_NUDGE)}"
         text-anchor="end"
-        font-size="12"
+        font-size="${String(EXPORT_YEAR_LABEL_FONT_SIZE)}"
         fill="#666"
-      >${value}</text>
+      >${String(value)}</text>
     `;
   }
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+<svg width="${String(EXPORT_WIDTH)}" height="${String(EXPORT_HEIGHT)}" xmlns="http://www.w3.org/2000/svg">
   <rect width="100%" height="100%" fill="white"/>
-  <text x="${width / 2}" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#333">
+  <text x="${String(EXPORT_WIDTH / PADDING_SIDES)}" y="${String(EXPORT_TITLE_Y)}" text-anchor="middle" font-size="${String(EXPORT_TITLE_FONT_SIZE)}" font-weight="bold" fill="#333">
     Topic Evolution Over Time
   </text>
   ${svgContent}
@@ -248,7 +288,7 @@ const generateSVG = (
 
 export const TopicEvolutionChart = ({ entities, onClose }: TopicEvolutionChartProperties) => {
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
-  const [visibleTopics, setVisibleTopics] = useState<Set<string>>(new Set());
+  const [visibleTopics, setVisibleTopics] = useState<Set<string>>(() => new Set());
 
   const allData = useMemo(() => groupByYearAndTopic(entities), [entities]);
   const allTopics = useMemo(() => getAllTopics(allData), [allData]);
@@ -266,17 +306,17 @@ export const TopicEvolutionChart = ({ entities, onClose }: TopicEvolutionChartPr
     if (timeRange === 'all') return allData;
 
     const currentYear = new Date().getFullYear();
-    const cutoffYear = timeRange === '5years' ? currentYear - 5
-      : timeRange === '10years' ? currentYear - 10
-      : currentYear - 20;
+    const cutoffYear = timeRange === '5years' ? currentYear - RECENT_YEARS_SHORT
+      : timeRange === '10years' ? currentYear - RECENT_YEARS_MEDIUM
+      : currentYear - RECENT_YEARS_LONG;
 
     return allData.filter(d => d.year >= cutoffYear);
   }, [allData, timeRange]);
 
   const totalTopics = allTopics.length;
   const totalEntities = entities.length;
-  const yearRange = filteredData.length > 0
-    ? `${Math.min(...filteredData.map(d => d.year))} - ${Math.max(...filteredData.map(d => d.year))}`
+  const yearRangeLabel = filteredData.length > 0
+    ? `${String(Math.min(...filteredData.map(d => d.year)))} - ${String(Math.max(...filteredData.map(d => d.year)))}`
     : 'N/A';
 
   // Handle topic toggle
@@ -327,7 +367,7 @@ export const TopicEvolutionChart = ({ entities, onClose }: TopicEvolutionChartPr
         <div>
           <Title order={3}>Topic Evolution</Title>
           <Text size="sm" c="dimmed">
-            Topic distribution over time ({yearRange})
+            Topic distribution over time ({yearRangeLabel})
           </Text>
         </div>
         <Tooltip label="Export as SVG">
@@ -364,7 +404,7 @@ export const TopicEvolutionChart = ({ entities, onClose }: TopicEvolutionChartPr
           </Stack>
           <Stack gap={0}>
             <Text size="xs" c="dimmed">Time Range</Text>
-            <Text size="xl" fw={700}>{yearRange}</Text>
+            <Text size="xl" fw={700}>{yearRangeLabel}</Text>
           </Stack>
         </Group>
       </Paper>
@@ -376,7 +416,9 @@ export const TopicEvolutionChart = ({ entities, onClose }: TopicEvolutionChartPr
             label="Time Range"
             description="Filter data by time period"
             value={timeRange}
-            onChange={(value) => setTimeRange(value as TimeRange)}
+            onChange={(value) => {
+              if (value !== null && isTimeRange(value)) setTimeRange(value);
+            }}
             data={[
               { value: 'all', label: 'All Time' },
               { value: '5years', label: 'Last 5 Years' },
@@ -387,10 +429,10 @@ export const TopicEvolutionChart = ({ entities, onClose }: TopicEvolutionChartPr
           />
 
           <Group>
-            <Button size="xs" variant="light" onClick={() => setVisibleTopics(new Set(allTopics))}>
+            <Button size="xs" variant="light" onClick={() => { setVisibleTopics(new Set(allTopics)); }}>
               Select All
             </Button>
-            <Button size="xs" variant="light" onClick={() => setVisibleTopics(new Set())}>
+            <Button size="xs" variant="light" onClick={() => { setVisibleTopics(new Set()); }}>
               Clear All
             </Button>
           </Group>
@@ -405,7 +447,7 @@ export const TopicEvolutionChart = ({ entities, onClose }: TopicEvolutionChartPr
             <Checkbox
               key={topic.name}
               checked={visibleTopics.has(topic.name)}
-              onChange={() => handleToggleTopic(topic.name)}
+              onChange={() => { handleToggleTopic(topic.name); }}
               label={
                 <Group gap="xs">
                   <Box
@@ -427,35 +469,32 @@ export const TopicEvolutionChart = ({ entities, onClose }: TopicEvolutionChartPr
       </Card>
 
       {/* Chart Visualization */}
-      <Card padding="md" radius="sm" style={{ border: BORDER_STYLE_GRAY_3 }} h={400}>
+      <Card padding="md" radius="sm" style={{ border: BORDER_STYLE_GRAY_3 }} h={EXPORT_HEIGHT}>
         {filteredData.length > 0 && visibleTopics.size > 0 ? (
           <svg
             width="100%"
             height="100%"
-            viewBox="0 0 800 400"
+            viewBox={`0 0 ${String(EXPORT_WIDTH)} ${String(EXPORT_HEIGHT)}`}
             style={{ overflow: 'visible' }}
           >
             {/* Background */}
             <rect width="100%" height="100%" fill="white" />
 
             {/* Title */}
-            <text x="400" y="30" textAnchor="middle" fontSize="16" fontWeight="bold" fill="#333">
+            <text x={EXPORT_WIDTH / PADDING_SIDES} y={EXPORT_TITLE_Y} textAnchor="middle" fontSize={CHART_TITLE_FONT_SIZE} fontWeight="bold" fill="#333">
               Topic Evolution Over Time
             </text>
 
             {/* Chart Area */}
-            <g transform="translate(60, 40)">
+            <g transform={`translate(${String(CHART_GROUP_TRANSLATE_X)}, ${String(CHART_GROUP_TRANSLATE_Y)})`}>
               {(() => {
-                const width = 680;
-                const height = 300;
-                const padding = 40;
-                const chartWidth = width - padding * 2;
-                const chartHeight = height - padding * 2;
+                const chartWidth = CHART_AREA_WIDTH - CHART_AREA_PADDING * PADDING_SIDES;
+                const chartHeight = CHART_AREA_HEIGHT - CHART_AREA_PADDING * PADDING_SIDES;
 
                 const years = filteredData.map(d => d.year);
                 const minYear = Math.min(...years);
                 const maxYear = Math.max(...years);
-                const yearRange = maxYear - minYear || 1;
+                const yearSpan = maxYear - minYear || 1;
 
                 // Calculate max stacked value
                 let maxStacked = 0;
@@ -469,14 +508,14 @@ export const TopicEvolutionChart = ({ entities, onClose }: TopicEvolutionChartPr
                   maxStacked = Math.max(maxStacked, sum);
                 }
 
-                const getX = (year: number) => padding + ((year - minYear) / yearRange) * chartWidth;
-                const getY = (value: number) => height - padding - (value / maxStacked) * chartHeight;
+                const getX = (year: number) => CHART_AREA_PADDING + ((year - minYear) / yearSpan) * chartWidth;
+                const getY = (value: number) => CHART_AREA_HEIGHT - CHART_AREA_PADDING - (value / maxStacked) * chartHeight;
 
                 const topicColorMap = new Map(topicInfo.map(t => [t.name, t.color]));
 
                 // Generate stacked areas for each visible topic
                 const stackedAreas = [...visibleTopics].sort().map(topic => {
-                  const color = topicColorMap.get(topic) || '#666';
+                  const color = topicColorMap.get(topic) ?? DEFAULT_AREA_COLOR;
 
                   // Build points for stacked area
                   let cumulative = 0;
@@ -484,9 +523,9 @@ export const TopicEvolutionChart = ({ entities, onClose }: TopicEvolutionChartPr
 
                   // Top edge of area
                   for (const { year, topics } of filteredData) {
-                    const count = topics.get(topic) || 0;
+                    const count = topics.get(topic) ?? 0;
                     cumulative += count;
-                    pointsTop.push(`${getX(year)},${getY(cumulative)}`);
+                    pointsTop.push(`${String(getX(year))},${String(getY(cumulative))}`);
                   }
 
                   // Bottom edge of area (reverse order)
@@ -502,7 +541,7 @@ export const TopicEvolutionChart = ({ entities, onClose }: TopicEvolutionChartPr
                       }
                     }
 
-                    pointsBottom.push(`${getX(year)},${getY(bottomCumulative)}`);
+                    pointsBottom.push(`${String(getX(year))},${String(getY(bottomCumulative))}`);
                   }
 
                   const allPoints = [...pointsTop, ...pointsBottom];
@@ -512,7 +551,7 @@ export const TopicEvolutionChart = ({ entities, onClose }: TopicEvolutionChartPr
                       key={topic}
                       points={allPoints.join(' ')}
                       fill={color}
-                      fillOpacity="0.7"
+                      fillOpacity={AREA_FILL_OPACITY}
                       stroke="white"
                       strokeWidth="1"
                     />
@@ -520,40 +559,40 @@ export const TopicEvolutionChart = ({ entities, onClose }: TopicEvolutionChartPr
                 });
 
                 // Axes
-                const xAxisY = height - padding;
+                const xAxisY = CHART_AREA_HEIGHT - CHART_AREA_PADDING;
                 const axes = (
                   <g>
-                    <line x1={padding} y1={xAxisY} x2={width - padding} y2={xAxisY} stroke="#666" strokeWidth="1" />
-                    <line x1={padding} y1={padding} x2={padding} y2={xAxisY} stroke="#666" strokeWidth="1" />
+                    <line x1={CHART_AREA_PADDING} y1={xAxisY} x2={CHART_AREA_WIDTH - CHART_AREA_PADDING} y2={xAxisY} stroke="#666" strokeWidth={AXIS_STROKE_WIDTH} />
+                    <line x1={CHART_AREA_PADDING} y1={CHART_AREA_PADDING} x2={CHART_AREA_PADDING} y2={xAxisY} stroke="#666" strokeWidth={AXIS_STROKE_WIDTH} />
                   </g>
                 );
 
                 // Grid lines
-                const gridLines = [0, 0.25, 0.5, 0.75, 1].map(ratio => (
+                const gridLines = GRID_TICKS.map(ratio => (
                   <line
-                    key={ratio}
-                    x1={padding}
+                    key={`grid-${String(ratio)}`}
+                    x1={CHART_AREA_PADDING}
                     y1={getY(maxStacked * ratio)}
-                    x2={width - padding}
+                    x2={CHART_AREA_WIDTH - CHART_AREA_PADDING}
                     y2={getY(maxStacked * ratio)}
                     stroke="#e5e7eb"
-                    strokeDasharray="4"
+                    strokeDasharray={GRID_STROKE_DASH}
                   />
                 ));
 
                 // Year labels (every few years to avoid crowding)
-                const yearStep = Math.max(1, Math.floor(yearRange / 10));
+                const yearStep = Math.max(1, Math.floor(yearSpan / YEAR_LABEL_TARGET_COUNT));
                 const yearLabels = Array.from(
-                  { length: Math.floor(yearRange / yearStep) + 1 },
+                  { length: Math.floor(yearSpan / yearStep) + 1 },
                   (_, index) => {
                     const year = minYear + index * yearStep;
                     return (
                       <text
                         key={year}
                         x={getX(year)}
-                        y={height - padding + 20}
+                        y={CHART_AREA_HEIGHT - CHART_AREA_PADDING + YEAR_LABEL_Y_OFFSET}
                         textAnchor="middle"
-                        fontSize="12"
+                        fontSize={YEAR_LABEL_FONT_SIZE}
                         fill="#666"
                       >
                         {year}
@@ -563,15 +602,15 @@ export const TopicEvolutionChart = ({ entities, onClose }: TopicEvolutionChartPr
                 );
 
                 // Y-axis labels
-                const yAxisLabels = [0, 0.25, 0.5, 0.75, 1].map(ratio => {
+                const yAxisLabels = GRID_TICKS.map(ratio => {
                   const value = Math.round(maxStacked * ratio);
                   return (
                     <text
-                      key={ratio}
-                      x={padding - 10}
-                      y={getY(value) + 4}
+                      key={`y-axis-${String(ratio)}`}
+                      x={CHART_AREA_PADDING - Y_AXIS_LABEL_X_OFFSET}
+                      y={getY(value) + Y_AXIS_LABEL_Y_NUDGE}
                       textAnchor="end"
-                      fontSize="12"
+                      fontSize={Y_AXIS_LABEL_FONT_SIZE}
                       fill="#666"
                     >
                       {value}

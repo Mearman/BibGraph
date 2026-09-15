@@ -8,10 +8,11 @@
  * @see spec-020 Phase 1: Settings page testing
  */
 
-import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
 import { BaseSPAPageObject } from "./BaseSPAPageObject";
+
+const THEME_TRANSITION_WAIT_MS = 200;
 
 export class SettingsPage extends BaseSPAPageObject {
 	// Settings-specific selectors
@@ -23,10 +24,6 @@ export class SettingsPage extends BaseSPAPageObject {
 		resetButton: "[data-testid='reset-settings']",
 		successMessage: "[data-testid='settings-saved']",
 	};
-
-	constructor(page: Page) {
-		super(page);
-	}
 
 	/**
 	 * Navigate to the Settings page
@@ -42,7 +39,7 @@ export class SettingsPage extends BaseSPAPageObject {
 	async toggleTheme(): Promise<void> {
 		await this.click(this.settingsSelectors.themeToggle);
 		// Wait for theme transition to complete
-		await this.page.waitForTimeout(200);
+		await this.page.waitForTimeout(THEME_TRANSITION_WAIT_MS);
 	}
 
 	/**
@@ -77,7 +74,7 @@ export class SettingsPage extends BaseSPAPageObject {
 		const theme = await this.page.evaluate(() => {
 			return document.documentElement.dataset.mantineColorScheme;
 		});
-		return theme || "light";
+		return theme ?? "light";
 	}
 
 	/**

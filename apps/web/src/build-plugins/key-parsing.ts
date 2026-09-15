@@ -9,7 +9,6 @@ import { inferEntityTypeFromId } from "./types";
 /**
  * Detect malformed filenames that should be removed from filesystem
  * Returns true if the filename represents a malformed double-encoded URL
- * @param filename
  */
 export const detectMalformedFilename = (filename: string): boolean => {
   // Pattern 1: Triple slashes in URL-encoded format (corrupted double-encoding)
@@ -36,7 +35,6 @@ export const detectMalformedFilename = (filename: string): boolean => {
 /**
  * Detect and clean malformed double-encoded keys
  * Handles cases like: "https://api.openalex.org/authors/Ahttps%2F%2F%2Fapi%2Eopenalex%2Eorg%2Fauthors%2FA5025875274"
- * @param key
  */
 export const detectAndCleanMalformedKey = (key: string): string => {
   // Pattern 1: Double-encoded URLs embedded in entity paths
@@ -45,8 +43,8 @@ export const detectAndCleanMalformedKey = (key: string): string => {
     /^https:\/\/api\.openalex\.org\/\w+\/[A-Z]https%2F%2F/;
   if (doubleEncodedPattern.test(key)) {
     // Extract the embedded encoded URL and decode it
-    const match = key.match(
-      /^https:\/\/api\.openalex\.org\/\w+\/[A-Z](https%2F%2F.+)$/,
+    const match = /^https:\/\/api\.openalex\.org\/\w+\/[A-Z](https%2F%2F.+)$/.exec(
+      key,
     );
     if (match) {
       try {
@@ -118,38 +116,6 @@ export const detectAndCleanMalformedKey = (key: string): string => {
   }
 
   return current;
-};
-
-/**
- * Parse various key formats into a standardized structure
- * @param key
- */
-export const parseIndexKey = (key: string): ParsedKey | null => {
-  // Note: Malformed key detection is now handled at the caller level
-  // to avoid recursive cleaning that masks the original malformed state
-
-  // Handle full OpenAlex URLs
-  if (key.startsWith("https://api.openalex.org/")) {
-    return parseOpenAlexApiUrl(key);
-  }
-
-  if (key.startsWith("https://openalex.org/")) {
-    return parseOpenAlexUrl(key);
-  }
-
-  // Handle relative paths and entity IDs
-  if (key.includes("?")) {
-    // Query format like "works?per_page=30&page=1" or "autocomplete?q=foo"
-    return parseRelativeQuery(key);
-  }
-
-  if (key.includes("/")) {
-    // Entity path format like "works/W2241997964"
-    return parseEntityPath(key);
-  }
-
-  // Direct entity ID like "W1234"
-  return parseDirectEntityId(key);
 };
 
 const parseOpenAlexApiUrl = (url: string): ParsedKey | null => {
@@ -290,4 +256,34 @@ const parseDirectEntityId = (key: string): ParsedKey | null => {
     originalKey: key,
     canonicalUrl: `https://api.openalex.org/${entityType}/${key}`,
   };
+};
+
+/**
+ * Parse various key formats into a standardized structure
+ */
+export const parseIndexKey = (key: string): ParsedKey | null => {
+  // Note: Malformed key detection is now handled at the caller level to avoid recursive cleaning that masks the original malformed state
+
+  // Handle full OpenAlex URLs
+  if (key.startsWith("https://api.openalex.org/")) {
+    return parseOpenAlexApiUrl(key);
+  }
+
+  if (key.startsWith("https://openalex.org/")) {
+    return parseOpenAlexUrl(key);
+  }
+
+  // Handle relative paths and entity IDs
+  if (key.includes("?")) {
+    // Query format like "works?per_page=30&page=1" or "autocomplete?q=foo"
+    return parseRelativeQuery(key);
+  }
+
+  if (key.includes("/")) {
+    // Entity path format like "works/W2241997964"
+    return parseEntityPath(key);
+  }
+
+  // Direct entity ID like "W1234"
+  return parseDirectEntityId(key);
 };

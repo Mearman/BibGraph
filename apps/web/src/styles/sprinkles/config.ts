@@ -2,14 +2,13 @@
  * Fallback sprinkles implementation
  * This bypasses Vanilla Extract configuration issues while maintaining API compatibility
  *
- * Note: Components using style={sprinkles(...)} should be migrated to use
+ * Note: Components using `style={sprinkles(...)}` should be migrated to use
  * inline styles directly or the useSprinkles hook.
  */
 
 /**
  * Sprinkles function - returns empty string for className compatibility.
  * This is a fallback implementation while Vanilla Extract configuration is resolved.
- * @param _styles
  */
  
 export const sprinkles = (_styles: Record<string, unknown>): string => {

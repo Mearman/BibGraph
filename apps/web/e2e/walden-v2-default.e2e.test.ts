@@ -14,10 +14,13 @@
 
 import { expect,test } from '@playwright/test';
 
+const MIN_PAGE_CONTENT_LENGTH = 100;
+const HTTP_OK = 200;
+
 test.describe('Data Version 2 Default Behavior', () => {
   test('should fetch work without data-version parameter (v2 is default)', async ({ page }) => {
     // Track API requests to verify parameters
-    const apiRequests: Array<{ url: string; params: URLSearchParams }> = [];
+    const apiRequests: { url: string; params: URLSearchParams }[] = [];
 
     page.on('request', (request) => {
       const url = request.url();
@@ -40,8 +43,8 @@ test.describe('Data Version 2 Default Behavior', () => {
     // Verify page loaded successfully
     const bodyText = page.locator('body');
     await expect(bodyText).not.toBeEmpty();
-    const textLength = await bodyText.evaluate((element) => element.textContent?.length ?? 0);
-    expect(textLength).toBeGreaterThan(100);
+    const textLength = await bodyText.evaluate((element) => element.textContent.length);
+    expect(textLength).toBeGreaterThan(MIN_PAGE_CONTENT_LENGTH);
 
     // Verify API requests were made
     expect(apiRequests.length).toBeGreaterThan(0);
@@ -53,20 +56,20 @@ test.describe('Data Version 2 Default Behavior', () => {
 
     expect(requestsWithDataVersion).toHaveLength(0);
 
-    console.log(`✅ Verified ${apiRequests.length} API requests, none included data-version parameter`);
+    console.log(`✅ Verified ${String(apiRequests.length)} API requests, none included data-version parameter`);
   });
 
   test('should receive v2-specific fields in work responses', async ({ page }) => {
     // Track API responses to verify v2 field presence
-    const apiResponses: Array<{ url: string; data: unknown }> = [];
+    const apiResponses: { url: string; data: unknown }[] = [];
 
     page.on('response', async (response) => {
       const url = response.url();
       if ((url.includes('api.openalex.org') || url.includes('/api/openalex')) &&
-          response.status() === 200 &&
+          response.status() === HTTP_OK &&
           url.includes('/works/')) {
         try {
-          const data = await response.json();
+          const data: unknown = await response.json();
           apiResponses.push({ url, data });
         } catch {
           // Ignore non-JSON responses
@@ -94,7 +97,7 @@ test.describe('Data Version 2 Default Behavior', () => {
       return;
     }
 
-    console.log(`✅ Captured ${apiResponses.length} API responses`);
+    console.log(`✅ Captured ${String(apiResponses.length)} API responses`);
     expect(apiResponses.length).toBeGreaterThan(0);
 
     // Check for v2-specific field: is_xpac
@@ -103,7 +106,7 @@ test.describe('Data Version 2 Default Behavior', () => {
 
       // Check if response has is_xpac field (v2 feature)
       // Note: is_xpac may be true, false, or undefined, but presence indicates v2
-      return data && (
+      return (
         'is_xpac' in data ||
         Object.prototype.hasOwnProperty.call(data, 'is_xpac')
       );
@@ -112,7 +115,7 @@ test.describe('Data Version 2 Default Behavior', () => {
     // At least one response should have v2 fields
     // Note: Some responses (like list responses) may not include is_xpac
     if (responsesWithV2Fields.length > 0) {
-      console.log(`✅ Found ${responsesWithV2Fields.length} responses with v2-specific fields`);
+      console.log(`✅ Found ${String(responsesWithV2Fields.length)} responses with v2-specific fields`);
       expect(responsesWithV2Fields.length).toBeGreaterThan(0);
     } else {
       console.log('⚠️ No API responses with v2 fields (may be list responses)');
@@ -121,7 +124,7 @@ test.describe('Data Version 2 Default Behavior', () => {
   });
 
   test('should not include data-version parameter for author requests', async ({ page }) => {
-    const apiRequests: Array<{ url: string; params: URLSearchParams }> = [];
+    const apiRequests: { url: string; params: URLSearchParams }[] = [];
 
     page.on('request', (request) => {
       const url = request.url();
@@ -154,11 +157,11 @@ test.describe('Data Version 2 Default Behavior', () => {
 
     expect(requestsWithDataVersion).toHaveLength(0);
 
-    console.log(`✅ Author requests: ${apiRequests.length} total, 0 with data-version`);
+    console.log(`✅ Author requests: ${String(apiRequests.length)} total, 0 with data-version`);
   });
 
   test('should not include data-version parameter for institution requests', async ({ page }) => {
-    const apiRequests: Array<{ url: string; params: URLSearchParams }> = [];
+    const apiRequests: { url: string; params: URLSearchParams }[] = [];
 
     page.on('request', (request) => {
       const url = request.url();
@@ -191,7 +194,7 @@ test.describe('Data Version 2 Default Behavior', () => {
 
     expect(requestsWithDataVersion).toHaveLength(0);
 
-    console.log(`✅ Institution requests: ${apiRequests.length} total, 0 with data-version`);
+    console.log(`✅ Institution requests: ${String(apiRequests.length)} total, 0 with data-version`);
   });
 
   test('should handle works with and without is_xpac field gracefully', async ({ page }) => {

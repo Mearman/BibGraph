@@ -1,40 +1,9 @@
 /**
- * Service Worker for OpenAlex API Request Interception
- * Intercepts requests to https://api.openalex.org and handles caching transparently
+ * Service Worker for OpenAlex API Request Interception Intercepts requests to https://api.openalex.org and handles caching transparently
  */
 
 const CACHE_NAME = "openalex-cache-v1";
 const OPENALEX_DOMAIN = "api.openalex.org";
-
-/**
- * Validate that data appears to be a valid OpenAlex entity
- * @param data
- */
-const isValidOpenAlexEntity = (data: unknown): boolean => {
-  if (!data || typeof data !== "object") {
-    return false;
-  }
-
-  const object = data as Record<string, unknown>;
-
-  // OpenAlex entities should have id and display_name
-  return typeof object.id === "string" && typeof object.display_name === "string";
-};
-
-/**
- * Validate that data appears to be a valid OpenAlex query result
- * @param data
- */
-const isValidOpenAlexQueryResult = (data: unknown): boolean => {
-  if (!data || typeof data !== "object") {
-    return false;
-  }
-
-  const object = data as Record<string, unknown>;
-
-  // OpenAlex query results should have results array and meta object
-  return Array.isArray(object.results) && typeof object.meta === "object";
-};
 
 /**
  * Parse OpenAlex URL into structured information
@@ -43,6 +12,71 @@ interface ParsedOpenAlexUrl {
   isQuery: boolean;
   entityId?: string;
 }
+
+// Cast self for service worker functionality
+interface ServiceWorkerGlobalScope {
+  addEventListener: (
+    type: string,
+    listener: (event: ExtendableEvent | FetchEvent) => void,
+  ) => void;
+  skipWaiting: () => void;
+  clients: { claim: () => Promise<void> };
+  location: { hostname: string; port: string };
+}
+
+// Extend global self with Workbox manifest placeholder
+declare const self: ServiceWorkerGlobalScope & {
+  __WB_MANIFEST: { url: string; revision: string | null }[];
+};
+
+// Workbox precache manifest injection point Workbox will replace this array with the actual precache manifest Note: precacheManifest contains the list of files to cache const precacheManifest = self.__WB_MANIFEST;
+
+// Service worker initialized with precache manifest Note: precacheManifest contains the list of files to cache
+
+// Service worker event types
+interface ExtendableEvent extends Event {
+  waitUntil: (promise: Readonly<Promise<unknown>>) => void;
+}
+
+interface FetchEvent extends ExtendableEvent {
+  request: Request;
+  respondWith: (response: Promise<Response> | Response) => void;
+}
+
+/**
+ * Narrows a service worker event to a {@link FetchEvent}: only the "fetch" listener receives an event carrying a `request`, which {@link ExtendableEvent} does not.
+ */
+const isFetchEvent = (event: ExtendableEvent | FetchEvent): event is FetchEvent => "request" in event;
+
+/**
+ * Validate that data appears to be a valid OpenAlex entity
+ */
+const isValidOpenAlexEntity = (data: unknown): boolean => {
+  if (typeof data !== "object" || data === null) {
+    return false;
+  }
+  if (!("id" in data) || !("display_name" in data)) {
+    return false;
+  }
+
+  // OpenAlex entities should have id and display_name
+  return typeof data.id === "string" && typeof data.display_name === "string";
+};
+
+/**
+ * Validate that data appears to be a valid OpenAlex query result
+ */
+const isValidOpenAlexQueryResult = (data: unknown): boolean => {
+  if (typeof data !== "object" || data === null) {
+    return false;
+  }
+  if (!("results" in data) || !("meta" in data)) {
+    return false;
+  }
+
+  // OpenAlex query results should have results array and meta object
+  return Array.isArray(data.results) && typeof data.meta === "object";
+};
 
 const parseOpenAlexUrl = (url: string): ParsedOpenAlexUrl | null => {
   try {
@@ -66,66 +100,6 @@ const parseOpenAlexUrl = (url: string): ParsedOpenAlexUrl | null => {
   }
 };
 
-// Cast self for service worker functionality
-interface ServiceWorkerGlobalScope {
-  addEventListener: (
-    type: string,
-    listener: (event: ExtendableEvent | FetchEvent) => void,
-  ) => void;
-  skipWaiting: () => void;
-  clients: { claim: () => Promise<void> };
-  location: { hostname: string; port: string };
-}
-
-// Extend global self with Workbox manifest placeholder
-declare const self: ServiceWorkerGlobalScope & {
-  __WB_MANIFEST: Array<{ url: string; revision: string | null }>;
-};
-
-// Workbox precache manifest injection point
-// Workbox will replace this array with the actual precache manifest
-// Note: precacheManifest contains the list of files to cache
-// const precacheManifest = self.__WB_MANIFEST;
-
-
-
-// Service worker initialized with precache manifest
-// Note: precacheManifest contains the list of files to cache
-
-// Service worker event types
-interface ExtendableEvent extends Event {
-  waitUntil: (promise: Promise<unknown>) => void;
-}
-
-interface FetchEvent extends ExtendableEvent {
-  request: Request;
-  respondWith: (response: Promise<Response> | Response) => void;
-}
-
-// Install event - set up the service worker
-self.addEventListener("install", () => {
-  // Service worker installation starting - activating immediately
-  self.skipWaiting(); // Activate immediately
-});
-
-// Activate event - clean up old caches
-self.addEventListener("activate", (event) => {
-  // Service worker activation starting - claiming all clients
-  (event as ExtendableEvent).waitUntil(self.clients.claim()); // Take control immediately
-});
-
-// Fetch event - intercept network requests
-self.addEventListener("fetch", (event) => {
-  const fetchEvent = event as FetchEvent;
-  const { request } = fetchEvent;
-  const url = new URL(request.url);
-
-  // Only intercept OpenAlex API requests
-  if (url.hostname === OPENALEX_DOMAIN) {
-    fetchEvent.respondWith(handleOpenAlexRequest(request));
-  }
-});
-
 /**
  * Check if we're in development environment
  */
@@ -135,9 +109,6 @@ const isDevelopmentEnvironment = (): boolean => self.location.hostname === "loca
 
 /**
  * Handle development proxy requests
- * @param root0
- * @param root0.request
- * @param root0.url
  */
 const handleDevelopmentRequest = async ({
   request,
@@ -160,7 +131,6 @@ const handleDevelopmentRequest = async ({
 
 /**
  * Try to serve static data file
- * @param url
  */
 const tryStaticFile = async (url: URL): Promise<Response | null> => {
   const staticPath = `/data/openalex${url.pathname}.json`;
@@ -179,9 +149,6 @@ const tryStaticFile = async (url: URL): Promise<Response | null> => {
 
 /**
  * Try to get cached response
- * @param root0
- * @param root0.request
- * @param root0.url
  */
 const tryCache = async ({
   request,
@@ -199,11 +166,23 @@ const tryCache = async ({
 };
 
 /**
+ * Validate OpenAlex response structure
+ */
+const isValidOpenAlexResponse = ({
+  data,
+  parsedUrl,
+}: {
+  data: unknown;
+  parsedUrl: ParsedOpenAlexUrl;
+}): boolean => {
+  const isEntity = parsedUrl.entityId !== undefined;
+  return isEntity
+    ? isValidOpenAlexEntity(data)
+    : isValidOpenAlexQueryResult(data);
+};
+
+/**
  * Validate and cache response if valid
- * @param root0
- * @param root0.request
- * @param root0.response
- * @param root0.url
  */
 const validateAndCacheResponse = async ({
   request,
@@ -217,12 +196,11 @@ const validateAndCacheResponse = async ({
 
   try {
     const responseClone = response.clone();
-    const data = await responseClone.json();
+    const data: unknown = await responseClone.json();
 
     const parsedUrl = parseOpenAlexUrl(request.url);
     if (parsedUrl && !isValidOpenAlexResponse({ data, parsedUrl })) {
-      // Invalid response structure detected, not caching this response
-      // Reason: Invalid response format for the request
+      // Invalid response structure detected, not caching this response Reason: Invalid response format for the request
       return response;
     }
 
@@ -231,35 +209,14 @@ const validateAndCacheResponse = async ({
     await cache.put(request, response.clone());
     // Successfully cached validated OpenAlex response
   } catch {
-    // Response validation failed, not caching this response
-    // Error details captured in service worker debugging
+    // Response validation failed, not caching this response Error details captured in service worker debugging
   }
 
   return response;
 };
 
 /**
- * Validate OpenAlex response structure
- * @param root0
- * @param root0.data
- * @param root0.parsedUrl
- */
-const isValidOpenAlexResponse = ({
-  data,
-  parsedUrl,
-}: {
-  data: unknown;
-  parsedUrl: ParsedOpenAlexUrl;
-}): boolean => {
-  const isEntity = !!parsedUrl.entityId;
-  return isEntity
-    ? isValidOpenAlexEntity(data)
-    : isValidOpenAlexQueryResult(data);
-};
-
-/**
  * Handle OpenAlex API requests with caching
- * @param request
  */
 const handleOpenAlexRequest = async (request: Request): Promise<Response> => {
   try {
@@ -267,7 +224,7 @@ const handleOpenAlexRequest = async (request: Request): Promise<Response> => {
     // Intercepting OpenAlex API request for caching and optimization
 
     if (isDevelopmentEnvironment()) {
-      return handleDevelopmentRequest({ request, url });
+      return await handleDevelopmentRequest({ request, url });
     }
 
     // Try static file first
@@ -278,14 +235,38 @@ const handleOpenAlexRequest = async (request: Request): Promise<Response> => {
     const cachedResponse = await tryCache({ request, url });
     if (cachedResponse) return cachedResponse;
 
-    // Fetch from API
-    // No cached response available, fetching from live OpenAlex API
+    // Fetch from API No cached response available, fetching from live OpenAlex API
     const response = await fetch(request);
 
-    return validateAndCacheResponse({ request, response, url });
+    return await validateAndCacheResponse({ request, response, url });
   } catch {
-    // Error in service worker, falling back to direct network request
-    // Fallback to normal fetch
+    // Error in service worker, falling back to direct network request Fallback to normal fetch
     return fetch(request);
   }
 };
+
+// Install event - set up the service worker
+self.addEventListener("install", () => {
+  // Service worker installation starting - activating immediately
+  self.skipWaiting(); // Activate immediately
+});
+
+// Activate event - clean up old caches
+self.addEventListener("activate", (event) => {
+  // Service worker activation starting - claiming all clients
+  event.waitUntil(self.clients.claim()); // Take control immediately
+});
+
+// Fetch event - intercept network requests
+self.addEventListener("fetch", (event) => {
+  if (!isFetchEvent(event)) {
+    return;
+  }
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Only intercept OpenAlex API requests
+  if (url.hostname === OPENALEX_DOMAIN) {
+    event.respondWith(handleOpenAlexRequest(request));
+  }
+});

@@ -12,10 +12,12 @@ import { expect,test } from "@playwright/test";
 import { waitForAppReady } from "@/test/helpers/app-ready";
 import { BaseSPAPageObject } from "@/test/page-objects/BaseSPAPageObject";
 
-const BASE_URL = process.env.CI ? "http://localhost:4173" : "http://localhost:5173";
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = IS_CI ? "http://localhost:4173" : "http://localhost:5173";
+const TEST_SUITE_TIMEOUT_MS = 30_000;
 
 test.describe("@utility About Page", () => {
-	test.setTimeout(30_000);
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS);
 
 	test.beforeEach(async ({ page }) => {
 		// Navigate to About page

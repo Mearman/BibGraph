@@ -4,11 +4,9 @@
  * Page object for the Evaluation features (US-27, US-28).
  * Handles dataset upload, results dashboard, and metric exports.
  *
- * Hierarchy: BasePageObject -> BaseSPAPageObject -> EvaluationPage
+ * Hierarchy: BasePageObject -\> BaseSPAPageObject -\> EvaluationPage
  * @see US-27, US-28
  */
-
-import type { Page } from "@playwright/test";
 
 import { BaseSPAPageObject } from "./BaseSPAPageObject";
 
@@ -37,10 +35,6 @@ export class EvaluationPage extends BaseSPAPageObject {
 		// STAR metrics
 		starMetrics: "[data-testid='star-metrics']",
 	};
-
-	constructor(page: Page) {
-		super(page);
-	}
 
 	async gotoDashboard(): Promise<void> {
 		await this.goto("#/evaluation");

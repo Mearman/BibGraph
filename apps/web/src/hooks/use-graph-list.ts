@@ -24,7 +24,7 @@ export interface UseGraphListReturn {
 	nodes: GraphListNode[];
 	loading: boolean;
 	error: Error | null;
-	addNode: (node: GraphNodeInput, provenance: GraphProvenance) => Promise<void>;
+	addNode: (node: Readonly<GraphNodeInput>, provenance: GraphProvenance) => Promise<void>;
 	removeNode: (entityId: string) => Promise<void>;
 	clearList: () => Promise<void>;
 }
@@ -54,7 +54,7 @@ export const useGraphList = (): UseGraphListReturn => {
 			} catch (error_) {
 				logger.error(LOG_PREFIX, 'Failed to load graph list', { error: error_ });
 				if (isMounted) {
-					setError(error_ as Error);
+					setError(error_ instanceof Error ? error_ : new Error(String(error_)));
 				}
 			} finally {
 				if (isMounted) {
@@ -63,7 +63,7 @@ export const useGraphList = (): UseGraphListReturn => {
 			}
 		};
 
-		loadNodes();
+		void loadNodes();
 
 		return () => {
 			isMounted = false;
@@ -79,7 +79,7 @@ export const useGraphList = (): UseGraphListReturn => {
 	 * Uses optimistic updates for better UX
 	 */
 	const addNode = useCallback(
-		async (node: GraphNodeInput, provenance: GraphProvenance): Promise<void> => {
+		async (node: Readonly<GraphNodeInput>, provenance: GraphProvenance): Promise<void> => {
 			const newEntry: GraphListNode = {
 				id: node.entityId, // Use entityId as temporary id for optimistic update
 				entityId: node.entityId,
@@ -164,9 +164,12 @@ export const useGraphList = (): UseGraphListReturn => {
 	 * T052: Implementation for clearing
 	 */
 	const clearList = useCallback(async (): Promise<void> => {
-		// Optimistic update
-		const previousNodes = nodes;
-		setNodes([]);
+		// Optimistic update - capture the pre-clear list via the updater so the rollback below always has the true previous value rather than a possibly-stale closure
+		let rollbackNodes: GraphListNode[] = [];
+		setNodes((previous) => {
+			rollbackNodes = previous;
+			return [];
+		});
 
 		try {
 			await storage.clearGraphList();
@@ -175,11 +178,11 @@ export const useGraphList = (): UseGraphListReturn => {
 			logger.error(LOG_PREFIX, 'Failed to clear graph list', { error: error_ });
 
 			// Rollback optimistic update
-			setNodes(previousNodes);
+			setNodes(rollbackNodes);
 
 			throw error_;
 		}
-	}, [storage, nodes]);
+	}, [storage]);
 
 	return {
 		nodes,

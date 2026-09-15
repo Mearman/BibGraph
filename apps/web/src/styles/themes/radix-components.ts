@@ -1,6 +1,6 @@
-// Radix-inspired component overrides
-// These components provide minimal styling, staying close to browser defaults
-// Radix is unstyled by default - minimal styling only
+import { Card } from '@mantine/core'
+
+// Radix-inspired component overrides These components provide minimal styling, staying close to browser defaults Radix is unstyled by default - minimal styling only
 
 export const radixComponents = {
   // Radix Button - minimal styling, focus-visible only
@@ -28,34 +28,20 @@ export const radixComponents = {
   },
 
   // Radix Card - absolutely minimal styling
-  Card: {
-    vars: (_theme, properties) => {
-      const variant = properties.variant ?? 'default'
-
-      return {
-        root: {
-          '--card-bg': 'transparent', // Radix is unstyled
-          '--card-border-color': 'transparent', // Radix is unstyled
-          '--card-shadow': 'none', // Radix is unstyled
-          '--card-radius': 'var(--mantine-radius-default)',
-          '--card-padding': variant === 'compact' ? 'var(--mantine-spacing-md)' : 'var(--mantine-spacing-xl)',
-        },
-      }
-    },
+  Card: Card.extend({
     styles: {
       root: {
-        // Radix is unstyled - absolutely minimal
-        // Use backgroundColor (not background shorthand) for consistency with other themes
-        backgroundColor: 'var(--card-bg)',
+        // Radix is unstyled - absolutely minimal Use backgroundColor (not background shorthand) for consistency with other themes
+        backgroundColor: 'transparent', // Radix is unstyled
         border: 'none',
         boxShadow: 'none',
-        borderRadius: 'var(--card-radius)',
-        padding: 'var(--card-padding)',
+        borderRadius: 'var(--mantine-radius-default)',
+        padding: 'var(--mantine-spacing-xl)',
         position: 'relative',
         overflow: 'hidden',
       },
     },
-  },
+  }),
 
   // Radix Input - minimal browser styling
   Input: {

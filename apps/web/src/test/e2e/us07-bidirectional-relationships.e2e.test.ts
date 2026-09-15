@@ -19,10 +19,17 @@ import { expect, test } from '@playwright/test';
 
 import { waitForAppReady } from '@/test/helpers/app-ready';
 
-const BASE_URL = process.env.BASE_URL || (process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173');
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = process.env.BASE_URL ?? (IS_CI ? 'http://localhost:4173' : 'http://localhost:5173');
+
+const TEST_SUITE_TIMEOUT_MS = 60_000;
+const MAX_BADGES_TO_CHECK = 4;
+const RELATIONSHIP_RENDER_WAIT_MS = 2000;
+const MAX_LINKS_TO_CHECK = 10;
+const SCROLL_INTO_VIEW_WAIT_MS = 500;
 
 test.describe('@entity US-07 Bidirectional Relationships', () => {
-	test.setTimeout(60_000);
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS);
 
 	test.beforeEach(async ({ page }) => {
 		// Dismiss onboarding tour before any navigation so the dialog never appears
@@ -122,7 +129,7 @@ test.describe('@entity US-07 Bidirectional Relationships', () => {
 
 		if (badgeCount > 0) {
 			// Verify count badges contain numeric values
-			for (let index = 0; index < Math.min(badgeCount, 4); index++) {
+			for (let index = 0; index < Math.min(badgeCount, MAX_BADGES_TO_CHECK); index++) {
 				const badgeText = await countBadges.nth(index).textContent();
 				expect(badgeText).toBeTruthy();
 				// Badge should contain a number
@@ -130,7 +137,7 @@ test.describe('@entity US-07 Bidirectional Relationships', () => {
 			}
 		} else {
 			// Alternative: check for count information in page content
-			const pageContent = await page.locator('body').textContent() || '';
+			const pageContent = await page.locator('body').textContent() ?? '';
 
 			// Should display counts for relationships (e.g., "3 references", "cited by 42")
 			const hasCountInfo =
@@ -172,7 +179,7 @@ test.describe('@entity US-07 Bidirectional Relationships', () => {
 		});
 
 		// Allow additional time for relationship content to render
-		await page.waitForTimeout(2000);
+		await page.waitForTimeout(RELATIONSHIP_RENDER_WAIT_MS);
 
 		// Look for any anchor elements that point to entity detail pages.
 		// Search broadly in main content, not just inside entity-detail-layout.
@@ -192,9 +199,9 @@ test.describe('@entity US-07 Bidirectional Relationships', () => {
 
 		// Find a link that navigates to a different entity (not the current one)
 		let clickTarget = entityLinks.first();
-		for (let index = 0; index < Math.min(clickableCount, 10); index++) {
+		for (let index = 0; index < Math.min(clickableCount, MAX_LINKS_TO_CHECK); index++) {
 			const href = await entityLinks.nth(index).getAttribute('href');
-			if (href && !href.includes('W2741809807')) {
+			if (href !== null && !href.includes('W2741809807')) {
 				clickTarget = entityLinks.nth(index);
 				break;
 			}
@@ -203,7 +210,7 @@ test.describe('@entity US-07 Bidirectional Relationships', () => {
 		// Navigate using the href directly instead of clicking, since the link
 		// may be hidden inside an overflow container or collapsed section.
 		const href = await clickTarget.getAttribute('href');
-		if (href) {
+		if (href !== null) {
 			await page.goto(href.startsWith('http') ? href : `${BASE_URL}/${href.replace(/^\//, '')}`, {
 				waitUntil: 'domcontentloaded',
 				timeout: 30_000,
@@ -213,7 +220,7 @@ test.describe('@entity US-07 Bidirectional Relationships', () => {
 			await clickTarget.evaluate((element: Element) => {
 				element.scrollIntoView({ block: 'center', behavior: 'instant' });
 			});
-			await page.waitForTimeout(500);
+			await page.waitForTimeout(SCROLL_INTO_VIEW_WAIT_MS);
 			await clickTarget.click({ force: true, timeout: 10_000 });
 		}
 		await page.locator('main').waitFor({ timeout: 20_000 });
@@ -224,7 +231,7 @@ test.describe('@entity US-07 Bidirectional Relationships', () => {
 		expect(newUrl).not.toEqual(originalUrl);
 
 		// Should be on an entity detail page
-		const pageContent = await page.locator('body').textContent() || '';
+		const pageContent = await page.locator('body').textContent() ?? '';
 		expect(pageContent).not.toContain('Page not found');
 		expect(pageContent).not.toContain('Routing error');
 	});
@@ -239,7 +246,7 @@ test.describe('@entity US-07 Bidirectional Relationships', () => {
 		await page.locator('main').waitFor({ timeout: 20_000 });
 		await waitForAppReady(page);
 
-		const pageContent = await page.locator('body').textContent() || '';
+		const pageContent = await page.locator('body').textContent() ?? '';
 
 		// Should not crash or show an unhandled error
 		expect(pageContent).not.toContain('Routing error');

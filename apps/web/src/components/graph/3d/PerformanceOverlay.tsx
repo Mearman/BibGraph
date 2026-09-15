@@ -37,7 +37,6 @@ export interface PerformanceOverlayProps {
 
 /**
  * Get badge color based on performance level
- * @param level
  */
 const getPerformanceBadgeColor = (
   level: 'good' | 'ok' | 'poor'
@@ -56,7 +55,6 @@ const getPerformanceBadgeColor = (
 
 /**
  * Get LOD level display text
- * @param lodLevel
  */
 const getLODDisplayText = (lodLevel: LODLevel): string => {
   switch (lodLevel) {
@@ -76,10 +74,6 @@ const getLODDisplayText = (lodLevel: LODLevel): string => {
  *
  * Positioned in the top-right corner of the graph container.
  * Shows real-time performance metrics for debugging and optimization.
- * @param root0
- * @param root0.stats
- * @param root0.enableAdaptiveLOD
- * @param root0.lodManager
  */
 export const PerformanceOverlay = ({
   stats,

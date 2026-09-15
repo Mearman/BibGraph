@@ -21,7 +21,7 @@
  * ```
  */
 export const decodeEntityId = (encodedId: string | undefined): string | undefined => {
-  if (!encodedId) {
+  if (encodedId === undefined || encodedId === '') {
     return encodedId;
   }
 
@@ -54,12 +54,22 @@ export const decodeEntityId = (encodedId: string | undefined): string | undefine
  * @param fallback - Fallback value if ID is undefined (default: empty string)
  * @returns Decoded ID with fixed protocol slashes, never undefined
  */
-export const decodeEntityIdOrDefault = (encodedId: string | undefined, fallback: string = ""): string => decodeEntityId(encodedId) ?? fallback;
+export const decodeEntityIdOrDefault = (encodedId: string | undefined, fallback = ""): string => decodeEntityId(encodedId) ?? fallback;
+
+/**
+ * Convert a single parsed search-param value to its query-string representation. Returns undefined for values with no meaningful string form (e.g. plain objects), so callers never emit `"[object Object]"` into the query string.
+ */
+const toQueryValue = (value: unknown): string | undefined => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) return value.map(String).join(',');
+  return undefined;
+};
 
 /**
  * Serialize TanStack Router's parsed search object to a URL query string
  *
- * TanStack Router parses query strings into objects (e.g., { q: "test", page: 1 }).
+ * TanStack Router parses query strings into objects (e.g., \{ q: "test", page: 1 \}).
  * This function converts them back to URL query strings for storage or display.
  * @param search - The parsed search object from TanStack Router's useLocation()
  * @returns URL query string with leading "?" or empty string if no params
@@ -80,15 +90,16 @@ export const serializeSearch = (search: Record<string, unknown> | string): strin
     return search.startsWith('?') ? search : (search ? `?${search}` : '');
   }
 
-  // Handle empty or undefined search object
-  if (!search || Object.keys(search).length === 0) {
+  // Handle empty search object
+  if (Object.keys(search).length === 0) {
     return '';
   }
 
   const parameters = new URLSearchParams();
   for (const [key, value] of Object.entries(search)) {
-    if (value !== undefined && value !== null && value !== '') {
-      parameters.set(key, String(value));
+    const queryValue = toQueryValue(value);
+    if (queryValue !== undefined && queryValue !== '') {
+      parameters.set(key, queryValue);
     }
   }
 

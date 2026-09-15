@@ -101,7 +101,7 @@ export const AppActivityProvider: React.FC<AppActivityProviderProperties> = ({
         type: "user",
         category: "interaction",
         event: action,
-        description: `User ${action}${component ? ` in ${component}` : ""}`,
+        description: `User ${action}${component !== undefined && component !== "" ? ` in ${component}` : ""}`,
         severity: "info",
         metadata: { component, ...metadata },
       });
@@ -157,7 +157,7 @@ export const AppActivityProvider: React.FC<AppActivityProviderProperties> = ({
         type: "performance",
         category: "data",
         event: metric,
-        description: `Performance metric: ${metric} = ${value}`,
+        description: `Performance metric: ${metric} = ${String(value)}`,
         severity: "info",
         metadata: { performance: { [metric]: value }, ...metadata },
       });
@@ -211,7 +211,7 @@ export const AppActivityProvider: React.FC<AppActivityProviderProperties> = ({
         type: "api",
         category: "data",
         event: "call",
-        description: `API call for ${entityType}${entityId ? ` (${entityId})` : ""}`,
+        description: `API call for ${entityType}${entityId !== undefined && entityId !== "" ? ` (${entityId})` : ""}`,
         severity: "info",
         metadata: { entityType, entityId, queryParams: queryParameters },
       });
@@ -219,16 +219,16 @@ export const AppActivityProvider: React.FC<AppActivityProviderProperties> = ({
     [addEvent],
   );
 
-  const setTypeFilter = useCallback((types: string[]) => {
-    dispatch({ type: "SET_TYPE_FILTER", payload: types });
+  const setTypeFilter = useCallback((types: readonly string[]) => {
+    dispatch({ type: "SET_TYPE_FILTER", payload: [...types] });
   }, []);
 
-  const setCategoryFilter = useCallback((categories: string[]) => {
-    dispatch({ type: "SET_CATEGORY_FILTER", payload: categories });
+  const setCategoryFilter = useCallback((categories: readonly string[]) => {
+    dispatch({ type: "SET_CATEGORY_FILTER", payload: [...categories] });
   }, []);
 
-  const setSeverityFilter = useCallback((severities: string[]) => {
-    dispatch({ type: "SET_SEVERITY_FILTER", payload: severities });
+  const setSeverityFilter = useCallback((severities: readonly string[]) => {
+    dispatch({ type: "SET_SEVERITY_FILTER", payload: [...severities] });
   }, []);
 
   const setSearchTerm = useCallback((term: string) => {
@@ -311,6 +311,7 @@ const createFallbackAppActivityActions = () => {
       "ui",
       "Attempted to call async app activity action outside AppActivityProvider",
     );
+    await Promise.resolve();
   };
 
   const createNoOpWithString = () => () => {

@@ -1,9 +1,8 @@
 /**
  * Types for graph auto-population functionality
- * @module types/graph-auto-population
  */
 
-import type { GraphEdge, GraphNode } from '@bibgraph/types';
+import type { EntityType, GraphEdge, GraphNode } from '@bibgraph/types';
 import type { BackgroundStrategy } from '@bibgraph/utils';
 
 /**
@@ -66,7 +65,7 @@ export interface UseGraphAutoPopulationOptions {
   /**
   Callback to add discovered edges
    */
-  onEdgesDiscovered?: (edges: GraphEdge[]) => void;
+  onEdgesDiscovered?: (edges: readonly GraphEdge[]) => void;
   /**
   Whether auto-population is enabled
    */
@@ -81,7 +80,7 @@ export interface UseGraphAutoPopulationOptions {
  * Batch descriptor for label resolution
  */
 export interface LabelResolutionBatch {
-  entityType: import('@bibgraph/types').EntityType;
+  entityType: EntityType;
   ids: string[];
 }
 

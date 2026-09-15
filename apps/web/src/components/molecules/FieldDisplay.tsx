@@ -24,7 +24,6 @@ interface FieldDisplayProperties {
 
 /**
  * Checks if a value is considered "empty" (undefined, null, empty string, empty array)
- * @param value
  */
 const isEmpty = (value: unknown): boolean => {
   if (value === undefined || value === null) return true;
@@ -34,15 +33,20 @@ const isEmpty = (value: unknown): boolean => {
 };
 
 /**
+ * Checks whether a value is a plain (non-array) object, narrowing it to an indexable record
+ */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
  * Default formatter for field values
- * @param value
  */
 const defaultFormatter = (value: unknown): React.ReactNode => {
   if (isEmpty(value)) return null;
 
   // Handle arrays
   if (Array.isArray(value)) {
-    return value.length > 0 ? `${value.length} items` : null;
+    return value.length > 0 ? `${String(value.length)} items` : null;
   }
 
   // Handle objects
@@ -64,20 +68,20 @@ export const FieldDisplay: React.FC<FieldDisplayProperties> = ({
   formatter = defaultFormatter,
 }) => {
   const [currentValue, setCurrentValue] = useState(value);
-  const [hasBeenFetched, setHasBeenFetched] = useState(!isEmpty(value));
+  const [hasBeenFetched, setHasBeenFetched] = useState(() => !isEmpty(value));
 
   const { fetchField, isFetching } = useFieldFetch({
     entityId,
     entityType,
-    onSuccess: (data) => {
+    onSuccess: (data: unknown) => {
       logger.debug("ui", "[FieldDisplay] Field data fetched", {
         fieldName,
         entityId,
         entityType,
-        hasData: !!data
+        hasData: isRecord(data) && fieldName in data
       });
       // Extract the fetched field from the response
-      const fetchedValue = (data as Record<string, unknown>)[fieldName];
+      const fetchedValue = isRecord(data) ? data[fieldName] : undefined;
       setCurrentValue(fetchedValue);
       setHasBeenFetched(true);
 
@@ -125,7 +129,7 @@ export const FieldDisplay: React.FC<FieldDisplayProperties> = ({
                 size="sm"
                 variant="subtle"
                 color="blue"
-                onClick={handleFetchClick}
+                onClick={() => { void handleFetchClick(); }}
                 loading={isFetching}
                 aria-label={`Fetch ${label.toLowerCase()}`}
               >
@@ -139,7 +143,7 @@ export const FieldDisplay: React.FC<FieldDisplayProperties> = ({
                 size="sm"
                 variant="subtle"
                 color="gray"
-                onClick={handleFetchClick}
+                onClick={() => { void handleFetchClick(); }}
                 loading={isFetching}
                 aria-label={`Retry fetching ${label.toLowerCase()}`}
               >

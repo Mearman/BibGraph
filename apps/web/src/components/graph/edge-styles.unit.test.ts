@@ -7,6 +7,7 @@ import type { GraphEdge } from '@bibgraph/types';
 import { RelationType } from '@bibgraph/types';
 import { describe, expect,it } from 'vitest';
 
+import { RELATIONSHIP_TYPE_COLORS as TYPE_COLORS } from '../../styles/hash-colors';
 import {
   getEdgeFilteredStyle,
   getEdgeHoverStyle,
@@ -14,7 +15,6 @@ import {
   getInboundStyle,
   getOutboundStyle,
   getTypeColor,
-  TYPE_COLORS,
 } from './edge-styles';
 
 describe('Edge Styling System', () => {

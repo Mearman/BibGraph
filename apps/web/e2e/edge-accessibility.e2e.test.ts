@@ -14,6 +14,18 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect,test } from '@playwright/test';
 
+const HEX_RED_START = 1;
+const HEX_RED_END = 3;
+const HEX_GREEN_END = 5;
+const HEX_BLUE_END = 7;
+const HEX_BASE = 16;
+const LUMA_RED_WEIGHT = 0.299;
+const LUMA_GREEN_WEIGHT = 0.587;
+const LUMA_BLUE_WEIGHT = 0.114;
+const RGB_MAX_VALUE = 255;
+const MIN_LUMINANCE_THRESHOLD = 0.2;
+const MAX_LUMINANCE_THRESHOLD = 0.95;
+
 test.describe('Edge Styling Accessibility (WCAG 2.1 AA)', () => {
   test('should have no axe violations on page with graph edges', async ({ page }) => {
     // Navigate to a page with graph visualization
@@ -76,8 +88,7 @@ test.describe('Edge Styling Accessibility (WCAG 2.1 AA)', () => {
       expect(
         dashArray === null ||
           dashArray === '' ||
-          dashArray === 'none' ||
-          dashArray === undefined
+          dashArray === 'none'
       ).toBeTruthy();
     }
 
@@ -118,10 +129,10 @@ test.describe('Edge Styling Accessibility (WCAG 2.1 AA)', () => {
       expect(authorshipColor).not.toBe(referenceColor);
 
       // Colors should be valid hex colors
-      if (authorshipColor) {
+      if (authorshipColor !== null) {
         expect(authorshipColor).toMatch(/^#[0-9A-F]{6}$/i);
       }
-      if (referenceColor) {
+      if (referenceColor !== null) {
         expect(referenceColor).toMatch(/^#[0-9A-F]{6}$/i);
       }
     }
@@ -140,7 +151,7 @@ test.describe('Edge Styling Accessibility (WCAG 2.1 AA)', () => {
 
       // Should have arrow marker
       expect(markerEndValue).toBeTruthy();
-      if (markerEndValue) {
+      if (markerEndValue !== null) {
         expect(markerEndValue).toContain('arrow');
       }
     }
@@ -155,7 +166,7 @@ test.describe('Edge Styling Accessibility (WCAG 2.1 AA)', () => {
 
       // Should have arrow marker (potentially different style than outbound)
       expect(markerEndValue).toBeTruthy();
-      if (markerEndValue) {
+      if (markerEndValue !== null) {
         expect(markerEndValue).toContain('arrow');
       }
     }
@@ -175,9 +186,9 @@ test.describe('Edge Styling Accessibility (WCAG 2.1 AA)', () => {
     // // Removed: waitForTimeout - use locator assertions instead
     // Edges should still be visible
     const edgesAfterZoom = page.locator('[data-direction]');
-    const zoomCount = edgesAfterZoom;
+    
 
-    await expect(zoomCount).toHaveCount(defaultCount);
+    await expect(edgesAfterZoom).toHaveCount(defaultCount);
   });
 
   test('should provide sufficient color contrast for graphical objects', async ({ page }) => {
@@ -195,18 +206,18 @@ test.describe('Edge Styling Accessibility (WCAG 2.1 AA)', () => {
       expect(strokeColor).toMatch(/^#[0-9A-F]{6}$/i);
 
       // Parse hex color to RGB
-      const r = Number.parseInt(strokeColor!.slice(1, 3), 16);
-      const g = Number.parseInt(strokeColor!.slice(3, 5), 16);
-      const b = Number.parseInt(strokeColor!.slice(5, 7), 16);
+      const r = Number.parseInt(strokeColor!.slice(HEX_RED_START, HEX_RED_END), HEX_BASE);
+      const g = Number.parseInt(strokeColor!.slice(HEX_RED_END, HEX_GREEN_END), HEX_BASE);
+      const b = Number.parseInt(strokeColor!.slice(HEX_GREEN_END, HEX_BLUE_END), HEX_BASE);
 
       // Calculate relative luminance (simplified check)
-      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      const luminance = (LUMA_RED_WEIGHT * r + LUMA_GREEN_WEIGHT * g + LUMA_BLUE_WEIGHT * b) / RGB_MAX_VALUE;
 
       // Should not be too light (harder to see on white backgrounds)
       // and not too dark (for accessibility)
       // This is a basic check; actual contrast ratio calculation is more complex
-      expect(luminance).toBeGreaterThan(0.2); // Not too dark
-      expect(luminance).toBeLessThan(0.95); // Not too light
+      expect(luminance).toBeGreaterThan(MIN_LUMINANCE_THRESHOLD); // Not too dark
+      expect(luminance).toBeLessThan(MAX_LUMINANCE_THRESHOLD); // Not too light
     }
   });
 
@@ -220,14 +231,13 @@ test.describe('Edge Styling Accessibility (WCAG 2.1 AA)', () => {
     if (count > 0) {
       const edge = edges.first();
 
-      // Channel 1: Line style (stroke-dasharray)
-      const dashArray = await edge.getAttribute('stroke-dasharray');
-      // Should be either set (dashed) or not set (solid)
-      expect(dashArray !== undefined).toBeTruthy();
+      // Channel 1: Line style (stroke-dasharray) - either set (dashed) or not set (solid); the
+      // getAttribute call above having resolved without throwing is itself the check.
+      await edge.getAttribute('stroke-dasharray');
 
       // Channel 2: Color (stroke)
       const strokeColor = await edge.getAttribute('stroke');
-      if (strokeColor) {
+      if (strokeColor !== null) {
         expect(strokeColor).toMatch(/^#[0-9A-F]{6}$/i);
       }
 
@@ -237,14 +247,14 @@ test.describe('Edge Styling Accessibility (WCAG 2.1 AA)', () => {
 
       // Should have direction data attribute
       const direction = await edge.getAttribute('data-direction');
-      if (direction) {
+      if (direction !== null) {
         expect(direction).toMatch(/^(inbound|outbound)$/);
       }
 
       // Should have relation type data attribute
       const relationTypeValue = await edge.getAttribute('data-relation-type');
       expect(relationTypeValue).toBeTruthy();
-      if (relationTypeValue) {
+      if (relationTypeValue !== null) {
         expect(relationTypeValue.length).toBeGreaterThan(0);
       }
     }

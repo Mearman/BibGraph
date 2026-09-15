@@ -6,8 +6,6 @@
  * - Interactive hover for details
  * - Filter by decade
  * - Citation count overlay option
- *
- * @module components/entity-detail
  */
 
 import { Badge, Box, Group, Paper, SegmentedControl, Stack, Text, Title } from '@mantine/core';
@@ -38,41 +36,55 @@ type ChartView = 'bar' | 'line';
 const DECADES = ['all', '2020s', '2010s', '2000s', '1990s', '1980s', 'earlier'] as const;
 type DecadeFilter = (typeof DECADES)[number];
 
+const DECADE_LENGTH_YEARS = 10;
+const EARLIEST_NAMED_DECADE_START_YEAR = 1980;
+const COUNT_THOUSANDS_THRESHOLD = 1000;
+const CHART_PLOT_HEIGHT_PX = 200;
+const BAR_HEIGHT_PERCENT_SCALE = 100;
+const NON_HOVERED_BAR_OPACITY = 0.3;
+const DEFAULT_POINT_RADIUS_PX = 4;
+const HOVERED_POINT_RADIUS_PX = 6;
+const TOOLTIP_X_OFFSET_PERCENT = 25;
+const TOOLTIP_RECT_Y_OFFSET_PX = 50;
+const TOOLTIP_YEAR_TEXT_Y_OFFSET_PX = 35;
+const TOOLTIP_COUNT_TEXT_Y_OFFSET_PX = 20;
+const Y_AXIS_TICK_RATIO_QUARTER = 0.25;
+const Y_AXIS_TICK_RATIO_HALF = 0.5;
+const Y_AXIS_TICK_RATIO_THREE_QUARTERS = 0.75;
+const Y_AXIS_TICK_RATIOS = [
+  0,
+  Y_AXIS_TICK_RATIO_QUARTER,
+  Y_AXIS_TICK_RATIO_HALF,
+  Y_AXIS_TICK_RATIO_THREE_QUARTERS,
+  1,
+] as const;
+
 /**
- * Filter year data by decade
- * @param data
- * @param decade
+ * Filter year data by decade. Non-'all'/'earlier' decades are named `NNNNs` (e.g. '2020s'), so their bounds are derived from the label itself rather than a hardcoded range table.
  */
-const filterByDecade = (data: YearData[], decade: DecadeFilter): YearData[] => {
-  if (decade === 'all') return data;
+const filterByDecade = (data: readonly YearData[], decade: DecadeFilter): YearData[] => {
+  if (decade === 'all') return [...data];
+  if (decade === 'earlier') {
+    return data.filter((d) => d.year < EARLIEST_NAMED_DECADE_START_YEAR);
+  }
 
-  const decadeRanges: Record<string, [number, number]> = {
-    '2020s': [2020, 2029],
-    '2010s': [2010, 2019],
-    '2000s': [2000, 2009],
-    '1990s': [1990, 1999],
-    '1980s': [1980, 1989],
-    'earlier': [0, 1979],
-  };
-
-  const [start, end] = decadeRanges[decade];
-  return data.filter((d) => d.year >= start && d.year <= end);
+  const decadeStart = Number.parseInt(decade, 10);
+  const decadeEnd = decadeStart + DECADE_LENGTH_YEARS - 1;
+  return data.filter((d) => d.year >= decadeStart && d.year <= decadeEnd);
 };
 
 /**
  * Format number with K suffix for thousands
- * @param num
  */
 const formatCount = (num: number): string => {
-  if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
+  if (num >= COUNT_THOUSANDS_THRESHOLD) {
+    return `${(num / COUNT_THOUSANDS_THRESHOLD).toFixed(1)}k`;
+  }
   return num.toString();
 };
 
 /**
  * PublicationTimeline Component
- * @param root0
- * @param root0.yearData
- * @param root0.entityType
  */
 export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
   yearData,
@@ -96,7 +108,7 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
 
   const maxCitations = useMemo(() => {
     const citationData = filteredData.filter((d) => d.citations !== undefined);
-    return Math.max(...citationData.map((d) => d.citations || 0), 1);
+    return Math.max(...citationData.map((d) => d.citations ?? 0), 1);
   }, [filteredData]);
 
   if (yearData.length === 0) {
@@ -115,7 +127,7 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
           <Group gap="sm">
             <SegmentedControl
               value={view}
-              onChange={(value) => setView(value as ChartView)}
+              onChange={(value) => { setView(value); }}
               data={[
                 { label: 'Bar', value: 'bar' },
                 { label: 'Line', value: 'line' },
@@ -129,7 +141,7 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
         <Group justify="space-between">
           <SegmentedControl
             value={decadeFilter}
-            onChange={(value) => setDecadeFilter(value as DecadeFilter)}
+            onChange={(value) => { setDecadeFilter(value); }}
             data={DECADES.map((d) => ({ label: d.charAt(0).toUpperCase() + d.slice(1), value: d }))}
             size="xs"
           />
@@ -139,7 +151,7 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
               color="blue"
               size="sm"
               style={{ cursor: 'pointer' }}
-              onClick={() => setShowCitations(!showCitations)}
+              onClick={() => { setShowCitations(!showCitations); }}
             >
               {showCitations ? 'Showing' : 'Show'} Citations
             </Badge>
@@ -155,8 +167,8 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
           }}
         >
           {/* Y-axis labels */}
-          <Stack gap={0} style={{ position: 'absolute', left: 0, top: 20, height: 200 }}>
-            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+          <Stack gap={0} style={{ position: 'absolute', left: 0, top: 20, height: CHART_PLOT_HEIGHT_PX }}>
+            {Y_AXIS_TICK_RATIOS.map((ratio) => (
               <Text
                 key={ratio}
                 size="xs"
@@ -164,7 +176,7 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
                 ta="right"
                 style={{
                   position: 'absolute',
-                  top: `${200 * (1 - ratio)}px`,
+                  top: `${String(CHART_PLOT_HEIGHT_PX * (1 - ratio))}px`,
                   left: 0,
                   width: '40px',
                   transform: 'translateY(-50%)',
@@ -190,9 +202,9 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
               // Bar chart
               <Group gap="xs" wrap="nowrap" style={{ height: '100%' }}>
                 {filteredData.map((data) => {
-                  const height = showCitations && data.citations
-                    ? (data.citations / maxCitations) * 100
-                    : (data.count / maxCount) * 100;
+                  const height = showCitations && data.citations !== undefined
+                    ? (data.citations / maxCitations) * BAR_HEIGHT_PERCENT_SCALE
+                    : (data.count / maxCount) * BAR_HEIGHT_PERCENT_SCALE;
 
                   return (
                     <Box
@@ -206,18 +218,18 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
                         height: '100%',
                         position: 'relative',
                       }}
-                      onMouseEnter={() => setHoveredYear(data.year)}
-                      onMouseLeave={() => setHoveredYear(null)}
+                      onMouseEnter={() => { setHoveredYear(data.year); }}
+                      onMouseLeave={() => { setHoveredYear(null); }}
                     >
                       {/* Bar */}
                       <Box
                         style={{
                           width: '100%',
-                          height: `${height}%`,
+                          height: `${String(height)}%`,
                           backgroundColor: 'var(--mantine-color-blue-6)',
                           borderRadius: '4px 4px 0 0',
                           transition: 'all 0.2s',
-                          opacity: hoveredYear === null || hoveredYear === data.year ? 1 : 0.3,
+                          opacity: hoveredYear === null || hoveredYear === data.year ? 1 : NON_HOVERED_BAR_OPACITY,
                           cursor: 'pointer',
                         }}
                       />
@@ -278,13 +290,13 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
                 style={{ overflow: 'visible' }}
               >
                 {/* Grid lines */}
-                {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+                {Y_AXIS_TICK_RATIOS.map((ratio) => (
                   <line
                     key={ratio}
                     x1="0"
-                    y1={`${200 * (1 - ratio)}`}
+                    y1={String(CHART_PLOT_HEIGHT_PX * (1 - ratio))}
                     x2="100%"
-                    y2={`${200 * (1 - ratio)}`}
+                    y2={String(CHART_PLOT_HEIGHT_PX * (1 - ratio))}
                     stroke="var(--mantine-color-gray-2)"
                     strokeWidth="1"
                   />
@@ -294,11 +306,11 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
                 {filteredData.length > 1 && (
                   <polyline
                     points={filteredData.map((data, index) => {
-                      const x = (index / (filteredData.length - 1)) * 100;
-                      const y = showCitations && data.citations
-                        ? 200 - (data.citations / maxCitations) * 200
-                        : 200 - (data.count / maxCount) * 200;
-                      return `${x}% ${y}`;
+                      const x = (index / (filteredData.length - 1)) * BAR_HEIGHT_PERCENT_SCALE;
+                      const y = showCitations && data.citations !== undefined
+                        ? CHART_PLOT_HEIGHT_PX - (data.citations / maxCitations) * CHART_PLOT_HEIGHT_PX
+                        : CHART_PLOT_HEIGHT_PX - (data.count / maxCount) * CHART_PLOT_HEIGHT_PX;
+                      return `${String(x)}% ${String(y)}`;
                     }).join(' ')}
                     fill="none"
                     stroke="var(--mantine-color-blue-6)"
@@ -308,37 +320,37 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
 
                 {/* Data points */}
                 {filteredData.map((data, index) => {
-                  const x = (index / (filteredData.length - 1)) * 100;
-                  const y = showCitations && data.citations
-                    ? 200 - (data.citations / maxCitations) * 200
-                    : 200 - (data.count / maxCount) * 200;
+                  const x = (index / (filteredData.length - 1)) * BAR_HEIGHT_PERCENT_SCALE;
+                  const y = showCitations && data.citations !== undefined
+                    ? CHART_PLOT_HEIGHT_PX - (data.citations / maxCitations) * CHART_PLOT_HEIGHT_PX
+                    : CHART_PLOT_HEIGHT_PX - (data.count / maxCount) * CHART_PLOT_HEIGHT_PX;
 
                   return (
                     <g key={data.year}>
                       <circle
-                        cx={`${x}%`}
+                        cx={`${String(x)}%`}
                         cy={y}
-                        r={hoveredYear === data.year ? 6 : 4}
+                        r={hoveredYear === data.year ? HOVERED_POINT_RADIUS_PX : DEFAULT_POINT_RADIUS_PX}
                         fill="var(--mantine-color-blue-6)"
                         style={{ cursor: 'pointer' }}
-                        onMouseEnter={() => setHoveredYear(data.year)}
-                        onMouseLeave={() => setHoveredYear(null)}
+                        onMouseEnter={() => { setHoveredYear(data.year); }}
+                        onMouseLeave={() => { setHoveredYear(null); }}
                       />
                       <text
-                        x={`${x}%`}
+                        x={`${String(x)}%`}
                         y={215}
                         textAnchor="middle"
                         fontSize="10"
                         fill="var(--mantine-color-dimmed)"
-                        transform={`rotate(-45, ${x}%, 215)`}
+                        transform={`rotate(-45, ${String(x)}%, 215)`}
                       >
                         {data.year}
                       </text>
                       {hoveredYear === data.year && (
                         <g>
                           <rect
-                            x={`${x - 25}%`}
-                            y={y - 50}
+                            x={`${String(x - TOOLTIP_X_OFFSET_PERCENT)}%`}
+                            y={y - TOOLTIP_RECT_Y_OFFSET_PX}
                             width="50%"
                             height="40"
                             fill="white"
@@ -346,8 +358,8 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
                             rx="4"
                           />
                           <text
-                            x={`${x}%`}
-                            y={y - 35}
+                            x={`${String(x)}%`}
+                            y={y - TOOLTIP_YEAR_TEXT_Y_OFFSET_PX}
                             textAnchor="middle"
                             fontSize="12"
                             fontWeight="500"
@@ -355,8 +367,8 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
                             {data.year}
                           </text>
                           <text
-                            x={`${x}%`}
-                            y={y - 20}
+                            x={`${String(x)}%`}
+                            y={y - TOOLTIP_COUNT_TEXT_Y_OFFSET_PX}
                             textAnchor="middle"
                             fontSize="10"
                           >

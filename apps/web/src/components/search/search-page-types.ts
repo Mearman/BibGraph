@@ -22,7 +22,6 @@ export const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 
 /**
  * Get entity type color for badges using centralized metadata
- * @param entityType
  */
 export const getEntityTypeColor = (entityType: AutocompleteResult["entity_type"]): string => {
   const pluralForm = toEntityType(entityType);
@@ -34,13 +33,12 @@ export const getEntityTypeColor = (entityType: AutocompleteResult["entity_type"]
 
 /**
  * Calculate entity type breakdown from results
- * @param results
  */
-export const getEntityTypeBreakdown = (results: AutocompleteResult[]): { type: string; count: number }[] => {
-  const breakdown = results.reduce((accumulator, result) => {
-    accumulator[result.entity_type] = (accumulator[result.entity_type] || 0) + 1;
+export const getEntityTypeBreakdown = (results: readonly AutocompleteResult[]): { type: string; count: number }[] => {
+  const breakdown = results.reduce<Record<string, number>>((accumulator, result) => {
+    accumulator[result.entity_type] = (accumulator[result.entity_type] ?? 0) + 1;
     return accumulator;
-  }, {} as Record<string, number>);
+  }, {});
 
   return Object.entries(breakdown)
     .map(([type, count]) => ({ type, count }))

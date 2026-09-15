@@ -17,6 +17,12 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect,test } from '@playwright/test';
 
+const GRAPH_RENDER_WAIT_MS = 3000;
+const MIN_CANVAS_DIMENSION_PX = 100;
+const XPAC_SAMPLE_SIZE = 5;
+const INTERACTION_REPEAT_COUNT = 5;
+const RANDOM_CLICK_RANGE_PX = 200;
+
 test.describe('Graph XPAC Styling', () => {
   test('should load graph exploration page successfully', async ({ page }) => {
     // Navigate to graph exploration page
@@ -50,7 +56,7 @@ test.describe('Graph XPAC Styling', () => {
   test('should render graph container with appropriate canvas or SVG element', async ({ page }) => {
     await page.goto('#/#/explore/graph', { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('load');
-    await page.waitForTimeout(3000); // Allow graph rendering to complete
+    await page.waitForTimeout(GRAPH_RENDER_WAIT_MS); // Allow graph rendering to complete
 
     // Look for canvas element (primary graph rendering method)
     const canvas = page.locator('canvas');
@@ -67,11 +73,11 @@ test.describe('Graph XPAC Styling', () => {
         const boundingBox = await visibleCanvas.boundingBox();
 
         expect(boundingBox).toBeTruthy();
-        expect(boundingBox!.width).toBeGreaterThan(100);
-        expect(boundingBox!.height).toBeGreaterThan(100);
+        expect(boundingBox!.width).toBeGreaterThan(MIN_CANVAS_DIMENSION_PX);
+        expect(boundingBox!.height).toBeGreaterThan(MIN_CANVAS_DIMENSION_PX);
 
         isGraphFound = true;
-        console.log(`✅ Graph canvas rendered (${boundingBox!.width}x${boundingBox!.height})`);
+        console.log(`✅ Graph canvas rendered (${String(boundingBox!.width)}x${String(boundingBox!.height)})`);
       }
     }
 
@@ -101,7 +107,7 @@ test.describe('Graph XPAC Styling', () => {
 
       if (containerCount > 0) {
         isGraphFound = true;
-        console.log(`✅ Graph container found (${containerCount} elements)`);
+        console.log(`✅ Graph container found (${String(containerCount)} elements)`);
       }
     }
 
@@ -124,10 +130,10 @@ test.describe('Graph XPAC Styling', () => {
       const title = await firstNode.getAttribute('title').catch(() => null);
       const dataAttribute = await firstNode.getAttribute('data-node-type').catch(() => null);
 
-      const hasAccessibleLabel = label || title || dataAttribute;
+      const hasAccessibleLabel = label !== null || title !== null || dataAttribute !== null;
       expect(hasAccessibleLabel).toBeTruthy(); // Graph nodes should have accessible labels
 
-      console.log(`✅ Found ${nodeCount} accessible graph nodes`);
+      console.log(`✅ Found ${String(nodeCount)} accessible graph nodes`);
     } else {
       console.log('ℹ️ No explicitly accessible nodes found - graph may use canvas rendering');
       // This is acceptable for canvas-based graphs
@@ -147,7 +153,7 @@ test.describe('Graph XPAC Styling', () => {
 
     if (xpacNodeCount > 0) {
       isXpacFound = true;
-      console.log(`✅ Found ${xpacNodeCount} XPAC works in graph`);
+      console.log(`✅ Found ${String(xpacNodeCount)} XPAC works in graph`);
     }
 
     // Check for XPAC in data attributes
@@ -156,11 +162,11 @@ test.describe('Graph XPAC Styling', () => {
 
     if (xpacDataCount > 0 && !isXpacFound) {
       // Sample a few nodes to check for XPAC indicators
-      for (let index = 0; index < Math.min(xpacDataCount, 5); index++) {
+      for (let index = 0; index < Math.min(xpacDataCount, XPAC_SAMPLE_SIZE); index++) {
         const node = xpacDataNodes.nth(index);
         const workType = await node.getAttribute('data-work-type').catch(() => null);
 
-        if (workType && ['dataset', 'software', 'specimen', 'other'].includes(workType)) {
+        if (workType !== null && ['dataset', 'software', 'specimen', 'other'].includes(workType)) {
           isXpacFound = true;
           console.log(`✅ Found XPAC work type: ${workType}`);
           break;
@@ -169,8 +175,8 @@ test.describe('Graph XPAC Styling', () => {
     }
 
     // Check page text for XPAC references (in graph stats or labels)
-    const pageText = await page.textContent('body');
-    if (pageText && pageText.includes('XPAC')) {
+    const pageText = await page.locator('body').textContent();
+    if (pageText?.includes('XPAC') === true) {
       isXpacFound = true;
       console.log('✅ XPAC references found in graph page content');
     }
@@ -219,10 +225,10 @@ test.describe('Graph XPAC Styling', () => {
 
           // Verify some styling is present
           const hasStyled =
-            computedStyle.borderStyle ||
-            computedStyle.borderColor ||
-            computedStyle.stroke ||
-            computedStyle.strokeDasharray;
+            computedStyle.borderStyle !== '' ||
+            computedStyle.borderColor !== '' ||
+            computedStyle.stroke !== '' ||
+            computedStyle.strokeDasharray !== '';
 
           expect(hasStyled).toBeTruthy(); // XPAC nodes should have visual styling
         } else {
@@ -373,7 +379,7 @@ test.describe('Graph XPAC Styling', () => {
 
     // Note: We log but don't strictly fail on accessibility issues
     // as canvas-based graphs have inherent accessibility limitations
-    console.log(`✅ Accessibility scan completed: ${accessibilityScanResults.violations.length} violations found`);
+    console.log(`✅ Accessibility scan completed: ${String(accessibilityScanResults.violations.length)} violations found`);
   });
 
   test('should display graph statistics if available', async ({ page }) => {
@@ -388,14 +394,14 @@ test.describe('Graph XPAC Styling', () => {
       const statsText = await statsSection.textContent();
 
       // Check for common statistics
-      const hasNodeCount = statsText?.includes('node') || statsText?.includes('Node');
-      const hasEdgeCount = statsText?.includes('edge') || statsText?.includes('Edge');
-      const hasXpacInfo = statsText?.includes('XPAC') || statsText?.includes('xpac');
+      const hasNodeCount = (statsText?.includes('node') ?? false) || (statsText?.includes('Node') ?? false);
+      const hasEdgeCount = (statsText?.includes('edge') ?? false) || (statsText?.includes('Edge') ?? false);
+      const hasXpacInfo = (statsText?.includes('XPAC') ?? false) || (statsText?.includes('xpac') ?? false);
 
       console.log(`✅ Graph statistics displayed:
-        - Node count info: ${hasNodeCount}
-        - Edge count info: ${hasEdgeCount}
-        - XPAC info: ${hasXpacInfo}`);
+        - Node count info: ${String(hasNodeCount)}
+        - Edge count info: ${String(hasEdgeCount)}
+        - XPAC info: ${String(hasXpacInfo)}`);
     } else {
       console.log('ℹ️ No dedicated stats section found - may be integrated into layout');
     }
@@ -413,8 +419,8 @@ test.describe('Graph XPAC Styling', () => {
     expect(canvasExists).toBeGreaterThan(0);
 
     // Simulate extended interaction
-    for (let index = 0; index < 5; index++) {
-      await canvas.click({ position: { x: Math.random() * 200, y: Math.random() * 200 } });
+    for (let index = 0; index < INTERACTION_REPEAT_COUNT; index++) {
+      await canvas.click({ position: { x: Math.random() * RANDOM_CLICK_RANGE_PX, y: Math.random() * RANDOM_CLICK_RANGE_PX } });
       // Removed: waitForTimeout - use locator assertions instead
     }
 

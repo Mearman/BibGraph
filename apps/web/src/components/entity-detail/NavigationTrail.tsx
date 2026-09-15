@@ -1,21 +1,20 @@
 /**
  * NavigationTrail - Breadcrumbs and back navigation for entity detail pages
- * @module NavigationTrail
  */
 
 import { Anchor, Breadcrumbs, Button, Group, Text } from '@mantine/core';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { ICON_SIZE } from '@/config/style-constants';
 
-export type BreadcrumbItem = {
+export interface BreadcrumbItem {
   label: string;
   href?: string;
   onClick?: () => void;
-};
+}
 
-export type NavigationTrailProps = {
+export interface NavigationTrailProps {
   /**
   Current entity type (e.g., 'authors', 'works')
    */
@@ -32,7 +31,7 @@ export type NavigationTrailProps = {
   Custom breadcrumbs to prepend before entity trail
    */
   customBreadcrumbs?: BreadcrumbItem[];
-};
+}
 
 /**
 Default empty array for custom breadcrumbs to avoid React infinite loop
@@ -40,13 +39,7 @@ Default empty array for custom breadcrumbs to avoid React infinite loop
 const DEFAULT_BREADCRUMBS: BreadcrumbItem[] = [];
 
 /**
- * NavigationTrail provides breadcrumbs and optional back-to-search functionality
- * for entity detail pages, improving navigation context and UX.
- * @param props - Component props
- * @param props.entityType - Current entity type (e.g., 'authors', 'works')
- * @param props.entityName - Current entity display name
- * @param props.showBackToSearch - Show "back to search" button if user came from search
- * @param props.customBreadcrumbs - Custom breadcrumbs to prepend before entity trail
+ * NavigationTrail provides breadcrumbs and optional back-to-search functionality for entity detail pages, improving navigation context and UX.
  */
 export const NavigationTrail = ({
   entityType,
@@ -56,18 +49,14 @@ export const NavigationTrail = ({
 }: NavigationTrailProps) => {
   const navigate = useNavigate();
 
-  // Check if user came from search page by examining session storage
-  const [cameFromSearch, setCameFromSearch] = useState(false);
-
-  useEffect(() => {
-    // Check if we have search context in session storage
+  // Check if user came from search page by examining session storage. Read once via a lazy state initializer (runs during mount, not render) rather than synchronously during render, which React treats as an impure read.
+  const [cameFromSearch] = useState<boolean>(() => {
     try {
-      const searchContext = sessionStorage.getItem('lastSearchQuery');
-      setCameFromSearch(!!(showBackToSearch && searchContext));
+      return showBackToSearch && sessionStorage.getItem('lastSearchQuery') !== null;
     } catch {
-      // Session storage might not be available in all contexts
+      return false;
     }
-  }, [showBackToSearch]);
+  });
 
   // Build breadcrumb items
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -83,12 +72,12 @@ export const NavigationTrail = ({
   const handleBackToSearch = () => {
     try {
       const searchQuery = sessionStorage.getItem('lastSearchQuery');
-      navigate({
+      void navigate({
         to: '/search',
-        search: { q: searchQuery || '', filter: undefined, search: undefined },
+        search: { q: searchQuery ?? '', filter: undefined, search: undefined },
       });
     } catch {
-      navigate({
+      void navigate({
         to: '/search',
         search: { q: '', filter: undefined, search: undefined },
       });
@@ -114,7 +103,7 @@ export const NavigationTrail = ({
         {breadcrumbItems.map((item, index) => {
           const isLast = index === breadcrumbItems.length - 1;
 
-          if (isLast || !item.href) {
+          if (isLast || item.href === undefined) {
             // Current page or non-clickable item
             return (
               <Text

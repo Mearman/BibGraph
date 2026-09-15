@@ -1,8 +1,7 @@
 /**
  * HTML Entity Decoding Utility
  *
- * Handles decoding of HTML entities in text, including multi-level encoding
- * (e.g., &amp;amp; -> &amp; -> &)
+ * Handles decoding of HTML entities in text, including multi-level encoding (for example, &amp;amp; decodes to &amp; and then to &)
  */
 
 /**
@@ -32,14 +31,17 @@ const ENTITY_PATTERN = /&(?:amp|lt|gt|quot|apos|nbsp|#\d+|#x[0-9a-fA-F]+);/g;
 const MAX_DECODE_ITERATIONS = 5;
 
 /**
+ * Length of the "&#x" (or "&#X") prefix on a hex numeric entity, stripped before parsing
+ */
+const HEX_ENTITY_PREFIX_LENGTH = 3;
+
+/**
  * Decode HTML entities in text, handling multiple levels of encoding
  *
  * Some data sources double or triple-encode HTML entities
  * (e.g., "&amp;amp;" should become "&" not "&amp;")
- *
  * @param text - The text containing HTML entities
  * @returns Text with all HTML entities decoded
- *
  * @example
  * decodeHtmlEntities("&amp;") // "&"
  * decodeHtmlEntities("&amp;amp;") // "&" (double-encoded)
@@ -62,7 +64,7 @@ export const decodeHtmlEntities = (text: string): string => {
 				}
 				// Handle hex numeric entities: &#x00EF; -> ï
 				if (match.startsWith("&#x") || match.startsWith("&#X")) {
-					const codePoint = Number.parseInt(match.slice(3, -1), 16);
+					const codePoint = Number.parseInt(match.slice(HEX_ENTITY_PREFIX_LENGTH, -1), 16);
 					if (!Number.isNaN(codePoint)) {
 						return String.fromCodePoint(codePoint);
 					}

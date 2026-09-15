@@ -3,7 +3,6 @@
  * Refactored to use catalogue-based history system via useUserInteractions hook
  */
 
-import type { EntityType } from "@bibgraph/types";
 import { logError, logger } from "@bibgraph/utils/logger";
 import { type CatalogueEntity } from "@bibgraph/utils/storage/catalogue-db";
 import {
@@ -59,8 +58,21 @@ const ENTITY_TYPE_COLORS: Record<string, string> = {
 };
 
 const getEntityTypeColor = (entityType: string): string => {
-  return ENTITY_TYPE_COLORS[entityType] || "gray";
+  return ENTITY_TYPE_COLORS[entityType] ?? "gray";
 };
+
+// formatEntityId: truncation lengths for shortened OpenAlex IDs and generic entity IDs.
+const SHORT_ENTITY_ID_MAX_LENGTH = 8;
+const ENTITY_ID_PREVIEW_LENGTH = 15;
+
+// formatDate/groupEntriesByDate: units for converting a millisecond time difference into human terms.
+const MS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const MS_PER_HOUR = MS_PER_SECOND * SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
+const MS_PER_DAY = MS_PER_HOUR * HOURS_PER_DAY;
+const RECENT_DAYS_THRESHOLD = 7;
 
 /**
  * Sub-component for rendering a single history entry with display name resolution
@@ -69,7 +81,7 @@ interface HistoryEntryCardProperties {
   entry: CatalogueEntity;
   onNavigate: (entry: CatalogueEntity) => void;
   onDelete: (entityRecordId: string, title?: string) => void;
-  formatDate: (date: Date) => string;
+  formatDate: (date: Readonly<Date>) => string;
 }
 
 const HistoryEntryCard = ({ entry, onNavigate, onDelete, formatDate }: HistoryEntryCardProperties) => {
@@ -81,12 +93,12 @@ const HistoryEntryCard = ({ entry, onNavigate, onDelete, formatDate }: HistoryEn
   const titleFromNotes = entry.notes?.match(/Title: ([^\n]+)/)?.[1];
 
   // Check if URL points to a non-entity page
-  const isNonEntityUrl = urlFromNotes && NON_ENTITY_URL_PATTERNS.some(pattern => urlFromNotes.includes(pattern));
+  const isNonEntityUrl = urlFromNotes !== undefined && NON_ENTITY_URL_PATTERNS.some(pattern => urlFromNotes.includes(pattern));
 
   // Only fetch display name for valid entity URLs
   const { displayName, isLoading } = useEntityDisplayName({
     entityId: entry.entityId,
-    entityType: entry.entityType as EntityType,
+    entityType: entry.entityType,
     enabled: !isSpecialId && !isNonEntityUrl,
   });
 
@@ -98,12 +110,12 @@ const HistoryEntryCard = ({ entry, onNavigate, onDelete, formatDate }: HistoryEn
 
   // Format entity ID for display (shortened if long)
   const formatEntityId = (entityId: string): string => {
-    const idMatch = entityId.match(/([A-Z]\d+)$/);
+    const idMatch = /([A-Z]\d+)$/.exec(entityId);
     if (idMatch) {
       const id = idMatch[1];
-      return id.length > 8 ? `${id.slice(0, 8)}...` : id;
+      return id.length > SHORT_ENTITY_ID_MAX_LENGTH ? `${id.slice(0, SHORT_ENTITY_ID_MAX_LENGTH)}...` : id;
     }
-    return entityId.length > 15 ? `${entityId.slice(0, 15)}...` : entityId;
+    return entityId.length > ENTITY_ID_PREVIEW_LENGTH ? `${entityId.slice(0, ENTITY_ID_PREVIEW_LENGTH)}...` : entityId;
   };
 
   // Determine the title to display with proper priority
@@ -112,14 +124,14 @@ const HistoryEntryCard = ({ entry, onNavigate, onDelete, formatDate }: HistoryEn
     title = entry.entityId.startsWith("search-")
       ? `Search: ${entry.entityId.replace("search-", "").split("-", 1)[0]}`
       : `List: ${entry.entityId.replace("list-", "")}`;
-  } else if (isNonEntityUrl && urlFromNotes) {
+  } else if (isNonEntityUrl) {
     // For non-entity pages, show the page name
     const pageName = urlFromNotes.replace(/.*[#/]/, "").split("/", 1)[0];
     title = pageName.charAt(0).toUpperCase() + pageName.slice(1);
-  } else if (displayName) {
+  } else if (displayName !== null && displayName !== "") {
     // Prefer freshly fetched display name
     title = displayName;
-  } else if (titleFromNotes) {
+  } else if (titleFromNotes !== undefined) {
     // Fall back to stored title from notes
     title = titleFromNotes;
   } else {
@@ -129,7 +141,7 @@ const HistoryEntryCard = ({ entry, onNavigate, onDelete, formatDate }: HistoryEn
 
   return (
     <Card
-      key={`${entry.entityId}-${entry.addedAt.getTime()}`}
+      key={`${entry.entityId}-${String(entry.addedAt.getTime())}`}
       style={{ border: BORDER_STYLE_GRAY_3 }}
       padding="md"
       shadow="sm"
@@ -144,7 +156,7 @@ const HistoryEntryCard = ({ entry, onNavigate, onDelete, formatDate }: HistoryEn
             >
               {formatEntityType(entry.entityType)}
             </Badge>
-            {isLoading && !titleFromNotes ? (
+            {isLoading && titleFromNotes === undefined ? (
               <Skeleton height={16} width="60%" />
             ) : (
               <Text size="sm" fw={500} lineClamp={1}>
@@ -152,7 +164,7 @@ const HistoryEntryCard = ({ entry, onNavigate, onDelete, formatDate }: HistoryEn
               </Text>
             )}
           </Group>
-          {entry.notes && (
+          {entry.notes !== undefined && entry.notes !== "" && (
             <Text size="xs" c="dimmed" lineClamp={2}>
               {entry.notes.split('\n').filter(line => !line.startsWith('URL:') && !line.startsWith('Title:')).join('\n')}
             </Text>
@@ -166,7 +178,7 @@ const HistoryEntryCard = ({ entry, onNavigate, onDelete, formatDate }: HistoryEn
             <ActionIcon
               variant="light"
               color="blue"
-              onClick={() => onNavigate(entry)}
+              onClick={() => { onNavigate(entry); }}
               aria-label={`Navigate to ${title}`}
             >
               <IconExternalLink size={ICON_SIZE.MD} />
@@ -212,10 +224,19 @@ export const HistoryManager = ({ onNavigate }: HistoryManagerProperties) => {
     (entry) =>
       searchQuery === "" ||
       entry.entityId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (entry.notes && entry.notes.toLowerCase().includes(searchQuery.toLowerCase())),
+      (entry.notes?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false),
   );
 
-  const handleClearHistory = async () => {
+  const confirmClearHistory = async (): Promise<void> => {
+    try {
+      await clearHistory();
+      setSearchQuery("");
+    } catch (error) {
+      logError(logger, "Failed to clear history", error, "HistoryManager");
+    }
+  };
+
+  const handleClearHistory = () => {
     modals.openConfirmModal({
       title: "Clear All History",
       centered: true,
@@ -226,13 +247,8 @@ export const HistoryManager = ({ onNavigate }: HistoryManagerProperties) => {
       ),
       labels: { confirm: "Clear All", cancel: "Cancel" },
       confirmProps: { color: "red" },
-      onConfirm: async () => {
-        try {
-          await clearHistory();
-          setSearchQuery("");
-        } catch (error) {
-          logError(logger, "Failed to clear history", error, "HistoryManager");
-        }
+      onConfirm: () => {
+        void confirmClearHistory();
       },
     });
   };
@@ -248,7 +264,7 @@ export const HistoryManager = ({ onNavigate }: HistoryManagerProperties) => {
     } else if (entry.entityId.startsWith("search-") || entry.entityId.startsWith("list-")) {
       // For search and list entries, use the URL from notes
       const urlFromNotes = entry.notes?.match(/URL: ([^\n]+)/);
-      url = urlFromNotes?.[1] || "";
+      url = urlFromNotes?.[1] ?? "";
     } else {
       // For entity entries, construct the internal path
       url = `/${entry.entityType}/${entry.entityId}`;
@@ -259,10 +275,18 @@ export const HistoryManager = ({ onNavigate }: HistoryManagerProperties) => {
       if (onNavigate) {
         onNavigate(url);
       } else {
-        navigate({ to: url });
+        void navigate({ to: url });
       }
     } else if (url) {
       window.location.assign(url);
+    }
+  };
+
+  const confirmDeleteHistoryEntry = async (entityRecordId: string): Promise<void> => {
+    try {
+      await storageProvider.removeEntityFromList("history-list", entityRecordId);
+    } catch (error) {
+      logError(logger, "Failed to delete history entry", error, "HistoryManager");
     }
   };
 
@@ -272,46 +296,42 @@ export const HistoryManager = ({ onNavigate }: HistoryManagerProperties) => {
       centered: true,
       children: (
         <Text size="sm">
-          Are you sure you want to delete {entryTitle ? `"${entryTitle}"` : "this history entry"}? This action cannot be undone.
+          Are you sure you want to delete {entryTitle !== undefined && entryTitle !== "" ? `"${entryTitle}"` : "this history entry"}? This action cannot be undone.
         </Text>
       ),
       labels: { confirm: "Delete", cancel: "Cancel" },
       confirmProps: { color: "red" },
-      onConfirm: async () => {
-        try {
-          await storageProvider.removeEntityFromList("history-list", entityRecordId);
-        } catch (error) {
-          logError(logger, "Failed to delete history entry", error, "HistoryManager");
-        }
+      onConfirm: () => {
+        void confirmDeleteHistoryEntry(entityRecordId);
       },
     });
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Readonly<Date>) => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffMs / MS_PER_HOUR);
+    const diffDays = Math.floor(diffMs / MS_PER_DAY);
 
     if (diffHours < 1) {
       return "Just now";
     }
-    if (diffHours < 24) {
-      return `${diffHours}h ago`;
+    if (diffHours < HOURS_PER_DAY) {
+      return `${String(diffHours)}h ago`;
     }
-    if (diffDays < 7) {
-      return `${diffDays}d ago`;
+    if (diffDays < RECENT_DAYS_THRESHOLD) {
+      return `${String(diffDays)}d ago`;
     }
     return date.toLocaleDateString();
   };
 
-  const diffDays = (date: Date) => {
+  const diffDays = (date: Readonly<Date>) => {
     const now = new Date();
-    return Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.floor((now.getTime() - date.getTime()) / MS_PER_DAY);
   };
 
-  const groupEntriesByDate = (entries: Array<CatalogueEntity>) => {
-    const groups: { [key: string]: Array<CatalogueEntity> } = {};
+  const groupEntriesByDate = (entries: readonly CatalogueEntity[]) => {
+    const groups = new Map<string, CatalogueEntity[]>();
 
     for (const entry of entries) {
       const date = new Date(entry.addedAt);
@@ -324,16 +344,18 @@ export const HistoryManager = ({ onNavigate }: HistoryManagerProperties) => {
         groupKey = "Today";
       } else if (date.toDateString() === yesterday.toDateString()) {
         groupKey = "Yesterday";
-      } else if (diffDays(date) < 7) {
+      } else if (diffDays(date) < RECENT_DAYS_THRESHOLD) {
         groupKey = "This week";
       } else {
         groupKey = date.toLocaleDateString();
       }
 
-      if (!groups[groupKey]) {
-        groups[groupKey] = [];
+      const existingGroup = groups.get(groupKey);
+      if (existingGroup === undefined) {
+        groups.set(groupKey, [entry]);
+      } else {
+        existingGroup.push(entry);
       }
-      groups[groupKey].push(entry);
     }
 
     return groups;
@@ -365,12 +387,12 @@ export const HistoryManager = ({ onNavigate }: HistoryManagerProperties) => {
           placeholder="Search history..."
           aria-label="Search navigation history"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => { setSearchQuery(e.target.value); }}
           leftSection={<IconSearch size={ICON_SIZE.MD} />}
           style={{ flex: 1 }}
         />
         {searchQuery && (
-          <Button variant="light" onClick={() => setSearchQuery("")}>
+          <Button variant="light" onClick={() => { setSearchQuery(""); }}>
             Clear
           </Button>
         )}
@@ -395,7 +417,7 @@ export const HistoryManager = ({ onNavigate }: HistoryManagerProperties) => {
         </Card>
       ) : (
         <Stack gap="md">
-          {Object.entries(groupedEntries).map(([groupKey, entries]) => (
+          {[...groupedEntries].map(([groupKey, entries], groupIndex, groupEntries) => (
             <Stack key={groupKey} gap="xs">
               <Group justify="space-between">
                 <Text size="sm" fw={600} c="dimmed">
@@ -407,14 +429,14 @@ export const HistoryManager = ({ onNavigate }: HistoryManagerProperties) => {
               </Group>
               {entries.map((entry) => (
                 <HistoryEntryCard
-                  key={`${entry.entityId}-${entry.addedAt.getTime()}`}
+                  key={`${entry.entityId}-${String(entry.addedAt.getTime())}`}
                   entry={entry}
                   onNavigate={handleNavigate}
                   onDelete={handleDeleteHistoryEntry}
                   formatDate={formatDate}
                 />
               ))}
-              {groupKey !== Object.keys(groupedEntries)[Object.keys(groupedEntries).length - 1] && (
+              {groupIndex < groupEntries.length - 1 && (
                 <Divider size="xs" my="xs" />
               )}
             </Stack>

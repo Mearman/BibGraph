@@ -8,6 +8,28 @@ import { logger } from "@bibgraph/utils/logger";
 import Dexie, { type Table } from "dexie";
 import React, { createContext, type ReactNode, use, useEffect, useMemo, useReducer } from "react";
 
+const PROVIDER_TYPES: readonly ProviderType[] = ["xyflow", "d3", "cytoscape"];
+const PROVIDER_TYPE_SET = new Set<string>(PROVIDER_TYPES);
+const isProviderType = (value: string): value is ProviderType => PROVIDER_TYPE_SET.has(value);
+
+const isRecordObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+// Per-key converters for migrating loosely-typed legacy localStorage values into the properly typed LayoutPersistedState shape, keyed so each property gets its own concrete conversion (Boolean() coercion, or a validated ProviderType) without a generic function needing an unsound type assertion to satisfy its own signature.
+type LayoutMigrators = {
+  [K in keyof LayoutPersistedState]-?: (value: unknown) => LayoutPersistedState[K];
+};
+
+const layoutMigrators: LayoutMigrators = {
+  leftSidebarOpen: Boolean,
+  leftSidebarPinned: Boolean,
+  rightSidebarOpen: Boolean,
+  rightSidebarPinned: Boolean,
+  graphProvider: (value) =>
+    typeof value === "string" && isProviderType(value) ? value : undefined,
+  autoPinOnLayoutStabilization: Boolean,
+};
+
 // Database schema for layout persistence
 interface LayoutRecord {
   id?: number;
@@ -41,8 +63,8 @@ const getDB = (): LayoutDB => {
  * Pure Dexie layout persistence service
  */
 class LayoutPersistenceService {
-  private db: LayoutDB;
-  private logger = logger;
+  private readonly db: LayoutDB;
+  private readonly logger = logger;
 
   constructor() {
     this.db = getDB();
@@ -58,7 +80,7 @@ class LayoutPersistenceService {
 
       for (const record of records) {
         try {
-          const parsedValue = JSON.parse(record.value);
+          const parsedValue: unknown = JSON.parse(record.value);
 
           switch (record.key) {
             case "leftSidebarOpen":
@@ -74,8 +96,8 @@ class LayoutPersistenceService {
               layoutState.rightSidebarPinned = Boolean(parsedValue);
               break;
             case "graphProvider":
-              if (typeof parsedValue === "string") {
-                layoutState.graphProvider = parsedValue as ProviderType;
+              if (typeof parsedValue === "string" && isProviderType(parsedValue)) {
+                layoutState.graphProvider = parsedValue;
               }
               break;
             case "autoPinOnLayoutStabilization":
@@ -83,7 +105,7 @@ class LayoutPersistenceService {
               break;
           }
         } catch (parseError) {
-          this.logger?.warn(
+          this.logger.warn(
             "layout-persistence",
             `Failed to parse stored value for key: ${record.key}`,
             {
@@ -96,7 +118,7 @@ class LayoutPersistenceService {
 
       return layoutState;
     } catch (error) {
-      this.logger?.error("layout-persistence", "Failed to load layout state", {
+      this.logger.error("layout-persistence", "Failed to load layout state", {
         error,
       });
       return {};
@@ -105,8 +127,6 @@ class LayoutPersistenceService {
 
   /**
    * Persist a layout state property
-   * @param key
-   * @param value
    */
   async setLayoutProperty<K extends keyof LayoutPersistedState>(
     key: K,
@@ -119,12 +139,12 @@ class LayoutPersistenceService {
         updatedAt: new Date(),
       });
 
-      this.logger?.debug(
+      this.logger.debug(
         "layout-persistence",
         `Persisted layout property: ${key}`,
       );
     } catch (error) {
-      this.logger?.error(
+      this.logger.error(
         "layout-persistence",
         `Failed to persist layout property: ${key}`,
         {
@@ -142,12 +162,12 @@ class LayoutPersistenceService {
   async clearLayoutState(): Promise<void> {
     try {
       await this.db.layout.clear();
-      this.logger?.debug(
+      this.logger.debug(
         "layout-persistence",
         "Cleared all persisted layout state",
       );
     } catch (error) {
-      this.logger?.error("layout-persistence", "Failed to clear layout state", {
+      this.logger.error("layout-persistence", "Failed to clear layout state", {
         error,
       });
       throw error;
@@ -166,7 +186,7 @@ class LayoutPersistenceService {
       });
 
       if (existingMigration) {
-        this.logger?.debug("layout-persistence", "Migration already completed");
+        this.logger.debug("layout-persistence", "Migration already completed");
         return;
       }
 
@@ -177,11 +197,12 @@ class LayoutPersistenceService {
         try {
           // Look for any old layout state in localStorage
           const oldLayoutState = localStorage.getItem("layout-store");
-          if (oldLayoutState) {
-            const parsed = JSON.parse(oldLayoutState);
-            const state = parsed?.state;
+          if (oldLayoutState !== null) {
+            const parsed: unknown = JSON.parse(oldLayoutState);
+            const parsedRecord = isRecordObject(parsed) ? parsed : undefined;
+            const state = isRecordObject(parsedRecord?.state) ? parsedRecord.state : undefined;
 
-            if (state && typeof state === "object") {
+            if (state !== undefined) {
               // Migrate individual properties
               const persistableKeys: (keyof LayoutPersistedState)[] = [
                 "leftSidebarOpen",
@@ -197,18 +218,18 @@ class LayoutPersistenceService {
                 	continue;
                 }
 
-                await this.setLayoutProperty(key, state[key]);
+                await this.setLayoutProperty(key, layoutMigrators[key](state[key]));
                 isMigratedData = true;
               }
 
-              this.logger?.debug(
+              this.logger.debug(
                 "layout-persistence",
                 "Migrated layout state from localStorage",
               );
             }
           }
         } catch (error) {
-          this.logger?.warn(
+          this.logger.warn(
             "layout-persistence",
             "Failed to migrate from localStorage",
             {
@@ -225,11 +246,11 @@ class LayoutPersistenceService {
         updatedAt: new Date(),
       });
 
-      this.logger?.debug("layout-persistence", "Migration completed", {
+      this.logger.debug("layout-persistence", "Migration completed", {
         migratedData: isMigratedData,
       });
     } catch (error) {
-      this.logger?.error("layout-persistence", "Migration failed", { error });
+      this.logger.error("layout-persistence", "Migration failed", { error });
     }
   }
 }
@@ -238,22 +259,24 @@ class LayoutPersistenceService {
 const persistenceService = new LayoutPersistenceService();
 
 // Helper function to handle persistence operations safely in test environments
-const safePersist = (operation: Promise<void>) => {
+const safePersist = async (operation: Readonly<Promise<void>>): Promise<void> => {
   // Skip persistence entirely in test environments to avoid slowdowns
-  if (typeof process !== "undefined" && process.env.VITEST) {
-    return Promise.resolve();
+  if (typeof process !== "undefined" && process.env.VITEST !== undefined && process.env.VITEST !== "") {
+    return;
   }
 
-  return operation.catch((error) => {
+  try {
+    await operation;
+  } catch (error: unknown) {
     // In test environments, persistence may fail due to missing IndexedDB
-    if (typeof process !== "undefined" && process.env.VITEST) {
-      logger?.debug("layout-store", "Persistence failed in test environment", {
+    if (typeof process !== "undefined" && process.env.VITEST !== undefined && process.env.VITEST !== "") {
+      logger.debug("layout-store", "Persistence failed in test environment", {
         error,
       });
     } else {
       throw error;
     }
-  });
+  }
 };
 
 interface LayoutState {
@@ -326,7 +349,7 @@ type LayoutAction =
   | { type: "LOAD_PERSISTED_STATE"; payload: Partial<LayoutState> };
 
 // Reducer
-const layoutReducer = (state: LayoutState, action: LayoutAction): LayoutState => {
+const layoutReducer = (state: Readonly<LayoutState>, action: LayoutAction): LayoutState => {
   switch (action.type) {
     case "TOGGLE_LEFT_SIDEBAR":
       return { ...state, leftSidebarOpen: !state.leftSidebarOpen };
@@ -376,7 +399,7 @@ export const LayoutProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (typeof window === "undefined") return;
 
     // Skip in test environments
-    if (typeof process !== "undefined" && process.env.VITEST) return;
+    if (typeof process !== "undefined" && process.env.VITEST !== undefined && process.env.VITEST !== "") return;
 
     const initializeState = async () => {
       try {
@@ -389,7 +412,7 @@ export const LayoutProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           dispatch({ type: "LOAD_PERSISTED_STATE", payload: persistedState });
         }
       } catch (error) {
-        logger?.error("layout-store", "Failed to initialize persisted state", {
+        logger.error("layout-store", "Failed to initialize persisted state", {
           error,
         });
       }
@@ -403,7 +426,7 @@ export const LayoutProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (typeof window === "undefined") return;
 
     // Skip in test environments
-    if (typeof process !== "undefined" && process.env.VITEST) return;
+    if (typeof process !== "undefined" && process.env.VITEST !== undefined && process.env.VITEST !== "") return;
 
     const persistChanges = async () => {
       const persistableKeys: (keyof LayoutPersistedState)[] = [
@@ -425,14 +448,7 @@ export const LayoutProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
 
     void persistChanges();
-  }, [
-    state.leftSidebarOpen,
-    state.leftSidebarPinned,
-    state.rightSidebarOpen,
-    state.rightSidebarPinned,
-    state.graphProvider,
-    state.autoPinOnLayoutStabilization,
-  ]);
+  }, [state]);
 
   const contextValue = useMemo(() => ({ state, dispatch }), [state, dispatch]);
 
@@ -498,30 +514,41 @@ export const useLayoutActions = () => {
   }
 
   return {
-    toggleLeftSidebar: () => context.dispatch({ type: "TOGGLE_LEFT_SIDEBAR" }),
-    toggleRightSidebar: () => context.dispatch({ type: "TOGGLE_RIGHT_SIDEBAR" }),
-    setLeftSidebarOpen: (open: boolean) =>
-      context.dispatch({ type: "SET_LEFT_SIDEBAR_OPEN", payload: open }),
-    setRightSidebarOpen: (open: boolean) =>
-      context.dispatch({ type: "SET_RIGHT_SIDEBAR_OPEN", payload: open }),
-    pinLeftSidebar: (pinned: boolean) =>
-      context.dispatch({ type: "PIN_LEFT_SIDEBAR", payload: pinned }),
-    pinRightSidebar: (pinned: boolean) =>
-      context.dispatch({ type: "PIN_RIGHT_SIDEBAR", payload: pinned }),
-    setLeftSidebarAutoHidden: (autoHidden: boolean) =>
-      context.dispatch({ type: "SET_LEFT_SIDEBAR_AUTO_HIDDEN", payload: autoHidden }),
-    setRightSidebarAutoHidden: (autoHidden: boolean) =>
-      context.dispatch({ type: "SET_RIGHT_SIDEBAR_AUTO_HIDDEN", payload: autoHidden }),
-    setLeftSidebarHovered: (hovered: boolean) =>
-      context.dispatch({ type: "SET_LEFT_SIDEBAR_HOVERED", payload: hovered }),
-    setRightSidebarHovered: (hovered: boolean) =>
-      context.dispatch({ type: "SET_RIGHT_SIDEBAR_HOVERED", payload: hovered }),
-    setGraphProvider: (provider: ProviderType) =>
-      context.dispatch({ type: "SET_GRAPH_PROVIDER", payload: provider }),
-    setPreviewEntity: (entityId: string | null) =>
-      context.dispatch({ type: "SET_PREVIEW_ENTITY", payload: entityId }),
-    setAutoPinOnLayoutStabilization: (enabled: boolean) =>
-      context.dispatch({ type: "SET_AUTO_PIN_ON_LAYOUT_STABILIZATION", payload: enabled }),
+    toggleLeftSidebar: () => { context.dispatch({ type: "TOGGLE_LEFT_SIDEBAR" }); },
+    toggleRightSidebar: () => { context.dispatch({ type: "TOGGLE_RIGHT_SIDEBAR" }); },
+    setLeftSidebarOpen: (open: boolean) => {
+      context.dispatch({ type: "SET_LEFT_SIDEBAR_OPEN", payload: open });
+    },
+    setRightSidebarOpen: (open: boolean) => {
+      context.dispatch({ type: "SET_RIGHT_SIDEBAR_OPEN", payload: open });
+    },
+    pinLeftSidebar: (pinned: boolean) => {
+      context.dispatch({ type: "PIN_LEFT_SIDEBAR", payload: pinned });
+    },
+    pinRightSidebar: (pinned: boolean) => {
+      context.dispatch({ type: "PIN_RIGHT_SIDEBAR", payload: pinned });
+    },
+    setLeftSidebarAutoHidden: (autoHidden: boolean) => {
+      context.dispatch({ type: "SET_LEFT_SIDEBAR_AUTO_HIDDEN", payload: autoHidden });
+    },
+    setRightSidebarAutoHidden: (autoHidden: boolean) => {
+      context.dispatch({ type: "SET_RIGHT_SIDEBAR_AUTO_HIDDEN", payload: autoHidden });
+    },
+    setLeftSidebarHovered: (hovered: boolean) => {
+      context.dispatch({ type: "SET_LEFT_SIDEBAR_HOVERED", payload: hovered });
+    },
+    setRightSidebarHovered: (hovered: boolean) => {
+      context.dispatch({ type: "SET_RIGHT_SIDEBAR_HOVERED", payload: hovered });
+    },
+    setGraphProvider: (provider: ProviderType) => {
+      context.dispatch({ type: "SET_GRAPH_PROVIDER", payload: provider });
+    },
+    setPreviewEntity: (entityId: string | null) => {
+      context.dispatch({ type: "SET_PREVIEW_ENTITY", payload: entityId });
+    },
+    setAutoPinOnLayoutStabilization: (enabled: boolean) => {
+      context.dispatch({ type: "SET_AUTO_PIN_ON_LAYOUT_STABILIZATION", payload: enabled });
+    },
   };
 };
 
@@ -537,7 +564,7 @@ export const useLayoutStore = () => {
 };
 
 // Selector hook for optimized re-renders
-export const useLayoutSelector = <T,>(selector: (state: LayoutState) => T): T => {
+export const useLayoutSelector = <T,>(selector: (state: Readonly<LayoutState>) => T): T => {
   const state = useLayoutState();
   return selector(state);
 };

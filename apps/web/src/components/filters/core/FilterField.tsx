@@ -4,7 +4,7 @@
  */
 
 import type { EntityFilters } from "@bibgraph/types";
-import type { FilterFieldConfig as UtilitiesFilterFieldConfig } from "@bibgraph/utils";
+import type { FilterOperator } from "@bibgraph/utils";
 import { ActionIcon, Alert,Group, Text, Tooltip } from "@mantine/core";
 import { IconAlertCircle,IconX } from "@tabler/icons-react";
 import React, { useCallback, useMemo } from "react";
@@ -26,6 +26,53 @@ interface FilterFieldWrapperProperties<T extends EntityFilters = EntityFilters>
   showLabel?: boolean;
   error?: string;
 }
+
+const DATE_RANGE_TUPLE_LENGTH = 2;
+const DISABLED_FIELD_OPACITY = 0.7;
+const COMPACT_LABEL_MARGIN_BOTTOM = 4;
+const LABEL_MARGIN_BOTTOM = 8;
+
+const isFilterOperator = (value: string): value is FilterOperator =>
+  value === "=" ||
+  value === "!=" ||
+  value === ">" ||
+  value === ">=" ||
+  value === "<" ||
+  value === "<=" ||
+  value === "contains" ||
+  value === "search" ||
+  value === "between";
+
+const toStringValue = (value: unknown): string => (typeof value === "string" ? value : "");
+
+const toNumberValue = (value: unknown): number => (typeof value === "number" ? value : 0);
+
+const toBooleanValue = (value: unknown): boolean => (typeof value === "boolean" ? value : false);
+
+const toDateFilterValue = (value: unknown): string | [string, string] | null => {
+  if (value === null || typeof value === "string") {
+    return value;
+  }
+  if (
+    Array.isArray(value) &&
+    value.length === DATE_RANGE_TUPLE_LENGTH &&
+    typeof value[0] === "string" &&
+    typeof value[1] === "string"
+  ) {
+    return [value[0], value[1]];
+  }
+  return null;
+};
+
+const toStringOrStringArrayValue = (value: unknown): string | string[] => {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (Array.isArray(value) && value.every((item): item is string => typeof item === "string")) {
+    return value;
+  }
+  return "";
+};
 
 export const FilterField = <T extends EntityFilters>({
   condition,
@@ -59,9 +106,12 @@ export const FilterField = <T extends EntityFilters>({
   // Handle operator changes
   const handleOperatorChange = useCallback(
     (operator: string) => {
+      if (!isFilterOperator(operator)) {
+        return;
+      }
       const updatedCondition: FilterCondition<T> = {
         ...condition,
-        operator: operator as FilterCondition<T>["operator"],
+        operator,
       };
       onUpdate(updatedCondition);
     },
@@ -79,18 +129,14 @@ export const FilterField = <T extends EntityFilters>({
 
   // Render the appropriate field component based on type
   const renderFieldComponent = () => {
-    // Type assertion needed because TypeScript treats re-exported types as distinct
-    // even though they're structurally identical. Cast to the utils type for compatibility.
-    const filterConfig = config as unknown as UtilitiesFilterFieldConfig;
-
     switch (config.type) {
       case "text":
       case "search":
         return (
           <TextFilter
-            value={condition.value as string}
+            value={toStringValue(condition.value)}
             operator={condition.operator}
-            config={filterConfig}
+            config={config}
             onValueChange={handleValueChange}
             onOperatorChange={handleOperatorChange}
             disabled={disabled || !condition.enabled}
@@ -102,9 +148,9 @@ export const FilterField = <T extends EntityFilters>({
       case "number":
         return (
           <NumericFilter
-            value={condition.value as number}
+            value={toNumberValue(condition.value)}
             operator={condition.operator}
-            config={filterConfig}
+            config={config}
             onValueChange={handleValueChange}
             onOperatorChange={handleOperatorChange}
             disabled={disabled || !condition.enabled}
@@ -117,9 +163,9 @@ export const FilterField = <T extends EntityFilters>({
       case "dateRange":
         return (
           <DateFilter
-            value={condition.value as string | [string, string] | null}
+            value={toDateFilterValue(condition.value)}
             operator={condition.operator}
-            config={filterConfig}
+            config={config}
             onValueChange={handleValueChange}
             onOperatorChange={handleOperatorChange}
             disabled={disabled || !condition.enabled}
@@ -131,9 +177,9 @@ export const FilterField = <T extends EntityFilters>({
       case "boolean":
         return (
           <BooleanFilter
-            value={condition.value as boolean}
+            value={toBooleanValue(condition.value)}
             operator={condition.operator}
-            config={filterConfig}
+            config={config}
             onValueChange={handleValueChange}
             onOperatorChange={handleOperatorChange}
             disabled={disabled || !condition.enabled}
@@ -146,9 +192,9 @@ export const FilterField = <T extends EntityFilters>({
       case "multiSelect":
         return (
           <EnumFilter
-            value={condition.value as string | string[]}
+            value={toStringOrStringArrayValue(condition.value)}
             operator={condition.operator}
-            config={filterConfig}
+            config={config}
             onValueChange={handleValueChange}
             onOperatorChange={handleOperatorChange}
             disabled={disabled || !condition.enabled}
@@ -161,9 +207,9 @@ export const FilterField = <T extends EntityFilters>({
       case "entityMulti":
         return (
           <EntityFilter
-            value={condition.value as string | string[]}
+            value={toStringOrStringArrayValue(condition.value)}
             operator={condition.operator}
-            config={filterConfig}
+            config={config}
             onValueChange={handleValueChange}
             onOperatorChange={handleOperatorChange}
             disabled={disabled || !condition.enabled}
@@ -190,13 +236,13 @@ export const FilterField = <T extends EntityFilters>({
         backgroundColor: condition.enabled
           ? colors.background.primary
           : colors.background.secondary,
-        opacity: condition.enabled ? 1 : 0.7,
+        opacity: condition.enabled ? 1 : DISABLED_FIELD_OPACITY,
         transition: isPrefersReducedMotion ? "none" : "all 0.2s ease",
       }}
     >
       {/* Field Label and Controls */}
       {showLabel && (
-        <Group justify="space-between" mb={compact ? 4 : 8}>
+        <Group justify="space-between" mb={compact ? COMPACT_LABEL_MARGIN_BOTTOM : LABEL_MARGIN_BOTTOM}>
           <Group gap="xs">
             <Text
               size={compact ? "xs" : "sm"}
@@ -207,10 +253,10 @@ export const FilterField = <T extends EntityFilters>({
                   : colors.text.secondary,
               }}
             >
-              {condition.label || config.label}
+              {condition.label ?? config.label}
             </Text>
 
-            {config.helpText && (
+            {config.helpText !== undefined && config.helpText !== "" && (
               <Tooltip label={config.helpText} multiline w={220}>
                 <IconAlertCircle
                   size={12}
@@ -258,14 +304,14 @@ export const FilterField = <T extends EntityFilters>({
       {renderFieldComponent()}
 
       {/* Error Display */}
-      {error && (
+      {error !== undefined && error !== "" && (
         <Text size="xs" c="red" mt={4}>
           {error}
         </Text>
       )}
 
       {/* Field Description */}
-      {config.helpText && !compact && (
+      {config.helpText !== undefined && config.helpText !== "" && !compact && (
         <Text size="xs" c="dimmed" mt={4}>
           {config.helpText}
         </Text>

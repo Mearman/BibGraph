@@ -20,10 +20,14 @@ import { expect, test } from '@playwright/test';
 
 import { waitForAppReady } from '@/test/helpers/app-ready';
 
-const BASE_URL = process.env.BASE_URL || (process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173');
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = process.env.BASE_URL ?? (IS_CI ? 'http://localhost:4173' : 'http://localhost:5173');
+
+const TEST_SUITE_TIMEOUT_MS = 60_000;
+const RELATIONSHIP_DATA_WAIT_MS = 2000;
 
 test.describe('@entity US-08 Relationship Filtering', () => {
-	test.setTimeout(60_000);
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS);
 
 	test.beforeEach(async ({ page }) => {
 
@@ -100,7 +104,7 @@ test.describe('@entity US-08 Relationship Filtering', () => {
 		await page.waitForSelector('[data-testid="entity-detail-layout"]', { timeout: 20_000 });
 
 		// Wait for relationship data to load (async queries)
-		await page.waitForTimeout(2000);
+		await page.waitForTimeout(RELATIONSHIP_DATA_WAIT_MS);
 
 		// The RelatedEntitiesSection uses clickable Badge components for type filtering.
 		// React inline styles are applied via DOM properties, not HTML attributes, so
@@ -143,7 +147,7 @@ test.describe('@entity US-08 Relationship Filtering', () => {
 				expect(currentUrl).toEqual(originalUrl);
 
 				// Content should still be present
-				const filteredContent = await page.locator('body').textContent() || '';
+				const filteredContent = await page.locator('body').textContent() ?? '';
 				expect(filteredContent).toBeTruthy();
 
 				// Click again to deselect and restore
@@ -191,7 +195,7 @@ test.describe('@entity US-08 Relationship Filtering', () => {
 		const outboundOptions = await page.getByText('Outbound').all();
 
 		if (outboundOptions.length > 0) {
-			await outboundOptions[outboundOptions.length - 1]!.click();
+			await outboundOptions[outboundOptions.length - 1].click();
 
 			// Badge should update to reflect the active filter
 			const outboundBadge = page.getByText('outbound', { exact: true });
@@ -209,7 +213,7 @@ test.describe('@entity US-08 Relationship Filtering', () => {
 			// Switch to Inbound
 			const inboundOptions = await page.getByText('Inbound').all();
 			if (inboundOptions.length > 0) {
-				await inboundOptions[inboundOptions.length - 1]!.click();
+				await inboundOptions[inboundOptions.length - 1].click();
 
 				const inboundBadge = page.getByText('inbound', { exact: true });
 				const hasInboundBadge = await inboundBadge.isVisible().catch(() => false);
@@ -226,7 +230,7 @@ test.describe('@entity US-08 Relationship Filtering', () => {
 		const outboundOptions = await page.getByText('Outbound').all();
 
 		if (outboundOptions.length > 0) {
-			await outboundOptions[outboundOptions.length - 1]!.click();
+			await outboundOptions[outboundOptions.length - 1].click();
 
 			// Then interact with type filter if available
 			const typeFilter = page.locator("[data-testid='relationship-type-filter']");
@@ -248,8 +252,8 @@ test.describe('@entity US-08 Relationship Filtering', () => {
 
 			// No errors should have occurred
 			const errorElements = page.locator('[role="alert"]');
-			const errorCount = errorElements;
-			await expect(errorCount).toHaveCount(0);
+			
+			await expect(errorElements).toHaveCount(0);
 		} else {
 			// At minimum, verify the page loads without combined filter controls
 			await expect(page.locator('main')).toBeVisible();
@@ -262,7 +266,7 @@ test.describe('@entity US-08 Relationship Filtering', () => {
 
 		if (outboundOptions.length > 0) {
 			// Set to Outbound
-			await outboundOptions[outboundOptions.length - 1]!.click();
+			await outboundOptions[outboundOptions.length - 1].click();
 
 			// Verify filter is active
 			const outboundBadge = page.getByText('outbound', { exact: true });
@@ -293,8 +297,8 @@ test.describe('@entity US-08 Relationship Filtering', () => {
 		// Page should be in a clean state
 		await expect(page.locator('main')).toBeVisible();
 		const errorElements = page.locator('[role="alert"]');
-		const errorCount = errorElements;
-		await expect(errorCount).toHaveCount(0);
+		
+		await expect(errorElements).toHaveCount(0);
 	});
 
 	test('should pass accessibility checks (WCAG 2.1 AA)', async ({ page }) => {

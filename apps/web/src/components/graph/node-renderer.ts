@@ -9,12 +9,18 @@
  */
 
 import type { GraphNode } from "@bibgraph/types";
+import type { Mesh as ThreeMesh, MeshLambertMaterial as ThreeMeshLambertMaterial, SphereGeometry as ThreeSphereGeometry } from "three";
 
 import {
   getConditionalNodeStyle,
   getNodeAccessibilityLabel,
   type NodeStyleProperties,
 } from "./node-styles";
+
+// Minimum zoom level at which node labels become legible enough to render.
+const LABEL_VISIBILITY_ZOOM_THRESHOLD = 0.8;
+// Base font size (px) for node labels at 1x zoom, scaled down as the view zooms out.
+const LABEL_FONT_SIZE_PX = 12;
 
 /**
  * Canvas rendering function for react-force-graph-2d/3d
@@ -31,7 +37,7 @@ export const renderNodeOnCanvas = (node: GraphNode, ctx: CanvasRenderingContext2
   ctx.save();
 
   // Set fill style
-  ctx.fillStyle = style.fill || 'var(--mantine-color-blue-6)';
+  ctx.fillStyle = style.fill ?? 'var(--mantine-color-blue-6)';
   ctx.globalAlpha = style.fillOpacity ?? style.opacity ?? 1;
 
   // Draw node circle
@@ -40,11 +46,11 @@ export const renderNodeOnCanvas = (node: GraphNode, ctx: CanvasRenderingContext2
   ctx.fill();
 
   // Draw border
-  ctx.strokeStyle = style.stroke || 'var(--mantine-color-blue-filled)';
-  ctx.lineWidth = (style.strokeWidth || 2) / globalScale;
+  ctx.strokeStyle = style.stroke ?? 'var(--mantine-color-blue-filled)';
+  ctx.lineWidth = (style.strokeWidth ?? 2) / globalScale;
 
   // Handle dashed borders for xpac works
-  if (style.strokeDasharray) {
+  if (style.strokeDasharray !== undefined) {
     const dashArray = style.strokeDasharray.split(',').map(Number);
     ctx.setLineDash(dashArray);
   } else {
@@ -67,14 +73,14 @@ export const getSvgNodeAttributes = (node: GraphNode): Record<string, string | n
   const style = getConditionalNodeStyle(node);
 
   return {
-    fill: style.fill || 'var(--mantine-color-blue-6)',
-    stroke: style.stroke || 'var(--mantine-color-blue-filled)',
-    'stroke-width': style.strokeWidth || 2,
-    'stroke-dasharray': style.strokeDasharray || 'none',
+    fill: style.fill ?? 'var(--mantine-color-blue-6)',
+    stroke: style.stroke ?? 'var(--mantine-color-blue-filled)',
+    'stroke-width': style.strokeWidth ?? 2,
+    'stroke-dasharray': style.strokeDasharray ?? 'none',
     opacity: style.fillOpacity ?? style.opacity ?? 1,
     'aria-label': getNodeAccessibilityLabel(node),
-    ...(style['data-xpac'] && { 'data-xpac': style['data-xpac'] }),
-    ...(style['data-unverified-author'] && {
+    ...(style['data-xpac'] !== undefined && { 'data-xpac': style['data-xpac'] }),
+    ...(style['data-unverified-author'] !== undefined && {
       'data-unverified-author': style['data-unverified-author'],
     }),
   };
@@ -90,13 +96,13 @@ export const getDomNodeStyle = (node: GraphNode): React.CSSProperties => {
   const style = getConditionalNodeStyle(node);
 
   return {
-    border: style.border || `2px solid ${style.stroke || 'var(--mantine-color-blue-filled)'}`,
-    borderStyle: style.borderStyle || (style.strokeDasharray ? 'dashed' : 'solid'),
-    backgroundColor: style.backgroundColor || style.fill || 'var(--mantine-color-blue-6)',
+    border: style.border ?? `2px solid ${style.stroke ?? 'var(--mantine-color-blue-filled)'}`,
+    borderStyle: style.borderStyle ?? (style.strokeDasharray !== undefined ? 'dashed' : 'solid'),
+    backgroundColor: style.backgroundColor ?? style.fill ?? 'var(--mantine-color-blue-6)',
     opacity: style.opacity ?? 1,
     // Data attributes for testing
-    ...(style['data-xpac'] && { 'data-xpac': style['data-xpac'] }),
-    ...(style['data-unverified-author'] && {
+    ...(style['data-xpac'] !== undefined && { 'data-xpac': style['data-xpac'] }),
+    ...(style['data-unverified-author'] !== undefined && {
       'data-unverified-author': style['data-unverified-author'],
     }),
   };
@@ -110,7 +116,7 @@ export const getDomNodeStyle = (node: GraphNode): React.CSSProperties => {
  */
 export const getNodeColor = (node: GraphNode): string => {
   const style = getConditionalNodeStyle(node);
-  return style.fill || 'var(--mantine-color-blue-6)';
+  return style.fill ?? 'var(--mantine-color-blue-6)';
 };
 
 /**
@@ -120,21 +126,23 @@ export const getNodeColor = (node: GraphNode): string => {
  * This is the main integration point for react-force-graph-2d
  * @returns Function compatible with ForceGraph2D's nodeCanvasObject property
  * @example
+ * ```tsx
  * <ForceGraph2D
  *   nodeCanvasObject={createNodeCanvasObjectFunction()}
  *   nodePointerAreaPaint={createNodePointerAreaPaintFunction()}
  * />
+ * ```
  */
 export const createNodeCanvasObjectFunction = () => (node: GraphNode, context: CanvasRenderingContext2D, globalScale: number): void => {
     renderNodeOnCanvas(node, context, globalScale);
 
     // Optionally render label at higher zoom levels
-    if (globalScale > 0.8) {
+    if (globalScale > LABEL_VISIBILITY_ZOOM_THRESHOLD) {
       const style = getConditionalNodeStyle(node);
       const NODE_RADIUS = 5;
 
-      context.fillStyle = style.stroke || 'var(--mantine-color-blue-filled)';
-      context.font = `${12 / globalScale}px Sans-Serif`;
+      context.fillStyle = style.stroke ?? 'var(--mantine-color-blue-filled)';
+      context.font = `${String(LABEL_FONT_SIZE_PX / globalScale)}px Sans-Serif`;
       context.textAlign = 'center';
       context.textBaseline = 'top';
       context.fillText(node.label, node.x, node.y + NODE_RADIUS + 2);
@@ -146,9 +154,11 @@ export const createNodeCanvasObjectFunction = () => (node: GraphNode, context: C
  * Defines the clickable/hoverable area for nodes
  * @returns Function compatible with ForceGraph2D's nodePointerAreaPaint property
  * @example
+ * ```tsx
  * <ForceGraph2D
  *   nodePointerAreaPaint={createNodePointerAreaPaintFunction()}
  * />
+ * ```
  */
 export const createNodePointerAreaPaintFunction = () => (node: GraphNode, color: string, context: CanvasRenderingContext2D): void => {
     const NODE_RADIUS = 5;
@@ -166,29 +176,27 @@ export const createNodePointerAreaPaintFunction = () => (node: GraphNode, color:
  *
  * Note: Requires three.js imports to be available
  * @param node - Graph node
- * @param THREE
- * @param THREE.SphereGeometry
- * @param THREE.MeshLambertMaterial
- * @param THREE.Mesh
  * @returns Three.js Mesh (requires three.js in scope)
  * @example
+ * ```tsx
  * import * as THREE from 'three';
  *
  * <ForceGraph3D
  *   nodeThreeObject={(node) => createNodeThreeObject(node as GraphNode, THREE)}
  * />
+ * ```
  */
 export const createNodeThreeObject = (node: GraphNode, THREE: {
-    SphereGeometry: typeof import('three').SphereGeometry;
-    MeshLambertMaterial: typeof import('three').MeshLambertMaterial;
-    Mesh: typeof import('three').Mesh;
+    SphereGeometry: typeof ThreeSphereGeometry;
+    MeshLambertMaterial: typeof ThreeMeshLambertMaterial;
+    Mesh: typeof ThreeMesh;
   }): InstanceType<typeof THREE.Mesh> => {
   const style = getConditionalNodeStyle(node);
   const NODE_RADIUS = 5;
 
   const geometry = new THREE.SphereGeometry(NODE_RADIUS);
   const material = new THREE.MeshLambertMaterial({
-    color: style.fill || 'var(--mantine-color-blue-6)',
+    color: style.fill ?? 'var(--mantine-color-blue-6)',
     opacity: style.fillOpacity ?? style.opacity ?? 1,
     transparent: (style.fillOpacity ?? style.opacity ?? 1) < 1,
     // Note: Dashed lines not easily supported in Three.js materials

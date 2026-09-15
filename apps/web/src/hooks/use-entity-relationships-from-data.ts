@@ -1,7 +1,5 @@
 /**
- * React hook for extracting entity relationships from raw entity data
- * Falls back to parsing entity fields when GraphContext is not available
- * @module use-entity-relationships-from-data
+ * React hook for extracting entity relationships from raw entity data Falls back to parsing entity fields when GraphContext is not available
  */
 
 import type { EntityType } from '@bibgraph/types';
@@ -50,7 +48,7 @@ export const useEntityRelationshipsFromData = (
   entityData: Record<string, unknown> | null | undefined,
   entityType: EntityType,
 ): UseEntityRelationshipsFromDataResult => {
-  const entityId = (entityData?.id as string) || '';
+  const entityId = typeof entityData?.id === 'string' ? entityData.id : '';
 
   const { incoming, outgoing } = useMemo(() => {
     if (!entityData || !entityId) {
@@ -63,25 +61,35 @@ export const useEntityRelationshipsFromData = (
     // Extract relationships based on entity type
     switch (entityType) {
       case 'authors':
-        extractAuthorRelationships(entityData, entityId, outgoingSections);
+        outgoingSections.push(...extractAuthorRelationships(entityData, entityId));
         break;
-      case 'works':
-        extractWorkRelationships(entityData, entityId, outgoingSections, incomingSections);
+      case 'works': {
+        const workRelationships = extractWorkRelationships(entityData, entityId);
+        outgoingSections.push(...workRelationships.outgoing);
+        incomingSections.push(...workRelationships.incoming);
         break;
+      }
       case 'institutions':
-        extractInstitutionRelationships(entityData, entityId, outgoingSections);
+        outgoingSections.push(...extractInstitutionRelationships(entityData, entityId));
         break;
       case 'sources':
-        extractSourceRelationships(entityData, entityId, outgoingSections);
+        outgoingSections.push(...extractSourceRelationships(entityData, entityId));
         break;
       case 'topics':
-        extractTopicRelationships(entityData, entityId, outgoingSections);
+        outgoingSections.push(...extractTopicRelationships(entityData, entityId));
         break;
       case 'funders':
         // Funders typically don't have embedded relationship data
         break;
       case 'publishers':
         // Publishers typically don't have embedded relationship data
+        break;
+      case 'concepts':
+      case 'keywords':
+      case 'domains':
+      case 'fields':
+      case 'subfields':
+        // These entity types typically don't have embedded relationship data
         break;
     }
 

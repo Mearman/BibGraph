@@ -9,16 +9,33 @@ import { useSearchHotkeys } from "@/hooks/use-hotkeys";
 import { useSearchHistory } from "@/hooks/useSearchHistory";
 import { announceToScreenReader } from "@/utils/accessibility";
 
-import { AdvancedSearchFilters,SearchFilters } from "./SearchFilters";
+import type { AdvancedSearchFilters } from "./search-filters-types";
+import { SearchFilters } from "./SearchFilters";
 import { SearchHistoryDropdown } from "./SearchHistoryDropdown";
 
-interface SearchFilters {
+interface SearchQueryFilters {
   query: string;
   advanced?: AdvancedSearchFilters;
 }
 
+const SEARCH_TIPS = [
+  "Use quotes for exact phrases: \"machine learning\"",
+  "Combine terms: AI AND healthcare",
+  "Exclude terms: climate -change",
+  "Search by entity type: authors:Smith",
+  "Use wildcards: neural* networks",
+  "Filter by year: published:>2020",
+  "Use advanced filters for precise results",
+  "Combine text search with faceted filters",
+];
+
+const SEARCH_TIP_ROTATION_INTERVAL_MS = 8000;
+
+const getRandomSearchTip = (): string =>
+  SEARCH_TIPS[Math.floor(Math.random() * SEARCH_TIPS.length)];
+
 interface SearchInterfaceProperties {
-  onSearch: (filters: SearchFilters) => void;
+  onSearch: (filters: SearchQueryFilters) => void;
   isLoading?: boolean;
   placeholder?: string;
   showHelp?: boolean;
@@ -32,18 +49,12 @@ export const SearchInterface = ({
   showHelp = false,
   showAdvancedFilters = false
 }: SearchInterfaceProperties) => {
-  const searchInputReference = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
-  const [searchTip, setSearchTip] = useState("");
+  const [searchTip, setSearchTip] = useState(getRandomSearchTip);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedSearchFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const { addSearchQuery } = useSearchHistory();
-
-  // Set up keyboard shortcuts for search
-  useSearchHotkeys(
-    () => handleSearch(),
-    () => handleClearFilters()
-  );
 
   const handleSearch = useCallback(() => {
     const filters = {
@@ -79,8 +90,8 @@ export const SearchInterface = ({
   const handleHistoryQuerySelect = useCallback((selectedQuery: string) => {
     setQuery(selectedQuery);
     handleQueryChange(selectedQuery);
-    if (searchInputReference.current) {
-      searchInputReference.current.focus();
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
     }
   }, [handleQueryChange]);
 
@@ -121,27 +132,19 @@ export const SearchInterface = ({
     logger.info("ui", "Search cleared by user", { component: "SearchInterface" }, "SearchInterface");
   };
 
-  // Generate search tips rotation
+  // Set up keyboard shortcuts for search
+  useSearchHotkeys(
+    () => { handleSearch(); },
+    () => { handleClearFilters(); }
+  );
+
+  // Rotate search tips periodically (initial tip is set via lazy useState above)
   useEffect(() => {
-    const tips = [
-      "Use quotes for exact phrases: \"machine learning\"",
-      "Combine terms: AI AND healthcare",
-      "Exclude terms: climate -change",
-      "Search by entity type: authors:Smith",
-      "Use wildcards: neural* networks",
-      "Filter by year: published:>2020",
-      "Use advanced filters for precise results",
-      "Combine text search with faceted filters"
-    ];
-    const randomTip = tips[Math.floor(Math.random() * tips.length)];
-    setSearchTip(randomTip);
-
     const tipInterval = setInterval(() => {
-      const nextTip = tips[Math.floor(Math.random() * tips.length)];
-      setSearchTip(nextTip);
-    }, 8000); // Rotate tips every 8 seconds
+      setSearchTip(getRandomSearchTip());
+    }, SEARCH_TIP_ROTATION_INTERVAL_MS);
 
-    return () => clearInterval(tipInterval);
+    return () => { clearInterval(tipInterval); };
   }, []);
 
   
@@ -168,7 +171,7 @@ export const SearchInterface = ({
                   variant={showFilters ? "filled" : "outline"}
                   size="sm"
                   leftSection={<IconFilter size={ICON_SIZE.SM} />}
-                  onClick={() => setShowFilters(!showFilters)}
+                  onClick={() => { setShowFilters(!showFilters); }}
                   aria-label="Toggle advanced filters"
                 >
                   Filters
@@ -212,7 +215,7 @@ export const SearchInterface = ({
         {/* Search Input Group */}
         <Group align="flex-end">
           <TextInput
-            ref={searchInputReference}
+            ref={searchInputRef}
             placeholder={placeholder}
             data-testid="search-input"
             leftSection={

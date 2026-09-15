@@ -9,10 +9,9 @@ import type { SearchFilters } from "./search-page-types";
 
 /**
  * Real OpenAlex API autocomplete function - searches across all entity types
- * @param filters
  */
 export const searchAllEntities = async (
-  filters: SearchFilters,
+  filters: Readonly<SearchFilters>,
 ): Promise<AutocompleteResult[]> => {
   if (!filters.query.trim()) return [];
 
@@ -40,7 +39,6 @@ export const searchAllEntities = async (
 
 /**
  * Store search query in session storage for "back to search" functionality
- * @param query
  */
 export const storeSearchQuery = (query: string): void => {
   try {

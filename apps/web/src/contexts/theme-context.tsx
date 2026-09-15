@@ -1,6 +1,6 @@
-import { createTheme, MantineProvider, type MantineTheme } from "@mantine/core";
+import { createTheme, MantineProvider, type MantineThemeOverride } from "@mantine/core";
 import { useColorScheme, useHotkeys, useLocalStorage } from "@mantine/hooks";
-import React, { createContext, use, useMemo } from "react";
+import React, { createContext, use, useCallback, useMemo } from "react";
 
 import type { ShadcnPalette } from '@/styles/shadcn-colors'
 import { mantineTheme, radixTheme,shadcnTheme } from "@/styles/themes";
@@ -49,44 +49,44 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   
   // Theme setters
-  const setComponentLibrary = (library: ComponentLibrary) => {
+  const setComponentLibrary = useCallback((library: ComponentLibrary) => {
     setConfig((previous) => ({
       ...previous,
       componentLibrary: library,
     }));
-  };
+  }, [setConfig]);
 
-  const setColorScheme = (scheme: ColorScheme) => {
+  const setColorScheme = useCallback((scheme: ColorScheme) => {
     setConfig((previous) => ({
       ...previous,
       colorScheme: scheme,
     }));
-  };
+  }, [setConfig]);
 
-  const setColorMode = (mode: ColorMode) => {
+  const setColorMode = useCallback((mode: ColorMode) => {
     setConfig((previous) => ({
       ...previous,
       colorMode: mode,
     }));
-  };
+  }, [setConfig]);
 
-  const setBorderRadius = (radius: BorderRadius) => {
+  const setBorderRadius = useCallback((radius: BorderRadius) => {
     setConfig((previous) => ({
       ...previous,
       borderRadius: radius,
     }));
-  };
+  }, [setConfig]);
 
-  const resetTheme = () => {
+  const resetTheme = useCallback(() => {
     // Remove user preferences from localStorage to revert to defaults
     localStorage.removeItem("theme-config");
     setConfig(defaultThemeConfig);
-  };
+  }, [setConfig]);
 
   // Keyboard shortcuts for theme switching
   useHotkeys([
-    ["mod+K", () => setColorMode(config.colorMode === "light" ? "dark" : "light")],
-    ["mod+Shift+K", () => setColorMode("auto")],
+    ["mod+K", () => { setColorMode(config.colorMode === "light" ? "dark" : "light"); }],
+    ["mod+Shift+K", () => { setColorMode("auto"); }],
   ]);
 
   // Get base theme based on component library selection
@@ -104,16 +104,16 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   // Generate Mantine theme based on current configuration
-  const generateMantineTheme = (): MantineTheme => {
+  const generateMantineTheme = (): MantineThemeOverride => {
     const baseTheme = getBaseTheme()
 
     return createTheme({
       ...baseTheme,
       primaryColor: config.colorScheme,
-      focusRing: "auto" as const,
+      focusRing: "auto",
       defaultRadius: config.borderRadius, // Apply border radius globally
       // NO component-level overrides - handled in theme definitions
-    }) as MantineTheme;
+    });
   };
 
   const contextValue: ThemeContextType = useMemo(

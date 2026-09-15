@@ -7,7 +7,7 @@ import { lazy } from 'react';
 
 import { LazyRoute } from '@/components/routing/LazyRoute';
 
-const GraphPage = lazy(() => import('./graph.lazy'));
+const GraphPage = lazy(async () => import('./graph.lazy'));
 
 export const Route = createFileRoute('/graph')({
   component: () => (

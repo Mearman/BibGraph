@@ -14,9 +14,8 @@ import type { UseCatalogueOptions } from "./types";
 /**
  * Core catalogue hook for state management
  * Handles list/entity loading and selection state
- * @param options
  */
-export const useCatalogueCore = (options: UseCatalogueOptions = {}) => {
+export const useCatalogueCore = (options: Readonly<UseCatalogueOptions> = {}) => {
 	const storageProvider = useStorageProvider();
 	const [lists, setLists] = useState<CatalogueList[]>([]);
 	const [entities, setEntities] = useState<CatalogueEntity[]>([]);
@@ -67,7 +66,7 @@ export const useCatalogueCore = (options: UseCatalogueOptions = {}) => {
 
 	// Auto-select list if option provided
 	useEffect(() => {
-		if (!(options.listId && lists.length > 0)) {
+		if (options.listId === undefined || lists.length === 0) {
 			return;
 		}
 
@@ -81,7 +80,7 @@ export const useCatalogueCore = (options: UseCatalogueOptions = {}) => {
 	useEffect(() => {
 		if (!selectedList) {
 			setEntities([]);
-			return;
+			return undefined;
 		}
 
 		let isMounted = true;
@@ -89,7 +88,7 @@ export const useCatalogueCore = (options: UseCatalogueOptions = {}) => {
 		const loadEntities = async () => {
 			try {
 				setIsLoadingEntities(true);
-				if (!selectedList.id) {
+				if (selectedList.id === undefined) {
 					if (isMounted) {
 						setEntities([]);
 					}
@@ -132,7 +131,7 @@ export const useCatalogueCore = (options: UseCatalogueOptions = {}) => {
 			setEntities([]);
 			return;
 		}
-		if (!selectedList.id) {
+		if (selectedList.id === undefined) {
 			setEntities([]);
 			return;
 		}

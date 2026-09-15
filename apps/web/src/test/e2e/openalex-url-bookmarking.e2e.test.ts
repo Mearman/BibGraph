@@ -8,7 +8,8 @@ import { expect, test } from "@playwright/test";
 import { waitForMantineStyles } from "../helpers/css-ready";
 
 test.describe("OpenAlex URL Redirection and Bookmarking", () => {
-  const BASE_URL = process.env.CI ? "http://localhost:4173" : "http://localhost:5173";
+  const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+  const BASE_URL = IS_CI ? "http://localhost:4173" : "http://localhost:5173";
 
   // Sample URLs from openalex-urls.json that should be bookmarkable
   // (Currently used as documentation of test URL patterns)

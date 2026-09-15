@@ -79,7 +79,7 @@ export const SummaryMetricsGrid: React.FC<SummaryMetricsGridProperties> = ({
         color="var(--mantine-color-violet-5)"
       />
       <MetricCard
-        value={`+${metrics.totalAdditionalPapers}`}
+        value={`+${String(metrics.totalAdditionalPapers)}`}
         label="Additional Papers Found"
         color="var(--mantine-color-yellow-6)"
       />

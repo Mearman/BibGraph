@@ -1,9 +1,7 @@
-/**
- * @vitest-environment jsdom
- */
+// @vitest-environment jsdom
 
+import type { MantineColorScheme, MantineTheme } from "@mantine/core";
 import {
-  MantineTheme,
   useMantineColorScheme,
   useMantineTheme,
 } from "@mantine/core";
@@ -22,9 +20,24 @@ vi.mock("@mantine/core", async () => {
   };
 });
 
+/**
+ * Builds a fully-typed `useMantineColorScheme` mock return value so mock action handlers satisfy their real `() => void` / `(value: MantineColorScheme) => void` signatures
+ */
+const createColorSchemeMock = (colorScheme: MantineColorScheme) => ({
+  colorScheme,
+  setColorScheme: vi.fn<(value: MantineColorScheme) => void>(),
+  toggleColorScheme: vi.fn<() => void>(),
+  clearColorScheme: vi.fn<() => void>(),
+});
+
+const TEST_SHADE_3 = 3;
+const TEST_SHADE_4 = 4;
+const TEST_SHADE_7 = 7;
+const TEST_SHADE_OUT_OF_RANGE = 15;
+
 describe("useThemeColors", () => {
   let mockTheme: Partial<MantineTheme>;
-  let mockMatchMedia: any;
+  let mockMatchMedia: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     // Setup mock theme with all required color palettes
@@ -283,12 +296,7 @@ describe("useThemeColors", () => {
 
     // Setup default mocks
     vi.mocked(useMantineTheme).mockReturnValue(mockTheme as MantineTheme);
-    vi.mocked(useMantineColorScheme).mockReturnValue({
-      colorScheme: "light",
-      setColorScheme: vi.fn(),
-      toggleColorScheme: vi.fn(),
-      clearColorScheme: vi.fn(),
-    });
+    vi.mocked(useMantineColorScheme).mockReturnValue(createColorSchemeMock("light"));
 
     // Default matchMedia to light mode
     mockMatchMedia.mockReturnValue({
@@ -311,12 +319,7 @@ describe("useThemeColors", () => {
     });
 
     it("should correctly detect light mode", () => {
-      vi.mocked(useMantineColorScheme).mockReturnValue({
-        colorScheme: "light",
-        setColorScheme: vi.fn(),
-        toggleColorScheme: vi.fn(),
-        clearColorScheme: vi.fn(),
-      });
+      vi.mocked(useMantineColorScheme).mockReturnValue(createColorSchemeMock("light"));
 
       const { result } = renderHook(() => useThemeColors());
 
@@ -324,12 +327,7 @@ describe("useThemeColors", () => {
     });
 
     it("should correctly detect dark mode", () => {
-      vi.mocked(useMantineColorScheme).mockReturnValue({
-        colorScheme: "dark",
-        setColorScheme: vi.fn(),
-        toggleColorScheme: vi.fn(),
-        clearColorScheme: vi.fn(),
-      });
+      vi.mocked(useMantineColorScheme).mockReturnValue(createColorSchemeMock("dark"));
 
       const { result } = renderHook(() => useThemeColors());
 
@@ -345,12 +343,7 @@ describe("useThemeColors", () => {
         removeEventListener: vi.fn(),
       });
 
-      vi.mocked(useMantineColorScheme).mockReturnValue({
-        colorScheme: "auto",
-        setColorScheme: vi.fn(),
-        toggleColorScheme: vi.fn(),
-        clearColorScheme: vi.fn(),
-      });
+      vi.mocked(useMantineColorScheme).mockReturnValue(createColorSchemeMock("auto"));
 
       const { result } = renderHook(() => useThemeColors());
 
@@ -364,12 +357,7 @@ describe("useThemeColors", () => {
         removeEventListener: vi.fn(),
       });
 
-      vi.mocked(useMantineColorScheme).mockReturnValue({
-        colorScheme: "auto",
-        setColorScheme: vi.fn(),
-        toggleColorScheme: vi.fn(),
-        clearColorScheme: vi.fn(),
-      });
+      vi.mocked(useMantineColorScheme).mockReturnValue(createColorSchemeMock("auto"));
 
       const { result } = renderHook(() => useThemeColors());
 
@@ -379,12 +367,7 @@ describe("useThemeColors", () => {
 
   describe("color structure in light mode", () => {
     beforeEach(() => {
-      vi.mocked(useMantineColorScheme).mockReturnValue({
-        colorScheme: "light",
-        setColorScheme: vi.fn(),
-        toggleColorScheme: vi.fn(),
-        clearColorScheme: vi.fn(),
-      });
+      vi.mocked(useMantineColorScheme).mockReturnValue(createColorSchemeMock("light"));
     });
 
     it("should provide correct text colors for light mode", () => {
@@ -447,12 +430,7 @@ describe("useThemeColors", () => {
 
   describe("color structure in dark mode", () => {
     beforeEach(() => {
-      vi.mocked(useMantineColorScheme).mockReturnValue({
-        colorScheme: "dark",
-        setColorScheme: vi.fn(),
-        toggleColorScheme: vi.fn(),
-        clearColorScheme: vi.fn(),
-      });
+      vi.mocked(useMantineColorScheme).mockReturnValue(createColorSchemeMock("dark"));
     });
 
     it("should provide correct text colors for dark mode", () => {
@@ -618,7 +596,7 @@ describe("useThemeColors", () => {
     it("should return color at specified shade", () => {
       const { result } = renderHook(() => useThemeColors());
 
-      const blueColor3 = result.current.getColor("blue", 3);
+      const blueColor3 = result.current.getColor("blue", TEST_SHADE_3);
       expect(blueColor3).toBe(mockTheme.colors!.blue[3]);
     });
 
@@ -634,12 +612,12 @@ describe("useThemeColors", () => {
         ...mockTheme,
         colors: {
           ...mockTheme.colors,
-          purple: [] as any,
+          purple: [] as readonly string[],
         },
       };
 
       vi.mocked(useMantineTheme).mockReturnValue(
-        themeWithMissingColor as MantineTheme,
+        themeWithMissingColor as unknown as MantineTheme,
       );
 
       const { result } = renderHook(() => useThemeColors());
@@ -724,10 +702,10 @@ describe("useThemeColors", () => {
     it("should return correct colors at specified shade", () => {
       const { result } = renderHook(() => useThemeColors());
 
-      expect(result.current.getEntityColorShade("work", 3)).toBe(
+      expect(result.current.getEntityColorShade("work", TEST_SHADE_3)).toBe(
         mockTheme.colors!.blue[3],
       );
-      expect(result.current.getEntityColorShade("author", 7)).toBe(
+      expect(result.current.getEntityColorShade("author", TEST_SHADE_7)).toBe(
         mockTheme.colors!.green[7],
       );
     });
@@ -768,7 +746,7 @@ describe("useThemeColors", () => {
       expect(result.current.getEntityColorShade("WORKS", 2)).toBe(
         mockTheme.colors!.blue[2],
       );
-      expect(result.current.getEntityColorShade("Authors", 4)).toBe(
+      expect(result.current.getEntityColorShade("Authors", TEST_SHADE_4)).toBe(
         mockTheme.colors!.green[4],
       );
     });
@@ -780,7 +758,7 @@ describe("useThemeColors", () => {
       expect(result.current.getEntityColorShade("unknown")).toBe(
         mockTheme.colors!.blue[6],
       );
-      expect(result.current.getEntityColorShade("invalid", 3)).toBe(
+      expect(result.current.getEntityColorShade("invalid", TEST_SHADE_3)).toBe(
         mockTheme.colors!.blue[3],
       );
     });
@@ -816,12 +794,7 @@ describe("useThemeColors", () => {
         writable: true,
       });
 
-      vi.mocked(useMantineColorScheme).mockReturnValue({
-        colorScheme: "auto",
-        setColorScheme: vi.fn(),
-        toggleColorScheme: vi.fn(),
-        clearColorScheme: vi.fn(),
-      });
+      vi.mocked(useMantineColorScheme).mockReturnValue(createColorSchemeMock("auto"));
 
       // Should fall back to light mode when matchMedia fails
       const { result } = renderHook(() => useThemeColors());
@@ -832,7 +805,7 @@ describe("useThemeColors", () => {
       const { result } = renderHook(() => useThemeColors());
 
       // Shade 15 doesn't exist, should fallback to color name
-      const highShade = result.current.getColor("blue", 15);
+      const highShade = result.current.getColor("blue", TEST_SHADE_OUT_OF_RANGE);
       expect(highShade).toBe("blue");
     });
   });

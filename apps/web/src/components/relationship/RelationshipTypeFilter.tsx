@@ -1,7 +1,5 @@
 /**
- * Filter component for relationship types
- * Allows filtering relationship sections by RelationType with grouped categories
- * @module RelationshipTypeFilter
+ * Filter component for relationship types Allows filtering relationship sections by RelationType with grouped categories
  * @see specs/016-entity-relationship-viz/spec.md (User Story 3)
  */
 
@@ -31,12 +29,12 @@ export interface RelationshipTypeFilterProps {
   /**
   Currently selected relationship types (empty = all)
    */
-  selectedTypes: RelationType[];
+  selectedTypes: readonly RelationType[];
 
   /**
   Callback when filter changes
    */
-  onChange: (types: RelationType[]) => void;
+  onChange: (types: readonly RelationType[]) => void;
 
   /**
   Optional title for the filter section
@@ -47,10 +45,6 @@ export interface RelationshipTypeFilterProps {
 /**
  * Component for filtering relationships by type
  * Displays preset buttons and categorized chip toggles in collapsible sections
- * @param root0
- * @param root0.selectedTypes
- * @param root0.onChange
- * @param root0.title
  */
 export const RelationshipTypeFilter = ({
   selectedTypes,
@@ -90,24 +84,24 @@ export const RelationshipTypeFilter = ({
   };
 
   // Handle preset selection
-  const handlePresetSelect = (presetTypes: RelationType[]) => {
+  const handlePresetSelect = (presetTypes: readonly RelationType[]) => {
     onChange(presetTypes);
   };
 
   // Check if a category is fully selected
-  const isCategoryFullySelected = (categoryTypes: RelationType[]): boolean => {
+  const isCategoryFullySelected = (categoryTypes: readonly RelationType[]): boolean => {
     if (selectedTypes.length === 0) return true;
     return categoryTypes.every((type) => selectedTypes.includes(type));
   };
 
   // Get count of selected types in a category
-  const getSelectedCountInCategory = (categoryTypes: RelationType[]): number => {
+  const getSelectedCountInCategory = (categoryTypes: readonly RelationType[]): number => {
     if (selectedTypes.length === 0) return categoryTypes.length;
     return categoryTypes.filter((type) => selectedTypes.includes(type)).length;
   };
 
   // Toggle all types in a category
-  const handleCategoryToggle = (categoryTypes: RelationType[]) => {
+  const handleCategoryToggle = (categoryTypes: readonly RelationType[]) => {
     const isAllCategorySelected = isCategoryFullySelected(categoryTypes);
 
     if (selectedTypes.length === 0) {
@@ -164,7 +158,7 @@ export const RelationshipTypeFilter = ({
               key={preset.id}
               size="xs"
               variant={activePresetId === preset.id ? 'filled' : 'light'}
-              onClick={() => handlePresetSelect(preset.types)}
+              onClick={() => { handlePresetSelect(preset.types); }}
               data-testid={`preset-${preset.id}`}
             >
               {preset.label}
@@ -199,7 +193,7 @@ export const RelationshipTypeFilter = ({
                     <Button
                       size="xs"
                       variant="subtle"
-                      onClick={() => handleCategoryToggle(category.types)}
+                      onClick={() => { handleCategoryToggle(category.types); }}
                       data-testid={`category-toggle-${category.id}`}
                     >
                       {isFullySelected ? 'Deselect All' : 'Select All'}
@@ -215,7 +209,7 @@ export const RelationshipTypeFilter = ({
                           <Chip
                             key={type}
                             checked={isSelected}
-                            onChange={() => handleToggle(type)}
+                            onChange={() => { handleToggle(type); }}
                             variant="light"
                             size="sm"
                             data-testid={`filter-chip-${type}`}

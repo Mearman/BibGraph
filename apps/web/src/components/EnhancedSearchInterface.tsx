@@ -45,9 +45,10 @@ import { BORDER_STYLE_GRAY_3, ICON_SIZE } from '@/config/style-constants';
 
 import { useKeyboardShortcuts } from "./ui/KeyboardShortcuts";
 
-
-
-
+// Bounds of the publication-year filter slider, matching the earliest and most recent years OpenAlex indexes at the time this filter was built.
+const EARLIEST_PUBLICATION_YEAR = 1900;
+const LATEST_PUBLICATION_YEAR = 2024;
+const DEFAULT_PUBLICATION_YEAR_RANGE: [number, number] = [EARLIEST_PUBLICATION_YEAR, LATEST_PUBLICATION_YEAR];
 interface SearchFilters {
   query: string;
   entityType: string;
@@ -71,11 +72,11 @@ interface EnhancedSearchInterfaceProperties {
 }
 
 export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedSearchInterfaceProperties) => {
-  const searchInputReference = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [filters, setFilters] = useState<SearchFilters>({
     query: "",
     entityType: "works",
-    publicationYear: [1900, 2024],
+    publicationYear: DEFAULT_PUBLICATION_YEAR_RANGE,
     openAccess: false,
     peerReviewed: false,
     citedByMin: 0,
@@ -94,7 +95,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     if (filters.query) count++;
-    if (filters.publicationYear[0] !== 1900 || filters.publicationYear[1] !== 2024) count++;
+    if (filters.publicationYear[0] !== EARLIEST_PUBLICATION_YEAR || filters.publicationYear[1] !== LATEST_PUBLICATION_YEAR) count++;
     if (filters.openAccess) count++;
     if (filters.peerReviewed) count++;
     if (filters.citedByMin > 0) count++;
@@ -115,7 +116,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
     // Announce to screen readers using Mantine notifications
     notifications.show({
       title: "Search Started",
-      message: `Searching with ${activeFiltersCount} active filters`,
+      message: `Searching with ${String(activeFiltersCount)} active filters`,
       color: "blue",
       autoClose: NOTIFICATION_DURATION.BRIEF_MS,
       withCloseButton: false,
@@ -135,7 +136,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
     setFilters({
       query: "",
       entityType: "works",
-      publicationYear: [1900, 2024],
+      publicationYear: DEFAULT_PUBLICATION_YEAR_RANGE,
       openAccess: false,
       peerReviewed: false,
       citedByMin: 0,
@@ -150,7 +151,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
     });
     logger.debug("search", "Search filters reset");
     // Focus back to search input after reset
-    searchInputReference.current?.focus();
+    searchInputRef.current?.focus();
     notifications.show({
       title: "Filters Reset",
       message: "All search filters have been cleared",
@@ -167,7 +168,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
         keys: '/',
         description: 'Focus search input',
         handler: useCallback(() => {
-          searchInputReference.current?.focus();
+          searchInputRef.current?.focus();
         }, []),
         category: 'Search',
         enabled: true,
@@ -290,7 +291,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
                 border: 'none',
                 cursor: 'pointer',
               }}
-              onClick={() => setShowKeyboardShortcuts(false)}
+              onClick={() => { setShowKeyboardShortcuts(false); }}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
                   setShowKeyboardShortcuts(false);
@@ -302,7 +303,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
               padding="lg"
               shadow="xl"
               style={{ maxWidth: 500, width: '90%' }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); }}
             >
               <Title order={3} id="shortcuts-title" mb="md">Keyboard Shortcuts</Title>
               <Stack gap="xs">
@@ -373,7 +374,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
                   <Text size="sm">Close modals</Text>
                 </Group>
               </Stack>
-              <Button mt="md" onClick={() => setShowKeyboardShortcuts(false)}>Close</Button>
+              <Button mt="md" onClick={() => { setShowKeyboardShortcuts(false); }}>Close</Button>
             </Card>
           </div>
         </FocusTrap>
@@ -418,7 +419,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
               <Tooltip label="Keyboard shortcuts">
                 <ActionIcon
                   variant="light"
-                  onClick={() => setShowKeyboardShortcuts(true)}
+                  onClick={() => { setShowKeyboardShortcuts(true); }}
                   aria-label="Show keyboard shortcuts"
                 >
                   <IconKeyboard size={ICON_SIZE.MD} />
@@ -451,16 +452,16 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
             <Group gap="sm">
               <Select
                 value={filters.entityType}
-                onChange={(value) => setFilters({ ...filters, entityType: value || "works" })}
+                onChange={(value) => { setFilters({ ...filters, entityType: value !== null && value !== "" ? value : "works" }); }}
                 data={entityTypeOptions}
                 w={150}
                 size="md"
               />
               <TextInput
-                ref={searchInputReference}
+                ref={searchInputRef}
                 placeholder="Enter your search query..."
                 value={filters.query}
-                onChange={(e) => setFilters({ ...filters, query: e.target.value })}
+                onChange={(e) => { setFilters({ ...filters, query: e.target.value }); }}
                 style={{ flex: 1 }}
                 size="md"
                 leftSection={<IconSearch size={ICON_SIZE.MD} />}
@@ -488,25 +489,25 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
               <Switch
                 label="Open Access"
                 checked={filters.openAccess}
-                onChange={(e) => setFilters({ ...filters, openAccess: e.currentTarget.checked })}
+                onChange={(e) => { setFilters({ ...filters, openAccess: e.currentTarget.checked }); }}
                 size="sm"
               />
               <Switch
                 label="Peer Reviewed"
                 checked={filters.peerReviewed}
-                onChange={(e) => setFilters({ ...filters, peerReviewed: e.currentTarget.checked })}
+                onChange={(e) => { setFilters({ ...filters, peerReviewed: e.currentTarget.checked }); }}
                 size="sm"
               />
               <Switch
                 label="Has Abstract"
                 checked={filters.hasAbstract}
-                onChange={(e) => setFilters({ ...filters, hasAbstract: e.currentTarget.checked })}
+                onChange={(e) => { setFilters({ ...filters, hasAbstract: e.currentTarget.checked }); }}
                 size="sm"
               />
               <Switch
                 label="Has Full Text"
                 checked={filters.hasFulltext}
-                onChange={(e) => setFilters({ ...filters, hasFulltext: e.currentTarget.checked })}
+                onChange={(e) => { setFilters({ ...filters, hasFulltext: e.currentTarget.checked }); }}
                 size="sm"
               />
             </Group>
@@ -530,17 +531,17 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
                     </Text>
                   </Group>
                   <RangeSlider
-                    min={1900}
-                    max={2024}
+                    min={EARLIEST_PUBLICATION_YEAR}
+                    max={LATEST_PUBLICATION_YEAR}
                     value={filters.publicationYear}
-                    onChange={(value) => setFilters({ ...filters, publicationYear: value as [number, number] })}
+                    onChange={(value) => { setFilters({ ...filters, publicationYear: value }); }}
                     marks={[
-                      { value: 1900, label: "1900" },
+                      { value: EARLIEST_PUBLICATION_YEAR, label: String(EARLIEST_PUBLICATION_YEAR) },
                       { value: 1950, label: "1950" },
                       { value: 2000, label: "2000" },
                       { value: 2010, label: "2010" },
                       { value: 2020, label: "2020" },
-                      { value: 2024, label: "2024" },
+                      { value: LATEST_PUBLICATION_YEAR, label: String(LATEST_PUBLICATION_YEAR) },
                     ]}
                   />
                 </div>
@@ -550,7 +551,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
                   <Text size="sm" fw={500} mb="sm">Minimum Citations</Text>
                   <NumberInput
                     value={filters.citedByMin}
-                    onChange={(value) => setFilters({ ...filters, citedByMin: Number(value) || 0 })}
+                    onChange={(value) => { setFilters({ ...filters, citedByMin: Number(value) || 0 }); }}
                     min={0}
                     placeholder="Minimum citation count"
                     leftSection={<IconTrendingUp size={ICON_SIZE.MD} />}
@@ -562,7 +563,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
                   <Text size="sm" fw={500} mb="sm">Research Concepts</Text>
                   <TagsInput
                     value={filters.concepts}
-                    onChange={(value) => setFilters({ ...filters, concepts: value })}
+                    onChange={(value) => { setFilters({ ...filters, concepts: value }); }}
                     placeholder="Add concepts..."
                     data={conceptOptions}
                     clearable
@@ -573,7 +574,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
                   <Text size="sm" fw={500} mb="sm">Countries</Text>
                   <MultiSelect
                     value={filters.countries}
-                    onChange={(value) => setFilters({ ...filters, countries: value })}
+                    onChange={(value) => { setFilters({ ...filters, countries: value }); }}
                     data={countryOptions}
                     placeholder="Select countries"
                     clearable
@@ -585,7 +586,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
                   <Text size="sm" fw={500} mb="sm">Languages</Text>
                   <MultiSelect
                     value={filters.languages}
-                    onChange={(value) => setFilters({ ...filters, languages: value })}
+                    onChange={(value) => { setFilters({ ...filters, languages: value }); }}
                     data={languageOptions}
                     placeholder="Select languages"
                     clearable
@@ -597,7 +598,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
                   <Text size="sm" fw={500} mb="sm">Authors (comma-separated)</Text>
                   <TextInput
                     value={filters.authors.join(", ")}
-                    onChange={(e) => setFilters({ ...filters, authors: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })}
+                    onChange={(e) => { setFilters({ ...filters, authors: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }); }}
                     placeholder="Enter author names..."
                   />
                 </div>
@@ -606,7 +607,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
                   <Text size="sm" fw={500} mb="sm">Venues (comma-separated)</Text>
                   <TextInput
                     value={filters.venues.join(", ")}
-                    onChange={(e) => setFilters({ ...filters, venues: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })}
+                    onChange={(e) => { setFilters({ ...filters, venues: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }); }}
                     placeholder="Enter venue names..."
                   />
                 </div>
@@ -615,7 +616,7 @@ export const EnhancedSearchInterface = ({ onSearch, loading = false }: EnhancedS
                   <Text size="sm" fw={500} mb="sm">Institutions (comma-separated)</Text>
                   <TextInput
                     value={filters.institutions.join(", ")}
-                    onChange={(e) => setFilters({ ...filters, institutions: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })}
+                    onChange={(e) => { setFilters({ ...filters, institutions: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }); }}
                     placeholder="Enter institution names..."
                   />
                 </div>

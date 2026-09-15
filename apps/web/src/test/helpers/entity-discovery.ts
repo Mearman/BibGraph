@@ -17,6 +17,21 @@ const OPENALEX_API_BASE = "https://api.openalex.org";
 const entityCache = new Map<EntityType, string>();
 const externalIdCache = new Map<string, string>();
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * Read the value of `field` from the first element of `data.results`, when `data` has that shape. Returns `undefined` for any shape mismatch, so callers can narrow the result themselves.
+ */
+const getFirstResultField = (data: unknown, field: string): unknown => {
+	if (!isRecord(data)) return undefined;
+	const { results } = data;
+	if (!Array.isArray(results)) return undefined;
+	const first: unknown = results[0];
+	if (!isRecord(first)) return undefined;
+	return first[field];
+};
+
 /**
  * Discover a valid entity ID from OpenAlex API
  *
@@ -27,8 +42,9 @@ const externalIdCache = new Map<string, string>();
  */
 export const discoverEntityId = async (type: EntityType): Promise<string | null> => {
 	// Check cache first
-	if (entityCache.has(type)) {
-		return entityCache.get(type)!;
+	const cached = entityCache.get(type);
+	if (cached !== undefined) {
+		return cached;
 	}
 
 	try {
@@ -40,19 +56,23 @@ export const discoverEntityId = async (type: EntityType): Promise<string | null>
 		});
 
 		if (!response.ok) {
-			console.warn(`Failed to fetch ${type} from OpenAlex: ${response.status}`);
+			console.warn(`Failed to fetch ${type} from OpenAlex: ${String(response.status)}`);
 			return null;
 		}
 
-		const data = await response.json();
-		if (!data.results || data.results.length === 0) {
+		const data: unknown = await response.json();
+		const fullId = getFirstResultField(data, "id");
+		if (typeof fullId !== "string") {
 			console.warn(`No results found for ${type}`);
 			return null;
 		}
 
 		// Extract short ID from full URL (e.g., "https://openalex.org/W123" -> "W123")
-		const fullId = data.results[0].id as string;
-		const shortId = fullId.split("/").pop()!;
+		const shortId = fullId.split("/").pop();
+		if (shortId === undefined) {
+			console.warn(`No results found for ${type}`);
+			return null;
+		}
 
 		entityCache.set(type, shortId);
 		return shortId;
@@ -76,12 +96,12 @@ export const getEntityId = async (type: EntityType): Promise<string> => {
  * Discover external IDs from OpenAlex API
  *
  * Fetches entities with specific external identifiers (ORCID, DOI, ISSN, ROR).
- * @param idType
  */
 export const discoverExternalId = async (idType: "orcid" | "issn" | "ror" | "doi"): Promise<string | null> => {
 	// Check cache first
-	if (externalIdCache.has(idType)) {
-		return externalIdCache.get(idType)!;
+	const cached = externalIdCache.get(idType);
+	if (cached !== undefined) {
+		return cached;
 	}
 
 	try {
@@ -92,38 +112,37 @@ export const discoverExternalId = async (idType: "orcid" | "issn" | "ror" | "doi
 			case "orcid":
 				url = `${OPENALEX_API_BASE}/authors?filter=has_orcid:true&per_page=1&select=orcid`;
 				extractId = (data: unknown) => {
-					const results = (data as { results?: { orcid?: string }[] }).results;
-					const orcid = results?.[0]?.orcid;
+					const orcid = getFirstResultField(data, "orcid");
 					// Extract ORCID from full URL (e.g., "https://orcid.org/0000-0002-1234-5678")
-					return orcid?.split("/").pop() ?? null;
+					return typeof orcid === "string" ? (orcid.split("/").pop() ?? null) : null;
 				};
 				break;
 
 			case "doi":
 				url = `${OPENALEX_API_BASE}/works?filter=has_doi:true&per_page=1&select=doi`;
 				extractId = (data: unknown) => {
-					const results = (data as { results?: { doi?: string }[] }).results;
-					const doi = results?.[0]?.doi;
+					const doi = getFirstResultField(data, "doi");
 					// Extract DOI from full URL (e.g., "https://doi.org/10.1234/example")
-					return doi?.replace("https://doi.org/", "") ?? null;
+					return typeof doi === "string" ? doi.replace("https://doi.org/", "") : null;
 				};
 				break;
 
 			case "issn":
 				url = `${OPENALEX_API_BASE}/sources?filter=type:journal&per_page=1&select=issn`;
 				extractId = (data: unknown) => {
-					const results = (data as { results?: { issn?: string[] }[] }).results;
-					return results?.[0]?.issn?.[0] ?? null;
+					const issn = getFirstResultField(data, "issn");
+					if (!Array.isArray(issn)) return null;
+					const firstIssn: unknown = issn[0];
+					return typeof firstIssn === "string" ? firstIssn : null;
 				};
 				break;
 
 			case "ror":
 				url = `${OPENALEX_API_BASE}/institutions?per_page=1&select=ror`;
 				extractId = (data: unknown) => {
-					const results = (data as { results?: { ror?: string }[] }).results;
-					const ror = results?.[0]?.ror;
+					const ror = getFirstResultField(data, "ror");
 					// Extract ROR ID from full URL (e.g., "https://ror.org/00cvxb145")
-					return ror?.split("/").pop() ?? null;
+					return typeof ror === "string" ? (ror.split("/").pop() ?? null) : null;
 				};
 				break;
 		}
@@ -135,14 +154,14 @@ export const discoverExternalId = async (idType: "orcid" | "issn" | "ror" | "doi
 		});
 
 		if (!response.ok) {
-			console.warn(`Failed to fetch ${idType} from OpenAlex: ${response.status}`);
+			console.warn(`Failed to fetch ${idType} from OpenAlex: ${String(response.status)}`);
 			return null;
 		}
 
-		const data = await response.json();
+		const data: unknown = await response.json();
 		const externalId = extractId(data);
 
-		if (externalId) {
+		if (externalId !== null) {
 			externalIdCache.set(idType, externalId);
 		}
 
@@ -155,7 +174,6 @@ export const discoverExternalId = async (idType: "orcid" | "issn" | "ror" | "doi
 
 /**
  * Get an external ID, preferring runtime discovery with fallback to sample
- * @param idType
  */
 export const getExternalId = async (idType: "orcid" | "issn" | "ror" | "doi"): Promise<string> => {
 	const discovered = await discoverExternalId(idType);
@@ -200,7 +218,7 @@ export const prewarmEntityCache = async (): Promise<void> => {
 
 	// Discover all entity types in parallel
 	await Promise.all([
-		...entityTypes.map((type) => discoverEntityId(type)),
-		...externalIdTypes.map((type) => discoverExternalId(type)),
+		...entityTypes.map(discoverEntityId),
+		...externalIdTypes.map(discoverExternalId),
 	]);
 };

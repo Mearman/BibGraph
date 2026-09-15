@@ -35,7 +35,7 @@ export class SubfieldsDetailPage extends BaseEntityPageObject {
 	async gotoSubfield(subfieldId: string): Promise<void> {
 		// Strip full URL if provided, keep only the numeric ID
 		const numericId = subfieldId.includes("/")
-			? subfieldId.split("/").pop() || subfieldId
+			? subfieldId.split("/").pop() ?? subfieldId
 			: subfieldId;
 		await this.goto(`#/subfields/${numericId}`);
 	}
@@ -68,7 +68,7 @@ export class SubfieldsDetailPage extends BaseEntityPageObject {
 	 */
 	async getTopicCount(): Promise<number> {
 		const countText = await this.getText(this.subfieldSelectors.topicCount);
-		return countText ? Number.parseInt(countText, 10) : 0;
+		return countText !== null ? Number.parseInt(countText, 10) : 0;
 	}
 
 	/**

@@ -5,6 +5,8 @@
 
 import { expect,test } from "@playwright/test";
 
+const MIN_PAGE_BODY_TEXT_LENGTH = 100;
+
 test.describe("Catalogue Realistic Functionality Tests", () => {
   test("should have accessible catalogue components in the application", async ({ page }) => {
     // Navigate to home page first
@@ -45,7 +47,7 @@ test.describe("Catalogue Realistic Functionality Tests", () => {
         console.log('⚠️ No catalogue navigation or create buttons visible (acceptable in cached builds)');
         const bodyText = await page.locator('body').textContent();
         expect(bodyText).toBeTruthy();
-        expect(bodyText?.length).toBeGreaterThan(100);
+        expect(bodyText?.length).toBeGreaterThan(MIN_PAGE_BODY_TEXT_LENGTH);
         return;
       }
 
@@ -62,8 +64,8 @@ test.describe("Catalogue Realistic Functionality Tests", () => {
     const isCatalogueServicesAvailable = await page.evaluate(() => {
       try {
         // Check various ways the catalogue might be exposed
-        return (window as any).catalogueService !== undefined ||
-               (window as any).useCatalogue !== undefined ||
+        return 'catalogueService' in window ||
+               'useCatalogue' in window ||
                document.body.textContent.includes('Catalogue') ||
                document.body.textContent.includes('Create New List');
       } catch {
@@ -103,7 +105,7 @@ test.describe("Catalogue Realistic Functionality Tests", () => {
         // Try to create a simple IndexedDB database like the catalogue would
         const testDB = indexedDB.open('test-catalogue-db', 1);
 
-        return new Promise((resolve) => {
+        return await new Promise((resolve) => {
           testDB.onsuccess = (event) => {
             const database = (event.target as IDBOpenDBRequest).result;
             database.close();
@@ -131,7 +133,7 @@ test.describe("Catalogue Realistic Functionality Tests", () => {
     const isCompressionAvailable = await page.evaluate(() => {
       try {
         // Check if pako (compression library) is available globally or in modules
-        return (window as any).pako !== undefined ||
+        return 'pako' in window ||
                document.querySelector('script[src*="pako"]') !== null ||
                document.body.textContent.includes('compression');
       } catch {
@@ -169,7 +171,7 @@ test.describe("Catalogue Realistic Functionality Tests", () => {
       console.log('⚠️ No Mantine buttons or inputs visible (acceptable in cached builds)');
       const bodyText = await page.locator('body').textContent();
       expect(bodyText).toBeTruthy();
-      expect(bodyText?.length).toBeGreaterThan(100);
+      expect(bodyText?.length).toBeGreaterThan(MIN_PAGE_BODY_TEXT_LENGTH);
       return;
     }
 

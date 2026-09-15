@@ -3,7 +3,7 @@ import { lazy } from "react";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const ConceptsListRoute = lazy(() => import("./index.lazy"));
+const ConceptsListRoute = lazy(async () => import("./index.lazy"));
 
 export const Route = createFileRoute("/concepts/")({
   component: () => (

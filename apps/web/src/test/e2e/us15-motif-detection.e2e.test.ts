@@ -21,10 +21,12 @@ import { expect, test } from '@playwright/test';
 
 import { waitForAppReady } from '@/test/helpers/app-ready';
 
-test.describe('@workflow US-15 Motif Detection', () => {
-	test.setTimeout(60_000);
+const TEST_SUITE_TIMEOUT_MS = 60_000;
 
-	test.beforeEach(async ({ page }) => {
+test.describe('@workflow US-15 Motif Detection', () => {
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS);
+
+	test.beforeEach(({ page }) => {
 		page.on('console', (message) => {
 			if (message.type() === 'error') {
 				console.error('Browser console error:', message.text());

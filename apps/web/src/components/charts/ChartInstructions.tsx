@@ -22,10 +22,6 @@ interface ChartInstructionsProperties {
 
 /**
  * Instructions component showing interaction hints for charts
- * @param root0
- * @param root0.isMobile
- * @param root0.mobileText
- * @param root0.desktopText
  */
 export const ChartInstructions = ({
   isMobile,

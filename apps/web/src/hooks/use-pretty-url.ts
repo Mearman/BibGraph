@@ -12,10 +12,12 @@ import { useEffect } from "react";
  * @param rawId - The raw (potentially encoded) entity ID from route params (Note: TanStack Router auto-decodes this)
  * @param decodedId - The decoded entity ID (after additional processing like fixing collapsed slashes)
  */
+const URL_UPDATE_RETRY_DELAY_MS = 100;
+
 export const usePrettyUrl = (entityType: string, rawId: string | undefined, decodedId: string | undefined): void => {
 
   useEffect(() => {
-    if (!rawId || !decodedId) return;
+    if (rawId === undefined || rawId === "" || decodedId === undefined || decodedId === "") return undefined;
 
     // Function to check and update URL
     const checkAndUpdateUrl = () => {
@@ -63,8 +65,10 @@ export const usePrettyUrl = (entityType: string, rawId: string | undefined, deco
     checkAndUpdateUrl();
 
     // Also check after a short delay to handle any async loading
-    const timeoutId = setTimeout(checkAndUpdateUrl, 100);
+    const timeoutId = setTimeout(checkAndUpdateUrl, URL_UPDATE_RETRY_DELAY_MS);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, [entityType, rawId, decodedId]);
 };

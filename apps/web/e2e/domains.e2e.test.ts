@@ -1,7 +1,6 @@
 /**
  * E2E tests for Domains Detail Page
  * Tests domain entity detail pages, metadata display, and relationships
- * @module domains.e2e
  * @see spec-020 Phase 1: T010 - Domain entity E2E tests
  */
 
@@ -10,6 +9,8 @@ import { expect,test } from '@playwright/test';
 
 import { waitForAppReady, waitForEntityData } from '@/test/helpers/app-ready';
 import { DomainsDetailPage } from '@/test/page-objects/DomainsDetailPage';
+
+const ENTITY_DETAIL_LOAD_TARGET_MS = 2000;
 
 test.describe('@entity Domains Detail Page', () => {
   // OpenAlex has 5 domains: D1-D5
@@ -190,10 +191,10 @@ test.describe('@entity Domains Detail Page', () => {
     const endTime = Date.now();
 
     const loadTime = endTime - startTime;
-    console.log(`Entity detail page load time: ${loadTime}ms`);
+    console.log(`Entity detail page load time: ${String(loadTime)}ms`);
 
     // Target: <2000ms for entity detail page
-    expect(loadTime).toBeLessThan(2000);
+    expect(loadTime).toBeLessThan(ENTITY_DETAIL_LOAD_TARGET_MS);
 
     // Verify entity title is displayed
     const title = await domainsPage.getDomainName();

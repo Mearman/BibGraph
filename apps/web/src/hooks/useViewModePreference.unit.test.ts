@@ -1,7 +1,6 @@
+// @vitest-environment jsdom
 /**
  * Unit tests for useViewModePreference hook
- * @vitest-environment jsdom
- * @module useViewModePreference.unit.test
  */
 
 import { act,renderHook } from '@testing-library/react';
@@ -11,22 +10,22 @@ import { useViewModePreference } from './useViewModePreference';
 
 // Mock localStorage
 const localStorageMock = (() => {
-  let store: Record<string, string> = {};
+  const store = new Map<string, string>();
 
   return {
-    getItem: (key: string) => store[key] || null,
+    getItem: (key: string) => store.get(key) ?? null,
     setItem: (key: string, value: string) => {
-      store[key] = value;
+      store.set(key, value);
     },
     removeItem: (key: string) => {
-      delete store[key];
+      store.delete(key);
     },
     clear: () => {
-      store = {};
+      store.clear();
     },
-    key: (index: number) => Object.keys(store)[index] || null,
+    key: (index: number) => [...store.keys()][index] ?? null,
     get length() {
-      return Object.keys(store).length;
+      return store.size;
     }
   };
 })();
@@ -115,21 +114,28 @@ describe('useViewModePreference', () => {
 
   it('should handle localStorage errors gracefully', () => {
     // Mock localStorage to throw
-    const originalGetItem = localStorage.getItem;
-    const originalSetItem = localStorage.setItem;
+    const originalGetItem = localStorage.getItem.bind(localStorage);
+    const originalSetItem = localStorage.setItem.bind(localStorage);
+    const originalRemoveItem = localStorage.removeItem.bind(localStorage);
+    const originalClear = localStorage.clear.bind(localStorage);
+    const originalKey = localStorage.key.bind(localStorage);
+    const originalLength = localStorage.length;
 
-    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* suppress console output during test */ });
 
     // Mock getItem to throw
     Object.defineProperty(window, 'localStorage', {
       value: {
-        ...localStorage,
         getItem: vi.fn().mockImplementation(() => {
           throw new Error('localStorage unavailable');
         }),
         setItem: vi.fn().mockImplementation(() => {
           throw new Error('localStorage unavailable');
         }),
+        removeItem: originalRemoveItem,
+        clear: originalClear,
+        key: originalKey,
+        length: originalLength,
       },
       writable: true,
     });
@@ -154,16 +160,16 @@ describe('useViewModePreference', () => {
       value: {
         getItem: originalGetItem,
         setItem: originalSetItem,
-        removeItem: localStorage.removeItem,
-        clear: localStorage.clear,
-        length: localStorage.length,
-        key: localStorage.key,
+        removeItem: originalRemoveItem,
+        clear: originalClear,
+        length: originalLength,
+        key: originalKey,
       },
       writable: true,
     });
   });
 
-  it('should return isLoaded as false initially then true after effect', async () => {
+  it('should return isLoaded as false initially then true after effect', () => {
     // This test verifies the loading state transition
     // Note: In most test environments, the effect runs synchronously
     // so isLoaded will be true immediately

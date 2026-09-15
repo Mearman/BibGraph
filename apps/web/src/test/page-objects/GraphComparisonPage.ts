@@ -4,13 +4,13 @@
  * Page object for the Graph Comparison feature (US-16).
  * Handles dual-panel graph comparison, snapshot selection, and diff metrics.
  *
- * Hierarchy: BasePageObject -> BaseSPAPageObject -> GraphComparisonPage
+ * Hierarchy: BasePageObject -\> BaseSPAPageObject -\> GraphComparisonPage
  * @see US-16
  */
 
-import type { Page } from "@playwright/test";
-
 import { BaseSPAPageObject } from "./BaseSPAPageObject";
+
+const SWAP_ANIMATION_WAIT_MS = 300;
 
 export class GraphComparisonPage extends BaseSPAPageObject {
 	private readonly comparisonSelectors = {
@@ -25,10 +25,6 @@ export class GraphComparisonPage extends BaseSPAPageObject {
 		sharedEntity: "[data-testid='shared-entity'], .node--shared",
 		syncToggle: "[data-testid='sync-pan-zoom']",
 	};
-
-	constructor(page: Page) {
-		super(page);
-	}
 
 	async gotoComparison(): Promise<void> {
 		await this.goto("#/graph-comparison");
@@ -53,7 +49,7 @@ export class GraphComparisonPage extends BaseSPAPageObject {
 
 	async swapGraphs(): Promise<void> {
 		await this.click(this.comparisonSelectors.swapButton);
-		await this.page.waitForTimeout(300);
+		await this.page.waitForTimeout(SWAP_ANIMATION_WAIT_MS);
 	}
 
 	async isLeftPanelVisible(): Promise<boolean> {

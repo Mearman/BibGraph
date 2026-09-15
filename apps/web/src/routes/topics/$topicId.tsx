@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const TopicRoute = lazy(() =>
+const TopicRoute = lazy(async () =>
   import("./$topicId.lazy").then((m) => ({ default: m.default })),
 );
 

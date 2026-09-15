@@ -3,7 +3,7 @@ import { lazy } from "react";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const CatchAllRoute = lazy(() =>
+const CatchAllRoute = lazy(async () =>
   import("./$_.lazy").then((m) => ({ default: m.default })),
 );
 

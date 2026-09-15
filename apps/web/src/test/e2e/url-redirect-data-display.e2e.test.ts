@@ -12,7 +12,7 @@ test.describe("URL Redirect and Data Display", () => {
   test("should redirect bioplastics URL and display all data", async ({ page }) => {
     // Navigate to the API redirect route (this is how the app handles full API URLs)
     const fullUrl = "/#/api-openalex-org/works?filter=display_name.search:bioplastics&sort=publication_year:desc,relevance_score:desc";
-    await page.goto(`${fullUrl}`);
+    await page.goto(fullUrl);
 
     // Wait for redirect to complete - use more flexible URL check
     await page.waitForURL(/\/#\/works/, { timeout: 10_000 });
@@ -73,7 +73,7 @@ test.describe("URL Redirect and Data Display", () => {
     ];
 
     for (const urlTest of testUrls) {
-      await page.goto(`${urlTest.input}`);
+      await page.goto(urlTest.input);
       // Wait for redirect to complete
       await page.waitForURL(new RegExp(urlTest.expected.replaceAll('?', String.raw`\?`)), { timeout: 10_000 });
       const currentUrl = page.url();

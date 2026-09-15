@@ -3,7 +3,6 @@
  * Handles display name resolution and actions
  */
 
-import type { EntityType } from "@bibgraph/types";
 import { hostnameMatches } from '@bibgraph/utils';
 import { logError, logger } from "@bibgraph/utils/logger";
 import { type CatalogueEntity } from "@bibgraph/utils/storage/catalogue-db";
@@ -28,7 +27,7 @@ import * as styles from "./sidebar.css";
 interface HistoryCardProperties {
   entry: CatalogueEntity;
   onClose?: () => void;
-  formatDate: (date: Date) => string;
+  formatDate: (date: Readonly<Date>) => string;
 }
 
 /**
@@ -41,6 +40,10 @@ Pattern for corrupted URLs
  */
 const CORRUPTED_URL_PATTERNS = ["[object Object]", "[object%20Object]", "%5Bobject"];
 
+// Entity id display truncation lengths
+const SHORT_ID_TRUNCATE_LENGTH = 8;
+const ENTITY_ID_TRUNCATE_LENGTH = 15;
+
 export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardProperties) => {
   const storageProvider = useStorageProvider();
 
@@ -52,15 +55,15 @@ export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardPropertie
   const titleFromNotes = entry.notes?.match(/Title: ([^\n]+)/)?.[1];
 
   // Check if URL points to a non-entity page
-  const isNonEntityUrl = urlFromNotes && NON_ENTITY_URL_PATTERNS.some(pattern => urlFromNotes.includes(pattern));
+  const isNonEntityUrl = urlFromNotes !== undefined && NON_ENTITY_URL_PATTERNS.some(pattern => urlFromNotes.includes(pattern));
 
   // Check if URL is corrupted
-  const isCorruptedUrl = urlFromNotes && CORRUPTED_URL_PATTERNS.some(pattern => urlFromNotes.includes(pattern));
+  const isCorruptedUrl = urlFromNotes !== undefined && CORRUPTED_URL_PATTERNS.some(pattern => urlFromNotes.includes(pattern));
 
   // Only fetch display name for valid entity URLs
   const { displayName, isLoading } = useEntityDisplayName({
     entityId: entry.entityId,
-    entityType: entry.entityType as EntityType,
+    entityType: entry.entityType,
     enabled: !isSpecialId && !isNonEntityUrl && !isCorruptedUrl,
   });
 
@@ -73,14 +76,14 @@ export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardPropertie
   // Format entity ID for display (shortened if it's a long ID)
   const formatEntityId = (entityId: string): string => {
     // Extract just the ID part (e.g., "W123456789" from URL or keep as-is)
-    const idMatch = entityId.match(/([A-Z]\d+)$/);
+    const idMatch = /([A-Z]\d+)$/.exec(entityId);
     if (idMatch) {
       const id = idMatch[1];
       // Show first letter + first few digits for readability
-      return id.length > 8 ? `${id.slice(0, 8)}...` : id;
+      return id.length > SHORT_ID_TRUNCATE_LENGTH ? `${id.slice(0, SHORT_ID_TRUNCATE_LENGTH)}...` : id;
     }
     // For other IDs, truncate if too long
-    return entityId.length > 15 ? `${entityId.slice(0, 15)}...` : entityId;
+    return entityId.length > ENTITY_ID_TRUNCATE_LENGTH ? `${entityId.slice(0, ENTITY_ID_TRUNCATE_LENGTH)}...` : entityId;
   };
 
   // Determine the title to display
@@ -92,10 +95,10 @@ export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardPropertie
     // For non-entity pages, show the page name (e.g., "About", "Settings")
     const pageName = urlFromNotes.replace(/.*[#/]/, "").split("/", 1)[0];
     title = pageName.charAt(0).toUpperCase() + pageName.slice(1);
-  } else if (displayName) {
+  } else if (displayName !== null && displayName !== "") {
     // Prefer freshly fetched display name for entity pages
     title = displayName;
-  } else if (titleFromNotes) {
+  } else if (titleFromNotes !== undefined) {
     // Fall back to stored title from notes
     title = titleFromNotes;
   } else if (isLoading) {
@@ -147,14 +150,16 @@ export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardPropertie
       ),
       labels: { confirm: "Delete", cancel: "Cancel" },
       confirmProps: { color: "red" },
-      onConfirm: async () => {
-        try {
-          if (entry.id) {
-            await storageProvider.removeEntityFromList("history-list", entry.id);
+      onConfirm: () => {
+        void (async () => {
+          try {
+            if (entry.id !== undefined) {
+              await storageProvider.removeEntityFromList("history-list", entry.id);
+            }
+          } catch (error) {
+            logError(logger, "Failed to delete history entry", error, "HistoryCard");
           }
-        } catch (error) {
-          logError(logger, "Failed to delete history entry", error, "HistoryCard");
-        }
+        })();
       },
     });
   };
@@ -185,7 +190,7 @@ export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardPropertie
           >
             {title}
           </Text>
-          {notesDisplay && (
+          {notesDisplay !== undefined && notesDisplay !== "" && (
             <Text size="xs" c="dimmed" lineClamp={1}>
               {notesDisplay}
             </Text>
@@ -194,7 +199,7 @@ export const HistoryCard = ({ entry, onClose, formatDate }: HistoryCardPropertie
             {formatDate(new Date(entry.addedAt))}
           </Text>
         </Stack>
-        {entry.id && (
+        {entry.id !== undefined && (
           <Tooltip label="Delete history entry">
             <ActionIcon
               size="sm"

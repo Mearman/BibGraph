@@ -26,17 +26,12 @@ import { getEntityTypeColor } from "./search-page-types";
 interface SearchResultViewProperties {
   results: AutocompleteResult[];
   isInGraph: (entityId: string) => boolean;
-  onToggleGraph: (result: AutocompleteResult, e?: React.MouseEvent) => void;
+  onToggleGraph: (result: Readonly<AutocompleteResult>, e?: React.MouseEvent) => void;
   graphLoading: boolean;
 }
 
 /**
  * Table view for search results
- * @param root0
- * @param root0.results
- * @param root0.isInGraph
- * @param root0.onToggleGraph
- * @param root0.graphLoading
  */
 export const SearchResultsTableView = ({
   results,
@@ -79,7 +74,7 @@ export const SearchResultsTableView = ({
                 ) : (
                   <Text size="sm" fw={500}>{result.display_name}</Text>
                 )}
-                {result.hint && (
+                {result.hint !== undefined && result.hint !== "" && (
                   <Text size="xs" c="dimmed" lineClamp={1}>
                     {result.hint}
                   </Text>
@@ -88,12 +83,12 @@ export const SearchResultsTableView = ({
             </Table.Td>
             <Table.Td>
               <Text size="sm" fw={500}>
-                {result.cited_by_count ? formatLargeNumber(result.cited_by_count) : '-'}
+                {result.cited_by_count !== undefined && result.cited_by_count !== 0 ? formatLargeNumber(result.cited_by_count) : '-'}
               </Text>
             </Table.Td>
             <Table.Td>
               <Text size="sm">
-                {result.works_count ? formatLargeNumber(result.works_count) : '-'}
+                {result.works_count !== undefined && result.works_count !== 0 ? formatLargeNumber(result.works_count) : '-'}
               </Text>
             </Table.Td>
             <Table.Td>
@@ -119,11 +114,6 @@ export const SearchResultsTableView = ({
 
 /**
  * Card view for search results
- * @param root0
- * @param root0.results
- * @param root0.isInGraph
- * @param root0.onToggleGraph
- * @param root0.graphLoading
  */
 export const SearchResultsCardView = ({
   results,
@@ -152,7 +142,7 @@ export const SearchResultsCardView = ({
               </Badge>
               <Group gap="xs">
                 <Text size="xs" c="dimmed">
-                  {result.cited_by_count ? `${formatLargeNumber(result.cited_by_count)} citations` : '-'}
+                  {result.cited_by_count !== undefined && result.cited_by_count !== 0 ? `${formatLargeNumber(result.cited_by_count)} citations` : '-'}
                 </Text>
                 <Tooltip label={inGraph ? "Remove from graph" : "Add to graph"} position="bottom">
                   <ActionIcon
@@ -171,7 +161,7 @@ export const SearchResultsCardView = ({
             <Text size="sm" fw={500} lineClamp={2}>
               {result.display_name}
             </Text>
-            {result.hint && (
+            {result.hint !== undefined && result.hint !== "" && (
               <Text size="xs" c="dimmed" lineClamp={1}>
                 {result.hint}
               </Text>
@@ -185,11 +175,6 @@ export const SearchResultsCardView = ({
 
 /**
  * List view for search results
- * @param root0
- * @param root0.results
- * @param root0.isInGraph
- * @param root0.onToggleGraph
- * @param root0.graphLoading
  */
 export const SearchResultsListView = ({
   results,
@@ -220,7 +205,7 @@ export const SearchResultsListView = ({
                 <Text size="sm" fw={500}>
                   {result.display_name}
                 </Text>
-                {result.hint && (
+                {result.hint !== undefined && result.hint !== "" && (
                   <Text size="xs" c="dimmed" lineClamp={1}>
                     {result.hint}
                   </Text>
@@ -228,12 +213,12 @@ export const SearchResultsListView = ({
               </Stack>
             </Group>
             <Group gap="md">
-              {result.cited_by_count && (
+              {result.cited_by_count !== undefined && result.cited_by_count !== 0 && (
                 <Text size="xs" c="dimmed" ta="right">
                   {formatLargeNumber(result.cited_by_count)} citations
                 </Text>
               )}
-              {result.works_count && (
+              {result.works_count !== undefined && result.works_count !== 0 && (
                 <Text size="xs" c="dimmed" ta="right">
                   {formatLargeNumber(result.works_count)} works
                 </Text>

@@ -18,23 +18,22 @@ interface SyncStatusContextValue {
 }
 
 const MAX_HISTORY = 50; // Keep last 50 completed operations
+const OPERATION_RETENTION_MS = 5000; // Keep completed operations visible for 5 seconds
+const STATUS_POLL_INTERVAL_MS = 1000; // Sweep completed operations once per second
 
 const SyncStatusContext = createContext<SyncStatusContextValue | null>(null);
 
 export const SyncStatusProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [operations, setOperations] = useState<SyncOperation[]>([]);
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
 
   // Track online/offline status
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnline = () => { setIsOnline(true); };
+    const handleOffline = () => { setIsOnline(false); };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
-    // Initial check
-    setIsOnline(navigator.onLine);
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -93,17 +92,17 @@ export const SyncStatusProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   // Auto-remove successful operations after 5 seconds
-  const shouldKeepOp = useCallback((op: SyncOperation, now: Date) => {
+  const shouldKeepOp = useCallback((op: SyncOperation, now: Readonly<Date>) => {
     if (!op.endTime) return true;
     const age = now.getTime() - op.endTime.getTime();
-    return age < 5000 || op.status === 'error';
+    return age < OPERATION_RETENTION_MS || op.status === 'error';
   }, []);
 
-  const filterActiveOps = useCallback((ops: SyncOperation[]) => {
+  const filterActiveOps = useCallback((ops: readonly SyncOperation[]) => {
     return ops.filter((op) => op.status === 'syncing');
   }, []);
 
-  const filterAndTrimCompletedOps = useCallback((ops: SyncOperation[], now: Date) => {
+  const filterAndTrimCompletedOps = useCallback((ops: readonly SyncOperation[], now: Readonly<Date>) => {
     const completed = ops.filter((op) => op.status !== 'syncing');
     const recentCompleted = completed.filter((op) => shouldKeepOp(op, now));
     return recentCompleted.slice(0, MAX_HISTORY);
@@ -117,9 +116,9 @@ export const SyncStatusProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const trimmedCompleted = filterAndTrimCompletedOps(previous, now);
         return [...active, ...trimmedCompleted];
       });
-    }, 1000);
+    }, STATUS_POLL_INTERVAL_MS);
 
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); };
   }, [filterActiveOps, filterAndTrimCompletedOps]);
 
   const syncStatus: SyncStatus = useMemo(() => ({

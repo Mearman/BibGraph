@@ -40,14 +40,12 @@ export const useSprinkles = () => {
 
     /**
      * Helper for creating theme-aware spacing
-     * @param size
      */
     spacing: (size: 'xs' | 'sm' | 'md' | 'lg' | 'xl') =>
       `var(--mantine-spacing-${size})`,
 
     /**
      * Helper for creating theme-aware border radius
-     * @param size
      */
     radius: (size: 'xs' | 'sm' | 'md' | 'lg' | 'xl') =>
       `var(--mantine-radius-${size})`,
@@ -106,10 +104,6 @@ export const useDynamicSpacing = () => {
 /**
  * Hook for interactive states (hover, active, disabled, selected)
  * Returns dynamic styles and utilities for interactive components
- * @param options
- * @param options.disabled
- * @param options.selected
- * @param options.hoverable
  */
 export const useInteractiveStates = (options?: {
   disabled?: boolean;
@@ -126,24 +120,24 @@ export const useInteractiveStates = (options?: {
   }, []);
 
   const getStyles = useCallback((
-    base: boolean = true,
-    disabled: boolean = false,
-    selected: boolean = false,
-    hoverable: boolean = true
+    base = true,
+    disabled = false,
+    selected = false,
+    hoverable = true
   ): CSSProperties => {
     let combinedStyles: CSSProperties = {};
-    if (base) combinedStyles = { ...combinedStyles, ...(states.base as CSSProperties) };
-    if (disabled) combinedStyles = { ...combinedStyles, ...(states.disabled as CSSProperties) };
-    if (selected) combinedStyles = { ...combinedStyles, ...(states.selected as CSSProperties) };
-    if (hoverable) combinedStyles = { ...combinedStyles, ...(states.hoverable as CSSProperties) };
+    if (base) combinedStyles = { ...combinedStyles, ...states.base };
+    if (disabled) combinedStyles = { ...combinedStyles, ...states.disabled };
+    if (selected) combinedStyles = { ...combinedStyles, ...states.selected };
+    if (hoverable) combinedStyles = { ...combinedStyles, ...states.hoverable };
     return combinedStyles;
   }, [states]);
 
   return {
     states,
     getStyles,
-    isDisabled: options?.disabled || false,
-    isSelected: options?.selected || false,
+    isDisabled: options?.disabled ?? false,
+    isSelected: options?.selected ?? false,
     isHoverable: options?.hoverable !== false,
   };
 };
@@ -151,9 +145,6 @@ export const useInteractiveStates = (options?: {
 /**
  * Hook for dynamic card styling
  * Returns card styles that adapt to the current component library
- * @param options
- * @param options.elevated
- * @param options.library
  */
 export const useDynamicCard = (options?: {
   elevated?: boolean;
@@ -163,25 +154,21 @@ export const useDynamicCard = (options?: {
 
   const cardStyle = useMemo(() => {
     return createCardStyles(
-      options?.library || config.componentLibrary,
-      options?.elevated || false
+      options?.library ?? config.componentLibrary,
+      options?.elevated ?? false
     );
   }, [config.componentLibrary, options?.library, options?.elevated]);
 
   return {
     cardStyle,
-    isElevated: options?.elevated || false,
-    library: options?.library || config.componentLibrary,
+    isElevated: options?.elevated ?? false,
+    library: options?.library ?? config.componentLibrary,
   };
 };
 
 /**
  * Hook for dynamic button styling
  * Returns button styles that adapt to the current component library
- * @param options
- * @param options.variant
- * @param options.size
- * @param options.library
  */
 export const useDynamicButton = (options?: {
   variant?: 'solid' | 'subtle' | 'outline' | 'ghost';
@@ -192,17 +179,17 @@ export const useDynamicButton = (options?: {
 
   const buttonStyle = useMemo(() => {
     return createButtonStyles(
-      options?.library || config.componentLibrary,
-      options?.variant || 'solid',
-      options?.size || 'md'
+      options?.library ?? config.componentLibrary,
+      options?.variant ?? 'solid',
+      options?.size ?? 'md'
     );
   }, [config.componentLibrary, options?.library, options?.variant, options?.size]);
 
   return {
     buttonStyle,
-    variant: options?.variant || 'solid',
-    size: options?.size || 'md',
-    library: options?.library || config.componentLibrary,
+    variant: options?.variant ?? 'solid',
+    size: options?.size ?? 'md',
+    library: options?.library ?? config.componentLibrary,
   };
 };
 
@@ -210,6 +197,8 @@ export const useDynamicButton = (options?: {
  * Hook for responsive design utilities
  * Provides breakpoint-aware styling helpers with proper event handling
  */
+const RESIZE_DEBOUNCE_MS = 100;
+
 export const useResponsiveDesign = () => {
   const breakpoints = useMemo(() => ({
     mobile: '0px',
@@ -243,7 +232,7 @@ export const useResponsiveDesign = () => {
     let resizeTimer: NodeJS.Timeout;
     const handleResize = () => {
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(updateBreakpoint, 100);
+      resizeTimer = setTimeout(updateBreakpoint, RESIZE_DEBOUNCE_MS);
     };
 
     window.addEventListener('resize', handleResize);
@@ -260,7 +249,7 @@ export const useResponsiveDesign = () => {
     wide?: Sprinkles;
   }) => {
     // Return styles based on current breakpoint
-    const breakpointStyles = properties[currentBreakpoint] || properties.mobile || {};
+    const breakpointStyles = properties[currentBreakpoint] ?? properties.mobile ?? {};
     return sprinkles(breakpointStyles);
   }, [currentBreakpoint]);
 

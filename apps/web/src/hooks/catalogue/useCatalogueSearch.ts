@@ -18,7 +18,6 @@ export interface UseCatalogueSearchParams {
 
 /**
  * Search and filter hook for catalogue lists and entities
- * @param params
  */
 export const useCatalogueSearch = (params: UseCatalogueSearchParams) => {
 	const storageProvider = useStorageProvider();
@@ -42,15 +41,15 @@ export const useCatalogueSearch = (params: UseCatalogueSearchParams) => {
 
 		const lowercaseQuery = query.toLowerCase();
 		return entities.filter((entity) => {
-			const entityId = entity.entityId?.toLowerCase() || '';
-			const notes = entity.notes?.toLowerCase() || '';
+			const entityId = entity.entityId.toLowerCase() || '';
+			const notes = entity.notes?.toLowerCase() ?? '';
 			return entityId.includes(lowercaseQuery) || notes.includes(lowercaseQuery);
 		});
 	}, [entities]);
 
 	// Filter entities by type
-	const filterByType = useCallback((types: EntityType[]): CatalogueEntity[] => {
-		if (!types || types.length === 0) {
+	const filterByType = useCallback((types: readonly EntityType[]): CatalogueEntity[] => {
+		if (types.length === 0) {
 			return entities;
 		}
 

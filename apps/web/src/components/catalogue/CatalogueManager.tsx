@@ -54,12 +54,12 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
         {/* Header */}
         <CatalogueHeader
           selectedList={selectedList}
-          onImportClick={() => state.setShowImportModal(true)}
-          onShareClick={state.handleShare}
-          onTemplatesClick={() => state.setShowTemplatesModal(true)}
-          onSmartListsClick={() => state.setShowSmartListsModal(true)}
-          onMergeClick={() => state.setShowMergeModal(true)}
-          onCreateClick={() => state.setShowCreateModal(true)}
+          onImportClick={() => { state.setShowImportModal(true); }}
+          onShareClick={() => { void state.handleShare(); }}
+          onTemplatesClick={() => { state.setShowTemplatesModal(true); }}
+          onSmartListsClick={() => { state.setShowSmartListsModal(true); }}
+          onMergeClick={() => { state.setShowMergeModal(true); }}
+          onCreateClick={() => { state.setShowCreateModal(true); }}
         />
 
         {/* Search and filters */}
@@ -96,7 +96,7 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
           <Tabs.Panel value="lists" pt="md">
             <CatalogueListComponent
               lists={state.filteredLists.filter(l => l.type === "list")}
-              selectedListId={selectedList?.id || null}
+              selectedListId={selectedList?.id ?? null}
               onSelectList={selectList}
               onDeleteList={deleteList}
               onNavigate={onNavigate}
@@ -108,7 +108,7 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
           <Tabs.Panel value="bibliographies" pt="md">
             <CatalogueListComponent
               lists={state.filteredLists.filter(l => l.type === "bibliography")}
-              selectedListId={selectedList?.id || null}
+              selectedListId={selectedList?.id ?? null}
               onSelectList={selectList}
               onDeleteList={deleteList}
               onNavigate={onNavigate}
@@ -128,11 +128,11 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
             selectedList={selectedList}
             listStats={state.listStats}
             lists={lists}
-            onEditClick={() => {}}
-            onExportClick={() => state.setShowExportModal(true)}
-            onAnalyticsClick={() => state.setShowAnalyticsModal(true)}
-            onCitationsClick={() => state.setShowCitationModal(true)}
-            onShareClick={state.handleShare}
+            onEditClick={() => { /* No-op: SelectedListDetails does not yet wire this prop up to any action. */ }}
+            onExportClick={() => { state.setShowExportModal(true); }}
+            onAnalyticsClick={() => { state.setShowAnalyticsModal(true); }}
+            onCitationsClick={() => { state.setShowCitationModal(true); }}
+            onShareClick={() => { void state.handleShare(); }}
           />
         )}
 
@@ -144,7 +144,7 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
               if (onNavigate) {
                 onNavigate(url);
               } else {
-                navigate({ to: url });
+                void navigate({ to: url });
               }
             }}
           />
@@ -162,14 +162,14 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
           showAnalyticsModal={state.showAnalyticsModal}
           showCitationModal={state.showCitationModal}
           onCloseCreateModal={state.handleCloseCreateModal}
-          onCloseTemplatesModal={() => state.setShowTemplatesModal(false)}
-          onCloseSmartListsModal={() => state.setShowSmartListsModal(false)}
-          onCloseMergeModal={() => state.setShowMergeModal(false)}
-          onCloseShareModal={() => state.setShowShareModal(false)}
-          onCloseImportModal={() => state.setShowImportModal(false)}
-          onCloseExportModal={() => state.setShowExportModal(false)}
-          onCloseAnalyticsModal={() => state.setShowAnalyticsModal(false)}
-          onCloseCitationModal={() => state.setShowCitationModal(false)}
+          onCloseTemplatesModal={() => { state.setShowTemplatesModal(false); }}
+          onCloseSmartListsModal={() => { state.setShowSmartListsModal(false); }}
+          onCloseMergeModal={() => { state.setShowMergeModal(false); }}
+          onCloseShareModal={() => { state.setShowShareModal(false); }}
+          onCloseImportModal={() => { state.setShowImportModal(false); }}
+          onCloseExportModal={() => { state.setShowExportModal(false); }}
+          onCloseAnalyticsModal={() => { state.setShowAnalyticsModal(false); }}
+          onCloseCitationModal={() => { state.setShowCitationModal(false); }}
           selectedTemplate={state.selectedTemplate}
           shareUrl={state.shareUrl}
           selectedList={selectedList}

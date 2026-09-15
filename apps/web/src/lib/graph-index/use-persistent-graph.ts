@@ -5,15 +5,22 @@
  * - Hydrating from IndexedDB on first access
  * - Transforming GraphNodeRecord/GraphEdgeRecord to visualization nodes/edges
  * - Tracking hydration status and statistics
- * @module lib/graph-index/use-persistent-graph
+ *
+ * Module: lib/graph-index/use-persistent-graph
  */
 
-import { getPersistentGraph, PersistentGraph } from '@bibgraph/client';
+import { getPersistentGraph, type PersistentGraph } from '@bibgraph/client';
 import type { GraphEdge, GraphEdgeRecord,GraphNode, GraphNodeRecord, GraphStatistics  } from '@bibgraph/types';
 import { logger } from '@bibgraph/utils';
 import { useCallback, useEffect, useMemo,useState } from 'react';
 
 const LOG_PREFIX = 'use-persistent-graph';
+
+// Random initial node positions are centered on the origin, spread across an 800x600 viewport-sized area, before the force simulation repositions them.
+const INITIAL_POSITION_X_RANGE = 800;
+const INITIAL_POSITION_X_OFFSET = 400;
+const INITIAL_POSITION_Y_RANGE = 600;
+const INITIAL_POSITION_Y_OFFSET = 300;
 
 /**
  * Hydration status for the persistent graph
@@ -72,7 +79,6 @@ export interface UsePersistentGraphResult {
 
 /**
  * Transform GraphNodeRecord to GraphNode for visualization
- * @param record
  */
 const nodeRecordToGraphNode = (record: GraphNodeRecord): GraphNode => ({
     id: record.id,
@@ -80,8 +86,8 @@ const nodeRecordToGraphNode = (record: GraphNodeRecord): GraphNode => ({
     entityId: record.id,
     label: record.label,
     // Initialize with random positions - force simulation will reposition
-    x: Math.random() * 800 - 400,
-    y: Math.random() * 600 - 300,
+    x: Math.random() * INITIAL_POSITION_X_RANGE - INITIAL_POSITION_X_OFFSET,
+    y: Math.random() * INITIAL_POSITION_Y_RANGE - INITIAL_POSITION_Y_OFFSET,
     externalIds: [],
     // Pass completeness as metadata for visual distinction
     entityData: {
@@ -94,7 +100,6 @@ const nodeRecordToGraphNode = (record: GraphNodeRecord): GraphNode => ({
 
 /**
  * Transform GraphEdgeRecord to GraphEdge for visualization
- * @param record
  */
 const edgeRecordToGraphEdge = (record: GraphEdgeRecord): GraphEdge => ({
     id: record.id,

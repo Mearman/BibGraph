@@ -11,8 +11,10 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { IconKeyboard } from "@tabler/icons-react";
-import type { KeyboardEvent } from "react";
 import { useCallback, useEffect, useRef } from "react";
+
+// Type guard narrowing an event target (typed `EventTarget | null`) to `HTMLElement`.
+const isHTMLElement = (value: unknown): value is HTMLElement => value instanceof HTMLElement;
 
 export interface KeyboardShortcut {
   /**
@@ -98,14 +100,13 @@ interface KeyboardShortcutsManagerProperties {
 
 /**
  * Hook for keyboard shortcuts management
- * @param config
  */
 export const useKeyboardShortcuts = (config: KeyboardShortcutConfig) => {
-  const shortcutsReference = useRef(config.shortcuts);
+  const shortcutsRef = useRef(config.shortcuts);
 
   // Update shortcuts ref when config changes
   useEffect(() => {
-    shortcutsReference.current = config.shortcuts;
+    shortcutsRef.current = config.shortcuts;
   }, [config.shortcuts]);
 
   // Parse key combination
@@ -125,7 +126,7 @@ export const useKeyboardShortcuts = (config: KeyboardShortcutConfig) => {
       !['ctrl', 'control', 'alt', 'shift', 'meta', 'cmd', 'mod'].includes(part)
     );
 
-    return { modifiers, key: key || '' };
+    return { modifiers, key: key ?? '' };
   }, []);
 
   // Check if key event matches shortcut
@@ -135,7 +136,7 @@ export const useKeyboardShortcuts = (config: KeyboardShortcutConfig) => {
     }
 
     const combo = shortcut.modifiers ?
-      `${shortcut.modifiers.ctrl ? 'ctrl+' : ''}${shortcut.modifiers.alt ? 'alt+' : ''}${shortcut.modifiers.shift ? 'shift+' : ''}${shortcut.modifiers.meta ? 'meta+' : ''}${shortcut.key || ''}` :
+      `${shortcut.modifiers.ctrl === true ? 'ctrl+' : ''}${shortcut.modifiers.alt === true ? 'alt+' : ''}${shortcut.modifiers.shift === true ? 'shift+' : ''}${shortcut.modifiers.meta === true ? 'meta+' : ''}${shortcut.key ?? ''}` :
       shortcut.keys;
 
     const { modifiers, key } = parseKeyCombo(combo);
@@ -168,21 +169,23 @@ export const useKeyboardShortcuts = (config: KeyboardShortcutConfig) => {
     if (config.enabled === false) return;
 
     // Ignore events in input fields unless explicitly allowed
+    const target = event.target;
     if (
-      (event.target as HTMLElement)?.tagName === 'INPUT' ||
-      (event.target as HTMLElement)?.tagName === 'TEXTAREA' ||
-      (event.target as HTMLElement)?.contentEditable === 'true'
+      isHTMLElement(target) &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.contentEditable === 'true')
     ) {
       return;
     }
 
-    for (const shortcut of shortcutsReference.current) {
+    for (const shortcut of shortcutsRef.current) {
       if (matchesShortcut(event, shortcut)) {
         try {
-          if (shortcut.preventDefault) {
+          if (shortcut.preventDefault === true) {
             event.preventDefault();
           }
-          if (shortcut.stopPropagation) {
+          if (shortcut.stopPropagation === true) {
             event.stopPropagation();
           }
 
@@ -198,28 +201,26 @@ export const useKeyboardShortcuts = (config: KeyboardShortcutConfig) => {
   // Add and remove event listeners
   useEffect(() => {
     if (config.enabled === false) {
-    	return;
+      return undefined;
     }
 
-    const keydownHandler = (event: Event) => {
-      // Cast Event to our expected KeyboardEvent type
-      const keyboardEvent = event as unknown as KeyboardEvent;
-      handleKeyDown(keyboardEvent);
+    const keydownHandler = (event: KeyboardEvent) => {
+      void handleKeyDown(event);
     };
 
     document.addEventListener('keydown', keydownHandler, {capture: true});
-    return () => document.removeEventListener('keydown', keydownHandler, true);
+    return () => { document.removeEventListener('keydown', keydownHandler, true); };
   }, [config.enabled, handleKeyDown]);
 
   
   // Register new shortcut
   const registerShortcut = useCallback((shortcut: KeyboardShortcut) => {
-    shortcutsReference.current = [...shortcutsReference.current, shortcut];
+    shortcutsRef.current = [...shortcutsRef.current, shortcut];
   }, []);
 
   // Unregister shortcut
   const unregisterShortcut = useCallback((id: string) => {
-    shortcutsReference.current = shortcutsReference.current.filter(s => s.id !== id);
+    shortcutsRef.current = shortcutsRef.current.filter(s => s.id !== id);
   }, []);
 
   // Simple setter for help modal (for help button)
@@ -275,9 +276,6 @@ export const KeyboardHelpButton = ({
 
 /**
  * Main Keyboard Shortcuts Manager Component
- * @param root0
- * @param root0.config
- * @param root0.renderHelpButton
  */
 export const KeyboardShortcutsManager = ({
   config,
@@ -289,7 +287,7 @@ export const KeyboardShortcutsManager = ({
     return (
       <>
         <KeyboardHelpButton
-          onClick={() => setHelpOpen(true)}
+          onClick={() => { setHelpOpen(true); }}
           position={config.helpButtonPosition}
         />
       </>
@@ -307,56 +305,56 @@ export const CommonShortcuts = {
     id: 'search',
     keys: 'ctrl+k',
     description: 'Focus search input',
-    handler: () => {},
+    handler: () => { /* placeholder - override with a real handler when registering this preset */ },
     category: 'Navigation',
   },
   save: {
     id: 'save',
     keys: 'ctrl+s',
     description: 'Save current item',
-    handler: () => {},
+    handler: () => { /* placeholder - override with a real handler when registering this preset */ },
     category: 'File',
   },
   new: {
     id: 'new',
     keys: 'ctrl+n',
     description: 'Create new item',
-    handler: () => {},
+    handler: () => { /* placeholder - override with a real handler when registering this preset */ },
     category: 'File',
   },
   copy: {
     id: 'copy',
     keys: 'ctrl+c',
     description: 'Copy selected item',
-    handler: () => {},
+    handler: () => { /* placeholder - override with a real handler when registering this preset */ },
     category: 'Edit',
   },
   paste: {
     id: 'paste',
     keys: 'ctrl+v',
     description: 'Paste from clipboard',
-    handler: () => {},
+    handler: () => { /* placeholder - override with a real handler when registering this preset */ },
     category: 'Edit',
   },
   undo: {
     id: 'undo',
     keys: 'ctrl+z',
     description: 'Undo last action',
-    handler: () => {},
+    handler: () => { /* placeholder - override with a real handler when registering this preset */ },
     category: 'Edit',
   },
   redo: {
     id: 'redo',
     keys: 'ctrl+y',
     description: 'Redo last action',
-    handler: () => {},
+    handler: () => { /* placeholder - override with a real handler when registering this preset */ },
     category: 'Edit',
   },
   help: {
     id: 'help',
     keys: 'ctrl+?',
     description: 'Show keyboard shortcuts help',
-    handler: () => {},
+    handler: () => { /* placeholder - override with a real handler when registering this preset */ },
     category: 'Help',
   },
 } as const;

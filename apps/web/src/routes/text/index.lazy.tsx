@@ -22,8 +22,15 @@ import { BORDER_STYLE_GRAY_3 } from '@/config/style-constants';
 
 const TextAnalysisRoute = () => {
   const urlSearch = useSearch({ from: "/text/" });
-  const initialTitle = useMemo(() => urlSearch.title || "", [urlSearch.title]);
+  const initialTitle = useMemo(() => urlSearch.title ?? "", [urlSearch.title]);
   const [title, setTitle] = useState(initialTitle);
+  const [previousInitialTitle, setPreviousInitialTitle] = useState(initialTitle);
+
+  // Adjust `title` when the URL-derived initial title changes, following React's documented "adjusting state when a prop changes" pattern (a setState call during render, not inside an effect, so it does not trigger the extra-render eslint warning).
+  if (initialTitle !== previousInitialTitle) {
+    setPreviousInitialTitle(initialTitle);
+    setTitle(initialTitle);
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -37,10 +44,6 @@ const TextAnalysisRoute = () => {
     }
   }, []);
 
-  useEffect(() => {
-    setTitle(initialTitle);
-  }, [initialTitle]);
-
   const {
     data: concepts = [],
     isLoading,
@@ -52,15 +55,15 @@ const TextAnalysisRoute = () => {
 
       logger.debug("text", "Extracting concepts from title", { title });
 
-      const concepts = await cachedOpenAlex.client.textAnalysis.getConcepts({
+      const fetchedConcepts = await cachedOpenAlex.client.textAnalysis.getConcepts({
         title,
       });
 
       logger.debug("text", "Concepts extracted", {
-        count: concepts.length,
+        count: fetchedConcepts.length,
       });
 
-      return concepts;
+      return fetchedConcepts;
     },
     enabled: title.trim().length > 0,
     staleTime: 60_000,
@@ -94,7 +97,7 @@ const TextAnalysisRoute = () => {
           label="Title or Text"
           placeholder="Enter a research title or abstract to analyze..."
           value={title}
-          onChange={(event) => handleTitleChange(event.currentTarget.value)}
+          onChange={(event) => { handleTitleChange(event.currentTarget.value); }}
           minRows={3}
           autosize
         />
@@ -176,7 +179,7 @@ const TextAnalysisRoute = () => {
                     <Text size="xs" c="dimmed">
                       Level: {concept.level}
                     </Text>
-                    {concept.wikidata && (
+                    {concept.wikidata !== undefined && concept.wikidata !== "" && (
                       <Text size="xs" c="dimmed">
                         Wikidata: {concept.wikidata}
                       </Text>

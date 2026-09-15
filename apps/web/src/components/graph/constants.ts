@@ -4,7 +4,6 @@
  *
  * This file eliminates magic numbers across graph visualization components,
  * making defaults discoverable, documented, and easy to maintain.
- * @module components/graph/constants
  */
 
 // =============================================================================
@@ -74,6 +73,9 @@ export const NODE = {
 /**
  * Edge/link visual styling defaults
  */
+// Divisor used to derive the arrow head's 30-degree angle from a straight edge (Math.PI / 6 radians).
+const ARROW_ANGLE_DEGREES_DIVISOR = 6;
+
 export const LINK = {
   /**
   Default edge width
@@ -106,7 +108,7 @@ export const LINK = {
   /**
   Arrow head angle (radians) - forms 30° angle from edge line
    */
-  ARROW_ANGLE: Math.PI / 6,
+  ARROW_ANGLE: Math.PI / ARROW_ANGLE_DEGREES_DIVISOR,
 } as const;
 
 // =============================================================================
@@ -142,6 +144,10 @@ export const LABEL = {
 /**
  * Spinning ring animation for loading/expanding nodes
  */
+// Fraction of a full turn (2*PI) each loading ring's arc sweeps: 270 degrees and 90 degrees respectively.
+const PRIMARY_RING_ARC_TURN_FRACTION = 1.5;
+const SECONDARY_RING_ARC_TURN_FRACTION = 0.5;
+
 export const LOADING_RING = {
   /**
   Ring radius multiplier relative to node size
@@ -166,11 +172,11 @@ export const LOADING_RING = {
   /**
   Primary ring arc length (radians) - 270° arc
    */
-  PRIMARY_ARC_LENGTH: Math.PI * 1.5,
+  PRIMARY_ARC_LENGTH: Math.PI * PRIMARY_RING_ARC_TURN_FRACTION,
   /**
   Secondary ring arc length (radians) - 90° arc
    */
-  SECONDARY_ARC_LENGTH: Math.PI * 0.5,
+  SECONDARY_ARC_LENGTH: Math.PI * SECONDARY_RING_ARC_TURN_FRACTION,
   /**
   Ring opacity
    */

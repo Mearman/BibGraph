@@ -19,7 +19,8 @@ import {
 import type { PostHogErrorBoundaryFallbackProps } from "@posthog/react";
 import { PostHogErrorBoundary } from "@posthog/react";
 import { IconAlertTriangle, IconRefresh } from "@tabler/icons-react";
-import React, { FunctionComponent,ReactNode,useEffect } from "react";
+import type { FunctionComponent,ReactNode} from "react";
+import React, {useEffect } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from '@/config/style-constants';
 
@@ -34,8 +35,6 @@ interface CatalogueErrorBoundaryProperties {
 /**
  * Custom fallback component for catalogue errors
  * Provides detailed error information and recovery actions
- * @param root0
- * @param root0.error
  */
 const CatalogueFallback = ({
   error,
@@ -97,7 +96,7 @@ const CatalogueFallback = ({
           </Stack>
         </Alert>
 
-        {process.env.NODE_ENV === "development" && errorObject.stack && (
+        {process.env.NODE_ENV === "development" && errorObject.stack !== undefined && (
           <Alert color="yellow" variant="light">
             <Stack gap="xs">
               <Text size="sm" fw={500}>
@@ -124,7 +123,7 @@ const CatalogueFallback = ({
         <Group>
           <Button
             variant="subtle"
-            onClick={() => window.location.reload()}
+            onClick={() => { window.location.reload(); }}
             size="sm"
             leftSection={<IconRefresh size={ICON_SIZE.MD} />}
           >
@@ -132,7 +131,7 @@ const CatalogueFallback = ({
           </Button>
           <Button
             variant="subtle"
-            onClick={() => window.history.back()}
+            onClick={() => { window.history.back(); }}
             size="sm"
           >
             Go Back
@@ -148,14 +147,11 @@ const CatalogueFallback = ({
  *
  * Uses PostHog's official ErrorBoundary with custom fallback UI.
  * Automatically tracks errors to PostHog for analytics and debugging.
- * @param children - Components to wrap with error boundary
- * @param children.children
- * @param fallback - Optional custom fallback component (defaults to CatalogueFallback)
- * @param children.fallback
+ * Accepts the components to wrap plus an optional custom fallback component (defaults to CatalogueFallback).
  */
 export const CatalogueErrorBoundary = ({
   children,
   fallback,
-}: CatalogueErrorBoundaryProperties) => <PostHogErrorBoundary fallback={fallback || CatalogueFallback}>
+}: CatalogueErrorBoundaryProperties) => <PostHogErrorBoundary fallback={fallback ?? CatalogueFallback}>
       {children}
     </PostHogErrorBoundary>;

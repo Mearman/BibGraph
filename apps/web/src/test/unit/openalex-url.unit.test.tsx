@@ -1,3 +1,4 @@
+import type * as BibgraphUtilsModule from "@bibgraph/utils";
 import { EntityDetectionService } from "@bibgraph/utils";
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -10,7 +11,7 @@ const OpenAlexUrlComponent = OpenAlexUrlRoute.options.component!;
 
 // Mock EntityDetectionService
 vi.mock("@bibgraph/utils", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@bibgraph/utils")>();
+  const actual = await importOriginal<typeof BibgraphUtilsModule>();
   return {
     ...actual,
     EntityDetectionService: {
@@ -19,11 +20,10 @@ vi.mock("@bibgraph/utils", async (importOriginal) => {
   };
 });
 
-const mockDetectEntity = EntityDetectionService.detectEntity as any;
+const mockDetectEntity = vi.spyOn(EntityDetectionService, "detectEntity");
 
 describe("OpenAlexUrl Route Unit Tests", () => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const renderComponent = (url?: string) => {
+  const renderComponent = () => {
     return renderHook(() => <OpenAlexUrlComponent />, {
       wrapper: ({ children }: any) => <div>{children}</div>,
     });
@@ -99,15 +99,15 @@ describe("OpenAlexUrl Route Unit Tests", () => {
 
   it.each(testUrls)(
     "should handle $url correctly",
-    async ({ url }) => {
+    ({ url }) => {
       const pathParts = url.replace("https://api.openalex.org/", "").split("?");
       const path = pathParts[0];
 
-      renderComponent(url);
+      renderComponent();
 
       if (path.split("/").filter(Boolean).length === 2) {
         // Mock for single entity
-        mockDetectEntity.mockReturnValue({ entityType: "works" }); // Adjust based on ID
+        mockDetectEntity.mockReturnValue({ entityType: "works", normalizedId: "W1", originalInput: url, detectionMethod: "id" });
       }
 
       // Component should render without crashing
@@ -116,8 +116,7 @@ describe("OpenAlexUrl Route Unit Tests", () => {
   );
 
   it("should handle invalid URL", () => {
-    const invalidUrl = "https://invalid.com/path";
-    renderComponent(invalidUrl);
+    renderComponent();
 
     // Component should handle invalid URL gracefully
     expect(true).toBe(true); // Basic assertion that component renders

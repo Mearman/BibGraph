@@ -1,10 +1,7 @@
 /**
  * Helper functions for graph auto-population
  *
- * Contains pure functions and API interaction logic extracted from
- * useGraphAutoPopulation to reduce hook complexity.
- *
- * @module utils/graph-population-helpers
+ * Contains pure functions and API interaction logic extracted from useGraphAutoPopulation to reduce hook complexity.
  */
 
 import {
@@ -18,7 +15,7 @@ import type {
   EntityType,
   GraphEdge,
   GraphNode,
-  RelationshipQueryConfig,
+  RelationshipQueryConfig
 } from '@bibgraph/types';
 import { RelationType } from '@bibgraph/types';
 import type { BackgroundTaskExecutor } from '@bibgraph/utils';
@@ -32,25 +29,36 @@ import { BATCH_SIZE, PROCESSING_CHUNK_SIZE } from '@/types/graph-auto-population
 
 const LOG_PREFIX = 'graph-population';
 
+// RelationType is a real TS enum, so its string-literal-typed counterpart (RelationshipQueryConfig['type']) needs a genuine runtime membership check to convert between them rather than a type assertion.
+const RELATION_TYPE_VALUES: ReadonlySet<string> = new Set(Object.values(RelationType).map(String));
+
+const isRelationType = (value: string): value is RelationType => RELATION_TYPE_VALUES.has(value);
+
+const toRelationType = (value: string): RelationType => {
+  if (!isRelationType(value)) {
+    throw new Error(`Unknown relation type: ${value}`);
+  }
+  return value;
+};
+
+const isEntityWithId = (value: unknown): value is { id: string; [key: string]: unknown } =>
+  typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'string';
+
 /**
  * Check if a label looks like an ID-only label (e.g., "W123456", "A789")
- * @param label
  */
 export const isIdOnlyLabel = (label: string): boolean => /^[A-Z]\d+$/i.test(label);
 
 /**
  * Normalize an OpenAlex ID to short form (uppercase, no URL prefix)
- * @param id
  */
 export const normalizeId = (id: string): string =>
   id.replace('https://openalex.org/', '').toUpperCase();
 
 /**
  * Create batches from an array
- * @param items
- * @param batchSize
  */
-export const createBatches = <T>(items: T[], batchSize: number = BATCH_SIZE): T[][] => {
+export const createBatches = <T>(items: readonly T[], batchSize: number = BATCH_SIZE): T[][] => {
   const batches: T[][] = [];
   for (let index = 0; index < items.length; index += batchSize) {
     batches.push(items.slice(index, index + batchSize));
@@ -60,9 +68,6 @@ export const createBatches = <T>(items: T[], batchSize: number = BATCH_SIZE): T[
 
 /**
  * Flatten batch processor results
- * @param result
- * @param result.success
- * @param result.data
  */
 const flattenBatchResults = <T>(result: { success: boolean; data?: T[][] }): T[] => {
   const flattened: T[] = [];
@@ -76,8 +81,6 @@ const flattenBatchResults = <T>(result: { success: boolean; data?: T[][] }): T[]
 
 /**
  * Fetch entity data by type and ID
- * @param entityType
- * @param nodeId
  */
 const fetchEntityData = async (
   entityType: EntityType,
@@ -90,7 +93,7 @@ const fetchEntityData = async (
         per_page: 1,
       });
       return response.results.length > 0
-        ? (response.results[0] as Record<string, unknown>)
+        ? (response.results[0])
         : null;
     }
     case 'authors': {
@@ -99,7 +102,7 @@ const fetchEntityData = async (
         per_page: 1,
       });
       return response.results.length > 0
-        ? (response.results[0] as Record<string, unknown>)
+        ? (response.results[0])
         : null;
     }
     case 'institutions': {
@@ -108,7 +111,7 @@ const fetchEntityData = async (
         per_page: 1,
       });
       return response.results.length > 0
-        ? (response.results[0] as Record<string, unknown>)
+        ? (response.results[0])
         : null;
     }
     case 'sources': {
@@ -117,65 +120,76 @@ const fetchEntityData = async (
         per_page: 1,
       });
       return response.results.length > 0
-        ? (response.results[0] as Record<string, unknown>)
+        ? (response.results[0])
         : null;
     }
     case 'topics': {
       const topic = await getTopicById(nodeId);
-      return topic as Record<string, unknown>;
+      return topic;
     }
-    default:
+    case 'concepts':
+    case 'publishers':
+    case 'funders':
+    case 'keywords':
+    case 'domains':
+    case 'fields':
+    case 'subfields':
       return null;
+    default:
+      throw new Error(`Unhandled entity type: ${String(entityType)}`);
   }
 };
 
 /**
  * Execute API query for relationship discovery based on target type
- * @param targetType
- * @param filter
- * @param selectFields
  */
 const executeRelationshipQuery = async (
   targetType: EntityType,
   filter: string,
-  selectFields: string[]
+  selectFields: readonly string[]
 ): Promise<{ results: unknown[] } | null> => {
   switch (targetType) {
     case 'works':
       return getWorks({
         filter,
         per_page: 100,
-        select: selectFields,
+        select: [...selectFields],
       });
     case 'authors':
       return getAuthors({
         filter,
         per_page: 100,
-        select: selectFields,
+        select: [...selectFields],
       });
     case 'institutions':
       return getInstitutions({
         filters: { id: filter },
         per_page: 100,
-        select: selectFields,
+        select: [...selectFields],
       });
     case 'sources':
       return getSources({
         filters: { id: filter },
         per_page: 100,
-        select: selectFields,
+        select: [...selectFields],
       });
-    default:
+    case 'topics':
+    case 'concepts':
+    case 'publishers':
+    case 'funders':
+    case 'keywords':
+    case 'domains':
+    case 'fields':
+    case 'subfields':
       logger.warn(LOG_PREFIX, `Unsupported target type ${targetType} for discovery`);
       return null;
+    default:
+      throw new Error(`Unhandled entity type: ${String(targetType)}`);
   }
 };
 
 /**
  * Create an edge object with proper structure
- * @param sourceId
- * @param targetId
- * @param relationType
  */
 const createEdge = (
   sourceId: string,
@@ -191,9 +205,6 @@ const createEdge = (
 
 /**
  * Determine edge source and target based on direction
- * @param nodeId
- * @param relatedId
- * @param direction
  */
 const determineEdgeEndpoints = (
   nodeId: string,
@@ -208,10 +219,6 @@ const determineEdgeEndpoints = (
 
 /**
  * Check if an edge should be created (not existing and not processed)
- * @param edgeKey
- * @param pairKey
- * @param existingEdgeKeys
- * @param processedPairs
  */
 const shouldCreateEdge = (
   edgeKey: string,
@@ -222,16 +229,15 @@ const shouldCreateEdge = (
 
 /**
  * Resolve labels for a batch of entities
- * @param batch
  */
 export const resolveLabelBatch = async (
   batch: LabelResolutionBatch
-): Promise<Array<{ id: string; display_name?: string; title?: string }>> => {
+): Promise<{ id: string; display_name?: string; title?: string }[]> => {
   const idFilter = batch.ids.join('|');
   const selectFields = ['id', 'display_name', 'title'];
 
   try {
-    let results: Array<{ id: string; display_name?: string; title?: string }> = [];
+    let results: { id: string; display_name?: string; title?: string }[] = [];
 
     switch (batch.entityType) {
       case 'works': {
@@ -240,7 +246,7 @@ export const resolveLabelBatch = async (
           per_page: batch.ids.length,
           select: selectFields,
         });
-        results = response.results as typeof results;
+        results = response.results;
         break;
       }
       case 'authors': {
@@ -249,7 +255,7 @@ export const resolveLabelBatch = async (
           per_page: batch.ids.length,
           select: selectFields,
         });
-        results = response.results as typeof results;
+        results = response.results;
         break;
       }
       case 'institutions': {
@@ -258,7 +264,7 @@ export const resolveLabelBatch = async (
           per_page: batch.ids.length,
           select: selectFields,
         });
-        results = response.results as typeof results;
+        results = response.results;
         break;
       }
       case 'sources': {
@@ -267,10 +273,17 @@ export const resolveLabelBatch = async (
           per_page: batch.ids.length,
           select: selectFields,
         });
-        results = response.results as typeof results;
+        results = response.results;
         break;
       }
-      default:
+      case 'topics':
+      case 'concepts':
+      case 'publishers':
+      case 'funders':
+      case 'keywords':
+      case 'domains':
+      case 'fields':
+      case 'subfields':
         return [];
     }
 
@@ -283,17 +296,10 @@ export const resolveLabelBatch = async (
 
 /**
  * Process API query results to discover edges
- * @param results
- * @param batchIds
- * @param relationType
- * @param direction
- * @param allNodeIds
- * @param existingEdgeKeys
- * @param processedPairs
  */
 const processApiQueryResults = (
-  results: Array<{ id: string; [key: string]: unknown }>,
-  batchIds: string[],
+  results: readonly { id: string; [key: string]: unknown }[],
+  batchIds: readonly string[],
   relationType: RelationType,
   direction: RelationshipDirection,
   allNodeIds: Set<string>,
@@ -335,17 +341,9 @@ const processApiQueryResults = (
 
 /**
  * Discover relationships for API-based query configuration
- * @param sourceNodes
- * @param query
- * @param allNodeIds
- * @param existingEdgeKeys
- * @param processedPairs
- * @param direction
- * @param executor
- * @param signal
  */
 export const discoverApiRelationships = async (
-  sourceNodes: GraphNode[],
+  sourceNodes: readonly GraphNode[],
   query: RelationshipQueryConfig & { source: 'api' },
   allNodeIds: Set<string>,
   existingEdgeKeys: Set<string>,
@@ -373,9 +371,9 @@ export const discoverApiRelationships = async (
         if (!response) return [];
 
         return processApiQueryResults(
-          response.results as Array<{ id: string; [key: string]: unknown }>,
+          response.results.filter(isEntityWithId),
           batch,
-          query.type as RelationType,
+          toRelationType(query.type),
           direction,
           allNodeIds,
           existingEdgeKeys,
@@ -390,24 +388,15 @@ export const discoverApiRelationships = async (
   );
 
   const edges = flattenBatchResults(result);
-  logger.debug(LOG_PREFIX, `Discovered ${edges.length} ${query.type} edges via API`);
+  logger.debug(LOG_PREFIX, `Discovered ${String(edges.length)} ${query.type} edges via API`);
   return edges;
 };
 
 /**
  * Discover relationships from embedded data
- * @param sourceNodes
- * @param query
- * @param sourceEntityType
- * @param allNodeIds
- * @param existingEdgeKeys
- * @param processedPairs
- * @param direction
- * @param executor
- * @param signal
  */
 export const discoverEmbeddedRelationships = async (
-  sourceNodes: GraphNode[],
+  sourceNodes: readonly GraphNode[],
   query: RelationshipQueryConfig & { source: 'embedded' },
   sourceEntityType: EntityType,
   allNodeIds: Set<string>,
@@ -450,7 +439,7 @@ export const discoverEmbeddedRelationships = async (
             }
 
             processedPairs.add(pairKey);
-            discoveredEdges.push(createEdge(edgeSource, edgeTarget, query.type as RelationType));
+            discoveredEdges.push(createEdge(edgeSource, edgeTarget, toRelationType(query.type)));
           }
         } catch (error) {
           logger.warn(LOG_PREFIX, `Failed to discover embedded ${query.type} for ${node.id}`, {
@@ -465,24 +454,15 @@ export const discoverEmbeddedRelationships = async (
   );
 
   const edges = flattenBatchResults(result);
-  logger.debug(LOG_PREFIX, `Discovered ${edges.length} embedded ${query.type} edges`);
+  logger.debug(LOG_PREFIX, `Discovered ${String(edges.length)} embedded ${query.type} edges`);
   return edges;
 };
 
 /**
  * Discover relationships from embedded IDs with resolution
- * @param sourceNodes
- * @param query
- * @param sourceEntityType
- * @param allNodeIds
- * @param existingEdgeKeys
- * @param processedPairs
- * @param direction
- * @param executor
- * @param signal
  */
 export const discoverEmbeddedWithResolutionRelationships = async (
-  sourceNodes: GraphNode[],
+  sourceNodes: readonly GraphNode[],
   query: RelationshipQueryConfig & { source: 'embedded-with-resolution' },
   sourceEntityType: EntityType,
   allNodeIds: Set<string>,
@@ -511,7 +491,7 @@ export const discoverEmbeddedWithResolutionRelationships = async (
 
           if (response.results.length === 0) continue;
 
-          const entityData = response.results[0] as Record<string, unknown>;
+          const entityData = response.results[0];
           const itemsNeedingResolution = query.extractIds(entityData);
 
           for (const item of itemsNeedingResolution) {
@@ -533,7 +513,7 @@ export const discoverEmbeddedWithResolutionRelationships = async (
             }
 
             processedPairs.add(pairKey);
-            discoveredEdges.push(createEdge(edgeSource, edgeTarget, query.type as RelationType));
+            discoveredEdges.push(createEdge(edgeSource, edgeTarget, toRelationType(query.type)));
           }
         } catch (error) {
           logger.warn(
@@ -550,6 +530,6 @@ export const discoverEmbeddedWithResolutionRelationships = async (
   );
 
   const edges = flattenBatchResults(result);
-  logger.debug(LOG_PREFIX, `Discovered ${edges.length} embedded-with-resolution ${query.type} edges`);
+  logger.debug(LOG_PREFIX, `Discovered ${String(edges.length)} embedded-with-resolution ${query.type} edges`);
   return edges;
 };

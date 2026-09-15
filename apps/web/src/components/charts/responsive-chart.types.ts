@@ -153,6 +153,9 @@ export const BAR_COLORS = {
   },
 } as const;
 
+const isBarColorMetric = (metric: string): metric is keyof typeof BAR_COLORS =>
+  metric in BAR_COLORS;
+
 /**
  * Gets the appropriate bar color for a given metric
  * @param metric - The metric name (precision, recall, f1Score)
@@ -160,6 +163,6 @@ export const BAR_COLORS = {
  * @returns The CSS color variable for the bar
  */
 export const getBarColor = (metric: string, isHighlighted: boolean): string => {
-  const colorConfig = BAR_COLORS[metric as keyof typeof BAR_COLORS] ?? BAR_COLORS.default;
+  const colorConfig = isBarColorMetric(metric) ? BAR_COLORS[metric] : BAR_COLORS.default;
   return isHighlighted ? colorConfig.highlighted : colorConfig.normal;
 };

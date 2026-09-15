@@ -6,7 +6,11 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Bioplastics URL Pattern and Bookmarking E2E Test", () => {
-  const BASE_URL = process.env.CI ? "http://localhost:4173" : "http://localhost:5173";
+  const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+  const BASE_URL = IS_CI ? "http://localhost:4173" : "http://localhost:5173";
+
+  const CONTENT_LOAD_WAIT_MS = 3000;
+  const MAX_ACCEPTABLE_NON_CRITICAL_ERRORS = 3;
 
   // The exact bioplastics URL pattern from the requirements
   const BIOMATERIALS_URL = "https://api.openalex.org/works?filter=display_name.search:bioplastics&sort=publication_year:desc,relevance_score:desc";
@@ -39,11 +43,11 @@ test.describe("Bioplastics URL Pattern and Bookmarking E2E Test", () => {
       expect(currentUrl).toContain("relevance_score:desc");
 
       // Verify the page content loads correctly
-      await page.waitForTimeout(3000); // Allow content to load
+      await page.waitForTimeout(CONTENT_LOAD_WAIT_MS); // Allow content to load
 
       // Check for works list or search results
       const pageContent = await page.locator('body').textContent();
-      if (!pageContent) {
+      if (pageContent === null) {
         throw new Error("Expected page content but got null");
       }
 
@@ -158,8 +162,8 @@ test.describe("Bioplastics URL Pattern and Bookmarking E2E Test", () => {
         await expect(updatedIcon).toBeVisible();
 
         // Check for any visual indication of bookmark state change
-        const buttonClasses = firstBookmarkButton;
-        await expect(buttonClasses).toHaveAttribute('class', );
+        
+        await expect(firstBookmarkButton).toHaveAttribute('class', );
       }
     });
 
@@ -189,7 +193,7 @@ test.describe("Bioplastics URL Pattern and Bookmarking E2E Test", () => {
         // Removed: waitForTimeout - use locator assertions instead
         // Check page content for bookmark indicators
         const pageContent = await page.locator('body').textContent();
-        if (!pageContent) {
+        if (pageContent === null) {
           throw new Error("Expected page content but got null");
         }
         const hasBookmarkContent =
@@ -250,7 +254,7 @@ test.describe("Bioplastics URL Pattern and Bookmarking E2E Test", () => {
 
         // Verify the page loads correctly
         const pageContent = await page.locator('body').textContent();
-        if (!pageContent) {
+        if (pageContent === null) {
           throw new Error("Expected page content but got null");
         }
         const hasValidContent =
@@ -350,7 +354,7 @@ test.describe("Bioplastics URL Pattern and Bookmarking E2E Test", () => {
         e.includes('ReferenceError')
       );
 
-      expect(criticalErrors.length).toBeLessThan(3); // Allow some non-critical errors
+      expect(criticalErrors.length).toBeLessThan(MAX_ACCEPTABLE_NON_CRITICAL_ERRORS); // Allow some non-critical errors
     });
 
     test("should preserve URL encoding correctly", async ({ page }) => {
@@ -392,7 +396,7 @@ test.describe("Bioplastics URL Pattern and Bookmarking E2E Test", () => {
 
       // Verify content loads
       const hasValidContent = await page.locator('body').textContent();
-      if (!hasValidContent) {
+      if (hasValidContent === null) {
         throw new Error("Expected page content but got null");
       }
       const isContentLoaded =

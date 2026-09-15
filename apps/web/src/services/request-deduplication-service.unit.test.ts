@@ -5,12 +5,35 @@
 
 import type { OpenAlexEntity } from "@bibgraph/types";
 import { QueryClient } from "@tanstack/react-query";
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createRequestDeduplicationService,
   RequestDeduplicationService,
 } from "./request-deduplication-service";
+
+/**
+ * Minimal typed view of the service's private testing surface, used only to exercise white-box behaviour (the ongoing-requests map and two private helper methods) without resorting to `any`.
+ */
+interface RequestDeduplicationServiceInternals {
+  ongoingRequests: Map<
+    string,
+    { promise: Promise<OpenAlexEntity>; timestamp: number; entityId: string } | undefined
+  >;
+  isCacheEntryFresh: () => boolean;
+  detectEntityType: (entityId: string) => string;
+}
+
+const asInternals = (
+  service: RequestDeduplicationService,
+): RequestDeduplicationServiceInternals =>
+  service as unknown as RequestDeduplicationServiceInternals;
+
+const SLOW_FETCH_DELAY_MS = 100;
+const SLOW_FETCH_DELAY_SHORT_MS = 50;
+const STATS_CHECK_WAIT_MS = 10;
+const MIN_AGE_THRESHOLD_MS = 5;
 
 
 // Mock logger to prevent console output during tests
@@ -45,7 +68,7 @@ describe("RequestDeduplicationService", () => {
   let queryClient: QueryClient;
   let service: RequestDeduplicationService;
   let mockEntity: OpenAlexEntity;
-  let mockFetcher: ReturnType<typeof vi.fn>;
+  let mockFetcher: Mock<() => Promise<OpenAlexEntity>>;
 
   beforeEach(() => {
     // Create a fresh QueryClient for each test
@@ -67,7 +90,7 @@ describe("RequestDeduplicationService", () => {
     } as OpenAlexEntity;
 
     // Mock fetcher function
-    mockFetcher = vi.fn();
+    mockFetcher = vi.fn<() => Promise<OpenAlexEntity>>();
     vi.clearAllMocks();
   });
 
@@ -90,7 +113,7 @@ describe("RequestDeduplicationService", () => {
 
       const result = await service.getEntity({
         entityId: "W123456789",
-        fetcher: mockFetcher as any,
+        fetcher: mockFetcher,
       });
 
       expect(result).toEqual(mockEntity);
@@ -102,7 +125,7 @@ describe("RequestDeduplicationService", () => {
 
       const result = await service.getEntity({
         entityId: "W123456789",
-        fetcher: mockFetcher as any,
+        fetcher: mockFetcher,
       });
 
       expect(result).toEqual(mockEntity);
@@ -115,11 +138,11 @@ describe("RequestDeduplicationService", () => {
       // Start two concurrent requests for the same entity
       const promise1 = service.getEntity({
         entityId: "W123456789",
-        fetcher: mockFetcher as any,
+        fetcher: mockFetcher,
       });
       const promise2 = service.getEntity({
         entityId: "W123456789",
-        fetcher: mockFetcher as any,
+        fetcher: mockFetcher,
       });
 
       const [result1, result2] = await Promise.all([promise1, promise2]);
@@ -132,7 +155,7 @@ describe("RequestDeduplicationService", () => {
     it("should cache entity after successful fetch", async () => {
       mockFetcher.mockResolvedValue(mockEntity);
 
-      await service.getEntity({ entityId: "W123456789", fetcher: mockFetcher as any });
+      await service.getEntity({ entityId: "W123456789", fetcher: mockFetcher });
 
       // Verify entity is cached
       const cachedEntity = queryClient.getQueryData(["entity", "W123456789"]);
@@ -144,7 +167,7 @@ describe("RequestDeduplicationService", () => {
       mockFetcher.mockRejectedValue(error);
 
       await expect(
-        service.getEntity({ entityId: "W123456789", fetcher: mockFetcher as any }),
+        service.getEntity({ entityId: "W123456789", fetcher: mockFetcher }),
       ).rejects.toThrow("Fetch failed");
 
       // Should be able to retry after error
@@ -153,7 +176,7 @@ describe("RequestDeduplicationService", () => {
 
       const result = await service.getEntity({
         entityId: "W123456789",
-        fetcher: mockFetcher as any,
+        fetcher: mockFetcher,
       });
       expect(result).toEqual(mockEntity);
       expect(mockFetcher).toHaveBeenCalledOnce();
@@ -161,19 +184,16 @@ describe("RequestDeduplicationService", () => {
 
     it("should handle missing request entry error", async () => {
       // Manually corrupt the ongoing requests map to simulate the edge case
-      const service = new RequestDeduplicationService(queryClient);
+      const reflectionService = new RequestDeduplicationService(queryClient);
 
       // Use reflection to access private property for testing
-      const ongoingRequests = (service as any).ongoingRequests as Map<
-        string,
-        any
-      >;
+      const ongoingRequests = asInternals(reflectionService).ongoingRequests;
 
       // Set up a scenario where has() returns true but get() returns undefined
       ongoingRequests.set("W123456789", undefined);
 
       await expect(
-        service.getEntity({ entityId: "W123456789", fetcher: mockFetcher as any }),
+        reflectionService.getEntity({ entityId: "W123456789", fetcher: mockFetcher }),
       ).rejects.toThrow("Request entry not found for W123456789");
     });
   });
@@ -183,7 +203,7 @@ describe("RequestDeduplicationService", () => {
       mockFetcher.mockResolvedValue(mockEntity);
 
       // Call getEntity which internally calls getCachedEntity
-      await service.getEntity({ entityId: "W123456789", fetcher: mockFetcher as any });
+      await service.getEntity({ entityId: "W123456789", fetcher: mockFetcher });
 
       // Verify fetcher was called (meaning cache miss)
       expect(mockFetcher).toHaveBeenCalledOnce();
@@ -197,7 +217,7 @@ describe("RequestDeduplicationService", () => {
 
       const result = await service.getEntity({
         entityId: "W123456789",
-        fetcher: mockFetcher as any,
+        fetcher: mockFetcher,
       });
 
       expect(result).toEqual(mockEntity);
@@ -223,7 +243,7 @@ describe("RequestDeduplicationService", () => {
       // Should still work despite cache errors
       const result = await errorService.getEntity({
         entityId: "W123456789",
-        fetcher: mockFetcher as any,
+        fetcher: mockFetcher,
       });
       expect(result).toEqual(mockEntity);
       expect(mockFetcher).toHaveBeenCalledOnce();
@@ -233,14 +253,14 @@ describe("RequestDeduplicationService", () => {
   describe("isCacheEntryFresh", () => {
     it("should return true for all entities (simplified implementation)", () => {
       // The current implementation always returns true
-      const service = new RequestDeduplicationService(queryClient);
+      const reflectionService = new RequestDeduplicationService(queryClient);
 
       // Use reflection to test private method
-      const isCacheEntryFresh = (service as any).isCacheEntryFresh.bind(
-        service,
+      const isCacheEntryFresh = asInternals(reflectionService).isCacheEntryFresh.bind(
+        reflectionService,
       );
 
-      expect(isCacheEntryFresh(mockEntity)).toBe(true);
+      expect(isCacheEntryFresh()).toBe(true);
     });
   });
 
@@ -260,11 +280,11 @@ describe("RequestDeduplicationService", () => {
 
     for (const { id, expected } of testCases) {
       it(`should detect entity type ${expected} for ID ${id}`, () => {
-        const service = new RequestDeduplicationService(queryClient);
+        const reflectionService = new RequestDeduplicationService(queryClient);
 
         // Use reflection to test private method
-        const detectEntityType = (service as any).detectEntityType.bind(
-          service,
+        const detectEntityType = asInternals(reflectionService).detectEntityType.bind(
+          reflectionService,
         );
 
         expect(detectEntityType(id)).toBe(expected);
@@ -284,12 +304,11 @@ describe("RequestDeduplicationService", () => {
 
     it("should return stats for ongoing requests", async () => {
       // Create a slow fetcher to keep request ongoing
-      const slowFetcher = vi.fn().mockImplementation(() => {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve(mockEntity);
-          }, 100);
+      const slowFetcher = vi.fn().mockImplementation(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, SLOW_FETCH_DELAY_MS);
         });
+        return mockEntity;
       });
 
       // Start request but don't await
@@ -315,12 +334,11 @@ describe("RequestDeduplicationService", () => {
     });
 
     it("should calculate age correctly for ongoing requests", async () => {
-      const slowFetcher = vi.fn().mockImplementation(() => {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve(mockEntity);
-          }, 50);
+      const slowFetcher = vi.fn().mockImplementation(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, SLOW_FETCH_DELAY_SHORT_MS);
         });
+        return mockEntity;
       });
 
       // Start request
@@ -331,11 +349,11 @@ describe("RequestDeduplicationService", () => {
 
       // Wait a bit
       await new Promise((resolve) => {
-        setTimeout(resolve, 10);
+        setTimeout(resolve, STATS_CHECK_WAIT_MS);
       });
 
       const stats = service.getStats();
-      expect(stats.requestDetails[0].ageMs).toBeGreaterThan(5);
+      expect(stats.requestDetails[0].ageMs).toBeGreaterThan(MIN_AGE_THRESHOLD_MS);
 
       // Clean up
       await promise;
@@ -343,14 +361,13 @@ describe("RequestDeduplicationService", () => {
   });
 
   describe("clear", () => {
-    it("should clear all ongoing requests", async () => {
+    it("should clear all ongoing requests", () => {
       // Start a slow request
-      const slowFetcher = vi.fn().mockImplementation(() => {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve(mockEntity);
-          }, 100);
+      const slowFetcher = vi.fn().mockImplementation(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, SLOW_FETCH_DELAY_MS);
         });
+        return mockEntity;
       });
 
       // Start request but don't await
@@ -368,12 +385,11 @@ describe("RequestDeduplicationService", () => {
 
     it("should log cleared count", () => {
       // Start multiple slow requests
-      const slowFetcher = vi.fn().mockImplementation(() => {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve(mockEntity);
-          }, 100);
+      const slowFetcher = vi.fn().mockImplementation(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, SLOW_FETCH_DELAY_MS);
         });
+        return mockEntity;
       });
 
       void service.getEntity({ entityId: "W123456789", fetcher: slowFetcher });
@@ -393,12 +409,11 @@ describe("RequestDeduplicationService", () => {
       queryClient.setQueryData(["entity", "W123456789"], mockEntity);
 
       // Start an ongoing request for a different entity to test the cleanup
-      const slowFetcher = vi.fn().mockImplementation(() => {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve(mockEntity);
-          }, 100);
+      const slowFetcher = vi.fn().mockImplementation(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, SLOW_FETCH_DELAY_MS);
         });
+        return mockEntity;
       });
       void service.getEntity({ entityId: "A987654321", fetcher: slowFetcher }); // Different ID so it's not cached
 
@@ -463,20 +478,20 @@ describe("RequestDeduplicationService", () => {
       mockFetcher.mockRejectedValue(nonErrorObject);
 
       await expect(
-        service.getEntity({ entityId: "W123456789", fetcher: mockFetcher as any }),
+        service.getEntity({ entityId: "W123456789", fetcher: mockFetcher }),
       ).rejects.toEqual(nonErrorObject);
     });
 
     it("should clean up ongoing request on both success and failure", async () => {
       // Test success cleanup
       mockFetcher.mockResolvedValue(mockEntity);
-      await service.getEntity({ entityId: "W123456789", fetcher: mockFetcher as any });
+      await service.getEntity({ entityId: "W123456789", fetcher: mockFetcher });
       expect(service.getStats().ongoingRequests).toBe(0);
 
       // Test failure cleanup
       mockFetcher.mockRejectedValue(new Error("Test error"));
       await expect(
-        service.getEntity({ entityId: "W987654321", fetcher: mockFetcher as any }),
+        service.getEntity({ entityId: "W987654321", fetcher: mockFetcher }),
       ).rejects.toThrow();
       expect(service.getStats().ongoingRequests).toBe(0);
     });
@@ -500,7 +515,7 @@ describe("RequestDeduplicationService", () => {
       // Should still return the entity even if caching fails
       const result = await errorService.getEntity({
         entityId: "W123456789",
-        fetcher: mockFetcher as any,
+        fetcher: mockFetcher,
       });
       expect(result).toEqual(mockEntity);
       expect(mockFetcher).toHaveBeenCalledOnce();
@@ -514,15 +529,15 @@ describe("RequestDeduplicationService", () => {
       // First call should fetch
       await service.getEntity({
         entityId: "W123456789",
-        fetcher: mockFetcher as any,
+        fetcher: mockFetcher,
       });
       const result2 = await service.getEntity({
         entityId: "W123456789",
-        fetcher: mockFetcher as any,
+        fetcher: mockFetcher,
       });
       const result3 = await service.getEntity({
         entityId: "W123456789",
-        fetcher: mockFetcher as any,
+        fetcher: mockFetcher,
       });
 
       expect(result2).toEqual(mockEntity);

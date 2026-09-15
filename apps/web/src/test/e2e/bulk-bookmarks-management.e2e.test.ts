@@ -2,9 +2,84 @@
  * End-to-end test for bulk bookmarks delete functionality
  */
 
+import type { Page } from "@playwright/test";
 import { expect,test } from "@playwright/test";
 
+const BOOKMARK_HASH_LENGTH = 16;
+
+/**
+ * Shape of the test-only user-interactions service the app exposes on `window` in the test environment, used to seed bookmarks without going through the UI.
+ */
+interface TestUserInteractionsService {
+  addBookmark: (bookmark: {
+    request: {
+      cacheKey: string;
+      hash: string;
+      endpoint: string;
+      params: Record<string, string>;
+    };
+    title: string;
+    notes: string;
+    tags: string[];
+  }) => Promise<void>;
+  getBookmarks: () => Promise<{ id: string }[]>;
+  removeBookmark: (id: string) => Promise<void>;
+}
+
 test.describe("Bulk Bookmarks Management", () => {
+  // Helper function to create test bookmarks
+  const createTestBookmarks = async (page: Page): Promise<void> => {
+    // Navigate to author page first to ensure context is loaded
+    await page.goto("/#/authors/A5017898742");
+    await page.waitForLoadState("networkidle");
+
+    // Create bookmarks programmatically by accessing global service
+    await page.evaluate(async (hashLength) => {
+      try {
+        // Access the global user interactions service if it exists
+        const globalWindow = window as unknown as { userInteractionsService?: TestUserInteractionsService };
+        const { userInteractionsService } = globalWindow;
+
+        if (userInteractionsService === undefined) {
+          throw new Error('userInteractionsService not available on window object');
+        }
+
+        // Create first bookmark for author A5017898742
+        await userInteractionsService.addBookmark({
+          request: {
+            cacheKey: '/authors/A5017898742',
+            hash: 'entity-authors-A5017898742'.slice(0, hashLength),
+            endpoint: '/authors',
+            params: { id: 'A5017898742' }
+          },
+          title: 'Test Author 1 - A5017898742',
+          notes: 'Test bookmark for e2e testing',
+          tags: ['test', 'e2e', 'author']
+        });
+
+        // Create second bookmark for author A5023888391
+        await userInteractionsService.addBookmark({
+          request: {
+            cacheKey: '/authors/A5023888391',
+            hash: 'entity-authors-A5023888391'.slice(0, hashLength),
+            endpoint: '/authors',
+            params: { id: 'A5023888391' }
+          },
+          title: 'Test Author 2 - A5023888391',
+          notes: 'Another test bookmark for e2e testing',
+          tags: ['test', 'e2e', 'author']
+        });
+
+        return 'Bookmarks created successfully';
+      } catch (error) {
+        console.error('Failed to create bookmarks:', error);
+        return `Error: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }, BOOKMARK_HASH_LENGTH);
+
+    // Wait a moment for bookmarks to be saved Removed: waitForTimeout - use locator assertions instead
+  };
+
   test.beforeEach(async ({ page }) => {
     // First, ensure we have some bookmarks by creating them
     await createTestBookmarks(page);
@@ -22,60 +97,6 @@ test.describe("Bulk Bookmarks Management", () => {
     ]);
   });
 
-  // Helper function to create test bookmarks
-  const createTestBookmarks = async (page: any): Promise<void> => {
-    // Navigate to author page first to ensure context is loaded
-    await page.goto("/#/authors/A5017898742");
-    await page.waitForLoadState("networkidle");
-
-    // Create bookmarks programmatically by accessing global service
-    await page.evaluate(async () => {
-      try {
-        // Access the global user interactions service if it exists
-        // @ts-expect-error accessing global test service exposed in test environment
-        const { userInteractionsService } = window;
-
-        if (!userInteractionsService) {
-          throw new Error('userInteractionsService not available on window object');
-        }
-
-        // Create first bookmark for author A5017898742
-        await userInteractionsService.addBookmark({
-          request: {
-            cacheKey: '/authors/A5017898742',
-            hash: 'entity-authors-A5017898742'.slice(0, 16),
-            endpoint: '/authors',
-            params: { id: 'A5017898742' }
-          },
-          title: 'Test Author 1 - A5017898742',
-          notes: 'Test bookmark for e2e testing',
-          tags: ['test', 'e2e', 'author']
-        });
-
-        // Create second bookmark for author A5023888391
-        await userInteractionsService.addBookmark({
-          request: {
-            cacheKey: '/authors/A5023888391',
-            hash: 'entity-authors-A5023888391'.slice(0, 16),
-            endpoint: '/authors',
-            params: { id: 'A5023888391' }
-          },
-          title: 'Test Author 2 - A5023888391',
-          notes: 'Another test bookmark for e2e testing',
-          tags: ['test', 'e2e', 'author']
-        });
-
-        return 'Bookmarks created successfully';
-      } catch (error) {
-        console.error('Failed to create bookmarks:', error);
-        return `Error: ${error instanceof Error ? error.message : String(error)}`;
-      }
-    });
-
-    // Wait a moment for bookmarks to be saved
-    // Removed: waitForTimeout - use locator assertions instead
-  };
-
   test("should display bookmarks management interface", async ({ page }) => {
     // Check that bookmarks section is visible in main content
     await expect(page.locator('main:has-text("Bookmarks")')).toBeVisible();
@@ -87,7 +108,7 @@ test.describe("Bulk Bookmarks Management", () => {
     const bookmarkCards = page.locator('[data-testid="bookmark-card"]');
     const initialCount = await bookmarkCards.count();
 
-    console.log(`Found ${initialCount} bookmarks initially`);
+    console.log(`Found ${String(initialCount)} bookmarks initially`);
 
     // If there are bookmarks, check for Select All button
     if (initialCount > 0) {
@@ -141,7 +162,7 @@ test.describe("Bulk Bookmarks Management", () => {
     expect(checkedCount).toBe(count);
 
     // Check that selection counter shows total count
-    await expect(page.locator(`text=${count} selected`)).toBeVisible();
+    await expect(page.locator(`text=${String(count)} selected`)).toBeVisible();
 
     // Check that delete button appears
     await expect(page.locator('[title="Delete selected bookmarks"]')).toBeVisible();
@@ -159,7 +180,7 @@ test.describe("Bulk Bookmarks Management", () => {
     await page.locator('button:has-text("Select All")').click();
 
     // Verify selection counter appears
-    await expect(page.locator(`text=${count} selected`)).toBeVisible();
+    await expect(page.locator(`text=${String(count)} selected`)).toBeVisible();
 
     // Click Deselect All button
     await page.locator('button:has-text("Deselect All")').click();
@@ -182,7 +203,7 @@ test.describe("Bulk Bookmarks Management", () => {
 
     // Get initial count
     
-    console.log(`Starting with ${count} bookmarks`);
+    console.log(`Starting with ${String(count)} bookmarks`);
 
     // Select at least one bookmark (or all if there are few)
     if (count >= 2) {
@@ -226,7 +247,7 @@ test.describe("Bulk Bookmarks Management", () => {
     const finalBookmarkCards = page.locator('[data-testid="bookmark-card"]');
     const finalCount = await finalBookmarkCards.count();
 
-    console.log(`Ended with ${finalCount} bookmarks after bulk delete`);
+    console.log(`Ended with ${String(finalCount)} bookmarks after bulk delete`);
 
     // The count should have decreased by the number of deleted bookmarks
     const expectedFinalCount = count >= 2 ? count - 2 : count - 1;
@@ -246,7 +267,7 @@ test.describe("Bulk Bookmarks Management", () => {
     const firstTitle = await firstTitleLocator.textContent();
 
     // Require title to exist
-    if (!firstTitle) {
+    if (firstTitle === null) {
       throw new Error("First bookmark title is null or empty");
     }
 
@@ -267,18 +288,18 @@ test.describe("Bulk Bookmarks Management", () => {
     // Removed: waitForTimeout - use locator assertions instead
     // Should show all bookmarks again
     const allCardsAfterClear = page.locator('[data-testid="bookmark-card"]');
-    const countAfterClear = allCardsAfterClear;
+    
 
-    await expect(countAfterClear).toHaveCount(count);
+    await expect(allCardsAfterClear).toHaveCount(count);
   });
 
   test("should show empty state when no bookmarks exist", async ({ page }) => {
     // This test verifies empty state - clear any existing bookmarks first
     await page.evaluate(async () => {
       try {
-        // @ts-expect-error accessing global test service
-        const { userInteractionsService } = window;
-        if (userInteractionsService) {
+        const globalWindow = window as unknown as { userInteractionsService?: TestUserInteractionsService };
+        const { userInteractionsService } = globalWindow;
+        if (userInteractionsService !== undefined) {
           const bookmarks = await userInteractionsService.getBookmarks();
           for (const bookmark of bookmarks) {
             await userInteractionsService.removeBookmark(bookmark.id);
@@ -309,13 +330,15 @@ test.describe("Bulk Bookmarks Management", () => {
     // Require at least 2 bookmarks for this test
     expect(count).toBeGreaterThanOrEqual(2);
 
+    const SIDEBAR_ANIMATION_WAIT_MS = 500;
+
     // Helper function to open/close bookmarks sidebar
     const toggleSidebar = async () => {
       // Look for the left sidebar toggle button (it has a specific icon)
       const sidebarToggle = page.locator('button[aria-label*="left"], button[title*="left"], button:has(svg)').first();
       if (await sidebarToggle.isVisible()) {
         await sidebarToggle.click();
-        await page.waitForTimeout(500); // Wait for sidebar animation
+        await page.waitForTimeout(SIDEBAR_ANIMATION_WAIT_MS); // Wait for sidebar animation
       }
     };
 
@@ -341,7 +364,7 @@ test.describe("Bulk Bookmarks Management", () => {
     const initialMainCount = await getMainPageBookmarkCount();
     const initialSidebarCount = await getSidebarBookmarkCount();
 
-    console.log(`Initial counts - Main: ${initialMainCount}, Sidebar: ${initialSidebarCount}`);
+    console.log(`Initial counts - Main: ${String(initialMainCount)}, Sidebar: ${String(initialSidebarCount)}`);
 
     // Verify both locations have bookmarks
     expect(initialMainCount).toBeGreaterThan(0);
@@ -374,7 +397,7 @@ test.describe("Bulk Bookmarks Management", () => {
     const sidebarCountAfterMainDelete = await getSidebarBookmarkCount();
     expect(sidebarCountAfterMainDelete).toBeLessThan(initialSidebarCount);
 
-    console.log(`After main page delete - Main: ${mainCountAfterDelete}, Sidebar: ${sidebarCountAfterMainDelete}`);
+    console.log(`After main page delete - Main: ${String(mainCountAfterDelete)}, Sidebar: ${String(sidebarCountAfterMainDelete)}`);
 
     // Test 2: Delete from sidebar, verify main page updates
     console.log("Testing: Delete from sidebar → main page should update");
@@ -409,7 +432,7 @@ test.describe("Bulk Bookmarks Management", () => {
         const mainCountAfterSidebarDelete = await getMainPageBookmarkCount();
         expect(mainCountAfterSidebarDelete).toBeLessThan(currentMainCount);
 
-        console.log(`After sidebar delete - Main: ${mainCountAfterSidebarDelete}, Sidebar: ${sidebarCountAfterSidebarDelete}`);
+        console.log(`After sidebar delete - Main: ${String(mainCountAfterSidebarDelete)}, Sidebar: ${String(sidebarCountAfterSidebarDelete)}`);
       } else {
         console.log("No delete button found in sidebar bookmark - skipping sidebar delete test");
       }

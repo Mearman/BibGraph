@@ -7,11 +7,10 @@
  * - Circular layout
  * - Bipartite layout (two-column)
  * - Timeline layout
- *
- * @module components/graph/LayoutSelector
  */
 
 import type { GraphEdge, GraphNode } from '@bibgraph/types';
+import { RelationType } from '@bibgraph/types';
 import { SegmentedControl, Stack } from '@mantine/core';
 import { IconChartDots, IconGitBranch, IconHierarchy, IconRoute,IconTimeline } from '@tabler/icons-react';
 
@@ -94,12 +93,6 @@ export interface LayoutSelectorProps {
 
 /**
  * Layout selector UI component
- *
- * @param props
- * @param props.edges
- * @param props.nodes
- * @param props.onChange
- * @param props.value
  */
 export const LayoutSelector: React.FC<LayoutSelectorProps> = (props) => {
   const { edges = EMPTY_EDGES, nodes = EMPTY_NODES, onChange, value } = props;
@@ -112,7 +105,7 @@ export const LayoutSelector: React.FC<LayoutSelectorProps> = (props) => {
 
     // Hierarchical requires parent-child relationships
     if (option.value === 'hierarchical') {
-      return edges.some((e) => e.type === 'AUTHORSHIP' || e.type === 'AFFILIATION' || e.type === 'REFERENCE');
+      return edges.some((e) => e.type === RelationType.AUTHORSHIP || e.type === RelationType.AFFILIATION || e.type === RelationType.REFERENCE);
     }
 
     // Bipartite requires a way to split nodes
@@ -144,7 +137,7 @@ export const LayoutSelector: React.FC<LayoutSelectorProps> = (props) => {
         data={data}
         size="xs"
         value={value}
-        onChange={(newValue) => onChange(newValue as GraphLayoutType)}
+        onChange={(newValue) => { onChange(newValue); }}
       />
     </Stack>
   );

@@ -4,6 +4,7 @@
  */
 
 import type { EntityType } from "@bibgraph/types";
+import { isEntityType } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils/logger";
 import { useCallback } from "react";
 
@@ -12,6 +13,8 @@ import type { ExportFormat } from "@/types/catalogue";
 import { validateExportFormat } from "@/utils/catalogue-validation";
 
 const CATALOGUE_LOGGER_CONTEXT = "catalogue-import";
+const LARGE_IMPORT_ENTITY_WARNING_THRESHOLD = 1000;
+const BYTES_PER_KILOBYTE = 1024;
 
 /**
  * Import operations hook for catalogue lists
@@ -33,15 +36,11 @@ export const useCatalogueImport = () => {
 			validateExportFormat(data);
 
 			// Add warnings for potential issues
-			const exportData = data as ExportFormat;
-
-			if (exportData.entities.length > 1000) {
-				warnings.push(`Large import: ${exportData.entities.length} entities (may take a moment)`);
+			if (data.entities.length > LARGE_IMPORT_ENTITY_WARNING_THRESHOLD) {
+				warnings.push(`Large import: ${String(data.entities.length)} entities (may take a moment)`);
 			}
 
-			if (exportData.version !== "1.0") {
-				warnings.push(`Import uses version ${exportData.version} (current version is 1.0)`);
-			}
+			// exportData.version is guaranteed to be "1.0" here since validateExportFormat already asserts it above, so no further version-mismatch warning is possible.
 
 			return { valid: true, errors: [], warnings: warnings.length > 0 ? warnings : undefined };
 		} catch (error) {
@@ -86,8 +85,8 @@ export const useCatalogueImport = () => {
 			for (const entity of data.entities) {
 				const type = entity.type;
 				// Convert singular to plural for counting
-				const pluralType = (type + "s") as EntityType;
-				if (pluralType in entityTypes) {
+				const pluralType = `${type}s`;
+				if (isEntityType(pluralType)) {
 					entityTypes[pluralType]++;
 				}
 			}
@@ -97,7 +96,7 @@ export const useCatalogueImport = () => {
 			const allLists = await storageProvider.getAllLists();
 
 			for (const list of allLists) {
-				if (!list.id) continue;
+				if (list.id === undefined) continue;
 				const listEntities = await storageProvider.getListEntities(list.id);
 				const existingEntityIds = new Set(listEntities.map(e => e.entityId));
 
@@ -110,11 +109,11 @@ export const useCatalogueImport = () => {
 
 			// Estimate size (compressed size if applicable)
 			const jsonString = JSON.stringify(data);
-			const estimatedSize = jsonString.length < 1024
-				? `${jsonString.length} bytes`
-				: (jsonString.length < 1024 * 1024
-				? `${(jsonString.length / 1024).toFixed(1)} KB`
-				: `${(jsonString.length / (1024 * 1024)).toFixed(1)} MB`);
+			const estimatedSize = jsonString.length < BYTES_PER_KILOBYTE
+				? `${String(jsonString.length)} bytes`
+				: (jsonString.length < BYTES_PER_KILOBYTE * BYTES_PER_KILOBYTE
+				? `${(jsonString.length / BYTES_PER_KILOBYTE).toFixed(1)} KB`
+				: `${(jsonString.length / (BYTES_PER_KILOBYTE * BYTES_PER_KILOBYTE)).toFixed(1)} MB`);
 
 			return {
 				listTitle,
@@ -137,7 +136,7 @@ export const useCatalogueImport = () => {
 
 			// Helper function to convert singular entity type to plural
 			const toPluralType = (type: string): EntityType => {
-				const mapping: Record<string, EntityType> = {
+				const mapping: Partial<Record<string, EntityType>> = {
 					"work": "works",
 					"author": "authors",
 					"source": "sources",
@@ -146,13 +145,21 @@ export const useCatalogueImport = () => {
 					"publisher": "publishers",
 					"funder": "funders",
 				};
-				return mapping[type] || (type + "s") as EntityType;
+				const mapped = mapping[type];
+				if (mapped !== undefined) {
+					return mapped;
+				}
+				const pluralType = `${type}s`;
+				if (isEntityType(pluralType)) {
+					return pluralType;
+				}
+				throw new Error(`Unknown entity type: ${type}`);
 			};
 
 			// Create new list from imported data
 			const listId = await storageProvider.createList({
 				title: `${data.listMetadata.title} (Imported)`,
-				description: data.listMetadata.description
+				description: data.listMetadata.description !== undefined && data.listMetadata.description !== ""
 					? `${data.listMetadata.description} (Imported)`
 					: "Imported from file",
 				type: data.listMetadata.isBibliography ? "bibliography" : "list",
@@ -246,9 +253,9 @@ export const useCatalogueImport = () => {
 			// Create new list from compressed data
 			const listId = await storageProvider.createList({
 				title: `${listData.list.title} (Imported)`,
-				description: listData.list.description ? `${listData.list.description} (Imported)` : "Imported from compressed data",
+				description: listData.list.description !== undefined && listData.list.description !== "" ? `${listData.list.description} (Imported)` : "Imported from compressed data",
 				type: listData.list.type,
-				tags: [...(listData.list.tags || []), "imported"],
+				tags: [...(listData.list.tags ?? []), "imported"],
 				isPublic: false,
 			});
 
@@ -265,7 +272,7 @@ export const useCatalogueImport = () => {
 	}, [storageProvider]);
 
 	// Import list from File object
-	const importListFromFile = useCallback(async (file: File): Promise<string> => {
+	const importListFromFile = useCallback(async (file: Readonly<File>): Promise<string> => {
 		try {
 			// Read file as text
 			const text = await file.text();
@@ -279,16 +286,13 @@ export const useCatalogueImport = () => {
 
 			try {
 				// Try parsing as JSON first
-				const parsed = JSON.parse(text);
+				const parsed: unknown = JSON.parse(text);
 
-				// If it has the ExportFormat structure, use it directly
-				if (parsed.version && parsed.listMetadata && parsed.entities) {
-					data = parsed as ExportFormat;
-				} else {
-					throw new Error("Not an ExportFormat JSON");
-				}
+				// If it matches the ExportFormat structure, use it directly
+				validateExportFormat(parsed);
+				data = parsed;
 			} catch {
-				// If JSON parsing fails, treat as compressed data
+				// If JSON parsing or validation fails, treat as compressed data
 				try {
 					return await importListCompressed(text.trim());
 				} catch {

@@ -12,12 +12,16 @@ import { expect,test } from '@playwright/test';
 import { waitForAppReady, waitForGraphReady } from '@/test/helpers/app-ready';
 import { ExplorePage } from '@/test/page-objects/ExplorePage';
 
+const TEST_SUITE_TIMEOUT_MS = 60_000;
+const DATA_LOAD_WAIT_MS = 2000;
+const ASYNC_OPERATIONS_WAIT_MS = 3000;
+
 test.describe('@utility Explore Page', () => {
-	test.setTimeout(60_000); // 60 seconds for graph rendering
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS); // 60 seconds for graph rendering
 
 	let explorePage: ExplorePage;
 
-	test.beforeEach(async ({ page }) => {
+	test.beforeEach(({ page }) => {
 		explorePage = new ExplorePage(page);
 
 		// Set up console error listener for debugging
@@ -48,8 +52,8 @@ test.describe('@utility Explore Page', () => {
 
 		// Verify no critical errors
 		const errorMessages = page.locator('[role="alert"]');
-		const hasError = errorMessages;
-		await expect(hasError).toHaveCount(0);
+		
+		await expect(errorMessages).toHaveCount(0);
 	});
 
 	test('should render graph SVG container', async ({ page }) => {
@@ -58,7 +62,7 @@ test.describe('@utility Explore Page', () => {
 		await waitForGraphReady(page);
 
 		// Check for SVG container using primary selector
-		const graphContainer = page.locator(explorePage['exploreSelectors'].graphContainer);
+		const graphContainer = page.locator(explorePage.exploreSelectors.graphContainer);
 		const isPrimaryVisible = await graphContainer.isVisible().catch(() => false);
 
 		if (isPrimaryVisible) {
@@ -79,9 +83,9 @@ test.describe('@utility Explore Page', () => {
 		await waitForAppReady(page);
 
 		// Check for zoom controls using page object selectors
-		const zoomInButton = page.locator(explorePage['exploreSelectors'].zoomIn);
-		const zoomOutButton = page.locator(explorePage['exploreSelectors'].zoomOut);
-		const resetZoomButton = page.locator(explorePage['exploreSelectors'].resetZoom);
+		const zoomInButton = page.locator(explorePage.exploreSelectors.zoomIn);
+		const zoomOutButton = page.locator(explorePage.exploreSelectors.zoomOut);
+		const resetZoomButton = page.locator(explorePage.exploreSelectors.resetZoom);
 
 		// Check if any zoom controls are visible
 		const hasZoomIn = await zoomInButton.isVisible().catch(() => false);
@@ -91,7 +95,7 @@ test.describe('@utility Explore Page', () => {
 		// At least one zoom control should be visible, or check for zoom controls container
 		if (!hasZoomIn && !hasZoomOut && !hasResetZoom) {
 			// Alternative: check for zoom controls container
-			const zoomControls = page.locator(explorePage['exploreSelectors'].zoomControls);
+			const zoomControls = page.locator(explorePage.exploreSelectors.zoomControls);
 			const isControlsVisible = await zoomControls.isVisible().catch(() => false);
 
 			// If no zoom controls, verify this is expected behavior (empty state)
@@ -121,7 +125,7 @@ test.describe('@utility Explore Page', () => {
 			await waitForGraphReady(page);
 
 			// Try to zoom in
-			const zoomInButton = page.locator(explorePage['exploreSelectors'].zoomIn);
+			const zoomInButton = page.locator(explorePage.exploreSelectors.zoomIn);
 			const hasZoomIn = await zoomInButton.isVisible().catch(() => false);
 
 			if (hasZoomIn) {
@@ -176,7 +180,7 @@ test.describe('@utility Explore Page', () => {
 	test('should render graph nodes when data is available', async ({ page }) => {
 		await explorePage.goto('/explore');
 		await waitForAppReady(page);
-		await page.waitForTimeout(2000); // Allow time for data loading
+		await page.waitForTimeout(DATA_LOAD_WAIT_MS); // Allow time for data loading
 
 		const nodeCount = await explorePage.getNodeCount();
 
@@ -186,8 +190,8 @@ test.describe('@utility Explore Page', () => {
 			await explorePage.expectGraphLoaded();
 
 			// Verify nodes are interactive (have proper attributes)
-			const firstNode = page.locator(explorePage['exploreSelectors'].graphNode).first();
-			const fallbackNode = page.locator(explorePage['exploreSelectors'].graphNodeFallback).first();
+			const firstNode = page.locator(explorePage.exploreSelectors.graphNode).first();
+			const fallbackNode = page.locator(explorePage.exploreSelectors.graphNodeFallback).first();
 
 			const isPrimaryExists = await firstNode.count() > 0;
 			const isFallbackExists = await fallbackNode.count() > 0;
@@ -213,7 +217,7 @@ test.describe('@utility Explore Page', () => {
 
 		await explorePage.goto('/explore');
 		await waitForAppReady(page);
-		await page.waitForTimeout(3000); // Wait for any async operations
+		await page.waitForTimeout(ASYNC_OPERATIONS_WAIT_MS); // Wait for any async operations
 
 		// Filter for critical errors
 		const criticalErrors = consoleErrors.filter(

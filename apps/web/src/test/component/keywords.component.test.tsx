@@ -1,7 +1,10 @@
+import type * as BibgraphClientModule from '@bibgraph/client';
 import { cachedOpenAlex } from '@bibgraph/client';
+import type { Keyword } from '@bibgraph/types';
 import { InMemoryStorageProvider } from '@bibgraph/utils';
 import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type * as ReactRouterModule from '@tanstack/react-router';
 import { useParams, useSearch } from '@tanstack/react-router';
 import { cleanup,render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
@@ -11,9 +14,17 @@ import { NotificationProvider } from '@/contexts/NotificationContext';
 import { StorageProviderWrapper } from '@/contexts/storage-provider-context';
 import { UndoRedoProvider } from '@/contexts/UndoRedoContext';
 
+/**
+ * Mocked shape of the keywords API, with `getKeyword` typed as a plain function property rather than a class method so `vi.mocked()` can reference it without TypeScript treating it as an unbound method
+ */
+interface MockedKeywordsApi {
+  getKeyword: (id: string, params?: unknown) => Promise<Keyword>;
+}
+const mockedKeywords = cachedOpenAlex.client.keywords as unknown as MockedKeywordsApi;
+
 // Mock cachedOpenAlex client
 vi.mock('@bibgraph/client', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@bibgraph/client')>();
+  const actual = await importOriginal<typeof BibgraphClientModule>();
   return {
     ...actual,
     cachedOpenAlex: {
@@ -28,7 +39,7 @@ vi.mock('@bibgraph/client', async (importOriginal) => {
 
 // Mock router hooks and Link component
 vi.mock('@tanstack/react-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@tanstack/react-router')>();
+  const actual = await importOriginal<typeof ReactRouterModule>();
   return {
     ...actual,
     useParams: vi.fn(),
@@ -129,8 +140,8 @@ describe('Keywords Route - EntityDetailLayout Migration', () => {
     vi.mocked(useSearch).mockReturnValue({});
 
     // Mock successful API response by default
-    vi.mocked(cachedOpenAlex.client.keywords.getKeyword).mockResolvedValue(
-      mockKeyword as any
+    vi.mocked(mockedKeywords.getKeyword).mockResolvedValue(
+      mockKeyword as unknown as Keyword
     );
   });
 
@@ -172,11 +183,13 @@ describe('Keywords Route - EntityDetailLayout Migration', () => {
       expect(screen.getByRole('heading', { name: 'Artificial Intelligence' })).toBeInTheDocument();
     });
 
-    it('should use LoadingState component during fetch', async () => {
+    it('should use LoadingState component during fetch', () => {
       // Setup slow-resolving mock
-      vi.mocked(cachedOpenAlex.client.keywords.getKeyword).mockImplementation(
-        () => new Promise(() => {}) // Never resolves
-      );
+      vi.mocked(mockedKeywords.getKeyword).mockImplementation(async () => {
+        return await new Promise<Keyword>(() => {
+          // Intentionally never resolves - simulates an in-flight request for the loading-state test
+        });
+      });
 
       render(
         <TestWrapper>
@@ -191,7 +204,7 @@ describe('Keywords Route - EntityDetailLayout Migration', () => {
 
     it('should use ErrorState component on error', async () => {
       // Setup error mock
-      vi.mocked(cachedOpenAlex.client.keywords.getKeyword).mockRejectedValue(
+      vi.mocked(mockedKeywords.getKeyword).mockRejectedValue(
         new Error('Network error')
       );
 

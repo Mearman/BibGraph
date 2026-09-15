@@ -33,8 +33,8 @@ vi.mock('@tanstack/react-router', () => ({
     state: null,
     key: 'test'
   }),
-  Link: ({ children, to, ...properties }: any) => (
-    <a href={to} {...properties} onClick={() => mockNavigate(to)}>
+  Link: ({ children, to, ...properties }: Readonly<{ children: React.ReactNode; to: string } & React.AnchorHTMLAttributes<HTMLAnchorElement>>) => (
+    <a href={to} {...properties} onClick={() => { mockNavigate(to); }}>
       {children}
     </a>
   )
@@ -141,7 +141,7 @@ describe('Bookmark Navigation Integration Tests', () => {
         isLoadingHistory: false,
         isLoadingBookmarks: false,
         isLoadingStats: false
-      } as any)
+      })
 
       render(
         <TestWrapper>
@@ -186,7 +186,7 @@ describe('Bookmark Navigation Integration Tests', () => {
         isLoadingHistory: false,
         isLoadingBookmarks: false,
         isLoadingStats: false
-      } as any)
+      })
 
       render(
         <TestWrapper>
@@ -230,7 +230,7 @@ describe('Bookmark Navigation Integration Tests', () => {
         isLoadingHistory: false,
         isLoadingBookmarks: false,
         isLoadingStats: false
-      } as any)
+      })
 
       render(
         <TestWrapper>
@@ -276,7 +276,7 @@ describe('Bookmark Navigation Integration Tests', () => {
         isLoadingHistory: false,
         isLoadingBookmarks: false,
         isLoadingStats: false
-      } as any)
+      })
 
       render(
         <TestWrapper>
@@ -320,7 +320,7 @@ describe('Bookmark Navigation Integration Tests', () => {
         isLoadingHistory: false,
         isLoadingBookmarks: false,
         isLoadingStats: false
-      } as any)
+      })
 
       const { rerender } = render(
         <TestWrapper>
@@ -383,7 +383,7 @@ describe('Bookmark Navigation Integration Tests', () => {
         isLoadingHistory: false,
         isLoadingBookmarks: false,
         isLoadingStats: false
-      } as any)
+      })
 
       render(
         <TestWrapper>
@@ -399,7 +399,7 @@ describe('Bookmark Navigation Integration Tests', () => {
       expect(() => fireEvent.click(bookmarkLink)).not.toThrow()
     })
 
-    it('should handle malformed URLs in legacy bookmark notes', async () => {
+    it('should handle malformed URLs in legacy bookmark notes', () => {
       const malformedBookmark: CatalogueEntity = {
         id: 'bookmark-malformed',
         listId: SPECIAL_LIST_IDS.BOOKMARKS,
@@ -430,7 +430,7 @@ describe('Bookmark Navigation Integration Tests', () => {
         isLoadingHistory: false,
         isLoadingBookmarks: false,
         isLoadingStats: false
-      } as any)
+      })
 
       render(
         <TestWrapper>
@@ -474,7 +474,7 @@ describe('Bookmark Navigation Integration Tests', () => {
         isLoadingHistory: false,
         isLoadingBookmarks: false,
         isLoadingStats: false
-      } as any)
+      })
 
       render(
         <TestWrapper>

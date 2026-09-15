@@ -1,6 +1,5 @@
 /**
  * Page object for error pages (404, 500, network errors, etc.)
- * @module ErrorPage
  * @see spec-020 Phase 5: Error scenario coverage
  */
 

@@ -21,14 +21,15 @@ import { expect, test } from '@playwright/test';
 import { waitForAppReady } from '@/test/helpers/app-ready';
 import type { EntityType } from '@/test/page-objects/BaseEntityPageObject';
 
-const BASE_URL = process.env.BASE_URL || (process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173');
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = process.env.BASE_URL ?? (IS_CI ? 'http://localhost:4173' : 'http://localhost:5173');
 
 // Test entities with known stable IDs for each entity type
-const ENTITY_TEST_DATA: Array<{
+const ENTITY_TEST_DATA: {
 	entityType: EntityType;
 	id: string;
 	description: string;
-}> = [
+}[] = [
 	{ entityType: 'works', id: 'W2741809807', description: 'Test Work' },
 	{ entityType: 'authors', id: 'A5017898742', description: 'Test Author' },
 	{ entityType: 'sources', id: 'S137773608', description: 'Test Source' },
@@ -43,10 +44,16 @@ const ENTITY_TEST_DATA: Array<{
 	{ entityType: 'subfields', id: 'SF1701', description: 'Test Subfield' },
 ];
 
-test.describe('@entity US-06 Entity Detail Pages', () => {
-	test.setTimeout(60_000);
+const TEST_SUITE_TIMEOUT_MS = 60_000;
+const MIN_PAGE_CONTENT_LENGTH = 500;
+const VIEW_SWITCH_WAIT_MS = 500;
+const MIN_FALLBACK_CONTENT_LENGTH = 100;
+const MIN_LOADING_OR_CONTENT_LENGTH = 200;
 
-	test.beforeEach(async ({ page }) => {
+test.describe('@entity US-06 Entity Detail Pages', () => {
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS);
+
+	test.beforeEach(({ page }) => {
 		// Set up console error listener for debugging
 		page.on('console', (message) => {
 			if (message.type() === 'error') {
@@ -70,7 +77,7 @@ test.describe('@entity US-06 Entity Detail Pages', () => {
 			await page.locator('main').waitFor({ timeout: 20_000 });
 			await waitForAppReady(page);
 
-			const pageContent = await page.locator('body').textContent() || '';
+			const pageContent = await page.locator('body').textContent() ?? '';
 
 			// Should not have routing errors
 			expect(pageContent).not.toContain('Page not found');
@@ -85,7 +92,7 @@ test.describe('@entity US-06 Entity Detail Pages', () => {
 				pageContent.includes(`Error Loading`) ||
 				pageContent.includes('Not Found') ||
 				// Entity page loaded with some content
-				pageContent.length > 500;
+				pageContent.length > MIN_PAGE_CONTENT_LENGTH;
 
 			expect(hasEntityContent).toBe(true);
 		});
@@ -100,7 +107,7 @@ test.describe('@entity US-06 Entity Detail Pages', () => {
 		await page.locator('main').waitFor({ timeout: 20_000 });
 		await waitForAppReady(page);
 
-		const pageContent = await page.locator('body').textContent() || '';
+		const pageContent = await page.locator('body').textContent() ?? '';
 
 		// Should not be in an error state
 		expect(pageContent).not.toContain('Page not found');
@@ -159,10 +166,10 @@ test.describe('@entity US-06 Entity Detail Pages', () => {
 			await rawLabel.click({ force: true });
 
 			// Wait briefly for view to switch
-			await page.waitForTimeout(500);
+			await page.waitForTimeout(VIEW_SWITCH_WAIT_MS);
 
 			// JSON view should show raw data markers (the heading says "Raw JSON Data")
-			const jsonContent = await page.locator('body').textContent() || '';
+			const jsonContent = await page.locator('body').textContent() ?? '';
 			const hasJsonMarkers =
 				jsonContent.includes('{') ||
 				jsonContent.includes('id') ||
@@ -182,8 +189,8 @@ test.describe('@entity US-06 Entity Detail Pages', () => {
 		} else {
 			// SegmentedControl must be present on entity detail pages
 			// If not visible, fail with a clear message
-			const pageContent = await page.locator('body').textContent() || '';
-			expect(pageContent.length).toBeGreaterThan(100);
+			const pageContent = await page.locator('body').textContent() ?? '';
+			expect(pageContent.length).toBeGreaterThan(MIN_FALLBACK_CONTENT_LENGTH);
 		}
 	});
 
@@ -223,8 +230,8 @@ test.describe('@entity US-06 Entity Detail Pages', () => {
 
 		// If no loading indicators, content should be present
 		if (!isFoundLoadingOrContent) {
-			const pageContent = await page.locator('body').textContent() || '';
-			isFoundLoadingOrContent = pageContent.length > 200;
+			const pageContent = await page.locator('body').textContent() ?? '';
+			isFoundLoadingOrContent = pageContent.length > MIN_LOADING_OR_CONTENT_LENGTH;
 		}
 
 		expect(isFoundLoadingOrContent).toBe(true);
@@ -252,7 +259,7 @@ test.describe('@entity US-06 Entity Detail Pages', () => {
 		await page.locator('main').waitFor({ timeout: 20_000 });
 		await waitForAppReady(page);
 
-		const pageContent = await page.locator('body').textContent() || '';
+		const pageContent = await page.locator('body').textContent() ?? '';
 
 		// Should show a user-friendly error or not-found state, not a blank page
 		const hasErrorHandling =
@@ -296,7 +303,7 @@ test.describe('@entity US-06 Entity Detail Pages', () => {
 		const reloadedUrl = page.url();
 		expect(reloadedUrl).toContain(entityId);
 
-		const pageContent = await page.locator('body').textContent() || '';
+		const pageContent = await page.locator('body').textContent() ?? '';
 
 		// Should still show entity content after reload
 		expect(pageContent).not.toContain('Page not found');

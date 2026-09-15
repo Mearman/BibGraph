@@ -11,6 +11,11 @@ import {
 } from "@mantine/core";
 import { useCallback,useEffect, useRef, useState } from "react";
 
+// Type guard narrowing an event target / `document.activeElement` (typed `EventTarget` / `Element` unions) to `HTMLElement`.
+const isHTMLElement = (value: unknown): value is HTMLElement => value instanceof HTMLElement;
+
+const ANNOUNCEMENT_CLEANUP_DELAY_MS = 1000;
+
 // Inject focus manager CSS styles
 const injectFocusManagerStyles = () => {
   if (!document.querySelector('#focus-manager-styles')) {
@@ -122,14 +127,10 @@ interface FocusTrapProperties {
  * Focus Trap Component
  *
  * Traps focus within a container for modals, dialogs, and other focused UI patterns
- * @param root0
- * @param root0.children
- * @param root0.enabled
- * @param root0.onEscape
  */
 export const FocusTrap = ({ children, enabled = true, onEscape }: FocusTrapProperties) => {
-  const containerReference = useRef<HTMLDivElement>(null);
-  const previousFocusReference = useRef<HTMLElement | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   // Inject styles on component mount
   useEffect(() => {
@@ -137,10 +138,11 @@ export const FocusTrap = ({ children, enabled = true, onEscape }: FocusTrapPrope
   }, []);
 
   useEffect(() => {
-    if (!enabled || !containerReference.current) return;
+    if (!enabled || !containerRef.current) return undefined;
 
-    const container = containerReference.current;
-    previousFocusReference.current = document.activeElement as HTMLElement;
+    const container = containerRef.current;
+    const activeElement = document.activeElement;
+    previousFocusRef.current = isHTMLElement(activeElement) ? activeElement : null;
 
     // Get all focusable elements within the container
     const getFocusableElements = () => {
@@ -154,13 +156,13 @@ export const FocusTrap = ({ children, enabled = true, onEscape }: FocusTrapPrope
         '[contenteditable="true"]'
       ].join(', ');
 
-      return [...container.querySelectorAll(selector)] as HTMLElement[];
+      return [...container.querySelectorAll<HTMLElement>(selector)];
     };
 
     // Focus the first focusable element
-    const focusableElements = getFocusableElements();
-    if (focusableElements.length > 0) {
-      focusableElements[0].focus();
+    const initialFocusableElements = getFocusableElements();
+    if (initialFocusableElements.length > 0) {
+      initialFocusableElements[0].focus();
     }
 
     // Handle keyboard navigation within the trap
@@ -193,15 +195,15 @@ export const FocusTrap = ({ children, enabled = true, onEscape }: FocusTrapPrope
     return () => {
       container.removeEventListener('keydown', handleKeydown);
       // Restore previous focus
-      if (previousFocusReference.current && document.contains(previousFocusReference.current)) {
-        previousFocusReference.current.focus();
+      if (previousFocusRef.current && document.contains(previousFocusRef.current)) {
+        previousFocusRef.current.focus();
       }
     };
   }, [enabled, onEscape]);
 
   return (
     <div
-      ref={containerReference}
+      ref={containerRef}
       className="focus-trap"
     >
       {children}
@@ -220,10 +222,6 @@ interface SkipLinkProperties {
  * Skip Link Component
  *
  * Provides skip navigation links for keyboard users
- * @param root0
- * @param root0.target
- * @param root0.children
- * @param root0.position
  */
 export const SkipLink = ({ target, children, position = 'top-left' }: SkipLinkProperties) => {
   // Inject styles on component mount
@@ -233,12 +231,14 @@ export const SkipLink = ({ target, children, position = 'top-left' }: SkipLinkPr
 
   const getPositionClass = () => {
     switch (position) {
+      case 'top-left':
+        return '';
       case 'top-right':
         return 'top-right';
       case 'top-center':
         return 'top-center';
       default:
-        return '';
+        return position satisfies never;
     }
   };
 
@@ -265,11 +265,6 @@ interface FocusIndicatorProperties {
  * Focus Indicator Component
  *
  * Enhances focus visibility for better keyboard navigation
- * @param root0
- * @param root0.children
- * @param root0.animated
- * @param root0._color
- * @param root0._size
  */
 export const FocusIndicator = ({ children, animated = true, _color, _size = 'md' }: FocusIndicatorProperties) => {
   // Inject styles on component mount
@@ -296,11 +291,11 @@ export const FocusIndicator = ({ children, animated = true, _color, _size = 'md'
 
 // Keyboard navigation hint props
 interface KeyboardNavigationHintProperties {
-  shortcuts: Array<{
+  shortcuts: {
     key: string;
     description: string;
     action?: () => void;
-  }>;
+  }[];
   show?: boolean;
 }
 
@@ -308,9 +303,6 @@ interface KeyboardNavigationHintProperties {
  * Keyboard Navigation Hint Component
  *
  * Displays available keyboard shortcuts and navigation hints
- * @param root0
- * @param root0.shortcuts
- * @param root0.show
  */
 export const KeyboardNavigationHint = ({ shortcuts, show = false }: KeyboardNavigationHintProperties) => {
   if (!show) return null;
@@ -380,7 +372,8 @@ export const useFocusManagement = () => {
         'a[href], button:not([disabled]), textarea:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
       )];
 
-    const currentIndex = focusableElements.indexOf(document.activeElement as HTMLElement);
+    const activeElement = document.activeElement;
+    const currentIndex = isHTMLElement(activeElement) ? focusableElements.indexOf(activeElement) : -1;
     const nextIndex = currentIndex < focusableElements.length - 1 ? currentIndex + 1 : 0;
     focusElement(focusableElements[nextIndex]);
   }, [focusElement]);
@@ -390,7 +383,8 @@ export const useFocusManagement = () => {
         'a[href], button:not([disabled]), textarea:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
       )];
 
-    const currentIndex = focusableElements.indexOf(document.activeElement as HTMLElement);
+    const activeElement = document.activeElement;
+    const currentIndex = isHTMLElement(activeElement) ? focusableElements.indexOf(activeElement) : -1;
     const previousIndex = currentIndex > 0 ? currentIndex - 1 : focusableElements.length - 1;
     focusElement(focusableElements[previousIndex]);
   }, [focusElement]);
@@ -412,11 +406,13 @@ export const useFocusManagement = () => {
   // Track focused element
   useEffect(() => {
     const handleFocusIn = (e: FocusEvent) => {
-      setFocusedElement(e.target as HTMLElement);
+      if (isHTMLElement(e.target)) {
+        setFocusedElement(e.target);
+      }
     };
 
     document.addEventListener('focusin', handleFocusIn);
-    return () => document.removeEventListener('focusin', handleFocusIn);
+    return () => { document.removeEventListener('focusin', handleFocusIn); };
   }, []);
 
   return {
@@ -476,7 +472,7 @@ export const useScreenReaderAnnouncer = () => {
       if (document.body.contains(announcement)) {
         announcement.remove();
       }
-    }, 1000);
+    }, ANNOUNCEMENT_CLEANUP_DELAY_MS);
   }, []);
 
   return { announce };
@@ -492,31 +488,32 @@ interface FocusBoundaryProperties {
 
 export const FocusBoundary = ({ children, onEnter, onExit, boundaryClass = 'focus-boundary' }: FocusBoundaryProperties) => {
   const [isActive, setIsActive] = useState(false);
-  const boundaryReference = useRef<HTMLDivElement>(null);
+  const boundaryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleFocusIn = (e: FocusEvent) => {
-      const target = e.target as HTMLElement;
-      const boundary = boundaryReference.current;
+      if (!isHTMLElement(e.target)) return;
+      const target = e.target;
+      const boundary = boundaryRef.current;
 
-      if (boundary && boundary.contains(target)) {
+      if (boundary?.contains(target) === true) {
         if (!isActive) {
           setIsActive(true);
           onEnter?.();
         }
-      } else if (isActive && !boundary?.contains(target)) {
+      } else if (isActive && boundary?.contains(target) !== true) {
         setIsActive(false);
         onExit?.();
       }
     };
 
     document.addEventListener('focusin', handleFocusIn);
-    return () => document.removeEventListener('focusin', handleFocusIn);
+    return () => { document.removeEventListener('focusin', handleFocusIn); };
   }, [isActive, onEnter, onExit]);
 
   return (
     <div
-      ref={boundaryReference}
+      ref={boundaryRef}
       className={`${boundaryClass} ${isActive ? 'active' : ''}`}
       data-focus-boundary-active={isActive}
     >

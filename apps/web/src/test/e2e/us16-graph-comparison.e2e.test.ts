@@ -12,12 +12,14 @@ import { expect, test } from '@playwright/test';
 import { waitForAppReady } from '@/test/helpers/app-ready';
 import { GraphComparisonPage } from '@/test/page-objects/GraphComparisonPage';
 
+const TEST_SUITE_TIMEOUT_MS = 60_000;
+
 test.describe('@workflow US-16 Graph Comparison', () => {
-	test.setTimeout(60_000);
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS);
 
 	let comparisonPage: GraphComparisonPage;
 
-	test.beforeEach(async ({ page }) => {
+	test.beforeEach(({ page }) => {
 		comparisonPage = new GraphComparisonPage(page);
 
 		page.on('console', (message) => {
@@ -140,8 +142,8 @@ test.describe('@workflow US-16 Graph Comparison', () => {
 
 			// Verify the toggle state changed
 			const isChecked =
-				(await syncToggle.getAttribute('aria-checked')) ||
-				(await syncToggle.getAttribute('data-state')) ||
+				(await syncToggle.getAttribute('aria-checked')) ??
+				(await syncToggle.getAttribute('data-state')) ??
 				(await syncToggle.isChecked().catch(() => null));
 
 			// Toggle state should be truthy after click

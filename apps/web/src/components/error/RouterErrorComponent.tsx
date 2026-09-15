@@ -1,7 +1,7 @@
 import { logger } from "@bibgraph/utils/logger";
 import { Alert, Button, Container, Group,Stack, Text } from "@mantine/core";
 import { IconAlertTriangle, IconHome,IconRefresh } from "@tabler/icons-react";
-import { ErrorComponentProps } from "@tanstack/react-router";
+import type { ErrorComponentProps } from "@tanstack/react-router";
 import React from "react";
 
 import { ICON_SIZE } from "@/config/style-constants";
@@ -21,16 +21,23 @@ declare global {
  * Router Error Component
  * Handles TanStack Router errors at the route level
  * This prevents the router from intercepting errors that should go to GlobalErrorBoundary
- * @param root0
- * @param root0.error
- * @param root0.reset
- * @param root0.info
  */
 export const RouterErrorComponent: React.FC<ErrorComponentProps> = ({
   error,
   reset,
   info,
 }) => {
+  // Utility function for user agent grouping
+  const getUserAgentGroup = (): string => {
+    if (typeof navigator === 'undefined') return 'unknown';
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.includes('chrome')) return 'chrome';
+    if (userAgent.includes('firefox')) return 'firefox';
+    if (userAgent.includes('safari')) return 'safari';
+    if (userAgent.includes('edge')) return 'edge';
+    return 'other';
+  };
+
   // Log the router error with PostHog analytics
   React.useEffect(() => {
     logger.error(
@@ -63,17 +70,6 @@ export const RouterErrorComponent: React.FC<ErrorComponentProps> = ({
       logger.warn('routing', 'Failed to send router error to PostHog', { analyticsError }, 'RouterErrorComponent');
     }
   }, [error, info]);
-
-  // Utility function for user agent grouping
-  const getUserAgentGroup = (): string => {
-    if (typeof navigator === 'undefined') return 'unknown';
-    const userAgent = navigator.userAgent.toLowerCase();
-    if (userAgent.includes('chrome')) return 'chrome';
-    if (userAgent.includes('firefox')) return 'firefox';
-    if (userAgent.includes('safari')) return 'safari';
-    if (userAgent.includes('edge')) return 'edge';
-    return 'other';
-  };
 
   // For context/hook errors and React Flow errors, throw to let GlobalErrorBoundary handle them
   if (

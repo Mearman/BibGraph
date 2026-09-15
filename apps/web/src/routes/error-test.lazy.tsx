@@ -5,6 +5,9 @@ import React, { useState } from "react";
 
 import { ICON_SIZE } from "@/config/style-constants";
 
+// Delay before the simulated JavaScript error fires, in milliseconds.
+const JS_ERROR_DELAY_MS = 100;
+
 /**
  * Error Test Component
  * Used to verify that GlobalErrorBoundary is working correctly
@@ -39,7 +42,7 @@ const ErrorTestComponent = () => {
       throw new Error(
         "Test JavaScript error - This should be caught by global error handling",
       );
-    }, 100);
+    }, JS_ERROR_DELAY_MS);
   };
 
   return (

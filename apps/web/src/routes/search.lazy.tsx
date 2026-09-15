@@ -71,7 +71,7 @@ const SearchPage = () => {
     const queryString = queryStructure.terms
       .filter((term) => term.text.trim().length > 0)
       .map((term, index) => {
-        const prefix = index > 0 ? ` ${term.operator || 'AND'} ` : '';
+        const prefix = index > 0 ? ` ${term.operator ?? 'AND'} ` : '';
         return `${prefix}"${term.text.trim()}"`;
       })
       .join('');
@@ -87,12 +87,12 @@ const SearchPage = () => {
       return <SearchLoadingStateRenderer />;
     }
 
-    if (error) {
+    if (error !== null && error !== undefined) {
       return (
         <SearchErrorStateRenderer
           error={error}
-          onRetry={handleRetry}
-          onRetryWithExponentialBackoff={handleRetryWithExponentialBackoff}
+          onRetry={() => { void handleRetry(); }}
+          onRetryWithExponentialBackoff={() => { void handleRetryWithExponentialBackoff(); }}
           retryCount={retryCount}
           maxRetries={maxRetries}
           isRetrying={isRetrying}
@@ -108,18 +108,18 @@ const SearchPage = () => {
       <Stack>
         <SearchResultsHeader
           sortedResultsCount={sortedResults.length}
-          totalResultsCount={searchResults?.length || 0}
+          totalResultsCount={searchResults?.length ?? 0}
           selectedTypes={selectedTypes}
           searchDuration={searchDuration}
           viewMode={viewMode}
           sortBy={sortBy}
-          searchResults={searchResults || []}
+          searchResults={searchResults ?? []}
           searchQuery={searchFilters.query}
           sortedResults={sortedResults}
           onViewModeChange={setViewMode}
           onSortChange={setSortBy}
           onTypeFilterToggle={handleTypeFilterToggle}
-          onClearFilters={() => setSelectedTypes([])}
+          onClearFilters={() => { setSelectedTypes([]); }}
         />
 
         {hasQuery && (
@@ -135,7 +135,7 @@ const SearchPage = () => {
           <SearchResultsTableView
             results={sortedResults}
             isInGraph={isInGraph}
-            onToggleGraph={handleToggleGraph}
+            onToggleGraph={(result, e) => { void handleToggleGraph(result, e); }}
             graphLoading={graphList.loading}
           />
         )}
@@ -144,7 +144,7 @@ const SearchPage = () => {
           <SearchResultsCardView
             results={sortedResults}
             isInGraph={isInGraph}
-            onToggleGraph={handleToggleGraph}
+            onToggleGraph={(result, e) => { void handleToggleGraph(result, e); }}
             graphLoading={graphList.loading}
           />
         )}
@@ -153,7 +153,7 @@ const SearchPage = () => {
           <SearchResultsListView
             results={sortedResults}
             isInGraph={isInGraph}
-            onToggleGraph={handleToggleGraph}
+            onToggleGraph={(result, e) => { void handleToggleGraph(result, e); }}
             graphLoading={graphList.loading}
           />
         )}
@@ -171,7 +171,7 @@ const SearchPage = () => {
           <Button
             variant={showAdvancedQuery ? "filled" : "light"}
             leftSection={<IconToggleLeft size={ICON_SIZE.SM} />}
-            onClick={() => setShowAdvancedQuery(!showAdvancedQuery)}
+            onClick={() => { setShowAdvancedQuery(!showAdvancedQuery); }}
             size="sm"
           >
             {showAdvancedQuery ? "Hide" : "Show"} Advanced Query Builder
@@ -200,7 +200,7 @@ const SearchPage = () => {
             refinementQuery={refinementQuery}
             onRefinementChange={setRefinementQuery}
             sortedResultsCount={sortedResults.length}
-            totalResultsCount={searchResults?.length || 0}
+            totalResultsCount={searchResults?.length ?? 0}
           />
         )}
 

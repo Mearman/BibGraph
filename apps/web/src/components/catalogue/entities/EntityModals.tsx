@@ -95,11 +95,15 @@ export const BulkMoveModal = ({
           label="Target List"
           placeholder="Select a list..."
           value={targetListId}
-          onChange={(value) => onTargetListChange(value)}
+          onChange={(value) => {
+            onTargetListChange(value);
+          }}
           data={lists
             .filter(
               (list): list is typeof list & { id: string } =>
-                list.id !== currentListId && !!list.id
+                list.id !== currentListId &&
+                list.id !== undefined &&
+                list.id !== ""
             )
             .map((list) => ({
               value: list.id,
@@ -112,7 +116,11 @@ export const BulkMoveModal = ({
           <Button variant="subtle" onClick={handleClose}>
             Cancel
           </Button>
-          <Button color="blue" onClick={onConfirm} disabled={!targetListId}>
+          <Button
+            color="blue"
+            onClick={onConfirm}
+            disabled={targetListId === null}
+          >
             Move
           </Button>
         </Group>

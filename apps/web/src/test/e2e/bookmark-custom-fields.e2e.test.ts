@@ -15,12 +15,8 @@ import { expect,test } from "@playwright/test";
 
 /**
  * Helper to navigate to an entity page with custom select parameter
- * @param page
- * @param entityType
- * @param entityId
- * @param selectFields
  */
-const navigateToEntityWithCustomFields = async (page: Page, entityType: string, entityId: string, selectFields: string[]): Promise<void> => {
+const navigateToEntityWithCustomFields = async (page: Page, entityType: string, entityId: string, selectFields: readonly string[]): Promise<void> => {
   const selectParameter = selectFields.join(",");
   const url = `/${entityType}/${entityId}?select=${selectParameter}`;
   await page.goto(url);
@@ -29,7 +25,6 @@ const navigateToEntityWithCustomFields = async (page: Page, entityType: string, 
 
 /**
  * Helper to bookmark the current page
- * @param page
  */
 const bookmarkCurrentPage = async (page: Page): Promise<void> => {
   const bookmarkButton = page.locator('[data-testid="entity-bookmark-button"]');
@@ -41,7 +36,6 @@ const bookmarkCurrentPage = async (page: Page): Promise<void> => {
 
 /**
  * Helper to navigate to bookmarks page
- * @param page
  */
 const navigateToBookmarks = async (page: Page): Promise<void> => {
   await page.goto("/bookmarks/");
@@ -50,29 +44,33 @@ const navigateToBookmarks = async (page: Page): Promise<void> => {
 
 /**
  * Helper to get bookmark items
- * @param page
  */
 const getBookmarkItems = (page: Page) => page.locator('[data-testid="bookmark-list-item"]');
 
 /**
  * Helper to extract select parameter from URL
- * @param url
  */
 const extractSelectParameter = (url: string): string[] => {
   const urlObject = new URL(url, "http://localhost");
   const selectParameter = urlObject.searchParams.get("select");
-  return selectParameter ? selectParameter.split(",") : [];
+  return selectParameter !== null ? selectParameter.split(",") : [];
 };
+
+/**
+ * Type guard confirming a parsed JSON value is a plain object.
+ */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 test.describe("Bookmark Custom Field Views", () => {
   test.beforeEach(async ({ page }) => {
     // Clear bookmarks before each test
     await page.goto("/");
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       return new Promise<void>((resolve) => {
         const request = indexedDB.deleteDatabase("bibgraph-db");
-        request.onsuccess = () => resolve();
-        request.onerror = () => resolve();
+        request.onsuccess = () => { resolve(); };
+        request.onerror = () => { resolve(); };
       });
     });
     await page.reload();
@@ -142,7 +140,8 @@ test.describe("Bookmark Custom Field Views", () => {
       await rawViewButton.click();
       // Removed: waitForTimeout - use locator assertions instead
       const rawContent = await page.locator("pre").textContent();
-      const jsonData = JSON.parse(rawContent || "{}");
+      const parsedContent: unknown = JSON.parse(rawContent ?? "{}");
+      const jsonData = isRecord(parsedContent) ? parsedContent : {};
 
       // Verify only the selected fields are present (plus always-included fields)
       const actualFields = Object.keys(jsonData);
@@ -190,10 +189,11 @@ test.describe("Bookmark Custom Field Views", () => {
       const secondText = await secondPreview.textContent();
 
       // One should show "2 fields" and the other "5 fields"
-      expect(
-        (firstText?.includes("2 fields") && secondText?.includes("5 fields")) ||
-        (firstText?.includes("5 fields") && secondText?.includes("2 fields"))
-      ).toBeTruthy();
+      const isMinimalThenExtended =
+        firstText?.includes("2 fields") === true && secondText?.includes("5 fields") === true;
+      const isExtendedThenMinimal =
+        firstText?.includes("5 fields") === true && secondText?.includes("2 fields") === true;
+      expect(isMinimalThenExtended || isExtendedThenMinimal).toBeTruthy();
     }
   });
 
@@ -272,7 +272,7 @@ test.describe("Bookmark Custom Field Views", () => {
       if (await fieldPreview.isVisible()) {
         const previewText = await fieldPreview.textContent();
         const expectedFieldCount = entity.fields.length;
-        expect(previewText).toContain(`${expectedFieldCount} field`);
+        expect(previewText).toContain(`${String(expectedFieldCount)} field`);
       }
     }
   });
@@ -297,8 +297,8 @@ test.describe("Bookmark Custom Field Views", () => {
       const previewText = await fieldPreview.textContent();
       // Should indicate default or show a different indicator
       expect(
-        previewText?.includes("default") ||
-        previewText?.includes("all fields") ||
+        previewText?.includes("default") ??
+        previewText?.includes("all fields") ??
         previewText?.includes("standard")
       ).toBeTruthy();
     }

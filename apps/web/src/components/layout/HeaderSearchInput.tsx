@@ -28,48 +28,67 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { useLocation, useNavigate, useSearch } from "@tanstack/react-router";
+import type { ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { NOTIFICATION_DURATION } from "@/config/notification-constants";
 import { ICON_SIZE } from "@/config/style-constants";
 import { useNavigationEnhancements } from "@/hooks/useNavigationEnhancements";
 import { announceToScreenReader } from "@/utils/accessibility";
-import { decodeHtmlEntities } from "@/utils/decode-html-entities";
 
-// Type for OpenAlex autocomplete API response
-interface OpenAlexAutocompleteItem {
-  id?: string;
-  display_name: string;
-  entity_type: string;
-  works_count?: number;
-  cited_by_count?: number;
-}
+import {
+  buildSearchSuggestions,
+  isOpenAlexAutocompleteResponse,
+  type SearchSuggestion,
+} from "./search-suggestion-scoring";
 
-interface OpenAlexAutocompleteResponse {
-  results?: OpenAlexAutocompleteItem[];
-}
+// Entity type presentation lookups. Keyed as Record<EntityType, ...> so adding a new EntityType is a compile error here until it is given an icon and colour.
+const ENTITY_TYPE_ICONS: Record<EntityType, ReactElement> = {
+  works: <IconBook size={ICON_SIZE.XS} />,
+  authors: <IconUser size={ICON_SIZE.XS} />,
+  institutions: <IconBuilding size={ICON_SIZE.XS} />,
+  sources: <IconBulb size={ICON_SIZE.XS} />,
+  topics: <IconSearch size={ICON_SIZE.XS} />,
+  concepts: <IconSearch size={ICON_SIZE.XS} />,
+  publishers: <IconSearch size={ICON_SIZE.XS} />,
+  funders: <IconSearch size={ICON_SIZE.XS} />,
+  keywords: <IconSearch size={ICON_SIZE.XS} />,
+  domains: <IconSearch size={ICON_SIZE.XS} />,
+  fields: <IconSearch size={ICON_SIZE.XS} />,
+  subfields: <IconSearch size={ICON_SIZE.XS} />,
+};
 
-// Type for search suggestions
-interface SearchSuggestion {
-  id: string;
-  displayName: string;
-  entityType: EntityType;
-  description?: string;
-  worksCount?: number;
-  citedByCount?: number;
-  score?: number;
-  trending?: boolean;
-  recent?: boolean;
-  relevanceReason?: string;
-}
+const ENTITY_TYPE_COLORS: Record<EntityType, string> = {
+  works: 'blue',
+  authors: 'green',
+  institutions: 'orange',
+  sources: 'purple',
+  topics: 'gray',
+  concepts: 'gray',
+  publishers: 'gray',
+  funders: 'gray',
+  keywords: 'gray',
+  domains: 'gray',
+  fields: 'gray',
+  subfields: 'gray',
+};
+
+// Component-level timing and pagination constants
+const SUGGESTIONS_DEBOUNCE_MS = 300;
+const MAX_HISTORY_ITEMS_NO_QUERY = 5;
+const MAX_HISTORY_ITEMS_FILTERED = 3;
+const BLUR_CLOSE_DELAY_MS = 200;
 
 export const HeaderSearchInput = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const searchParameters = useSearch({ strict: false });
-  const inputReference = useRef<HTMLInputElement>(null);
-  const suggestionsAbortControllerReference = useRef<AbortController | null>(null);
-  const suggestionTimeoutReference = useRef<NodeJS.Timeout | null>(null);
+  // useSearch({ strict: false }) loses per-route type safety, so `q` comes back as `any`; narrow it to a plain string here rather than propagating the `any` further.
+  const searchQueryParameter: string | undefined =
+    typeof searchParameters.q === "string" ? searchParameters.q : undefined;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsAbortControllerRef = useRef<AbortController | null>(null);
+  const suggestionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const {
     addToSearchHistory,
@@ -82,12 +101,9 @@ export const HeaderSearchInput = () => {
   useKeyboardNavigation();
 
   // Initialize from URL params if on search page
-  const [query, setQuery] = useState(() => {
-    if (location.pathname === "/search" && searchParameters.q) {
-      return String(searchParameters.q);
-    }
-    return "";
-  });
+  const [query, setQuery] = useState(() =>
+    location.pathname === "/search" && searchQueryParameter !== undefined ? searchQueryParameter : ""
+  );
 
   // Enhanced state management
   const [focused, setFocused] = useState(false);
@@ -97,14 +113,13 @@ export const HeaderSearchInput = () => {
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
 
-  // Update local state when URL changes
-  useEffect(() => {
-    if (location.pathname === "/search" && searchParameters.q) {
-      setQuery(String(searchParameters.q));
-    } else if (location.pathname !== "/search") {
-      setQuery("");
-    }
-  }, [location.pathname, searchParameters.q]);
+  // Sync local state from the URL during render (rather than in an effect) to avoid an extra render pass.
+  const routeSyncKey = `${location.pathname}::${searchQueryParameter ?? ""}`;
+  const [lastRouteSyncKey, setLastRouteSyncKey] = useState(routeSyncKey);
+  if (routeSyncKey !== lastRouteSyncKey) {
+    setLastRouteSyncKey(routeSyncKey);
+    setQuery(location.pathname === "/search" && searchQueryParameter !== undefined ? searchQueryParameter : "");
+  }
 
   // Real-time search suggestions with debouncing
   const fetchSuggestions = useCallback(async (searchQuery: string) => {
@@ -115,13 +130,13 @@ export const HeaderSearchInput = () => {
     }
 
     // Cancel previous request
-    if (suggestionsAbortControllerReference.current) {
-      suggestionsAbortControllerReference.current.abort();
+    if (suggestionsAbortControllerRef.current) {
+      suggestionsAbortControllerRef.current.abort();
     }
 
     // Create new abort controller
     const abortController = new AbortController();
-    suggestionsAbortControllerReference.current = abortController;
+    suggestionsAbortControllerRef.current = abortController;
 
     try {
       setIsLoadingSuggestions(true);
@@ -140,88 +155,23 @@ export const HeaderSearchInput = () => {
       );
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${String(response.status)}`);
       }
 
-      const data: OpenAlexAutocompleteResponse = await response.json();
-
-      // Map OpenAlex entity types to our EntityType enum
-      const mapEntityType = (apiType: string): EntityType => {
-        switch (apiType) {
-          case 'work': return 'works';
-          case 'author': return 'authors';
-          case 'institution': return 'institutions';
-          case 'source': return 'sources';
-          case 'topic': return 'topics';
-          case 'concept': return 'concepts';
-          case 'publisher': return 'publishers';
-          case 'funder': return 'funders';
-          case 'keyword': return 'keywords';
-          case 'domain': return 'domains';
-          case 'field': return 'fields';
-          case 'subfield': return 'subfields';
-          default: return 'works'; // Default fallback
-        }
-      };
+      const rawData: unknown = await response.json();
+      if (!isOpenAlexAutocompleteResponse(rawData)) {
+        throw new Error("Unexpected autocomplete response shape");
+      }
 
       // Transform OpenAlex suggestions to our format with research scoring
-      const rawSuggestions = (data.results || []).slice(0, 8);
-      const transformedSuggestions: SearchSuggestion[] = rawSuggestions.map((item: OpenAlexAutocompleteItem, index: number) => {
-        // Calculate relevance score based on multiple factors
-        let score = 100 - (index * 5); // Base score from API ordering
-
-        // Boost highly cited works
-        if (item.cited_by_count && item.cited_by_count > 100) {
-          score += 15;
-        } else if (item.cited_by_count && item.cited_by_count > 50) {
-          score += 10;
-        } else if (item.cited_by_count && item.cited_by_count > 10) {
-          score += 5;
-        }
-
-        // Boost recent publications (assumed from OpenAlex freshness heuristics)
-        if (item.works_count && item.works_count < 10) {
-          score += 8; // Likely emerging researcher/topic
-        }
-
-        // Boost institutional entities for research credibility
-        if (item.entity_type === 'institution') {
-          score += 5;
-        }
-
-        const suggestion: SearchSuggestion = {
-          id: item.id || `${item.entity_type}-${item.display_name}`,
-          displayName: decodeHtmlEntities(item.display_name),
-          entityType: mapEntityType(item.entity_type),
-          description: item.entity_type,
-          worksCount: item.works_count,
-          citedByCount: item.cited_by_count,
-          score,
-          trending: item.cited_by_count ? item.cited_by_count > 200 : false,
-          recent: item.works_count ? item.works_count < 5 : false,
-        };
-
-        // Add relevance reason for highly scored suggestions
-        if (score >= 115) {
-          suggestion.relevanceReason = 'Highly cited research';
-        } else if (score >= 110) {
-          suggestion.relevanceReason = 'Emerging research';
-        } else if (item.entity_type === 'institution') {
-          suggestion.relevanceReason = 'Research institution';
-        }
-
-        return suggestion;
-      });
-
-      // Sort by calculated score for research relevance
-      transformedSuggestions.sort((a, b) => (b.score || 0) - (a.score || 0));
+      const transformedSuggestions = buildSearchSuggestions(rawData);
 
       setSuggestions(transformedSuggestions);
 
       // Announce to screen readers
       if (transformedSuggestions.length > 0) {
         announceToScreenReader(
-          `Found ${transformedSuggestions.length} suggestions for ${searchQuery}`,
+          `Found ${String(transformedSuggestions.length)} suggestions for ${searchQuery}`,
           'polite'
         );
       }
@@ -240,13 +190,13 @@ export const HeaderSearchInput = () => {
     setHighlightedIndex(-1);
 
     // Debounce suggestions
-    if (suggestionTimeoutReference.current) {
-      clearTimeout(suggestionTimeoutReference.current);
+    if (suggestionTimeoutRef.current) {
+      clearTimeout(suggestionTimeoutRef.current);
     }
 
-    suggestionTimeoutReference.current = setTimeout(() => {
-      fetchSuggestions(value);
-    }, 300);
+    suggestionTimeoutRef.current = setTimeout(() => {
+      void fetchSuggestions(value);
+    }, SUGGESTIONS_DEBOUNCE_MS);
   }, [fetchSuggestions]);
 
   const handleSearch = useCallback((searchQuery: string) => {
@@ -258,7 +208,7 @@ export const HeaderSearchInput = () => {
     addToSearchHistory(trimmedQuery);
 
     // Navigate to search
-    navigate({
+    void navigate({
       to: "/search",
       search: { q: trimmedQuery, filter: undefined, search: undefined },
     });
@@ -266,59 +216,42 @@ export const HeaderSearchInput = () => {
     // Clear focus and close history
     setFocused(false);
     setShowHistory(false);
-    inputReference.current?.blur();
+    inputRef.current?.blur();
   }, [navigate, addToSearchHistory]);
 
   // Auto-suggest recent searches when focused
   const filteredHistory = useMemo(() => {
     if (!query.trim()) {
-      return searchHistory.slice(0, 5);
+      return searchHistory.slice(0, MAX_HISTORY_ITEMS_NO_QUERY);
     }
     return searchHistory
       .filter(item => item.toLowerCase().includes(query.toLowerCase()))
-      .slice(0, 3);
+      .slice(0, MAX_HISTORY_ITEMS_FILTERED);
   }, [query, searchHistory]);
 
   // Get entity type icon and color
-  const getEntityTypeIcon = useCallback((entityType: EntityType) => {
-    switch (entityType) {
-      case 'works':
-        return <IconBook size={ICON_SIZE.XS} />;
-      case 'authors':
-        return <IconUser size={ICON_SIZE.XS} />;
-      case 'institutions':
-        return <IconBuilding size={ICON_SIZE.XS} />;
-      case 'sources':
-        return <IconBulb size={ICON_SIZE.XS} />;
-      default:
-        return <IconSearch size={ICON_SIZE.XS} />;
-    }
-  }, []);
+  const getEntityTypeIcon = useCallback(
+    (entityType: EntityType) => ENTITY_TYPE_ICONS[entityType],
+    [],
+  );
 
-  const getEntityTypeColor = useCallback((entityType: EntityType) => {
-    switch (entityType) {
-      case 'works':
-        return 'blue';
-      case 'authors':
-        return 'green';
-      case 'institutions':
-        return 'orange';
-      case 'sources':
-        return 'purple';
-      default:
-        return 'gray';
-    }
-  }, []);
+  const getEntityTypeColor = useCallback(
+    (entityType: EntityType) => ENTITY_TYPE_COLORS[entityType],
+    [],
+  );
 
   // Enhanced keyboard navigation
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        if (highlightedIndex >= 0 && suggestions[highlightedIndex]) {
+        const highlightedSuggestion =
+          highlightedIndex >= 0 && highlightedIndex < suggestions.length
+            ? suggestions[highlightedIndex]
+            : undefined;
+        if (highlightedSuggestion !== undefined) {
           // Navigate to highlighted suggestion
-          const suggestion = suggestions[highlightedIndex];
-          handleSearch(suggestion.displayName);
+          handleSearch(highlightedSuggestion.displayName);
         } else {
           handleSearch(query);
         }
@@ -327,7 +260,7 @@ export const HeaderSearchInput = () => {
         setFocused(false);
         setShowHistory(false);
         setHighlightedIndex(-1);
-        inputReference.current?.blur();
+        inputRef.current?.blur();
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
         const totalItems = suggestions.length + (filteredHistory.length > 0 ? filteredHistory.length : 0);
@@ -347,7 +280,7 @@ export const HeaderSearchInput = () => {
         setHighlightedIndex(-1);
       }
     },
-    [query, handleSearch, showHistory, suggestions, filteredHistory, highlightedIndex],
+    [query, handleSearch, suggestions, filteredHistory, highlightedIndex],
   );
 
   const handleHistoryItemClick = useCallback((historyQuery: string) => {
@@ -382,12 +315,12 @@ export const HeaderSearchInput = () => {
   useEffect(() => {
     return () => {
       // Cleanup timeout
-      if (suggestionTimeoutReference.current) {
-        clearTimeout(suggestionTimeoutReference.current);
+      if (suggestionTimeoutRef.current) {
+        clearTimeout(suggestionTimeoutRef.current);
       }
       // Cleanup fetch request
-      if (suggestionsAbortControllerReference.current) {
-        suggestionsAbortControllerReference.current.abort();
+      if (suggestionsAbortControllerRef.current) {
+        suggestionsAbortControllerRef.current.abort();
       }
     };
   }, []);
@@ -407,11 +340,11 @@ export const HeaderSearchInput = () => {
       >
         <Popover.Target>
           <TextInput
-            ref={inputReference}
+            ref={inputRef}
             placeholder="Search works, authors, institutions..."
             leftSection={<IconSearch size={ICON_SIZE.MD} />}
             value={query}
-            onChange={(e) => handleChange(e.target.value)}
+            onChange={(e) => { handleChange(e.target.value); }}
             onKeyDown={handleKeyDown}
             onFocus={() => {
               setFocused(true);
@@ -419,13 +352,13 @@ export const HeaderSearchInput = () => {
             }}
             onBlur={() => {
               setTimeout(() => {
-                if (inputReference.current?.matches(':focus-within')) {
+                if (inputRef.current?.matches(':focus-within') === true) {
                 	return;
                 }
 
                 setFocused(false);
                 setShowHistory(false);
-              }, 200);
+              }, BLUR_CLOSE_DELAY_MS);
             }}
             size="sm"
             styles={{
@@ -454,7 +387,7 @@ export const HeaderSearchInput = () => {
                       setQuery("");
                       setSuggestions([]);
                       setHighlightedIndex(-1);
-                      inputReference.current?.focus();
+                      inputRef.current?.focus();
                     }}
                     aria-label="Clear search"
                   >
@@ -466,7 +399,7 @@ export const HeaderSearchInput = () => {
                     size="sm"
                     variant="transparent"
                     color="gray"
-                    onClick={() => inputReference.current?.focus()}
+                    onClick={() => inputRef.current?.focus()}
                     aria-label="Search with autocomplete"
                   >
                     <IconChevronDown size={ICON_SIZE.XS} />
@@ -497,7 +430,7 @@ export const HeaderSearchInput = () => {
                   </Group>
                 )}
 
-                {suggestionsError && (
+                {suggestionsError !== null && suggestionsError !== "" && (
                   <Text size="sm" c="red" ta="center" py="md">
                     {suggestionsError}
                   </Text>
@@ -526,8 +459,8 @@ export const HeaderSearchInput = () => {
                             e.preventDefault();
                             handleSearch(suggestion.displayName);
                           }}
-                          onMouseEnter={() => setHighlightedIndex(index)}
-                          onMouseLeave={() => setHighlightedIndex(-1)}
+                          onMouseEnter={() => { setHighlightedIndex(index); }}
+                          onMouseLeave={() => { setHighlightedIndex(-1); }}
                           role="option"
                           aria-selected={isHighlighted}
                           tabIndex={-1}
@@ -545,12 +478,12 @@ export const HeaderSearchInput = () => {
                               </Badge>
 
                               {/* Research relevance indicators */}
-                              {suggestion.trending && (
+                              {suggestion.trending === true && (
                                 <Badge size="xs" variant="filled" color="orange">
                                   📈 Trending
                                 </Badge>
                               )}
-                              {suggestion.recent && (
+                              {suggestion.recent === true && (
                                 <Badge size="xs" variant="light" color="green">
                                   🆕 Recent
                                 </Badge>
@@ -567,7 +500,7 @@ export const HeaderSearchInput = () => {
                                     {suggestion.citedByCount.toLocaleString()} citations
                                   </Text>
                                 )}
-                                {suggestion.relevanceReason && (
+                                {suggestion.relevanceReason !== undefined && suggestion.relevanceReason !== "" && (
                                   <Text size="xs" c="blue" fw={500}>
                                     {suggestion.relevanceReason}
                                   </Text>
@@ -637,8 +570,8 @@ export const HeaderSearchInput = () => {
                         e.preventDefault();
                         handleHistoryItemClick(historyQuery);
                       }}
-                      onMouseEnter={() => setHighlightedIndex(suggestions.length + index)}
-                      onMouseLeave={() => setHighlightedIndex(-1)}
+                      onMouseEnter={() => { setHighlightedIndex(suggestions.length + index); }}
+                      onMouseLeave={() => { setHighlightedIndex(-1); }}
                       role="option"
                       aria-selected={isHighlighted}
                       tabIndex={-1}

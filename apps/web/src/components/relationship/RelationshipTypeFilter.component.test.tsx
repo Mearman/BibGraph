@@ -13,7 +13,7 @@ import { RelationshipTypeFilter } from './RelationshipTypeFilter';
 
 
 describe('RelationshipTypeFilter', () => {
-  const mockOnChange = vi.fn();
+  const mockOnChange = vi.fn(() => { /* no-op */ });
 
   // Get unique relationship types (excluding deprecated aliases)
   const getUniqueTypes = (): RelationType[] => {
@@ -26,7 +26,7 @@ describe('RelationshipTypeFilter', () => {
     });
   };
 
-  const renderComponent = (selectedTypes: RelationType[] = []) => {
+  const renderComponent = (selectedTypes: readonly RelationType[] = []) => {
     return render(
       <MantineProvider>
         <RelationshipTypeFilter

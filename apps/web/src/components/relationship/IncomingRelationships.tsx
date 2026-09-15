@@ -1,7 +1,5 @@
 /**
- * IncomingRelationships component
- * Displays all incoming relationship sections for an entity
- * @module IncomingRelationships
+ * IncomingRelationships component Displays all incoming relationship sections for an entity
  * @see specs/016-entity-relationship-viz/spec.md (User Story 1, User Story 3)
  */
 
@@ -13,9 +11,18 @@ import React, { useEffect,useState } from 'react';
 import { BORDER_STYLE_GRAY_3 } from '@/config/style-constants';
 import { useEntityRelationshipQueries } from '@/hooks/use-entity-relationship-queries';
 import { useEntityRelationshipsFromData } from '@/hooks/use-entity-relationships-from-data';
+import type { RelationshipSection as RelationshipSectionType } from '@/types/relationship';
 
 import { RelationshipSection } from './RelationshipSection';
 import { RelationshipTypeFilter } from './RelationshipTypeFilter';
+
+const RELATION_TYPE_VALUES = new Set<string>(Object.values(RelationType));
+
+const isRelationType = (value: unknown): value is RelationType =>
+  typeof value === 'string' && RELATION_TYPE_VALUES.has(value);
+
+const isRelationTypeArray = (value: unknown): value is RelationType[] =>
+  Array.isArray(value) && value.every(isRelationType);
 
 export interface IncomingRelationshipsProps {
   /**
@@ -37,10 +44,6 @@ export interface IncomingRelationshipsProps {
 /**
  * Displays incoming relationship sections for an entity
  * Shows all types of relationships where other entities point to this entity
- * @param root0
- * @param root0.entityId
- * @param root0.entityType
- * @param root0.entityData
  */
 export const IncomingRelationships: React.FC<IncomingRelationshipsProps> = ({
   entityId,
@@ -53,9 +56,9 @@ export const IncomingRelationships: React.FC<IncomingRelationshipsProps> = ({
   const [selectedTypes, setSelectedTypes] = useState<RelationType[]>(() => {
     try {
       const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return Array.isArray(parsed) ? parsed : [];
+      if (stored !== null) {
+        const parsed: unknown = JSON.parse(stored);
+        return isRelationTypeArray(parsed) ? parsed : [];
       }
     } catch {
       // Ignore parse errors, use empty array
@@ -88,7 +91,8 @@ export const IncomingRelationships: React.FC<IncomingRelationshipsProps> = ({
   // Choose which source to use with priority: API queries > embedded data
   const hasApiData = apiIncoming.length > 0 || apiLoading;
 
-  let incoming, loading, error;
+  let incoming: RelationshipSectionType[];
+  let loading: boolean;
 
   if (hasApiData) {
     // Priority 1: API-queried relationships (e.g., works by author)
@@ -99,7 +103,6 @@ export const IncomingRelationships: React.FC<IncomingRelationshipsProps> = ({
     incoming = dataRelationships.incoming;
     loading = false;
   }
-  error = apiError;
 
   // Show loading skeleton while fetching
   if (loading) {
@@ -120,7 +123,7 @@ export const IncomingRelationships: React.FC<IncomingRelationshipsProps> = ({
     );
   }
 
-  if (error) {
+  if (apiError) {
     const handleRetry = () => {
       // Reload the page to retry loading
       window.location.reload();
@@ -130,7 +133,7 @@ export const IncomingRelationships: React.FC<IncomingRelationshipsProps> = ({
       <Paper p="md" style={{ border: BORDER_STYLE_GRAY_3 }} data-testid="incoming-relationships-error">
         <Stack gap="sm">
           <Text c="red" size="sm">
-            Failed to load relationships: {error.message}
+            Failed to load relationships: {apiError.message}
           </Text>
           <Group>
             <Button
@@ -161,7 +164,7 @@ export const IncomingRelationships: React.FC<IncomingRelationshipsProps> = ({
 
       <RelationshipTypeFilter
         selectedTypes={selectedTypes}
-        onChange={setSelectedTypes}
+        onChange={(types) => { setSelectedTypes([...types]); }}
         title="Filter Incoming Relationships"
       />
 
@@ -171,8 +174,8 @@ export const IncomingRelationships: React.FC<IncomingRelationshipsProps> = ({
           <RelationshipSection
             key={section.id}
             section={section}
-            onPageChange={hasApiData ? (page) => goToPage(section.id, page) : undefined}
-            onPageSizeChange={hasApiData ? (size) => setPageSize(section.id, size) : undefined}
+            onPageChange={hasApiData ? (page: number) => { void goToPage(section.id, page); } : undefined}
+            onPageSizeChange={hasApiData ? (size: number) => { void setPageSize(section.id, size); } : undefined}
             isLoading={hasApiData ? isLoadingMore(section.id) : false}
           />
         ))}

@@ -70,32 +70,41 @@ type AutocompleteMethod = (query: string) => Promise<AutocompleteResult[]>;
 
 const getAutocompleteMethod = (entityType: EntityType): AutocompleteMethod | null => {
   const methodMap: Partial<Record<EntityType, AutocompleteMethod>> = {
-    works: (q) => cachedOpenAlex.client.works.autocomplete(q),
-    authors: (q) => cachedOpenAlex.client.authors.autocomplete(q),
-    sources: (q) => cachedOpenAlex.client.sources.autocomplete(q),
-    institutions: (q) => cachedOpenAlex.client.institutions.autocomplete(q),
-    concepts: (q) => cachedOpenAlex.client.concepts.autocomplete(q),
-    publishers: (q) => cachedOpenAlex.client.publishers.autocomplete(q),
-    funders: (q) => cachedOpenAlex.client.funders.autocomplete(q),
-    topics: (q) => cachedOpenAlex.client.topics.autocomplete(q),
+    works: async (q) => cachedOpenAlex.client.works.autocomplete(q),
+    authors: async (q) => cachedOpenAlex.client.authors.autocomplete(q),
+    sources: async (q) => cachedOpenAlex.client.sources.autocomplete(q),
+    institutions: async (q) => cachedOpenAlex.client.institutions.autocomplete(q),
+    concepts: async (q) => cachedOpenAlex.client.concepts.autocomplete(q),
+    publishers: async (q) => cachedOpenAlex.client.publishers.autocomplete(q),
+    funders: async (q) => cachedOpenAlex.client.funders.autocomplete(q),
+    topics: async (q) => cachedOpenAlex.client.topics.autocomplete(q),
   };
 
   return methodMap[entityType] ?? null;
 };
 
 /**
+ * Resolve the active search query from URL params, preferring `q` then falling back to `search` Empty strings are treated the same as an absent param so a cleared field falls through correctly
+ */
+const resolveQueryFromUrlSearch = (params: Readonly<AutocompleteSearchParams>): string => {
+  if (params.q !== undefined && params.q !== "") {
+    return params.q;
+  }
+  if (params.search !== undefined && params.search !== "") {
+    return params.search;
+  }
+  return "";
+};
+
+/**
  * Shared hook for entity-specific autocomplete pages
- * @param root0
- * @param root0.entityType
- * @param root0.urlSearch
- * @param root0.routePath
  */
 export const useEntityAutocomplete = ({
   entityType,
   urlSearch,
   routePath,
-}: UseEntityAutocompleteOptions): UseEntityAutocompleteResult => {
-  const [query, setQuery] = useState(urlSearch.q || urlSearch.search || "");
+}: Readonly<UseEntityAutocompleteOptions>): UseEntityAutocompleteResult => {
+  const [query, setQuery] = useState(resolveQueryFromUrlSearch(urlSearch));
   const metadata = ENTITY_METADATA[entityType];
 
   // Prettify URL by decoding encoded characters
@@ -113,7 +122,7 @@ export const useEntityAutocomplete = ({
 
   // Sync query state with URL params
   useEffect(() => {
-    const newQuery = urlSearch.q || urlSearch.search || "";
+    const newQuery = resolveQueryFromUrlSearch(urlSearch);
     if (newQuery !== query) {
       setQuery(newQuery);
     }
@@ -159,7 +168,7 @@ export const useEntityAutocomplete = ({
       if (value) {
         parameterParts.push(`q=${encodeURIComponent(value)}`);
       }
-      if (urlSearch.filter) {
+      if (urlSearch.filter !== undefined && urlSearch.filter !== "") {
         parameterParts.push(`filter=${encodeURIComponent(urlSearch.filter)}`);
       }
 
@@ -176,7 +185,7 @@ export const useEntityAutocomplete = ({
     handleSearch,
     results,
     isLoading,
-    error: error as Error | null,
+    error,
     filter: urlSearch.filter,
   };
 };

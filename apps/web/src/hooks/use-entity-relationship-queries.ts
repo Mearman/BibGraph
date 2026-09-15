@@ -1,7 +1,5 @@
 /**
- * React hook for querying entity relationships via OpenAlex API
- * Uses the entity relationship query registry to fetch related entities
- * @module use-entity-relationship-queries
+ * React hook for querying entity relationships via OpenAlex API Uses the entity relationship query registry to fetch related entities
  */
 
 import type { EntityType, RelationshipQueryConfig } from '@bibgraph/types';
@@ -25,20 +23,19 @@ import type {
   SectionLoadState,
   UseEntityRelationshipQueriesResult,
 } from './relationship-query-types';
+import { MS_PER_MINUTE } from './time-constants';
 
-// Note: UseEntityRelationshipQueriesResult type is exported from './relationship-query-types'
-// Consumers should import it directly from there if needed
+// Note: UseEntityRelationshipQueriesResult type is exported from './relationship-query-types' Consumers should import it directly from there if needed
 
 /**
 Query cache duration (5 minutes)
  */
-const QUERY_STALE_TIME_MS = 5 * 60 * 1000;
+const QUERY_STALE_TIME_MINUTES = 5;
+const QUERY_STALE_TIME_MS = QUERY_STALE_TIME_MINUTES * MS_PER_MINUTE;
 
 /**
  * Query for entity relationships using the relationship query registry
  * Makes parallel API calls for all configured inbound/outbound relationships
- * @param entityId
- * @param entityType
  */
 export const useEntityRelationshipQueries = (
   entityId: string | undefined,
@@ -62,24 +59,24 @@ export const useEntityRelationshipQueries = (
     queries: [
       ...inboundConfigs.map((config) => ({
         queryKey: ['entity-relationships', 'inbound', entityType, entityId, config.type],
-        queryFn: () => {
-          if (!entityId) {
+        queryFn: async () => {
+          if (entityId === undefined || entityId === '') {
             throw new Error('Entity ID is required');
           }
           return executeRelationshipQuery(entityId, entityType, config, 1);
         },
-        enabled: !!entityId,
+        enabled: entityId !== undefined && entityId !== '',
         staleTime: QUERY_STALE_TIME_MS,
       })),
       ...outboundConfigs.map((config) => ({
         queryKey: ['entity-relationships', 'outbound', entityType, entityId, config.type],
-        queryFn: () => {
-          if (!entityId) {
+        queryFn: async () => {
+          if (entityId === undefined || entityId === '') {
             throw new Error('Entity ID is required');
           }
           return executeRelationshipQuery(entityId, entityType, config, 1);
         },
-        enabled: !!entityId,
+        enabled: entityId !== undefined && entityId !== '',
         staleTime: QUERY_STALE_TIME_MS,
       })),
     ],
@@ -116,7 +113,7 @@ export const useEntityRelationshipQueries = (
 
   // Determine loading and error states
   const isLoading = queryResults.some((result) => result.isLoading);
-  const error = queryResults.find((result) => result.error)?.error as Error | undefined;
+  const error = queryResults.find((result) => result.error)?.error ?? undefined;
 
   // Find config for a section ID
   const findConfigForSection = useCallback(
@@ -131,7 +128,7 @@ export const useEntityRelationshipQueries = (
   // Load more items for a specific section
   const loadMore = useCallback(
     async (sectionId: string) => {
-      if (!entityId) return;
+      if (entityId === undefined || entityId === '') return;
       if (loadingMoreReference.current.has(sectionId)) return;
 
       const { direction } = parseSectionId(sectionId);
@@ -181,7 +178,7 @@ export const useEntityRelationshipQueries = (
   // Navigate to a specific page (0-indexed)
   const goToPage = useCallback(
     async (sectionId: string, page: number) => {
-      if (!entityId) return;
+      if (entityId === undefined || entityId === '') return;
       if (loadingMoreReference.current.has(sectionId)) return;
 
       const { direction } = parseSectionId(sectionId);
@@ -219,7 +216,7 @@ export const useEntityRelationshipQueries = (
           return newMap;
         });
       } catch (error_) {
-        console.error(`Failed to go to page ${page} for section ${sectionId}:`, error_);
+        console.error(`Failed to go to page ${String(page)} for section ${sectionId}:`, error_);
       } finally {
         loadingMoreReference.current.delete(sectionId);
         forceUpdate({});
@@ -231,7 +228,7 @@ export const useEntityRelationshipQueries = (
   // Change page size (resets to page 0)
   const setPageSize = useCallback(
     async (sectionId: string, newPageSize: number) => {
-      if (!entityId) return;
+      if (entityId === undefined || entityId === '') return;
       if (loadingMoreReference.current.has(sectionId)) return;
 
       const { direction } = parseSectionId(sectionId);
@@ -275,7 +272,7 @@ export const useEntityRelationshipQueries = (
 
   // Background prefetch for ID-only relationships (displayName is OpenAlex ID URL)
   React.useEffect(() => {
-    if (isLoading || !entityId) return;
+    if (isLoading || entityId === undefined || entityId === '') return;
 
     const allSections = [...incoming, ...outgoing];
     const itemsNeedingFetch = allSections.flatMap((section) =>
@@ -289,7 +286,7 @@ export const useEntityRelationshipQueries = (
 
     // Prefetch each entity in the background
     for (const { id, entityType: targetEntityType } of itemsNeedingFetch) {
-      prefetchEntity(queryClient, id, targetEntityType);
+      void prefetchEntity(queryClient, id, targetEntityType);
     }
   }, [isLoading, entityId, incoming, outgoing, queryClient]);
 

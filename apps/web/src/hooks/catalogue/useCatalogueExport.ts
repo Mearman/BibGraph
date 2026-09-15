@@ -42,7 +42,7 @@ export const useCatalogueExport = () => {
 		let bibtex = `@${bibTeXType}{${citationKey},\n`;
 		bibtex += `  openalex = {${entity.entityId}},\n`;
 
-		if (entity.notes) {
+		if (entity.notes !== undefined && entity.notes !== "") {
 			// Escape quotes for BibTeX; the previous trailing replaceAll was an identity
 			// call (replacing '}' with "}" is a no-op) so it is simply dropped.
 			bibtex += `  note = {${entity.notes.replaceAll('"', "{")}},\n`;
@@ -165,9 +165,9 @@ export const useCatalogueExport = () => {
 				const row = [
 					entity.entityId,
 					entity.entityType,
-					entity.notes || "",
-					entity.position?.toString() || "",
-					entity.addedAt instanceof Date ? entity.addedAt.toISOString() : entity.addedAt || "",
+					entity.notes ?? "",
+					entity.position.toString(),
+					entity.addedAt.toISOString(),
 				];
 				csv += row.map(escapeCSVValue).join(",") + "\n";
 			}
@@ -230,7 +230,7 @@ export const useCatalogueExport = () => {
 
 			for (const entity of listEntities) {
 				const entry = convertToBibTeX(entity);
-				if (entry) {
+				if (entry !== null) {
 					bibtex += entry + "\n\n";
 				} else {
 					skippedEntities.push({ entityId: entity.entityId, type: entity.entityType });

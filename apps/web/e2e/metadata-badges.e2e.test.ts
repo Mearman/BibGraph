@@ -19,6 +19,8 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect,test } from '@playwright/test';
 
+const MAX_REASONABLE_BADGE_Y_PX = 2000;
+
 test.describe('Metadata Improvement Badges', () => {
   test('should render badges for work with improved metadata', async ({ page }) => {
     // W2741809807 has:
@@ -42,7 +44,7 @@ test.describe('Metadata Improvement Badges', () => {
 
       // Check if work data loaded
       const hasWorkData = pageContent.includes('W2741809807');
-      console.log(`Work data loaded: ${hasWorkData}`);
+      console.log(`Work data loaded: ${String(hasWorkData)}`);
 
       throw new Error('Metadata improvement badges not found on page');
     });
@@ -106,7 +108,7 @@ test.describe('Metadata Improvement Badges', () => {
     if (isBadgesExist) {
       // If badges exist, verify they're appropriate
       const badgeCount = await badgesContainer.locator('> *').count();
-      console.log(`ℹ️ ${badgeCount} badges rendered (work has improvements)`);
+      console.log(`ℹ️ ${String(badgeCount)} badges rendered (work has improvements)`);
       expect(badgeCount).toBeGreaterThan(0);
     } else {
       console.log('✅ No badges rendered for work without improvements');
@@ -139,14 +141,14 @@ test.describe('Metadata Improvement Badges', () => {
       // Should have at least 2 badges (references + locations)
       expect(badgeCount).toBeGreaterThanOrEqual(2);
 
-      console.log(`✅ Rendered ${badgeCount} improvement badges`);
+      console.log(`✅ Rendered ${String(badgeCount)} improvement badges`);
 
       // Verify each badge has text content
       for (let index = 0; index < badgeCount; index++) {
         const badge = badgeElements.nth(index);
         await expect(badge).not.toBeEmpty();
         const badgeText = await badge.textContent();
-        console.log(`  - Badge ${index + 1}: "${badgeText}"`);
+        console.log(`  - Badge ${String(index + 1)}: "${String(badgeText)}"`);
       }
     } else {
       console.log('ℹ️ No badges rendered - work may be using cached v1 data or have no improvements');
@@ -183,11 +185,11 @@ test.describe('Metadata Improvement Badges', () => {
 
         // Verify text matches one of the expected patterns
         const isMatchesPattern = expectedPatterns.some(pattern =>
-          pattern.test(badgeText || '')
+          pattern.test(badgeText ?? '')
         );
 
         expect(isMatchesPattern).toBe(true);
-        console.log(`✅ Badge text matches expected format: "${badgeText}"`);
+        console.log(`✅ Badge text matches expected format: "${String(badgeText)}"`);
       }
     } else {
       console.log('⚠️ Skipping text format test - no badges rendered');
@@ -220,7 +222,7 @@ test.describe('Metadata Improvement Badges', () => {
         expect(boundingBox!.width).toBeGreaterThan(0);
         expect(boundingBox!.height).toBeGreaterThan(0);
 
-        console.log(`✅ Badge ${index + 1} has proper dimensions: ${boundingBox!.width}x${boundingBox!.height}`);
+        console.log(`✅ Badge ${String(index + 1)} has proper dimensions: ${String(boundingBox!.width)}x${String(boundingBox!.height)}`);
       }
     } else {
       console.log('⚠️ Skipping styling test - no badges rendered');
@@ -273,9 +275,9 @@ test.describe('Metadata Improvement Badges', () => {
 
       // Badges should be within reasonable viewport bounds
       expect(boundingBox!.y).toBeGreaterThanOrEqual(0);
-      expect(boundingBox!.y).toBeLessThan(2000); // Should be reasonably positioned
+      expect(boundingBox!.y).toBeLessThan(MAX_REASONABLE_BADGE_Y_PX); // Should be reasonably positioned
 
-      console.log(`✅ Badges positioned at y=${boundingBox!.y}px (within viewport)`);
+      console.log(`✅ Badges positioned at y=${String(boundingBox!.y)}px (within viewport)`);
     } else {
       console.log('ℹ️ Badges not rendered - work may have no improvements');
     }

@@ -5,6 +5,7 @@
  */
 
 import type { EntityType, GraphEdge, GraphNode } from '@bibgraph/types';
+import type { ForceGraphMethods, LinkObject, NodeObject } from 'react-force-graph-3d';
 
 /**
  * Node representation for the 3D force graph (extends NodeObject)
@@ -97,4 +98,22 @@ export interface Vector3D {
 export interface WebGLStatus {
   available: boolean;
   reason?: string;
+}
+
+/**
+ * Controls object exposed by the underlying three.js orbit controls instance. `react-force-graph-3d`'s own types declare `controls()` as returning a bare `object`; this narrows it to the properties this codebase actually reads and writes.
+ */
+export interface ForceGraph3DControls {
+  target?: Vector3D;
+  zoomToCursor?: boolean;
+}
+
+/**
+ * The imperative handle exposed by `react-force-graph-3d`'s `ForceGraph3D` ref.
+ *
+ * `ForceGraphMethods` from the library declares only the setter overload of `cameraPosition` (it omits the getter overload the runtime actually supports) and types `controls()` as a bare `object`; this extends it with the getter overload and the narrower controls shape this codebase actually uses.
+ */
+export interface ForceGraph3DInstanceHandle extends Omit<ForceGraphMethods<NodeObject<ForceGraphNode>, LinkObject<ForceGraphNode, ForceGraphLink>>, 'cameraPosition' | 'controls'> {
+  cameraPosition: (() => Vector3D) & ForceGraphMethods<NodeObject<ForceGraphNode>, LinkObject<ForceGraphNode, ForceGraphLink>>['cameraPosition'];
+  controls: () => ForceGraph3DControls;
 }

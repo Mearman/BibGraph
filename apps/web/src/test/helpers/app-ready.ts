@@ -5,6 +5,8 @@ interface WaitOptions {
 }
 
 const DEFAULT_TIMEOUT = 45_000;
+const SKIP_TOUR_DISMISS_WAIT_MS = 300;
+const LOADING_INDICATOR_TIMEOUT_MS = 5000;
 
 /**
  * Wait for the application to be fully initialized and ready for interaction.
@@ -27,7 +29,7 @@ export const waitForAppReady = async (page: Page, options?: WaitOptions): Promis
 		const skipTourButton = page.locator('button:has-text("Skip Tour")');
 		await skipTourButton.waitFor({ state: 'visible', timeout: 2000 });
 		await skipTourButton.click();
-		await page.waitForTimeout(300);
+		await page.waitForTimeout(SKIP_TOUR_DISMISS_WAIT_MS);
 	} catch {
 		// Dialog may not be present if localStorage was set early enough
 	}
@@ -37,17 +39,20 @@ export const waitForAppReady = async (page: Page, options?: WaitOptions): Promis
 		await page.waitForSelector('#root:has(*)', { timeout, state: 'attached' });
 	} catch (error) {
 		// In CI, provide more diagnostic information if the app fails to load
-		if (process.env.CI) {
+		if (process.env.CI !== undefined && process.env.CI !== '') {
 			const diagnostics = await page.evaluate(() => {
-				const scripts = [...document.querySelectorAll('script[src*="index-"]')];
-				const mainScript = scripts.find(s => (s as HTMLScriptElement).src.includes('index-'));
+				const isScriptElement = (element: Element): element is HTMLScriptElement =>
+					element instanceof HTMLScriptElement;
+
+				const scripts = [...document.querySelectorAll('script[src*="index-"]')].filter(isScriptElement);
+				const mainScript = scripts.find(s => s.src.includes('index-'));
 				const rootElement = document.querySelector('#root');
 
 				return {
 					hasRoot: !!rootElement,
 					rootHasChildren: rootElement ? rootElement.children.length > 0 : false,
 					hasMainScript: !!mainScript,
-					mainScriptSrc: mainScript ? (mainScript as HTMLScriptElement).src : null,
+					mainScriptSrc: mainScript ? mainScript.src : null,
 					documentReady: document.readyState,
 					location: window.location.href,
 					userAgent: navigator.userAgent
@@ -156,7 +161,7 @@ export const waitForGraphReady = async (page: Page, options?: WaitOptions): Prom
 
 				const simulationRunning =
 					svgElement.dataset.simulationRunning;
-				return simulationRunning === 'false' || simulationRunning === null;
+				return simulationRunning === 'false' || simulationRunning === undefined;
 			},
 			{ timeout }
 		);
@@ -175,10 +180,7 @@ export const waitForRouterReady = async (page: Page, options?: WaitOptions): Pro
 	const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
 
 	await page.waitForFunction(
-		() => {
-			return (window as unknown as { __tanstack_router__?: unknown })
-				.__tanstack_router__ !== undefined;
-		},
+		() => window.__TSR_ROUTER__ !== undefined,
 		{ timeout }
 	);
 };
@@ -203,7 +205,7 @@ export const waitForNoLoading = async (page: Page, options?: WaitOptions): Promi
 	for (const selector of loadingSelectors) {
 		try {
 			await page.waitForSelector(selector, {
-				timeout: Math.min(timeout, 5000),
+				timeout: Math.min(timeout, LOADING_INDICATOR_TIMEOUT_MS),
 				state: 'hidden',
 			});
 		} catch {

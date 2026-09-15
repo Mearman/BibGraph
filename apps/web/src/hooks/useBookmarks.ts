@@ -24,7 +24,7 @@ export interface UseBookmarksResult {
   /**
   Add a new bookmark
    */
-  addBookmark: (parameters: AddBookmarkParams) => Promise<string>;
+  addBookmark: (parameters: Readonly<AddBookmarkParams>) => Promise<string>;
 
   /**
   Remove a bookmark by entity record ID
@@ -155,7 +155,7 @@ export const useBookmarks = (): UseBookmarksResult => {
   }, [refresh]);
 
   // Add bookmark
-  const addBookmark = useCallback(async (parameters: AddBookmarkParams): Promise<string> => {
+  const addBookmark = useCallback(async (parameters: Readonly<AddBookmarkParams>): Promise<string> => {
     setLoading(true);
     setError(null);
 

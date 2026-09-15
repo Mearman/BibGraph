@@ -11,30 +11,44 @@
  * - Tasks: T011-T016
  */
 
+import type { Page } from '@playwright/test';
 import { expect,test } from '@playwright/test';
 
 /**
- * Helper to extract graph data from page
- * Assumes graph data is exposed via window object or can be extracted from DOM
- * @param page
+A single edge in the graph data exposed on `window.__GRAPH_DATA__` for E2E inspection.
  */
-const getGraphEdges = async (page: any): Promise<any[]> => {
+interface GraphEdge {
+  readonly type: string;
+  readonly source: string;
+  readonly target: string;
+  readonly direction: string;
+}
+
+declare global {
+  interface Window {
+    __GRAPH_DATA__?: { readonly edges?: readonly GraphEdge[] };
+  }
+}
+
+const WAIT_FOR_GRAPH_RENDER_MS = 3000;
+
+/**
+ * Helper to extract graph data from page Assumes graph data is exposed via window object or can be extracted from DOM
+ */
+const getGraphEdges = async (page: Page): Promise<GraphEdge[]> => {
   // Try to get graph data from window object
   const edges = await page.evaluate(() => {
-    // @ts-expect-error accessing custom window property in test environment
-    if (window.__GRAPH_DATA__?.edges) {
-      // @ts-expect-error accessing custom window property in test environment
+    if (window.__GRAPH_DATA__?.edges !== undefined) {
       return window.__GRAPH_DATA__.edges;
     }
     return null;
   });
 
-  if (edges) {
-    return edges;
+  if (edges !== null) {
+    return [...edges];
   }
 
-  // Fallback: Look for data attributes or other DOM indicators
-  // This will need to be implemented based on actual graph rendering
+  // Fallback: Look for data attributes or other DOM indicators This will need to be implemented based on actual graph rendering
   return [];
 };
 
@@ -44,13 +58,13 @@ test.describe('Edge Direction - Work → Author (Authorship)', () => {
     // Using W2741809807 as test case (known work with multiple authors)
     await page.goto('#/#/works/W2741809807', { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('load');
-    await page.waitForTimeout(3000); // Allow graph to render
+    await page.waitForTimeout(WAIT_FOR_GRAPH_RENDER_MS); // Allow graph to render
 
     // Get graph edges
     const edges = await getGraphEdges(page);
 
     // Find authorship edges
-    const authorshipEdges = edges.filter((edge: any) =>
+    const authorshipEdges = edges.filter((edge: GraphEdge) =>
       edge.type === 'AUTHORSHIP' || edge.type === 'authored'
     );
 
@@ -82,7 +96,7 @@ test.describe('Edge Direction - Work → Work (Reference)', () => {
     const edges = await getGraphEdges(page);
 
     // Find reference edges (outbound citations)
-    const referenceEdges = edges.filter((edge: any) =>
+    const referenceEdges = edges.filter((edge: GraphEdge) =>
       (edge.type === 'REFERENCE' || edge.type === 'references') &&
       edge.direction === 'outbound'
     );
@@ -111,7 +125,7 @@ test.describe('Edge Direction - Work → Work (Reference)', () => {
     const edges = await getGraphEdges(page);
 
     // Find inbound citation edges
-    const inboundCitations = edges.filter((edge: any) =>
+    const inboundCitations = edges.filter((edge: GraphEdge) =>
       (edge.type === 'REFERENCE' || edge.type === 'references') &&
       edge.direction === 'inbound'
     );
@@ -142,7 +156,7 @@ test.describe('Edge Direction - Work → Source (Publication)', () => {
     const edges = await getGraphEdges(page);
 
     // Find publication edges
-    const publicationEdges = edges.filter((edge: any) =>
+    const publicationEdges = edges.filter((edge: GraphEdge) =>
       edge.type === 'PUBLICATION' || edge.type === 'published_in'
     );
 
@@ -173,7 +187,7 @@ test.describe('Edge Direction - Work → Topic', () => {
     const edges = await getGraphEdges(page);
 
     // Find topic edges
-    const topicEdges = edges.filter((edge: any) =>
+    const topicEdges = edges.filter((edge: GraphEdge) =>
       edge.type === 'TOPIC' || edge.type === 'work_has_topic'
     );
 
@@ -216,7 +230,7 @@ test.describe('Edge Direction - Author → Institution (Affiliation)', () => {
       const edges = await getGraphEdges(page);
 
       // Find affiliation edges
-      const affiliationEdges = edges.filter((edge: any) =>
+      const affiliationEdges = edges.filter((edge: GraphEdge) =>
         edge.type === 'AFFILIATION' || edge.type === 'affiliated'
       );
 
@@ -261,7 +275,7 @@ test.describe('Edge Direction - Institution → Institution (Lineage)', () => {
       const edges = await getGraphEdges(page);
 
       // Find lineage edges
-      const lineageEdges = edges.filter((edge: any) =>
+      const lineageEdges = edges.filter((edge: GraphEdge) =>
         edge.type === 'LINEAGE' || edge.type === 'institution_child_of'
       );
 

@@ -50,7 +50,7 @@ export const SidebarFallback = ({ title, type, onClose }: SidebarFallbackPropert
         <TextInput
           placeholder={`Search ${title.toLowerCase()}...`}
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => { setSearchQuery(e.target.value); }}
           leftSection={<IconSearch size={ICON_SIZE.SM} />}
           size="sm"
         />

@@ -1,11 +1,12 @@
-import { MantineColorsTuple, rem } from '@mantine/core'
+import type { MantineColorsTuple } from '@mantine/core'
+import { rem } from '@mantine/core'
 
 import { generateMantineColors } from '../css-variable-resolver'
 
 const shadcnColors = generateMantineColors()
 
 // Convert shadcn palettes to MantineColorsTuple format
-const createMantineColorTuple = (colors: string[]): MantineColorsTuple => [
+const createMantineColorTuple = (colors: readonly string[]): MantineColorsTuple => [
   colors[0], colors[1], colors[2], colors[3], colors[4],
   colors[5], colors[6], colors[7], colors[8], colors[9], colors[10]
 ]

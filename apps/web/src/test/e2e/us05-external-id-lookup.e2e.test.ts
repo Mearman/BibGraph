@@ -19,12 +19,16 @@ import { expect, test } from '@playwright/test';
 
 import { waitForAppReady } from '@/test/helpers/app-ready';
 
-const BASE_URL = process.env.BASE_URL || (process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173');
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = process.env.BASE_URL ?? (IS_CI ? 'http://localhost:4173' : 'http://localhost:5173');
+
+const TEST_SUITE_TIMEOUT_MS = 60_000;
+const MIN_PAGE_CONTENT_LENGTH = 500;
 
 test.describe('@entity US-05 External Identifier Lookup', () => {
-	test.setTimeout(60_000);
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS);
 
-	test.beforeEach(async ({ page }) => {
+	test.beforeEach(({ page }) => {
 
 		// Set up console error listener for debugging
 		page.on('console', (message) => {
@@ -51,7 +55,7 @@ test.describe('@entity US-05 External Identifier Lookup', () => {
 		await page.locator('main').waitFor({ timeout: 20_000 });
 		await waitForAppReady(page);
 
-		const pageContent = await page.locator('body').textContent() || '';
+		const pageContent = await page.locator('body').textContent() ?? '';
 
 		// Should not be stuck on identifier resolution
 		expect(pageContent).not.toContain('Resolving identifier');
@@ -85,7 +89,7 @@ test.describe('@entity US-05 External Identifier Lookup', () => {
 		await page.locator('main').waitFor({ timeout: 20_000 });
 		await waitForAppReady(page);
 
-		const pageContent = await page.locator('body').textContent() || '';
+		const pageContent = await page.locator('body').textContent() ?? '';
 
 		// Should not be stuck on identifier resolution
 		expect(pageContent).not.toContain('Resolving identifier');
@@ -115,7 +119,7 @@ test.describe('@entity US-05 External Identifier Lookup', () => {
 		await page.locator('main').waitFor({ timeout: 20_000 });
 		await waitForAppReady(page);
 
-		const pageContent = await page.locator('body').textContent() || '';
+		const pageContent = await page.locator('body').textContent() ?? '';
 
 		// Should not be stuck on identifier resolution
 		expect(pageContent).not.toContain('Resolving identifier');
@@ -145,7 +149,7 @@ test.describe('@entity US-05 External Identifier Lookup', () => {
 		await page.locator('main').waitFor({ timeout: 20_000 });
 		await waitForAppReady(page);
 
-		const pageContent = await page.locator('body').textContent() || '';
+		const pageContent = await page.locator('body').textContent() ?? '';
 
 		// Should not be stuck on identifier resolution
 		expect(pageContent).not.toContain('Resolving identifier');
@@ -173,7 +177,7 @@ test.describe('@entity US-05 External Identifier Lookup', () => {
 		await page.locator('main').waitFor({ timeout: 20_000 });
 		await waitForAppReady(page);
 
-		const pageContent = await page.locator('body').textContent() || '';
+		const pageContent = await page.locator('body').textContent() ?? '';
 
 		// Should not be stuck on resolution
 		expect(pageContent).not.toContain('Resolving identifier');
@@ -214,7 +218,7 @@ test.describe('@entity US-05 External Identifier Lookup', () => {
 			// URL may not redirect in all cases
 		});
 
-		const pageContent = await page.locator('body').textContent() || '';
+		const pageContent = await page.locator('body').textContent() ?? '';
 
 		// Should not be stuck on resolution
 		expect(pageContent).not.toContain('Resolving identifier');
@@ -232,7 +236,7 @@ test.describe('@entity US-05 External Identifier Lookup', () => {
 			// URL might redirect to /works/W2741809807
 			page.url().includes('/works/W2741809807') ||
 			// The page may show entity data in raw or rich view
-			pageContent.length > 500;
+			pageContent.length > MIN_PAGE_CONTENT_LENGTH;
 
 		expect(hasEntityContent).toBe(true);
 	});

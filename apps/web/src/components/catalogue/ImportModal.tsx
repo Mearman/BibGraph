@@ -33,6 +33,7 @@ import React, { useCallback,useState } from "react";
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from '@/config/style-constants';
 import { useCatalogue } from "@/hooks/useCatalogue";
 import type { ExportFormat } from "@/types/catalogue";
+import { validateExportFormat } from "@/utils/catalogue-validation";
 
 
 interface ImportModalProperties {
@@ -59,7 +60,7 @@ export const ImportModal = ({ onClose, onImport, initialShareData }: ImportModal
   } = useCatalogue();
 
   const [compressedData, setCompressedData] = useState("");
-  const [shareUrl, setShareUrl] = useState(initialShareData || ""); // T063, T064: Share URL input state
+  const [shareUrl, setShareUrl] = useState(initialShareData ?? ""); // T063, T064: Share URL input state
   const [isImporting, setIsImporting] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,15 +86,17 @@ export const ImportModal = ({ onClose, onImport, initialShareData }: ImportModal
       setValidationResult(validation);
 
       if (validation.valid) {
+        // Narrows `data` to ExportFormat without an `as` cast; throws only if validation.valid lied, which validateExportFormat's own logic never does.
+        validateExportFormat(data);
         // Generate preview
-        const previewData = await previewImport(data as ExportFormat);
+        const previewData = await previewImport(data);
         setPreview(previewData);
-        setDataToImport(data as ExportFormat);
+        setDataToImport(data);
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to validate data";
+    } catch (validationError) {
+      const errorMessage = validationError instanceof Error ? validationError.message : "Failed to validate data";
       setError(errorMessage);
-      logger.error("catalogue-ui", "Failed to validate import data", { error });
+      logger.error("catalogue-ui", "Failed to validate import data", { error: validationError });
     } finally {
       setIsValidating(false);
     }
@@ -116,7 +119,7 @@ export const ImportModal = ({ onClose, onImport, initialShareData }: ImportModal
 
       // Try to parse as JSON to validate structure
       try {
-        const parsed = JSON.parse(text);
+        const parsed: unknown = JSON.parse(text);
         await validateAndPreview(parsed);
       } catch {
         // If not JSON, treat as compressed data
@@ -129,13 +132,13 @@ export const ImportModal = ({ onClose, onImport, initialShareData }: ImportModal
         fileSize: file.size,
         contentLength: text.length
       });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to read file";
+    } catch (uploadError) {
+      const errorMessage = uploadError instanceof Error ? uploadError.message : "Failed to read file";
       setError(errorMessage);
       logger.error("catalogue-ui", "Failed to upload file", {
-        fileName: file?.name,
-        fileSize: file?.size,
-        error
+        fileName: file.name,
+        fileSize: file.size,
+        error: uploadError
       });
       setSelectedFile(null);
     }
@@ -173,8 +176,8 @@ export const ImportModal = ({ onClose, onImport, initialShareData }: ImportModal
       logger.debug("catalogue-ui", "Clipboard content pasted successfully", {
         textLength: text.trim().length
       });
-    } catch (error) {
-      logger.warn("catalogue-ui", "Could not read clipboard", { error });
+    } catch (clipboardError) {
+      logger.warn("catalogue-ui", "Could not read clipboard", { error: clipboardError });
     }
   }, []);
 
@@ -205,17 +208,17 @@ export const ImportModal = ({ onClose, onImport, initialShareData }: ImportModal
         throw new Error("No data to import");
       }
 
-      if (!listId) {
+      if (listId === null) {
         throw new Error("Import failed: no list ID returned");
       }
 
       logger.info("catalogue-ui", "List imported successfully", { listId });
       onImport(listId);
       onClose();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to import list";
+    } catch (importError) {
+      const errorMessage = importError instanceof Error ? importError.message : "Failed to import list";
       setError(errorMessage);
-      logger.error("catalogue-ui", "Failed to import list", { error });
+      logger.error("catalogue-ui", "Failed to import list", { error: importError });
     } finally {
       setIsImporting(false);
     }
@@ -241,7 +244,7 @@ export const ImportModal = ({ onClose, onImport, initialShareData }: ImportModal
         <Stack gap="xs">
           <Text size="sm" fw={500} id="file-upload-label">Upload from File</Text>
           <FileButton
-            onChange={handleFileUpload}
+            onChange={(file) => { void handleFileUpload(file); }}
             accept=".txt,.json"
           >
             {(properties) => (
@@ -286,13 +289,13 @@ export const ImportModal = ({ onClose, onImport, initialShareData }: ImportModal
           <TextInput
             placeholder="Paste shared catalogue URL or data string"
             value={shareUrl}
-            onChange={(e) => handleShareUrlChange(e.currentTarget.value)}
+            onChange={(e) => { handleShareUrlChange(e.currentTarget.value); }}
             leftSection={<IconLink size={ICON_SIZE.MD} />}
             rightSection={
               <Button
                 variant="subtle"
                 size="xs"
-                onClick={handlePaste}
+                onClick={() => { void handlePaste(); }}
                 aria-label="Paste from clipboard"
               >
                 Paste
@@ -318,14 +321,14 @@ export const ImportModal = ({ onClose, onImport, initialShareData }: ImportModal
             id="compressed-data-textarea"
             placeholder="Paste compressed catalogue data here..."
             value={compressedData}
-            onChange={(e) => handleCompressedDataChange(e.currentTarget.value)}
+            onChange={(e) => { handleCompressedDataChange(e.currentTarget.value); }}
             minRows={3}
             maxRows={6}
             rightSection={
               <Button
                 variant="subtle"
                 size="xs"
-                onClick={handlePaste}
+                onClick={() => { void handlePaste(); }}
                 aria-label="Paste from clipboard"
               >
                 Paste
@@ -368,7 +371,7 @@ export const ImportModal = ({ onClose, onImport, initialShareData }: ImportModal
         )}
 
         {/* Import Error */}
-        {error && (
+        {error !== null && error !== "" && (
           <Alert
             icon={<IconAlertTriangle size={ICON_SIZE.MD} />}
             title="Import Failed"
@@ -390,7 +393,7 @@ export const ImportModal = ({ onClose, onImport, initialShareData }: ImportModal
           </Paper>
         )}
 
-        {preview && validationResult?.valid && (
+        {preview && validationResult?.valid === true && (
           <Paper style={{ border: BORDER_STYLE_GRAY_3 }} p="md">
             <Stack gap="md">
               <Group justify="space-between">
@@ -457,11 +460,11 @@ export const ImportModal = ({ onClose, onImport, initialShareData }: ImportModal
             Cancel
           </Button>
           <Button
-            onClick={handleConfirmImport}
+            onClick={() => { void handleConfirmImport(); }}
             loading={isImporting}
             disabled={
               (!preview && !compressedData.trim() && !shareUrl.trim()) ||
-              (validationResult && !validationResult.valid) ||
+              (validationResult !== null && !validationResult.valid) ||
               isValidating
             }
             leftSection={<IconDownload size={ICON_SIZE.MD} />}

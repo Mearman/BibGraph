@@ -14,7 +14,9 @@ import { waitForAppReady, waitForSearchResults } from '@/test/helpers/app-ready'
 import { StorageTestHelper } from '@/test/helpers/StorageTestHelper';
 import { SearchPage } from '@/test/page-objects/SearchPage';
 
-const BASE_URL = process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173';
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = IS_CI ? 'http://localhost:4173' : 'http://localhost:5173';
+const CLEAR_HISTORY_SETTLE_WAIT_MS = 1000;
 
 test.describe('@utility US-23 Search History', () => {
 	let searchPage: SearchPage;
@@ -77,7 +79,7 @@ test.describe('@utility US-23 Search History', () => {
 					k.toLowerCase().includes('recent')
 			);
 
-			if (historyKey) {
+			if (historyKey !== undefined) {
 				return window.localStorage.getItem(historyKey);
 			}
 
@@ -89,7 +91,7 @@ test.describe('@utility US-23 Search History', () => {
 					k.toLowerCase().includes('search')
 			);
 
-			if (sessionHistoryKey) {
+			if (sessionHistoryKey !== undefined) {
 				return window.sessionStorage.getItem(sessionHistoryKey);
 			}
 
@@ -262,7 +264,7 @@ test.describe('@utility US-23 Search History', () => {
 
 					// After clearing, the history icon should no longer be visible
 					// (SearchHistoryDropdown returns null when history is empty)
-					await page.waitForTimeout(1000);
+					await page.waitForTimeout(CLEAR_HISTORY_SETTLE_WAIT_MS);
 
 					// Re-check: the dropdown should have closed and the button may disappear
 					const isHistoryButtonStillVisible = await historyIconButton.isVisible({ timeout: 3000 }).catch(() => false);

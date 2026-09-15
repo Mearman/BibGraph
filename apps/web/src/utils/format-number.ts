@@ -64,11 +64,9 @@ const isReasonableYear = (value: number): boolean => {
 
 /**
  * Format a number with context-aware formatting
- *
  * @param value - The numeric value to format
  * @param fieldName - Optional field name for context (e.g., "year", "publication_year")
  * @returns Formatted string representation
- *
  * @example
  * formatNumber(2014, 'year')        // "2014" (no separator for year fields)
  * formatNumber(2014)                 // "2014" (no separator for year-range values)
@@ -77,7 +75,7 @@ const isReasonableYear = (value: number): boolean => {
  */
 export const formatNumber = (value: number, fieldName?: string): string => {
 	// If field name suggests a year, don't use thousands separator
-	if (fieldName && isYearField(fieldName) && isReasonableYear(value)) {
+	if (fieldName !== undefined && fieldName !== '' && isYearField(fieldName) && isReasonableYear(value)) {
 		return value.toString();
 	}
 
@@ -88,7 +86,7 @@ export const formatNumber = (value: number, fieldName?: string): string => {
 	}
 
 	// For score/share/percentile fields, preserve decimal precision
-	if (fieldName && isDecimalPrecisionField(fieldName) && !Number.isInteger(value)) {
+	if (fieldName !== undefined && fieldName !== '' && isDecimalPrecisionField(fieldName) && !Number.isInteger(value)) {
 		// For very small values, use significant figures to avoid showing "0"
 		if (Math.abs(value) > 0 && Math.abs(value) < SMALL_VALUE_THRESHOLD) {
 			return value.toPrecision(2);

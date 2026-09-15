@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 /**
  * Component tests for VisualQueryBuilder component
- * @vitest-environment jsdom
  */
 
 import { MantineProvider } from "@mantine/core";
@@ -9,6 +9,8 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type VisualQuery,VisualQueryBuilder } from "./VisualQueryBuilder";
+
+type QueryChangeHandler = (query: VisualQuery) => void;
 
 // Mock ResizeObserver before importing Mantine
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
@@ -20,7 +22,7 @@ global.ResizeObserver = vi.fn().mockImplementation(() => ({
 // Mock window.matchMedia before importing Mantine
 Object.defineProperty(window, "matchMedia", {
   writable: true,
-  value: vi.fn().mockImplementation((query) => ({
+  value: vi.fn().mockImplementation((query: string) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -83,8 +85,8 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 describe("VisualQueryBuilder", () => {
-  const mockOnQueryChange = vi.fn();
-  const mockOnApply = vi.fn();
+  const mockOnQueryChange = vi.fn<QueryChangeHandler>();
+  const mockOnApply = vi.fn<QueryChangeHandler>();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -218,14 +220,12 @@ describe("VisualQueryBuilder", () => {
     });
     fireEvent.click(addGroupButtons[0]);
 
-    expect(mockOnQueryChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        groups: expect.arrayContaining([
-          expect.objectContaining({ id: expect.stringMatching(/^group-/) }),
-          expect.objectContaining({ id: expect.stringMatching(/^group-/) }),
-        ]),
-      }),
-    );
+    const lastCall = mockOnQueryChange.mock.calls[mockOnQueryChange.mock.calls.length - 1];
+    const [updatedQuery] = lastCall;
+    expect(updatedQuery.groups).toHaveLength(2);
+    for (const group of updatedQuery.groups) {
+      expect(group.id).toMatch(/^group-/);
+    }
   });
 
   it("renders with initial query when provided", () => {

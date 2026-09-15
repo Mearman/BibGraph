@@ -37,9 +37,20 @@ interface PerformanceMemory {
   jsHeapSizeLimit: number;
 }
 
-interface ExtendedPerformance extends Performance {
-  memory?: PerformanceMemory;
-}
+const isPerformanceMemory = (value: unknown): value is PerformanceMemory =>
+  typeof value === 'object' &&
+  value !== null &&
+  'usedJSHeapSize' in value &&
+  'totalJSHeapSize' in value &&
+  'jsHeapSizeLimit' in value;
+
+/**
+Reads the non-standard Chrome `performance.memory` extension via a runtime type guard, since it isn't declared on the standard `Performance` interface.
+ */
+const getPerformanceMemory = (): PerformanceMemory | undefined => {
+  const memory: unknown = Reflect.get(performance, 'memory');
+  return isPerformanceMemory(memory) ? memory : undefined;
+};
 
 // Performance metrics interface
 interface PerformanceMetrics {
@@ -73,7 +84,7 @@ interface PerformanceDashboardProperties {
   expanded?: boolean;
   refreshInterval?: number;
   maxHistoryPoints?: number;
-  onOptimize?: (suggestions: string[]) => void;
+  onOptimize?: (suggestions: readonly string[]) => void;
 }
 
 // Performance thresholds
@@ -101,14 +112,21 @@ const PERFORMANCE_THRESHOLDS = {
   }
 } as const;
 
+const BYTES_PER_KILOBYTE = 1024;
+const PERCENTAGE_SCALE = 100;
+const MS_PER_SECOND = 1000;
+const DEFAULT_MEMORY_LIMIT_MB = 4096;
+const LOW_MEMORY_HEADROOM_RATIO = 0.3;
+const MODERATE_MEMORY_HEADROOM_RATIO = 0.5;
+const CULLING_EFFICIENCY_THRESHOLD = 0.5;
+const NODE_COUNT_CULLING_THRESHOLD = 100;
+const DROPPED_FRAMES_TEAL_THRESHOLD = 5;
+const DROPPED_FRAMES_YELLOW_THRESHOLD = 20;
+
 /**
  * Performance Dashboard Component
  *
  * Real-time monitoring dashboard for graph visualization performance
- * @param root0
- * @param root0.expanded
- * @param root0.maxHistoryPoints
- * @param root0.onOptimize
  */
 export const PerformanceDashboard = ({
   expanded = false,
@@ -116,13 +134,13 @@ export const PerformanceDashboard = ({
   onOptimize
 }: PerformanceDashboardProperties) => {
   // State management
-  const [metrics, setMetrics] = useState<PerformanceMetrics>({
+  const [metrics, setMetrics] = useState<PerformanceMetrics>(() => ({
     currentFPS: 60,
     averageFPS: 60,
     frameTimeMs: 16,
     droppedFrames: 0,
     memoryUsedMB: 0,
-    memoryLimitMB: 4096,
+    memoryLimitMB: DEFAULT_MEMORY_LIMIT_MB,
     memoryPressure: 0,
     nodeCount: 0,
     edgeCount: 0,
@@ -134,16 +152,16 @@ export const PerformanceDashboard = ({
     cpuUsage: 0,
     networkRequests: 0,
     timestamp: Date.now()
-  });
+  }));
 
   const [isMonitoring, setIsMonitoring] = useState(false);
-  const [alerts, setAlerts] = useState<Array<{ level: AlertLevel; message: string }>>([]);
+  const [alerts, setAlerts] = useState<{ level: AlertLevel; message: string }[]>([]);
 
-  // Refs for performance tracking
-  const frameCountReference = useRef(0);
-  const lastFrameTimeReference = useRef(performance.now());
-  const fpsHistoryReference = useRef<number[]>([]);
-  const animationFrameIdReference = useRef<number | undefined>(undefined);
+  // Refs for performance tracking. lastFrameTimeRef's initial value is never read - toggleMonitoring always overwrites it with a fresh performance.now() before the measurement loop starts.
+  const frameCountRef = useRef(0);
+  const lastFrameTimeRef = useRef(0);
+  const fpsHistoryRef = useRef<number[]>([]);
+  const animationFrameIdRef = useRef<number | undefined>(undefined);
 
   // Get performance level
   const getPerformanceLevel = useCallback((metric: number, thresholds: typeof PERFORMANCE_THRESHOLDS.fps | typeof PERFORMANCE_THRESHOLDS.frameTime): PerformanceLevel => {
@@ -168,41 +186,40 @@ export const PerformanceDashboard = ({
 
   // Calculate memory usage
   const calculateMemoryUsage = useCallback(() => {
-    const extendedPerformance = performance as ExtendedPerformance;
-    if (extendedPerformance.memory) {
-      const memory = extendedPerformance.memory;
-      const used = memory.usedJSHeapSize / 1024 / 1024;
-      const limit = memory.jsHeapSizeLimit / 1024 / 1024;
+    const memory = getPerformanceMemory();
+    if (memory) {
+      const used = memory.usedJSHeapSize / BYTES_PER_KILOBYTE / BYTES_PER_KILOBYTE;
+      const limit = memory.jsHeapSizeLimit / BYTES_PER_KILOBYTE / BYTES_PER_KILOBYTE;
       const pressure = used / limit;
 
       return {
         used: Math.round(used),
         limit: Math.round(limit),
-        pressure: Math.round(pressure * 100)
+        pressure: Math.round(pressure * PERCENTAGE_SCALE)
       };
     }
-    return { used: 0, limit: 4096, pressure: 0 };
+    return { used: 0, limit: DEFAULT_MEMORY_LIMIT_MB, pressure: 0 };
   }, []);
 
   // Calculate memory usage ratio for display
-  const memoryUsageRatio = 1 - (metrics.memoryPressure / 100);
+  const memoryUsageRatio = 1 - (metrics.memoryPressure / PERCENTAGE_SCALE);
 
   // Performance monitoring loop
   const measurePerformance = useCallback(() => {
     const currentTime = performance.now();
-    const deltaTime = currentTime - lastFrameTimeReference.current;
+    const deltaTime = currentTime - lastFrameTimeRef.current;
 
-    frameCountReference.current++;
-    fpsHistoryReference.current.push(1000 / deltaTime);
+    frameCountRef.current++;
+    fpsHistoryRef.current.push(MS_PER_SECOND / deltaTime);
 
-    if (fpsHistoryReference.current.length > 60) {
-      fpsHistoryReference.current = fpsHistoryReference.current.slice(-60);
+    if (fpsHistoryRef.current.length > maxHistoryPoints) {
+      fpsHistoryRef.current = fpsHistoryRef.current.slice(-maxHistoryPoints);
     }
 
     // Calculate FPS
-    const currentFPS = Math.round(1000 / deltaTime);
+    const currentFPS = Math.round(MS_PER_SECOND / deltaTime);
     const averageFPS = Math.round(
-      fpsHistoryReference.current.reduce((sum, fps) => sum + fps, 0) / fpsHistoryReference.current.length
+      fpsHistoryRef.current.reduce((sum, fps) => sum + fps, 0) / fpsHistoryRef.current.length
     );
 
     // Get memory usage
@@ -213,7 +230,7 @@ export const PerformanceDashboard = ({
       currentFPS,
       averageFPS,
       frameTimeMs: Math.round(deltaTime),
-      droppedFrames: Math.max(0, frameCountReference.current - averageFPS),
+      droppedFrames: Math.max(0, frameCountRef.current - averageFPS),
       memoryUsedMB: memUsage.used,
       memoryLimitMB: memUsage.limit,
       memoryPressure: memUsage.pressure,
@@ -230,22 +247,22 @@ export const PerformanceDashboard = ({
     };
 
     setMetrics(newMetrics);
-    lastFrameTimeReference.current = currentTime;
-    animationFrameIdReference.current = requestAnimationFrame(measurePerformance);
+    lastFrameTimeRef.current = currentTime;
+    animationFrameIdRef.current = requestAnimationFrame(measurePerformance);
   }, [calculateMemoryUsage, maxHistoryPoints]);
 
   // Start/stop monitoring
   const toggleMonitoring = useCallback(() => {
     if (isMonitoring) {
-      if (animationFrameIdReference.current) {
-        cancelAnimationFrame(animationFrameIdReference.current);
+      if (animationFrameIdRef.current !== undefined) {
+        cancelAnimationFrame(animationFrameIdRef.current);
       }
       setIsMonitoring(false);
     } else {
-      frameCountReference.current = 0;
-      fpsHistoryReference.current = [];
-      lastFrameTimeReference.current = performance.now();
-      animationFrameIdReference.current = requestAnimationFrame(measurePerformance);
+      frameCountRef.current = 0;
+      fpsHistoryRef.current = [];
+      lastFrameTimeRef.current = performance.now();
+      animationFrameIdRef.current = requestAnimationFrame(measurePerformance);
       setIsMonitoring(true);
     }
   }, [isMonitoring, measurePerformance]);
@@ -253,8 +270,8 @@ export const PerformanceDashboard = ({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (animationFrameIdReference.current) {
-        cancelAnimationFrame(animationFrameIdReference.current);
+      if (animationFrameIdRef.current !== undefined) {
+        cancelAnimationFrame(animationFrameIdRef.current);
       }
     };
   }, []);
@@ -262,7 +279,7 @@ export const PerformanceDashboard = ({
   // Generate optimization suggestions
   useEffect(() => {
     const suggestions: string[] = [];
-    const newAlerts: Array<{ level: AlertLevel; message: string }> = [];
+    const newAlerts: { level: AlertLevel; message: string }[] = [];
 
     // FPS-based suggestions
     const fpsLevel = getPerformanceLevel(metrics.currentFPS, PERFORMANCE_THRESHOLDS.fps);
@@ -270,25 +287,26 @@ export const PerformanceDashboard = ({
       suggestions.push('Consider reducing node count or enabling viewport culling');
       newAlerts.push({
         level: 'warning',
-        message: `Low FPS detected: ${metrics.currentFPS}`
+        message: `Low FPS detected: ${String(metrics.currentFPS)}`
       });
     }
 
     // Memory-based suggestions
-    if (memoryUsageRatio < 0.3) {
+    if (memoryUsageRatio < LOW_MEMORY_HEADROOM_RATIO) {
       suggestions.push('Memory pressure high - consider reducing graph complexity');
       newAlerts.push({
         level: 'error',
-        message: `High memory usage: ${metrics.memoryUsedMB}MB`
+        message: `High memory usage: ${String(metrics.memoryUsedMB)}MB`
       });
     }
 
     // Culling efficiency suggestions
-    if (metrics.cullingEfficiency < 0.5 && metrics.nodeCount > 100) {
+    if (metrics.cullingEfficiency < CULLING_EFFICIENCY_THRESHOLD && metrics.nodeCount > NODE_COUNT_CULLING_THRESHOLD) {
       suggestions.push('Enable or optimize viewport culling for better performance');
     }
 
-    setAlerts(newAlerts);
+    // Deferred so the update doesn't run synchronously within the effect commit.
+    queueMicrotask(() => { setAlerts(newAlerts); });
 
     if (suggestions.length > 0 && onOptimize) {
       onOptimize(suggestions);
@@ -397,7 +415,7 @@ export const PerformanceDashboard = ({
                 </Stack>
                 <Indicator
                   size={12}
-                  color={memoryUsageRatio < 0.3 ? 'red' : memoryUsageRatio < 0.5 ? 'yellow' : 'green'}
+                  color={memoryUsageRatio < LOW_MEMORY_HEADROOM_RATIO ? 'red' : memoryUsageRatio < MODERATE_MEMORY_HEADROOM_RATIO ? 'yellow' : 'green'}
                   processing={false}
                 />
               </Group>
@@ -416,8 +434,8 @@ export const PerformanceDashboard = ({
                 <Indicator
                   size={12}
                   color={metrics.droppedFrames === 0 ? 'green' :
-                         metrics.droppedFrames < 5 ? 'teal' :
-                         metrics.droppedFrames < 20 ? 'yellow' : 'red'}
+                         metrics.droppedFrames < DROPPED_FRAMES_TEAL_THRESHOLD ? 'teal' :
+                         metrics.droppedFrames < DROPPED_FRAMES_YELLOW_THRESHOLD ? 'yellow' : 'red'}
                   processing={false}
                 />
               </Group>
@@ -465,7 +483,7 @@ export const usePerformanceMonitor = () => {
     setIsRecording(false);
   }, []);
 
-  const addRecording = useCallback((metrics: PerformanceMetrics) => {
+  const addRecording = useCallback((metrics: Readonly<PerformanceMetrics>) => {
     if (isRecording) {
       setRecordings(previous => [...previous, metrics]);
     }

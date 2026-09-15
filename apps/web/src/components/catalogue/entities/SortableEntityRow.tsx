@@ -39,6 +39,8 @@ import {
   formatNotesForDisplay,
 } from "./entity-metadata-formatter";
 
+const DRAGGING_OPACITY = 0.5;
+
 export interface SortableEntityRowProps {
   entity: CatalogueEntity;
   onNavigate?: (entityType: EntityType, entityId: string) => void;
@@ -68,18 +70,29 @@ export const SortableEntityRow = ({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? DRAGGING_OPACITY : 1,
   };
 
   const [editingNotes, setEditingNotes] = useState(false);
-  const [notes, setNotes] = useState(entity.notes || "");
+  const [notes, setNotes] = useState(entity.notes ?? "");
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [removing, setRemoving] = useState(false);
 
   const handleSaveNotes = async () => {
-    if (!entity.id) return;
+    if (entity.id === undefined) return;
     await onEditNotes(entity.id, notes);
     setEditingNotes(false);
+  };
+
+  const handleRemove = async () => {
+    if (entity.id === undefined) return;
+    setRemoving(true);
+    try {
+      await onRemove(entity.id);
+      setShowRemoveConfirm(false);
+    } finally {
+      setRemoving(false);
+    }
   };
 
   return (
@@ -95,7 +108,7 @@ export const SortableEntityRow = ({
           <Checkbox
             checked={isSelected}
             onChange={() => {
-              if (!entity.id) return;
+              if (entity.id === undefined) return;
               onToggleSelect(entity.id);
             }}
             aria-label={`Select ${entity.entityId}`}
@@ -143,18 +156,27 @@ export const SortableEntityRow = ({
                 minRows={1}
                 maxRows={3}
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(e) => {
+                  setNotes(e.target.value);
+                }}
                 placeholder="Add notes..."
                 flex={1}
                 aria-label="Edit notes for this entity"
               />
-              <Button size="xs" onClick={handleSaveNotes}>
+              <Button
+                size="xs"
+                onClick={() => {
+                  void handleSaveNotes();
+                }}
+              >
                 Save
               </Button>
               <Button
                 size="xs"
                 variant="subtle"
-                onClick={() => setEditingNotes(false)}
+                onClick={() => {
+                  setEditingNotes(false);
+                }}
               >
                 Cancel
               </Button>
@@ -167,7 +189,9 @@ export const SortableEntityRow = ({
               <ActionIcon
                 size="sm"
                 variant="subtle"
-                onClick={() => setEditingNotes(true)}
+                onClick={() => {
+                  setEditingNotes(true);
+                }}
                 title="Edit notes"
                 aria-label="Edit notes"
               >
@@ -188,7 +212,9 @@ export const SortableEntityRow = ({
                 <ActionIcon
                   size="sm"
                   variant="subtle"
-                  onClick={() => onNavigate(entity.entityType, entity.entityId)}
+                  onClick={() => {
+                    onNavigate(entity.entityType, entity.entityId);
+                  }}
                 >
                   <IconExternalLink size={ICON_SIZE.SM} />
                 </ActionIcon>
@@ -203,14 +229,18 @@ export const SortableEntityRow = ({
               <Menu.Dropdown>
                 <Menu.Item
                   leftSection={<IconNotes size={ICON_SIZE.SM} />}
-                  onClick={() => setEditingNotes(true)}
+                  onClick={() => {
+                    setEditingNotes(true);
+                  }}
                 >
                   Edit Notes
                 </Menu.Item>
                 <Menu.Item
                   leftSection={<IconTrash size={ICON_SIZE.SM} />}
                   color="red"
-                  onClick={() => setShowRemoveConfirm(true)}
+                  onClick={() => {
+                    setShowRemoveConfirm(true);
+                  }}
                   aria-label="Remove entity"
                 >
                   Remove
@@ -224,7 +254,9 @@ export const SortableEntityRow = ({
       {/* Remove Confirmation Modal */}
       <Modal
         opened={showRemoveConfirm}
-        onClose={() => setShowRemoveConfirm(false)}
+        onClose={() => {
+          setShowRemoveConfirm(false);
+        }}
         title="Confirm Removal"
         centered
       >
@@ -236,7 +268,9 @@ export const SortableEntityRow = ({
           <Group justify="flex-end" gap="xs">
             <Button
               variant="subtle"
-              onClick={() => setShowRemoveConfirm(false)}
+              onClick={() => {
+                setShowRemoveConfirm(false);
+              }}
             >
               Cancel
             </Button>
@@ -244,15 +278,8 @@ export const SortableEntityRow = ({
               color="red"
               data-testid="confirm-remove-entity-button"
               disabled={removing}
-              onClick={async () => {
-                if (!entity.id) return;
-                setRemoving(true);
-                try {
-                  await onRemove(entity.id);
-                  setShowRemoveConfirm(false);
-                } finally {
-                  setRemoving(false);
-                }
+              onClick={() => {
+                void handleRemove();
               }}
             >
               Remove

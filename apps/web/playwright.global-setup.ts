@@ -6,7 +6,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { chromium, FullConfig } from "@playwright/test";
+import type { FullConfig } from "@playwright/test";
+import { chromium } from "@playwright/test";
 
 import { startMSWServer } from "./test/setup/msw-setup";
 
@@ -20,6 +21,11 @@ const HAR_CACHE_DIR = path.join(
   process.cwd(),
   "test-results/har-cache"
 );
+
+const PAGE_LOAD_TIMEOUT_MS = 30_000;
+const APP_INIT_WAIT_MS = 45_000;
+const STORAGE_SAVE_TIMEOUT_MS = 10_000;
+const INDEXEDDB_ACCESS_TIMEOUT_MS = 3000;
 
 const globalSetup = async (config: FullConfig) => {
   // START MSW SERVER FIRST - must intercept requests before any browser contexts created
@@ -55,8 +61,8 @@ const globalSetup = async (config: FullConfig) => {
   // Check if we should warm up the cache
   // Skip cache warmup in CI environments, during E2E tests, and when OpenAlex API requests are causing rate limiting
   const shouldWarmCache =
-    !process.env.CI &&
-    !process.env.RUNNING_E2E &&
+    process.env.CI === undefined &&
+    process.env.RUNNING_E2E === undefined &&
     process.env.E2E_WARM_CACHE === "true" &&
     !fs.existsSync(STORAGE_STATE_PATH);
 
@@ -81,18 +87,18 @@ const globalSetup = async (config: FullConfig) => {
 
       // Add timeout protection for the entire page load process
       await Promise.race([
-        page.goto(baseURL, { waitUntil: "networkidle", timeout: 30_000 }),
-        new Promise((_resolve, reject) =>
-          setTimeout(() => reject(new Error("Page load timeout")), 30_000)
-        )
+        page.goto(baseURL, { waitUntil: "networkidle", timeout: PAGE_LOAD_TIMEOUT_MS }),
+        new Promise((_resolve, reject) => {
+          setTimeout(() => { reject(new Error("Page load timeout")); }, PAGE_LOAD_TIMEOUT_MS);
+        })
       ]);
 
       // Wait for the application to initialize and cache to populate (with extended timeout)
       await Promise.race([
-        page.waitForTimeout(45000),
-        new Promise((_resolve, reject) =>
-          setTimeout(() => reject(new Error("Application initialization timeout")), 45000)
-        )
+        page.waitForTimeout(APP_INIT_WAIT_MS),
+        new Promise((_resolve, reject) => {
+          setTimeout(() => { reject(new Error("Application initialization timeout")); }, APP_INIT_WAIT_MS);
+        })
       ]);
 
       // Save storage state for reuse in tests (with timeout protection)
@@ -102,9 +108,9 @@ const globalSetup = async (config: FullConfig) => {
           path: STORAGE_STATE_PATH,
           indexedDB: true // Enable IndexedDB state persistence
         }),
-        new Promise((_resolve, reject) =>
-          setTimeout(() => reject(new Error("Storage state save timeout")), 10_000)
-        )
+        new Promise((_resolve, reject) => {
+          setTimeout(() => { reject(new Error("Storage state save timeout")); }, STORAGE_SAVE_TIMEOUT_MS);
+        })
       ]);
       console.log(`✅ Storage state saved with IndexedDB support: ${STORAGE_STATE_PATH}`);
 
@@ -179,7 +185,7 @@ const globalSetup = async (config: FullConfig) => {
       console.log("🧹 IndexedDB databases preserved for E2E test state");
 
       // Log cache statistics if available (with timeout protection)
-      const cacheStats = await page.evaluate(() => {
+      const cacheStats = await page.evaluate(async (indexedDbTimeoutMs) => {
         return new Promise((resolve) => {
           // Set a timeout for IndexedDB operations
           const timeout = setTimeout(() => {
@@ -187,7 +193,7 @@ const globalSetup = async (config: FullConfig) => {
               error: "IndexedDB access timeout",
               localStorageKeys: Object.keys(localStorage)
             });
-          }, 3000); // Reduced timeout since we just cleared databases
+          }, indexedDbTimeoutMs); // Reduced timeout since we just cleared databases
 
           // Check IndexedDB cache size
           if ("indexedDB" in window) {
@@ -232,7 +238,7 @@ const globalSetup = async (config: FullConfig) => {
             } catch (error) {
               clearTimeout(timeout);
               resolve({
-                error: `IndexedDB exception: ${error}`,
+                error: `IndexedDB exception: ${String(error)}`,
                 localStorageKeys: Object.keys(localStorage)
               });
             }
@@ -244,7 +250,7 @@ const globalSetup = async (config: FullConfig) => {
             });
           }
         });
-      });
+      }, INDEXEDDB_ACCESS_TIMEOUT_MS);
 
       console.log("📊 Cache statistics after cleanup:", cacheStats);
     } catch (error) {

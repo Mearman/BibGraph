@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const SubfieldRoute = lazy(() =>
+const SubfieldRoute = lazy(async () =>
   import("./$subfieldId.lazy").then((m) => ({ default: m.default })),
 );
 

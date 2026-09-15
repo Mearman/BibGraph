@@ -50,6 +50,8 @@ const STATUS_CONFIG = {
   },
 } as const;
 
+const MAX_DISPLAYED_ERROR_MESSAGES = 3;
+
 export const SyncStatusIndicator = memo(() => {
   const { syncStatus, clearCompleted } = useSyncStatus();
   const { overall, operations } = syncStatus;
@@ -67,12 +69,12 @@ export const SyncStatusIndicator = memo(() => {
   const errorMessages = useMemo(() => {
     return operations
       .filter((op) => op.status === 'error')
-      .map((op) => `${op.name}: ${op.error?.message || 'Unknown error'}`)
-      .slice(0, 3);
+      .map((op) => `${op.name}: ${op.error?.message ?? 'Unknown error'}`)
+      .slice(0, MAX_DISPLAYED_ERROR_MESSAGES);
   }, [operations]);
 
   const label = activeCount > 0
-    ? `Syncing ${activeCount} operation${activeCount > 1 ? 's' : ''}...`
+    ? `Syncing ${String(activeCount)} operation${activeCount > 1 ? 's' : ''}...`
     : config.label;
 
   return (

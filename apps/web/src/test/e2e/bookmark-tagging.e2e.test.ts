@@ -14,15 +14,14 @@ import { expect,test } from "@playwright/test";
 
 /**
  * Helper to clear all bookmarks before each test
- * @param page
  */
 const clearBookmarks = async (page: Page): Promise<void> => {
 	await page.goto("/");
-	await page.evaluate(() => {
+	await page.evaluate(async () => {
 		return new Promise<void>((resolve) => {
 			const request = indexedDB.deleteDatabase("bibgraph-db");
-			request.onsuccess = () => resolve();
-			request.onerror = () => resolve();
+			request.onsuccess = () => { resolve(); };
+			request.onerror = () => { resolve(); };
 		});
 	});
 	await page.reload();
@@ -155,7 +154,7 @@ test.describe("Bookmark Tagging", () => {
 
 		// Verify all bookmarks are shown initially
 		const allBookmarks = page.locator('[data-testid="bookmark-list-item"]');
-		await expect(allBookmarks).toHaveCount(3);
+		await expect(allBookmarks).toHaveCount(bookmarks.length);
 
 		// Future implementation: Filter by "research" tag
 		// Expected: Only 2 bookmarks shown (authors and works)

@@ -3,7 +3,7 @@
  * Refactored to use catalogue service for bookmarks and history
  */
 
-import type { EntityType } from "@bibgraph/types";
+import { isEntityType } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils/logger";
 import type { CatalogueEntity } from "@bibgraph/utils/storage/catalogue-db";
 import {
@@ -24,6 +24,11 @@ import {
 } from "./types";
 import { useBookmarkOperations } from "./use-bookmark-operations";
 import { useHistoryOperations } from "./use-history-operations";
+
+/**
+ * Maximum number of recent history entries kept in memory for display.
+ */
+const RECENT_HISTORY_LIMIT = 20;
 
 export const useUserInteractions = (
   options: UseUserInteractionsOptions = {},
@@ -75,7 +80,7 @@ export const useUserInteractions = (
 
   // Update displayName entity reference when displayName changes
   useEffect(() => {
-    if (displayName && entityId) {
+    if (displayName !== undefined && entityId !== undefined) {
       displayNameEntityReference.current = entityId;
     }
   }, [displayName, entityId]);
@@ -97,22 +102,22 @@ export const useUserInteractions = (
 
         const historyEntries = await storageProvider.getHistory();
         if (isMountedReference.current) {
-          setRecentHistory(historyEntries.slice(-20).reverse());
+          setRecentHistory(historyEntries.slice(-RECENT_HISTORY_LIMIT).reverse());
         }
 
-        if (entityId && entityType) {
+        if (entityId !== undefined && entityType !== undefined && isEntityType(entityType)) {
           const bookmarked = await storageProvider.isBookmarked(
-            entityType as EntityType,
+            entityType,
             entityId,
           );
           if (isMountedReference.current) {
             setIsBookmarked(bookmarked);
           }
-        } else if (searchQuery || url) {
+        } else if (searchQuery !== undefined || url !== undefined) {
           const allBookmarks = await storageProvider.getBookmarks();
-          const searchTerm = searchQuery || url;
+          const searchTerm = searchQuery ?? url;
           const bookmarked = allBookmarks.some((bookmark) =>
-            bookmark.notes?.includes(searchTerm || ""),
+            bookmark.notes?.includes(searchTerm ?? "") ?? false,
           );
           if (isMountedReference.current) {
             setIsBookmarked(bookmarked);
@@ -159,7 +164,10 @@ export const useUserInteractions = (
 
   // Auto-track page visits when enabled
   useEffect(() => {
-    if (!(autoTrackVisits && entityId && entityType)) {
+    if (!autoTrackVisits || entityId === undefined || entityType === undefined) {
+    	return;
+    }
+    if (!isEntityType(entityType)) {
     	return;
     }
 
@@ -189,8 +197,8 @@ export const useUserInteractions = (
           displayNameEntityReference.current === entityId ? displayName : undefined;
 
         await storageProvider.addToHistory({
-          entityType: entityType as EntityType,
-          entityId: entityId,
+          entityType,
+          entityId,
           url: currentUrl,
           title: safeDisplayName,
         });

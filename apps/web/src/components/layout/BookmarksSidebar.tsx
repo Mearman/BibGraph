@@ -3,6 +3,7 @@
  */
 
 import { logger } from "@bibgraph/utils/logger";
+import { SPECIAL_LIST_IDS } from "@bibgraph/utils/storage/catalogue-db";
 import {
   ActionIcon,
   Box,
@@ -51,21 +52,28 @@ export const BookmarksSidebar = ({ onClose }: BookmarksSidebarProperties) => {
       return useUserInteractions();
     } catch (error) {
       logger.error('bookmarks', 'BookmarksSidebar: Error in useUserInteractions', error);
-      // Return fallback values
+      // Return fallback values. Each action logs a warning instead of doing nothing silently, since useUserInteractions() has already failed and these actions cannot perform real work.
+      const warnUnavailable = (action: string): void => {
+        logger.warn('bookmarks', `BookmarksSidebar: ${action} unavailable, useUserInteractions failed to initialize`);
+      };
       return {
         bookmarks: [],
         isLoadingBookmarks: false,
-        refreshData: async () => {},
+        refreshData: async () => { warnUnavailable('refreshData'); await Promise.resolve(); },
         isBookmarked: false,
-        recordPageVisit: async () => {},
-        bookmarkEntity: async () => {},
-        bookmarkSearch: async () => {},
-        bookmarkList: async () => {},
-        unbookmarkEntity: async () => {},
-        unbookmarkSearch: async () => {},
-        unbookmarkList: async () => {},
-        updateBookmark: async () => {},
-        searchBookmarks: async () => [],
+        recordPageVisit: async () => { warnUnavailable('recordPageVisit'); await Promise.resolve(); },
+        bookmarkEntity: async () => { warnUnavailable('bookmarkEntity'); await Promise.resolve(); },
+        bookmarkSearch: async () => { warnUnavailable('bookmarkSearch'); await Promise.resolve(); },
+        bookmarkList: async () => { warnUnavailable('bookmarkList'); await Promise.resolve(); },
+        unbookmarkEntity: async () => { warnUnavailable('unbookmarkEntity'); await Promise.resolve(); },
+        unbookmarkSearch: async () => { warnUnavailable('unbookmarkSearch'); await Promise.resolve(); },
+        unbookmarkList: async () => { warnUnavailable('unbookmarkList'); await Promise.resolve(); },
+        updateBookmark: async () => { warnUnavailable('updateBookmark'); await Promise.resolve(); },
+        searchBookmarks: async (): Promise<never[]> => {
+          warnUnavailable('searchBookmarks');
+          await Promise.resolve();
+          return [];
+        },
         isLoadingPageVisits: false,
         isLoadingStats: false,
       };
@@ -82,7 +90,7 @@ export const BookmarksSidebar = ({ onClose }: BookmarksSidebarProperties) => {
     ? bookmarks.filter(
         (bookmark) =>
           bookmark.entityId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          bookmark.notes?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (bookmark.notes?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
           bookmark.entityType.toLowerCase().includes(searchQuery.toLowerCase()),
       )
     : bookmarks;
@@ -124,9 +132,9 @@ export const BookmarksSidebar = ({ onClose }: BookmarksSidebarProperties) => {
     );
   }
 
-  // Filter lists to exclude special system lists (bookmarks, history)
-  const userLists = lists.filter(list =>
-    list.type === "list" || list.type === "bibliography"
+  // Filter lists to exclude special system lists (bookmarks, history), which are identified by id, not by type
+  const userLists = lists.filter(
+    (list) => list.id !== SPECIAL_LIST_IDS.BOOKMARKS && list.id !== SPECIAL_LIST_IDS.HISTORY,
   );
 
   return (
@@ -155,7 +163,7 @@ export const BookmarksSidebar = ({ onClose }: BookmarksSidebarProperties) => {
             align="center"
             mb="xs"
             style={{ cursor: "pointer" }}
-            onClick={() => setListsExpanded(!listsExpanded)}
+            onClick={() => { setListsExpanded(!listsExpanded); }}
             role="button"
             aria-expanded={listsExpanded}
             aria-label="Toggle lists section"
@@ -237,7 +245,7 @@ export const BookmarksSidebar = ({ onClose }: BookmarksSidebarProperties) => {
             align="center"
             mb="xs"
             style={{ cursor: "pointer" }}
-            onClick={() => setBookmarksExpanded(!bookmarksExpanded)}
+            onClick={() => { setBookmarksExpanded(!bookmarksExpanded); }}
             role="button"
             aria-expanded={bookmarksExpanded}
             aria-label="Toggle bookmarks section"
@@ -275,19 +283,15 @@ export const BookmarksSidebar = ({ onClose }: BookmarksSidebarProperties) => {
                   placeholder="Search bookmarks..."
                   aria-label="Search bookmarks"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); }}
                   leftSection={<IconSearch size={ICON_SIZE.SM} />}
                   size="xs"
                 />
               </Box>
             )}
 
-            {isLoadingBookmarks ? (
-              <Group justify="center" p="sm">
-                <Loader size="xs" />
-                <Text size="xs" c="dimmed">Loading bookmarks...</Text>
-              </Group>
-            ) : (filteredBookmarks.length === 0 ? (
+            {/* isLoadingBookmarks is always false here: the early return above already handles the loading state for the whole component */}
+            {filteredBookmarks.length === 0 ? (
               <Card withBorder p="sm">
                 <Box className={styles.emptyState} p="md">
                   <IconBookmarkOff size={ICON_SIZE.XXL} />
@@ -305,14 +309,14 @@ export const BookmarksSidebar = ({ onClose }: BookmarksSidebarProperties) => {
               <Stack gap="xs">
                 {filteredBookmarks.map((bookmark) => (
                   <BookmarkCard
-                    key={bookmark.id || bookmark.entityId}
+                    key={bookmark.id ?? bookmark.entityId}
                     bookmark={bookmark}
                     onClose={onClose}
-                    onDeleted={refreshData}
+                    onDeleted={() => { void refreshData(); }}
                   />
                 ))}
               </Stack>
-            ))}
+            )}
           </Collapse>
         </Box>
       </div>

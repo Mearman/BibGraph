@@ -8,9 +8,9 @@
  * 1. Navigates successfully (no 404, no infinite redirect loops)
  * 2. Renders without JavaScript errors
  * 3. Shows meaningful content (not a blank page)
- * @module page-smoke.e2e
  */
 
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { waitForAppReady } from "@/test/helpers/app-ready";
@@ -24,18 +24,30 @@ import {
 	resolveRoute,
 } from "@/test/helpers/route-discovery";
 
+// Whether the tests are running in a CI environment
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+
 // Base URL from environment or defaults
 const BASE_URL =
-	process.env.BASE_URL ||
-	process.env.E2E_BASE_URL ||
-	(process.env.CI ? "http://localhost:4173" : "http://localhost:5173");
+	process.env.BASE_URL ??
+	process.env.E2E_BASE_URL ??
+	(IS_CI ? "http://localhost:4173" : "http://localhost:5173");
+
+const MAX_ROUTES_PER_CATEGORY_IN_CI = 1;
+// Route categories: static, entityIndex, entityDetail, externalId, autocomplete
+const CATEGORIES_TESTED_WITH_ENTITY_DETAIL = 5;
+const CATEGORIES_TESTED_WITHOUT_ENTITY_DETAIL = 4;
+const ROUTE_SUITE_TIMEOUT_MS = 60_000;
+const ENTITY_DETAIL_SUITE_TIMEOUT_MS = 90_000;
+const MIN_TOTAL_ROUTES_EXPECTED = 40;
+const MIN_STATIC_ROUTES_EXPECTED = 10;
+const MIN_ENTITY_INDEX_ROUTES_EXPECTED = 5;
 
 // Configuration for smoke testing optimization
 const SMOKE_TEST_CONFIG = {
-	// In CI, use aggressive sampling to fit within 8-minute job timeout
-	// At ~50s per test, we can only run ~6-7 tests total (50s * 7 = 350s + overhead)
-	maxRoutesPerCategory: process.env.CI ? 1 : Number.MAX_SAFE_INTEGER,
-	skipEntityDetailInCI: process.env.CI ? true : false,
+	// In CI, use aggressive sampling to fit within 8-minute job timeout At ~50s per test, we can only run ~6-7 tests total (50s * 7 = 350s + overhead)
+	maxRoutesPerCategory: IS_CI ? MAX_ROUTES_PER_CATEGORY_IN_CI : Number.MAX_SAFE_INTEGER,
+	skipEntityDetailInCI: IS_CI,
 };
 
 // Discover and categorize all routes at module load time
@@ -43,7 +55,7 @@ const allRoutes = getAllRoutes();
 const routes = categorizeRoutes(allRoutes);
 
 // Helper to sample routes for CI optimization
-const sampleRoutes = (routeList: string[], maxCount: number): string[] => {
+const sampleRoutes = (routeList: readonly string[], maxCount: number): readonly string[] => {
 	if (routeList.length <= maxCount) return routeList;
 
 	// Take first, middle, and last routes to ensure good coverage
@@ -63,8 +75,11 @@ const sampleRoutes = (routeList: string[], maxCount: number): string[] => {
 // Helper to build hash routes (SPA uses hash routing)
 const buildUrl = (path: string): string => `${BASE_URL}/#${path}`;
 
+const DEFAULT_PAGE_LOAD_TIMEOUT_MS = 45_000;
+const MIN_PAGE_CONTENT_LENGTH = 10;
+
 // Helper to check page loads without errors
-const expectPageLoads = async (page: import("@playwright/test").Page, path: string, options?: {
+const expectPageLoads = async (page: Page, path: string, options?: {
 		expectContent?: string | RegExp;
 		skipContentCheck?: boolean;
 		timeout?: number;
@@ -74,7 +89,7 @@ const expectPageLoads = async (page: import("@playwright/test").Page, path: stri
 		errors.push(error.message);
 	});
 
-	const timeout = options?.timeout ?? 45_000;
+	const timeout = options?.timeout ?? DEFAULT_PAGE_LOAD_TIMEOUT_MS;
 	const url = buildUrl(path);
 	await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
 	await waitForAppReady(page, { timeout });
@@ -87,18 +102,18 @@ const expectPageLoads = async (page: import("@playwright/test").Page, path: stri
 	await expect(root).toBeVisible();
 
 	// Verify page has meaningful content (not blank)
-	if (!options?.skipContentCheck) {
+	if (options?.skipContentCheck !== true) {
 		const contentSelector =
 			(await page.locator("main").count()) > 0 ? "main" : "body";
 		const content = await page.locator(contentSelector).textContent();
 		expect(
 			content?.trim().length,
 			`Page ${path} should have content`
-		).toBeGreaterThanOrEqual(10);
+		).toBeGreaterThanOrEqual(MIN_PAGE_CONTENT_LENGTH);
 	}
 
 	// Check for specific content if provided
-	if (options?.expectContent) {
+	if (options?.expectContent !== undefined) {
 		const content = typeof options.expectContent === "string"
 			? options.expectContent
 			: options.expectContent.source;
@@ -144,7 +159,7 @@ const expectPageLoads = async (page: import("@playwright/test").Page, path: stri
 // ============================================================================
 
 test.describe("Auto-discovered Static Routes", () => {
-	test.setTimeout(60_000);
+	test.setTimeout(ROUTE_SUITE_TIMEOUT_MS);
 
 	// Filter out bookmarks route due to IndexedDB initialization issues in CI
 	const staticRoutesForTesting = routes.static.filter(route => route !== "/bookmarks");
@@ -155,7 +170,7 @@ test.describe("Auto-discovered Static Routes", () => {
 		const isHomepage = route === "/";
 		const isErrorTest = route === "/error-test";
 
-		test(`${route} loads successfully${process.env.CI ? ' (CI sampled)' : ''}`, async ({ page }) => {
+		test(`${route} loads successfully${IS_CI ? ' (CI sampled)' : ''}`, async ({ page }) => {
 			await expectPageLoads(page, route, {
 				expectContent: isHomepage ? "BibGraph" : undefined,
 				skipContentCheck: isErrorTest,
@@ -164,8 +179,8 @@ test.describe("Auto-discovered Static Routes", () => {
 	}
 
 	// Log sampling information in CI
-	if (process.env.CI && staticRoutesForTesting.length > sampledRoutes.length) {
-		console.log(`CI: Sampled ${sampledRoutes.length} of ${staticRoutesForTesting.length} static routes`);
+	if (IS_CI && staticRoutesForTesting.length > sampledRoutes.length) {
+		console.log(`CI: Sampled ${String(sampledRoutes.length)} of ${String(staticRoutesForTesting.length)} static routes`);
 	}
 });
 
@@ -174,20 +189,20 @@ test.describe("Auto-discovered Static Routes", () => {
 // ============================================================================
 
 test.describe("Auto-discovered Entity Index Pages", () => {
-	test.setTimeout(60_000);
+	test.setTimeout(ROUTE_SUITE_TIMEOUT_MS);
 
 	// Apply CI sampling to reduce test count
 	const sampledRoutes = sampleRoutes(routes.entityIndex, SMOKE_TEST_CONFIG.maxRoutesPerCategory);
 
 	for (const route of sampledRoutes) {
-		test(`${route} loads successfully${process.env.CI ? ' (CI sampled)' : ''}`, async ({ page }) => {
+		test(`${route} loads successfully${IS_CI ? ' (CI sampled)' : ''}`, async ({ page }) => {
 			await expectPageLoads(page, route);
 		});
 	}
 
 	// Log sampling information in CI
-	if (process.env.CI && routes.entityIndex.length > sampledRoutes.length) {
-		console.log(`CI: Sampled ${sampledRoutes.length} of ${routes.entityIndex.length} entity index routes`);
+	if (IS_CI && routes.entityIndex.length > sampledRoutes.length) {
+		console.log(`CI: Sampled ${String(sampledRoutes.length)} of ${String(routes.entityIndex.length)} entity index routes`);
 	}
 });
 
@@ -196,7 +211,7 @@ test.describe("Auto-discovered Entity Index Pages", () => {
 // ============================================================================
 
 test.describe("Auto-discovered Entity Detail Pages", () => {
-	test.setTimeout(90_000);
+	test.setTimeout(ENTITY_DETAIL_SUITE_TIMEOUT_MS);
 
 	// Skip entity detail tests entirely in CI to avoid API timeout issues
 	if (SMOKE_TEST_CONFIG.skipEntityDetailInCI) {
@@ -218,7 +233,7 @@ test.describe("Auto-discovered Entity Detail Pages", () => {
 			continue;
 		}
 
-		test(`${route} loads with discovered entity${process.env.CI ? ' (CI sampled)' : ''}`, async ({ page }) => {
+		test(`${route} loads with discovered entity${IS_CI ? ' (CI sampled)' : ''}`, async ({ page }) => {
 			// Get entity ID (runtime discovery with fallback)
 			const entityId = await getEntityId(entityType);
 			const resolvedPath = resolveRoute(route, entityId);
@@ -228,8 +243,8 @@ test.describe("Auto-discovered Entity Detail Pages", () => {
 	}
 
 	// Log sampling information
-	if (process.env.CI && routes.entityDetail.length > sampledRoutes.length) {
-		console.log(`CI: Sampled ${sampledRoutes.length} of ${routes.entityDetail.length} entity detail routes`);
+	if (IS_CI && routes.entityDetail.length > sampledRoutes.length) {
+		console.log(`CI: Sampled ${String(sampledRoutes.length)} of ${String(routes.entityDetail.length)} entity detail routes`);
 	}
 });
 
@@ -238,7 +253,7 @@ test.describe("Auto-discovered Entity Detail Pages", () => {
 // ============================================================================
 
 test.describe("Auto-discovered External ID Routes", () => {
-	test.setTimeout(60_000);
+	test.setTimeout(ROUTE_SUITE_TIMEOUT_MS);
 
 	// Apply CI sampling to reduce test count
 	const sampledRoutes = sampleRoutes(routes.externalId, SMOKE_TEST_CONFIG.maxRoutesPerCategory);
@@ -250,7 +265,7 @@ test.describe("Auto-discovered External ID Routes", () => {
 			continue;
 		}
 
-		test(`${route} resolves successfully${process.env.CI ? ' (CI sampled)' : ''}`, async ({ page }) => {
+		test(`${route} resolves successfully${IS_CI ? ' (CI sampled)' : ''}`, async ({ page }) => {
 			// Get external ID (runtime discovery with fallback)
 			const externalId = await getExternalId(
 				externalIdInfo.idType as "orcid" | "issn" | "ror" | "doi"
@@ -262,8 +277,8 @@ test.describe("Auto-discovered External ID Routes", () => {
 	}
 
 	// Log sampling information in CI
-	if (process.env.CI && routes.externalId.length > sampledRoutes.length) {
-		console.log(`CI: Sampled ${sampledRoutes.length} of ${routes.externalId.length} external ID routes`);
+	if (IS_CI && routes.externalId.length > sampledRoutes.length) {
+		console.log(`CI: Sampled ${String(sampledRoutes.length)} of ${String(routes.externalId.length)} external ID routes`);
 	}
 });
 
@@ -272,20 +287,20 @@ test.describe("Auto-discovered External ID Routes", () => {
 // ============================================================================
 
 test.describe("Auto-discovered Autocomplete Pages", () => {
-	test.setTimeout(60_000);
+	test.setTimeout(ROUTE_SUITE_TIMEOUT_MS);
 
 	// Apply CI sampling to reduce test count
 	const sampledRoutes = sampleRoutes(routes.autocomplete, SMOKE_TEST_CONFIG.maxRoutesPerCategory);
 
 	for (const route of sampledRoutes) {
-		test(`${route} loads successfully${process.env.CI ? ' (CI sampled)' : ''}`, async ({ page }) => {
+		test(`${route} loads successfully${IS_CI ? ' (CI sampled)' : ''}`, async ({ page }) => {
 			await expectPageLoads(page, route);
 		});
 	}
 
 	// Log sampling information in CI
-	if (process.env.CI && routes.autocomplete.length > sampledRoutes.length) {
-		console.log(`CI: Sampled ${sampledRoutes.length} of ${routes.autocomplete.length} autocomplete routes`);
+	if (IS_CI && routes.autocomplete.length > sampledRoutes.length) {
+		console.log(`CI: Sampled ${String(sampledRoutes.length)} of ${String(routes.autocomplete.length)} autocomplete routes`);
 	}
 });
 
@@ -294,32 +309,32 @@ test.describe("Auto-discovered Autocomplete Pages", () => {
 // ============================================================================
 
 test.describe("Route Discovery Summary", () => {
-	test("reports discovered routes", async () => {
+	test("reports discovered routes", () => {
 		console.log("\n=== Route Discovery Summary ===");
-		console.log(`Total routes discovered: ${allRoutes.length}`);
-		console.log(`  Static: ${routes.static.length}`);
-		console.log(`  Entity Index: ${routes.entityIndex.length}`);
-		console.log(`  Entity Detail: ${routes.entityDetail.length}`);
-		console.log(`  External ID: ${routes.externalId.length}`);
-		console.log(`  Autocomplete: ${routes.autocomplete.length}`);
-		console.log(`  Skipped: ${routes.skip.length}`);
+		console.log(`Total routes discovered: ${String(allRoutes.length)}`);
+		console.log(`  Static: ${String(routes.static.length)}`);
+		console.log(`  Entity Index: ${String(routes.entityIndex.length)}`);
+		console.log(`  Entity Detail: ${String(routes.entityDetail.length)}`);
+		console.log(`  External ID: ${String(routes.externalId.length)}`);
+		console.log(`  Autocomplete: ${String(routes.autocomplete.length)}`);
+		console.log(`  Skipped: ${String(routes.skip.length)}`);
 
-		if (process.env.CI) {
+		if (IS_CI) {
 			console.log("\n=== CI Optimization Applied ===");
 			console.log(`Entity detail tests: ${SMOKE_TEST_CONFIG.skipEntityDetailInCI ? 'SKIPPED' : 'SAMPLED'}`);
-			console.log(`Max routes per category: ${SMOKE_TEST_CONFIG.maxRoutesPerCategory}`);
-			console.log(`Estimated tests in CI: ~${SMOKE_TEST_CONFIG.skipEntityDetailInCI ?
-				(SMOKE_TEST_CONFIG.maxRoutesPerCategory * 4) : // 4 categories tested
-				(SMOKE_TEST_CONFIG.maxRoutesPerCategory * 5) // 5 categories tested
-			} tests (vs ${allRoutes.length} total routes)`);
+			console.log(`Max routes per category: ${String(SMOKE_TEST_CONFIG.maxRoutesPerCategory)}`);
+			console.log(`Estimated tests in CI: ~${String(SMOKE_TEST_CONFIG.skipEntityDetailInCI ?
+				(SMOKE_TEST_CONFIG.maxRoutesPerCategory * CATEGORIES_TESTED_WITHOUT_ENTITY_DETAIL) :
+				(SMOKE_TEST_CONFIG.maxRoutesPerCategory * CATEGORIES_TESTED_WITH_ENTITY_DETAIL)
+			)} tests (vs ${String(allRoutes.length)} total routes)`);
 		}
 
 		console.log("\nSkipped routes:", routes.skip);
 		console.log("===============================\n");
 
 		// Verify we discovered a reasonable number of routes
-		expect(allRoutes.length).toBeGreaterThan(40);
-		expect(routes.static.length).toBeGreaterThan(10);
-		expect(routes.entityIndex.length).toBeGreaterThan(5);
+		expect(allRoutes.length).toBeGreaterThan(MIN_TOTAL_ROUTES_EXPECTED);
+		expect(routes.static.length).toBeGreaterThan(MIN_STATIC_ROUTES_EXPECTED);
+		expect(routes.entityIndex.length).toBeGreaterThan(MIN_ENTITY_INDEX_ROUTES_EXPECTED);
 	});
 });

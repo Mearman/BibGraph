@@ -15,7 +15,7 @@ const ORCIDAuthorRoute = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const resolveORCID = async () => {
+    const resolveORCID = () => {
       try {
         // Decode the ORCID parameter
         const decodedORCID = decodeURIComponent(orcid);
@@ -24,7 +24,7 @@ const ORCIDAuthorRoute = () => {
         // EntityDetectionService will validate and normalize the format
         const detection = EntityDetectionService.detectEntity(decodedORCID);
 
-        if (!detection || detection.entityType !== "authors") {
+        if (detection?.entityType !== "authors") {
           throw new Error(
             `Invalid ORCID format: ${decodedORCID}`,
           );
@@ -52,7 +52,7 @@ const ORCIDAuthorRoute = () => {
       }
     };
 
-    void resolveORCID();
+    resolveORCID();
   }, [orcid, navigate]);
 
   return (

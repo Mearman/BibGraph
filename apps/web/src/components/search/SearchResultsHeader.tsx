@@ -25,6 +25,14 @@ import { ExportButton } from "../export/ExportButton";
 import type { SortOption, ViewMode } from "./search-page-types";
 import { getEntityTypeBreakdown,SORT_OPTIONS } from "./search-page-types";
 
+const MS_PER_SECOND = 1000;
+
+const isSortOption = (value: string | null): value is SortOption =>
+  value !== null && SORT_OPTIONS.some((option) => option.value === value);
+
+const isViewMode = (value: string): value is ViewMode =>
+  value === "table" || value === "card" || value === "list";
+
 interface EntityTypeFilterBadgeProperties {
   type: string;
   count: number;
@@ -46,7 +54,9 @@ const EntityTypeFilterBadge = ({
     variant={isSelected ? "filled" : "light"}
     leftSection={isSelected ? "* " : undefined}
     style={{ cursor: 'pointer', userSelect: 'none' }}
-    onClick={() => onToggle(type)}
+    onClick={() => {
+      onToggle(type);
+    }}
   >
     {type} ({count})
   </Badge>
@@ -92,12 +102,12 @@ export const SearchResultsHeader = ({
         <Group gap="md" align="center">
           <Text size="sm" fw={500}>
             {sortedResultsCount} {sortedResultsCount === 1 ? 'result' : 'results'}
-            {selectedTypes.length > 0 && ` (filtered from ${totalResultsCount})`}
+            {selectedTypes.length > 0 && ` (filtered from ${String(totalResultsCount)})`}
           </Text>
           {searchDuration > 0 && (
-            <Tooltip label={`${searchDuration}ms from OpenAlex API`}>
+            <Tooltip label={`${String(searchDuration)}ms from OpenAlex API`}>
               <Text size="xs" c="dimmed" style={{ cursor: 'help' }}>
-                {(searchDuration / 1000).toFixed(2)}s
+                {(searchDuration / MS_PER_SECOND).toFixed(2)}s
               </Text>
             </Tooltip>
           )}
@@ -108,14 +118,22 @@ export const SearchResultsHeader = ({
           <Select
             size="xs"
             value={sortBy}
-            onChange={(value) => onSortChange(value as SortOption)}
+            onChange={(value) => {
+              if (isSortOption(value)) {
+                onSortChange(value);
+              }
+            }}
             data={SORT_OPTIONS}
             style={{ width: 140 }}
             allowDeselect={false}
           />
           <SegmentedControl
             value={viewMode}
-            onChange={(value) => onViewModeChange(value as ViewMode)}
+            onChange={(value) => {
+              if (isViewMode(value)) {
+                onViewModeChange(value);
+              }
+            }}
             data={[
               {
                 value: 'table',

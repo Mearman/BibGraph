@@ -16,7 +16,11 @@ import { useActivity } from "@/contexts/ActivityContext";
 import { useGraphList } from "@/hooks/useGraphList";
 import { useUserInteractions } from "@/hooks/user-interactions";
 
+import { MS_PER_SECOND } from "./time-constants";
+
 const MAX_RETRIES = 3;
+const EXPONENTIAL_BACKOFF_BASE_MS = 1000;
+const MAX_BACKOFF_DELAY_MS = 30000;
 
 export interface UseSearchPageReturn {
   // Search state
@@ -61,12 +65,12 @@ export interface UseSearchPageReturn {
   isInGraph: (entityId: string) => boolean;
 
   // Actions
-  handleSearch: (filters: SearchFilters) => void;
+  handleSearch: (filters: Readonly<SearchFilters>) => void;
   handleQuickSearch: (query: string) => void;
   handleRetry: () => Promise<void>;
   handleRetryWithExponentialBackoff: () => Promise<void>;
   handleTypeFilterToggle: (type: string) => void;
-  handleToggleGraph: (result: AutocompleteResult, e?: React.MouseEvent) => Promise<void>;
+  handleToggleGraph: (result: Readonly<AutocompleteResult>, e?: React.MouseEvent) => Promise<void>;
 }
 
 export const useSearchPage = (): UseSearchPageReturn => {
@@ -129,7 +133,7 @@ export const useSearchPage = (): UseSearchPageReturn => {
   }, [graphList.nodes]);
 
   // Handle add/remove from graph
-  const handleToggleGraph = useCallback(async (result: AutocompleteResult, e?: React.MouseEvent) => {
+  const handleToggleGraph = useCallback(async (result: Readonly<AutocompleteResult>, e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
       e.preventDefault();
@@ -177,13 +181,13 @@ export const useSearchPage = (): UseSearchPageReturn => {
     error,
   } = useQuery({
     queryKey: ["search-autocomplete", searchFilters],
-    queryFn: () => searchAllEntities(searchFilters),
+    queryFn: async () => searchAllEntities(searchFilters),
     enabled: Boolean(searchFilters.query.trim()),
     retry: SEARCH.MAX_RETRY_ATTEMPTS,
     staleTime: TIME_MS.SEARCH_STALE_TIME,
   });
 
-  const handleSearch = useCallback((filters: SearchFilters) => {
+  const handleSearch = useCallback((filters: Readonly<SearchFilters>) => {
     setSearchStartTime(Date.now());
     setSearchFilters(filters);
     storeSearchQuery(filters.query);
@@ -206,8 +210,8 @@ export const useSearchPage = (): UseSearchPageReturn => {
       await queryClient.refetchQueries({
         queryKey: ["search-autocomplete", searchFilters],
       });
-    } catch (error) {
-      logger.error("search", "Manual retry failed", { error, retryCount: retryCount + 1 });
+    } catch (retryError) {
+      logger.error("search", "Manual retry failed", { error: retryError, retryCount: retryCount + 1 });
     } finally {
       setIsRetrying(false);
     }
@@ -216,27 +220,29 @@ export const useSearchPage = (): UseSearchPageReturn => {
   const handleRetryWithExponentialBackoff = useCallback(async () => {
     if (retryCount >= MAX_RETRIES) return;
 
-    const delay = Math.min(Math.pow(2, retryCount) * 1000, 30000);
+    const delay = Math.min(Math.pow(2, retryCount) * EXPONENTIAL_BACKOFF_BASE_MS, MAX_BACKOFF_DELAY_MS);
 
     logger.info("search", "Starting exponential backoff retry", {
       retryCount: retryCount + 1,
-      delay: delay / 1000
+      delay: delay / MS_PER_SECOND
     });
 
     setIsRetrying(true);
     setRetryCount(previous => previous + 1);
 
-    await new Promise(resolve => setTimeout(resolve, delay));
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, delay);
+    });
 
     try {
       await queryClient.refetchQueries({
         queryKey: ["search-autocomplete", searchFilters],
       });
-    } catch (error) {
+    } catch (retryError) {
       logger.error("search", "Exponential backoff retry failed", {
-        error,
+        error: retryError,
         retryCount: retryCount + 1,
-        delay: delay / 1000
+        delay: delay / MS_PER_SECOND
       });
     } finally {
       setIsRetrying(false);
@@ -277,7 +283,7 @@ export const useSearchPage = (): UseSearchPageReturn => {
       const query = refinementQuery.toLowerCase();
       results = results.filter(result =>
         result.display_name.toLowerCase().includes(query) ||
-        (result.id && result.id.toLowerCase().includes(query))
+        result.id.toLowerCase().includes(query)
       );
     }
 
@@ -286,20 +292,18 @@ export const useSearchPage = (): UseSearchPageReturn => {
 
   // Sort results
   const sortedResults = useMemo(() => {
-    const results = filteredResults;
-
     switch (sortBy) {
       case "citations":
-        return [...results].sort((a, b) => (b.cited_by_count || 0) - (a.cited_by_count || 0));
+        return [...filteredResults].sort((a, b) => (b.cited_by_count ?? 0) - (a.cited_by_count ?? 0));
       case "works":
-        return [...results].sort((a, b) => (b.works_count || 0) - (a.works_count || 0));
+        return [...filteredResults].sort((a, b) => (b.works_count ?? 0) - (a.works_count ?? 0));
       case "name":
-        return [...results].sort((a, b) => a.display_name.localeCompare(b.display_name));
+        return [...filteredResults].sort((a, b) => a.display_name.localeCompare(b.display_name));
       case "type":
-        return [...results].sort((a, b) => a.entity_type.localeCompare(b.entity_type));
+        return [...filteredResults].sort((a, b) => a.entity_type.localeCompare(b.entity_type));
       case "relevance":
       default:
-        return results;
+        return filteredResults;
     }
   }, [filteredResults, sortBy]);
 

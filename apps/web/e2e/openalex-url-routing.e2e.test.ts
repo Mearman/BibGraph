@@ -12,7 +12,6 @@
  * - Full API URL handling
  *
  * Promoted from manual tests to automated smoke tests.
- * @module openalex-url-routing.e2e
  * @see apps/web/src/test/e2e/manual/openalex-url.e2e.test.ts
  * @see apps/web/src/test/e2e/manual/external-id-routing.e2e.test.ts
  */
@@ -25,7 +24,9 @@ import {
 	waitForRouterReady,
 } from "@/test/helpers/app-ready";
 
-const BASE_URL = process.env.CI ? "http://localhost:4173" : "http://localhost:5173";
+const isCi = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = isCi ? "http://localhost:4173" : "http://localhost:5173";
+const URL_PREVIEW_LENGTH = 80;
 
 test.describe("@manual @utility OpenAlex URL Routing", () => {
 	test.describe("API URL Conversion and Routing", () => {
@@ -180,7 +181,7 @@ test.describe("@manual @utility OpenAlex URL Routing", () => {
 		];
 
 		for (const { url, expectedUrl, assertUI } of testScenarios) {
-			test(`should handle ${url.slice(0, 80)}... and redirect to ${expectedUrl}`, async ({
+			test(`should handle ${url.slice(0, URL_PREVIEW_LENGTH)}... and redirect to ${expectedUrl}`, async ({
 				page,
 			}) => {
 				// Parse the URL to determine the correct route path
@@ -202,7 +203,7 @@ test.describe("@manual @utility OpenAlex URL Routing", () => {
 						const hash = window.location.hash;
 						return (
 							hash !== expectedHash &&
-							!document.body.textContent?.includes("Resolving")
+							!document.body.textContent.includes("Resolving")
 						);
 					},
 					`#${routePath}`,

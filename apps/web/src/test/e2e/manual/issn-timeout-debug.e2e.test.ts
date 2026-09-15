@@ -2,6 +2,11 @@ import { hostnameMatches } from '@bibgraph/utils';
 import { expect,test } from '@playwright/test';
 
 const DEPLOYED_URL = 'https://mearman.github.io/BibGraph';
+const DEBUG_TEST_TIMEOUT_MS = 60_000;
+const MAIN_TEXT_PREVIEW_LENGTH = 200;
+const EXTENDED_TEXT_PREVIEW_LENGTH = 500;
+const RECENT_CONSOLE_MESSAGES_COUNT = 10;
+const MIN_CONTENT_LENGTH = 100;
 
 /**
  * ISSN Timeout Debug Test
@@ -11,7 +16,7 @@ const DEPLOYED_URL = 'https://mearman.github.io/BibGraph';
  */
 
 test.describe('ISSN Timeout Investigation', () => {
-  test.setTimeout(60_000);
+  test.setTimeout(DEBUG_TEST_TIMEOUT_MS);
 
   test('should debug ISSN timeout with full diagnostics', async ({ page }) => {
     const consoleMessages: { type: string; text: string }[] = [];
@@ -54,7 +59,7 @@ test.describe('ISSN Timeout Investigation', () => {
       try {
         await page.locator('main').waitFor({ timeout: 10_000 });
         const mainText = await page.locator('main').textContent();
-        console.log('Main content found:', mainText?.slice(0, 200));
+        console.log('Main content found:', mainText?.slice(0, MAIN_TEXT_PREVIEW_LENGTH));
       } catch (mainError) {
         console.log('Main selector not found:', mainError);
       }
@@ -77,18 +82,18 @@ test.describe('ISSN Timeout Investigation', () => {
     // Output diagnostics
     console.log('\n=== DIAGNOSTICS ===');
     console.log('Console Errors:', errors.length);
-    for (const [index, error] of errors.entries()) console.log(`  ${index + 1}. ${error}`);
+    for (const [index, error] of errors.entries()) console.log(`  ${String(index + 1)}. ${error}`);
 
     console.log('\nNetwork Requests:', networkRequests.length);
     const openalexRequests = networkRequests.filter((request) =>
       hostnameMatches(request.url, 'openalex.org'),
     );
     console.log('OpenAlex API Requests:', openalexRequests.length);
-    for (const request of openalexRequests) console.log(`  ${request.status} - ${request.url}`)
+    for (const request of openalexRequests) console.log(`  ${String(request.status)} - ${request.url}`)
     ;
 
     console.log('\nConsole Messages (last 10):');
-    for (const message of consoleMessages.slice(-10)) {
+    for (const message of consoleMessages.slice(-RECENT_CONSOLE_MESSAGES_COUNT)) {
       console.log(`  [${message.type}] ${message.text}`);
     }
 
@@ -110,14 +115,14 @@ test.describe('ISSN Timeout Investigation', () => {
     console.log('Final URL after extended wait:', finalUrl);
 
     const mainText = await page.locator('body').textContent();
-    console.log('Page content (first 500 chars):', mainText?.slice(0, 500));
+    console.log('Page content (first 500 chars):', mainText?.slice(0, EXTENDED_TEXT_PREVIEW_LENGTH));
 
     // Check if we got redirected to search
     const isSearchPage = finalUrl.includes('/search');
     console.log('Redirected to search?', isSearchPage);
 
     // Check if page shows any content
-    const hasContent = mainText && mainText.length > 100;
+    const hasContent = mainText !== null && mainText.length > MIN_CONTENT_LENGTH;
     console.log('Has content?', hasContent);
 
     expect(hasContent).toBe(true);
@@ -154,7 +159,7 @@ test.describe('ISSN Timeout Investigation', () => {
 
     console.log('ISSN URL:', issnUrl);
     console.log('ISSN content length:', issnMain?.length);
-    console.log('ISSN content (first 500 chars):', issnMain?.slice(0, 500));
+    console.log('ISSN content (first 500 chars):', issnMain?.slice(0, EXTENDED_TEXT_PREVIEW_LENGTH));
 
     // Compare behaviors
     console.log('\n=== COMPARISON ===');

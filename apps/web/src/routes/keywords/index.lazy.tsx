@@ -13,9 +13,9 @@ const keywordsColumns: ColumnConfig[] = [
 
 
 const KeywordsListRoute = () => {
-  const search = useSearch({ from: "/keywords/" }) as { filter?: string };
+  const search = useSearch({ from: "/keywords/" });
   const filterBuilder = createFilterBuilder();
-  const urlFilters = search.filter
+  const urlFilters = search.filter !== undefined && search.filter !== ''
     ? filterBuilder.parseFilterString(search.filter)
     : undefined;
 

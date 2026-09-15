@@ -11,6 +11,9 @@ import { useQueryBookmarking } from "@/hooks/use-query-bookmarking";
 import { EntityList, type EntityListProps as EntityListProperties } from "./EntityList";
 import { QueryBookmarkButton } from "./QueryBookmarkButton";
 
+// Preview length for the truncated bookmarked-query ID shown in the header.
+const QUERY_ID_PREVIEW_LENGTH = 12;
+
 interface EntityListWithQueryBookmarkingProperties extends Omit<EntityListProperties, "title"> {
   entityType: EntityType;
   entityId?: string;
@@ -44,10 +47,10 @@ export const EntityListWithQueryBookmarking = ({
   });
 
   // Check if this query has semantic parameters worth bookmarking
-  const hasSemanticQuery = Object.keys(currentQueryParams).length > 0 || !!entityId;
+  const hasSemanticQuery = Object.keys(currentQueryParams).length > 0 || entityId !== undefined;
 
-  const renderHeader = () => {
-    if (customHeader) {
+  const renderHeader = async () => {
+    if (customHeader !== undefined) {
       return customHeader;
     }
 
@@ -55,8 +58,8 @@ export const EntityListWithQueryBookmarking = ({
       <Group justify="space-between" mb="md">
         <div>
           <Title order={2}>
-            {title || `${entityType.charAt(0).toUpperCase() + entityType.slice(1)}${
-              entityId ? ` Details` : " List"
+            {title !== undefined && title !== "" ? title : `${entityType.charAt(0).toUpperCase() + entityType.slice(1)}${
+              entityId !== undefined ? ` Details` : " List"
             }`}
           </Title>
 
@@ -64,11 +67,9 @@ export const EntityListWithQueryBookmarking = ({
           {hasSemanticQuery && (
             <Text size="sm" c="dimmed" mt="xs">
               {generateDefaultTitle()}
-              {queryId && (
-                <Text component="span" size="xs" c="blue" ml="sm">
-                  ID: {queryId.slice(0, 12)}...
-                </Text>
-              )}
+              <Text component="span" size="xs" c="blue" ml="sm">
+                ID: {queryId.slice(0, QUERY_ID_PREVIEW_LENGTH)}...
+              </Text>
             </Text>
           )}
 
@@ -125,7 +126,7 @@ export const EntityListWithQueryBookmarking = ({
           fontFamily: "monospace"
         }}>
           <div><strong>Query Debug Info:</strong></div>
-          <div>Entity: {entityType}{entityId && `/${entityId}`}</div>
+          <div>Entity: {entityType}{entityId !== undefined && `/${entityId}`}</div>
           <div>Query ID: {queryId}</div>
           <div>Bookmarked: {isQueryBookmarked ? "Yes" : "No"}</div>
           <div>Semantic Params: {JSON.stringify(currentQueryParams, null, 2)}</div>

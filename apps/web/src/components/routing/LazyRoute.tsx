@@ -12,9 +12,6 @@ interface LazyRouteProperties {
 /**
  * Wrapper component for lazy-loaded routes with consistent loading states
  * Provides a centered loading spinner with optional custom fallback
- * @param root0
- * @param root0.children
- * @param root0.fallback
  */
 export const LazyRoute: React.FC<LazyRouteProperties> = ({ children, fallback }) => {
   const defaultFallback = (
@@ -28,5 +25,5 @@ export const LazyRoute: React.FC<LazyRouteProperties> = ({ children, fallback })
     </Center>
   );
 
-  return <Suspense fallback={fallback || defaultFallback}>{children}</Suspense>;
+  return <Suspense fallback={fallback ?? defaultFallback}>{children}</Suspense>;
 };

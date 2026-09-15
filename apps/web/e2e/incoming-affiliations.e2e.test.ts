@@ -1,6 +1,5 @@
 /**
  * E2E tests for incoming affiliation relationships on institution detail pages
- * @module incoming-affiliations.e2e
  * @see specs/016-entity-relationship-viz/spec.md (User Story 1)
  */
 

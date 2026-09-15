@@ -32,11 +32,11 @@ export const TextFilter = ({
       compact={compact}
       fieldId={fieldId}
     >
-      {(properties: BaseFilterRenderProps<string>) => (
+      {(properties: Readonly<BaseFilterRenderProps<string>>) => (
         <TextInput
           id={properties.fieldId}
           value={properties.value || ""}
-          onChange={(event) => properties.onChange(event.currentTarget.value)}
+          onChange={(event) => { properties.onChange(event.currentTarget.value); }}
           placeholder={config.placeholder}
           disabled={properties.disabled}
           size={properties.compact ? "xs" : "sm"}

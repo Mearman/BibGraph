@@ -5,7 +5,6 @@
  * - Expand (fetch relationships)
  * - View details (navigate to entity page)
  * - Set as path source/target
- * @module components/graph/NodeContextMenu
  */
 
 import type { EntityType,GraphNode } from '@bibgraph/types';
@@ -97,7 +96,6 @@ export interface NodeContextMenuProps {
 
 /**
  * Get route path for an entity type
- * @param entityType
  */
 const getEntityRoute = (entityType: EntityType): string => {
   const routes: Record<EntityType, string> = {
@@ -122,16 +120,6 @@ const getEntityRoute = (entityType: EntityType): string => {
  *
  * Renders a Mantine Menu positioned at the click location.
  * Uses Portal to ensure proper stacking above the graph canvas.
- * @param root0
- * @param root0.state
- * @param root0.onClose
- * @param root0.onExpand
- * @param root0.onSetPathSource
- * @param root0.onSetPathTarget
- * @param root0.isExpanding
- * @param root0.isExpanded
- * @param root0.pathSource
- * @param root0.pathTarget
  */
 export const NodeContextMenu = ({
   state,
@@ -144,15 +132,15 @@ export const NodeContextMenu = ({
   pathSource,
   pathTarget,
 }: NodeContextMenuProps) => {
-  const menuReference = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { opened, x, y, node } = state;
 
   // Close menu on click outside
   useEffect(() => {
-    if (!opened) return;
+    if (!opened) return undefined;
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuReference.current && !menuReference.current.contains(event.target as Node)) {
+      if (menuRef.current && event.target instanceof Node && !menuRef.current.contains(event.target)) {
         onClose();
       }
     };
@@ -169,7 +157,7 @@ export const NodeContextMenu = ({
 
   // Close on escape key
   useEffect(() => {
-    if (!opened) return;
+    if (!opened) return undefined;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -178,7 +166,7 @@ export const NodeContextMenu = ({
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return () => { document.removeEventListener('keydown', handleKeyDown); };
   }, [opened, onClose]);
 
   const handleExpand = useCallback(() => {
@@ -218,7 +206,7 @@ export const NodeContextMenu = ({
   return (
     <Portal>
       <div
-        ref={menuReference}
+        ref={menuRef}
         style={{
           position: 'fixed',
           left: x,

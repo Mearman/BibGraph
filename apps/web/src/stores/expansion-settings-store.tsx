@@ -434,7 +434,7 @@ export const useExpansionSettingsActions = () => {
         { target, settingsUpdate },
         "ExpansionSettingsStore",
       );
-    }, [context.dispatch]),
+    }, [context]),
 
     resetSettings: useCallback((target: ExpansionTarget) => {
       context.dispatch({ type: "RESET_SETTINGS", payload: target });
@@ -444,7 +444,7 @@ export const useExpansionSettingsActions = () => {
         { target },
         "ExpansionSettingsStore",
       );
-    }, [context.dispatch]),
+    }, [context]),
 
     resetAllSettings: useCallback(() => {
       context.dispatch({ type: "RESET_ALL_SETTINGS" });
@@ -454,12 +454,12 @@ export const useExpansionSettingsActions = () => {
         {},
         "ExpansionSettingsStore",
       );
-    }, [context.dispatch]),
+    }, [context]),
 
     // Sort criteria management
     addSortCriteria: useCallback((
       target: ExpansionTarget,
-      criteria: Omit<SortCriteria, "priority">,
+      criteria: Readonly<Omit<SortCriteria, "priority">>,
     ) => {
       context.dispatch({ type: "ADD_SORT_CRITERIA", payload: { target, criteria } });
       logger.debug(
@@ -468,12 +468,12 @@ export const useExpansionSettingsActions = () => {
         { target, criteria },
         "ExpansionSettingsStore",
       );
-    }, [context.dispatch]),
+    }, [context]),
 
     updateSortCriteria: useCallback((
       target: ExpansionTarget,
       index: number,
-      criteriaUpdate: Partial<SortCriteria>,
+      criteriaUpdate: Readonly<Partial<SortCriteria>>,
     ) => {
       context.dispatch({ type: "UPDATE_SORT_CRITERIA", payload: { target, index, criteriaUpdate } });
       logger.debug(
@@ -482,7 +482,7 @@ export const useExpansionSettingsActions = () => {
         { target, index, criteriaUpdate },
         "ExpansionSettingsStore",
       );
-    }, [context.dispatch]),
+    }, [context]),
 
     removeSortCriteria: useCallback((target: ExpansionTarget, index: number) => {
       context.dispatch({ type: "REMOVE_SORT_CRITERIA", payload: { target, index } });
@@ -492,7 +492,7 @@ export const useExpansionSettingsActions = () => {
         { target, index },
         "ExpansionSettingsStore",
       );
-    }, [context.dispatch]),
+    }, [context]),
 
     reorderSortCriteria: useCallback((
       target: ExpansionTarget,
@@ -506,7 +506,7 @@ export const useExpansionSettingsActions = () => {
         { target, fromIndex, toIndex },
         "ExpansionSettingsStore",
       );
-    }, [context.dispatch]),
+    }, [context]),
 
     // Filter criteria management
     addFilterCriteria: useCallback((target: ExpansionTarget, criteria: FilterCriteria) => {
@@ -517,7 +517,7 @@ export const useExpansionSettingsActions = () => {
         { target, criteria },
         "ExpansionSettingsStore",
       );
-    }, [context.dispatch]),
+    }, [context]),
 
     updateFilterCriteria: useCallback((
       target: ExpansionTarget,
@@ -531,7 +531,7 @@ export const useExpansionSettingsActions = () => {
         { target, index, criteriaUpdate },
         "ExpansionSettingsStore",
       );
-    }, [context.dispatch]),
+    }, [context]),
 
     removeFilterCriteria: useCallback((target: ExpansionTarget, index: number) => {
       context.dispatch({ type: "REMOVE_FILTER_CRITERIA", payload: { target, index } });
@@ -541,7 +541,7 @@ export const useExpansionSettingsActions = () => {
         { target, index },
         "ExpansionSettingsStore",
       );
-    }, [context.dispatch]),
+    }, [context]),
 
     toggleFilterEnabled: useCallback((target: ExpansionTarget, index: number) => {
       context.dispatch({ type: "TOGGLE_FILTER_ENABLED", payload: { target, index } });
@@ -551,7 +551,7 @@ export const useExpansionSettingsActions = () => {
         { target, index },
         "ExpansionSettingsStore",
       );
-    }, [context.dispatch]),
+    }, [context]),
 
     // Utility functions
     getSettingsSummary: useCallback((target: ExpansionTarget): string => {
@@ -598,7 +598,7 @@ export const useExpansionSettingsActions = () => {
         { count: Object.keys(settingsObject).length },
         "ExpansionSettingsStore",
       );
-    }, [context.dispatch]),
+    }, [context]),
   };
 };
 

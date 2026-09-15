@@ -76,8 +76,8 @@ const formatEntityForCitation = (entity: CatalogueEntity): {
  * @param index - Index for enumeration
  * @returns APA formatted citation
  */
-const formatAPA = (data: ReturnType<typeof formatEntityForCitation>, index: number): string => {
-  return `${index + 1}. ${data.type.toUpperCase()}: ${data.id}. (${data.year}). Retrieved from OpenAlex: ${data.url}`;
+const formatAPA = (data: Readonly<ReturnType<typeof formatEntityForCitation>>, index: number): string => {
+  return `${String(index + 1)}. ${data.type.toUpperCase()}: ${data.id}. (${data.year}). Retrieved from OpenAlex: ${data.url}`;
 };
 
 /**
@@ -86,8 +86,8 @@ const formatAPA = (data: ReturnType<typeof formatEntityForCitation>, index: numb
  * @param index - Index for enumeration
  * @returns MLA formatted citation
  */
-const formatMLA = (data: ReturnType<typeof formatEntityForCitation>, index: number): string => {
-  return `${index + 1}. "${data.type.toUpperCase()} Entity: ${data.id}." OpenAlex, ${data.year}, ${data.url}`;
+const formatMLA = (data: Readonly<ReturnType<typeof formatEntityForCitation>>, index: number): string => {
+  return `${String(index + 1)}. "${data.type.toUpperCase()} Entity: ${data.id}." OpenAlex, ${data.year}, ${data.url}`;
 };
 
 /**
@@ -96,8 +96,8 @@ const formatMLA = (data: ReturnType<typeof formatEntityForCitation>, index: numb
  * @param index - Index for enumeration
  * @returns Chicago formatted citation
  */
-const formatChicago = (data: ReturnType<typeof formatEntityForCitation>, index: number): string => {
-  return `${index + 1}. ${data.type.toUpperCase()}: ${data.id}. OpenAlex (${data.year}). ${data.url}`;
+const formatChicago = (data: Readonly<ReturnType<typeof formatEntityForCitation>>, index: number): string => {
+  return `${String(index + 1)}. ${data.type.toUpperCase()}: ${data.id}. OpenAlex (${data.year}). ${data.url}`;
 };
 
 /**
@@ -106,8 +106,8 @@ const formatChicago = (data: ReturnType<typeof formatEntityForCitation>, index: 
  * @param index - Index for enumeration
  * @returns IEEE formatted citation
  */
-const formatIEEE = (data: ReturnType<typeof formatEntityForCitation>, index: number): string => {
-  return `[${index + 1}] ${data.type.toUpperCase()} Entity: ${data.id}, ${data.year}. [Online]. Available: ${data.url}`;
+const formatIEEE = (data: Readonly<ReturnType<typeof formatEntityForCitation>>, index: number): string => {
+  return `[${String(index + 1)}] ${data.type.toUpperCase()} Entity: ${data.id}, ${data.year}. [Online]. Available: ${data.url}`;
 };
 
 /**
@@ -116,8 +116,8 @@ const formatIEEE = (data: ReturnType<typeof formatEntityForCitation>, index: num
  * @param index - Index for unique key
  * @returns BibTeX formatted entry
  */
-const formatBibTeX = (data: ReturnType<typeof formatEntityForCitation>, index: number): string => {
-  const key = `${data.type}${index + 1}`;
+const formatBibTeX = (data: Readonly<ReturnType<typeof formatEntityForCitation>>, index: number): string => {
+  const key = `${data.type}${String(index + 1)}`;
   return `@misc{${key},
   title = {${data.type.toUpperCase()}: ${data.id}},
   year = {${data.year}},
@@ -132,7 +132,7 @@ const formatBibTeX = (data: ReturnType<typeof formatEntityForCitation>, index: n
  * @param style - The citation style to use
  */
 const generateCitations = (
-  entities: CatalogueEntity[],
+  entities: readonly CatalogueEntity[],
   style: CitationStyle
 ): string[] => {
   return entities.map((entity, index) => {
@@ -198,7 +198,7 @@ export const CitationStylePreview = ({ entities, listTitle, onClose }: CitationS
         <body>
           <h1>${listTitle}</h1>
           <p><strong>Citation Style: ${selectedStyle.toUpperCase()}</strong></p>
-          <p><strong>Number of Items: ${entities.length}</strong></p>
+          <p><strong>Number of Items: ${String(entities.length)}</strong></p>
           <hr>
           ${citations.map(citation => `<div class="citation">${citation}</div>`).join('')}
         </body>
@@ -276,7 +276,7 @@ export const CitationStylePreview = ({ entities, listTitle, onClose }: CitationS
       <Card padding="md" radius="sm" style={{ border: BORDER_STYLE_GRAY_3 }}>
         <Radio.Group
           value={selectedStyle}
-          onChange={(value) => setSelectedStyle(value as CitationStyle)}
+          onChange={(value) => { setSelectedStyle(value); }}
           label="Select citation style"
           description="Choose the citation format you want to use"
         >
@@ -304,7 +304,7 @@ export const CitationStylePreview = ({ entities, listTitle, onClose }: CitationS
               <ActionIcon
                 variant="light"
                 color="blue"
-                onClick={handleCopy}
+                onClick={() => { void handleCopy(); }}
                 aria-label="Copy citations to clipboard"
               >
                 <IconClipboard size={ICON_SIZE.MD} />

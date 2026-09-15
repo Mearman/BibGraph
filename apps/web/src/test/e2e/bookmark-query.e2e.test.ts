@@ -16,9 +16,15 @@
  * - Query parameter preservation across navigation
  */
 
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-const BASE_URL = process.env.CI ? "http://localhost:4173" : "http://localhost:5173";
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = IS_CI ? "http://localhost:4173" : "http://localhost:5173";
+const APP_INIT_WAIT_MS = 1000;
+const QUERY_RESULTS_WAIT_MS = 2000;
+const SEARCH_QUERY_WAIT_MS = 3000;
+const RAPID_CLICK_COUNT = 5;
 
 /**
  * Test query scenarios covering different OpenAlex query patterns
@@ -86,21 +92,18 @@ const TEST_QUERIES = {
 
 /**
  * Helper function to build URL with query parameters
- * @param path
- * @param params
  */
-const buildQueryUrl = (path: string, params: Record<string, string>): string => {
+const buildQueryUrl = (path: string, params: Readonly<Record<string, string>>): string => {
   const searchParameters = new URLSearchParams(params);
   return `${path}?${searchParameters.toString()}`;
 };
 
 /**
  * Helper function to extract query parameters from current URL
- * @param page
  */
-const extractQueryParameters = async (page: any): Promise<Record<string, string>> => await page.evaluate(() => {
+const extractQueryParameters = async (page: Page): Promise<Record<string, string>> => await page.evaluate(() => {
     const hash = window.location.hash;
-    const queryStringMatch = hash.match(/\?(.+)$/);
+    const queryStringMatch = /\?(.+)$/.exec(hash);
     if (!queryStringMatch) return {};
 
     const parameters: Record<string, string> = {};
@@ -117,7 +120,7 @@ test.describe("Query Page Bookmarking E2E Tests (T011)", () => {
     await context.clearCookies();
     await page.goto(BASE_URL);
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1000); // Allow app to initialize
+    await page.waitForTimeout(APP_INIT_WAIT_MS); // Allow app to initialize
   });
 
   test.describe("Basic Query Bookmarking", () => {
@@ -133,7 +136,7 @@ test.describe("Query Page Bookmarking E2E Tests (T011)", () => {
         timeout: 30_000,
       });
 
-      await page.waitForTimeout(2000); // Allow query results to load
+      await page.waitForTimeout(QUERY_RESULTS_WAIT_MS); // Allow query results to load
 
       // Check for bookmark button (using data-testid or common patterns)
       const bookmarkButton = page.locator(
@@ -190,7 +193,7 @@ test.describe("Query Page Bookmarking E2E Tests (T011)", () => {
         timeout: 30_000,
       });
 
-      await page.waitForTimeout(3000); // Search queries may take longer
+      await page.waitForTimeout(SEARCH_QUERY_WAIT_MS); // Search queries may take longer
 
       // Attempt to bookmark
       const bookmarkButton = page.locator(
@@ -496,10 +499,10 @@ test.describe("Query Page Bookmarking E2E Tests (T011)", () => {
       // Removed: waitForTimeout - use locator assertions instead
       // Verify bookmark was removed
       const bookmarkCards = page.locator('[data-testid="bookmark-card"]');
-      const count = bookmarkCards;
+      
 
       // This should FAIL - feature not implemented
-      await expect(count).toHaveCount(0);
+      await expect(bookmarkCards).toHaveCount(0);
     });
   });
 
@@ -584,7 +587,7 @@ test.describe("Query Page Bookmarking E2E Tests (T011)", () => {
       await expect(bookmarkButton).toBeVisible({ timeout: 5000 });
 
       // Rapid clicks
-      for (let index = 0; index < 5; index++) {
+      for (let index = 0; index < RAPID_CLICK_COUNT; index++) {
         await bookmarkButton.click();
         // Removed: waitForTimeout - use locator assertions instead
       }

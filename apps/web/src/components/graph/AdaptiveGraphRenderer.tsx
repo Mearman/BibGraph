@@ -5,7 +5,6 @@
  * screen size, and graph complexity. Provides smooth experience across mobile and desktop.
  */
 
-import type { GraphNode } from '@bibgraph/types';
 import { Box, LoadingOverlay, useMantineTheme } from '@mantine/core';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, {
@@ -28,7 +27,6 @@ import type {
   AdaptiveGraphRendererProps as AdaptiveGraphRendererProperties,
   PerformanceMetrics,
   PerformanceProfile,
-  RenderSettings,
 } from './adaptive-graph-types';
 import {
   detectDeviceCapabilities,
@@ -56,6 +54,38 @@ const BORDER_VISIBILITY_SCALE = 1.5;
 const MIN_FONT_SIZE = 8;
 const FONT_SIZE_SCALE = 10;
 
+// FPS thresholds for the "good"/"ok"/"poor" performance-level classification.
+const GOOD_FPS_THRESHOLD = 50;
+const OK_FPS_THRESHOLD = 30;
+
+// Node radii (px) per detail level.
+const NODE_SIZE_HIGH = 8;
+const NODE_SIZE_MEDIUM = 6;
+const NODE_SIZE_LOW = 4;
+// Node fill opacity when animation is disabled (reduced to signal a lower-fidelity render).
+const STATIC_NODE_OPACITY = 0.8;
+
+// Link stroke widths (px) per detail level.
+const LINK_WIDTH_HIGH = 2;
+const LINK_WIDTH_MEDIUM = 1.5;
+const LINK_WIDTH_LOW = 1;
+// Link opacity with/without animation.
+const ANIMATED_LINK_OPACITY = 0.6;
+const STATIC_LINK_OPACITY = 0.4;
+
+// Touch-gesture pinch/swipe zoom multipliers and percentage display conversion.
+const SWIPE_ZOOM_IN_MULTIPLIER = 1.1;
+const SWIPE_ZOOM_OUT_MULTIPLIER = 0.9;
+const PERCENTAGE_MULTIPLIER = 100;
+// Double-tap zoom level (vs. the base 1x).
+const DOUBLE_TAP_ZOOM_LEVEL = 2;
+
+// d3-force simulation decay rates when animation is enabled vs. disabled (faster settling when static).
+const ANIMATED_ALPHA_DECAY = 0.0228;
+const STATIC_ALPHA_DECAY = 0.1;
+const ANIMATED_VELOCITY_DECAY = 0.4;
+const STATIC_VELOCITY_DECAY = 0.8;
+
 export const AdaptiveGraphRenderer = ({
   nodes,
   edges,
@@ -72,16 +102,31 @@ export const AdaptiveGraphRenderer = ({
   performanceProfile,
 }: AdaptiveGraphRendererProperties) => {
   const theme = useMantineTheme();
-  const [isMobile, setIsMobile] = useState(false);
+  const getIsMobile = useCallback(() => {
+    const breakpointPx = Number.parseInt(theme.breakpoints.sm.replace('px', ''));
+    return window.innerWidth < breakpointPx;
+  }, [theme.breakpoints.sm]);
+  const [isMobile, setIsMobile] = useState(getIsMobile);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [showControls, setShowControls] = useState(false);
-  const containerReference = useRef<HTMLDivElement>(null);
-  const graphReference = useRef<
+  const containerRef = useRef<HTMLDivElement>(null);
+  const graphRef = useRef<
     ForceGraphMethods<NodeObject, LinkObject<NodeObject>> | undefined
   >(undefined);
 
+  // The externally-provided profile, when present, always wins; auto-detection only supplies the initial value and is never re-run, so this is plain derived state adjusted during render (per https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes) rather than a set-state-in-effect sync.
   const [currentPerformanceProfile, setCurrentPerformanceProfile] =
-    useState<PerformanceProfile>('medium');
+    useState<PerformanceProfile>(
+      () => performanceProfile ?? determinePerformanceProfile(detectDeviceCapabilities())
+    );
+  const [lastAppliedProfileProp, setLastAppliedProfileProp] = useState(performanceProfile);
+  if (performanceProfile !== lastAppliedProfileProp) {
+    setLastAppliedProfileProp(performanceProfile);
+    if (performanceProfile !== undefined) {
+      setCurrentPerformanceProfile(performanceProfile);
+    }
+  }
+
   const [performanceMetrics, setPerformanceMetrics] =
     useState<PerformanceMetrics>({
       fps: INITIAL_FPS,
@@ -90,52 +135,35 @@ export const AdaptiveGraphRenderer = ({
       edgeCount: edges.length,
       performanceLevel: 'good',
     });
-  const [renderSettings, setRenderSettings] = useState<RenderSettings>(
-    getPerformanceSettings('medium', nodes.length)
-  );
+
+  // Render settings are fully derived from the current profile and graph size (falling back to 'low' when the graph exceeds the candidate profile's own node budget), so this is a pure useMemo rather than useState+useEffect.
+  const { renderSettings, wasAutoDowngraded } = useMemo(() => {
+    const candidateSettings = getPerformanceSettings(currentPerformanceProfile, nodes.length);
+    const tooManyNodes = nodes.length > candidateSettings.maxNodes;
+    return {
+      renderSettings: tooManyNodes ? getPerformanceSettings('low', nodes.length) : candidateSettings,
+      wasAutoDowngraded: tooManyNodes,
+    };
+  }, [currentPerformanceProfile, nodes.length]);
 
   // Detect mobile screen size
   useEffect(() => {
-    const checkMobile = () => {
-      const breakpointPx = Number.parseInt(
-        theme.breakpoints.sm.replace('px', '')
-      );
-      setIsMobile(window.innerWidth < breakpointPx);
-    };
-
-    checkMobile();
+    const checkMobile = () => { setIsMobile(getIsMobile()); };
     window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, [theme.breakpoints.sm]);
+    return () => { window.removeEventListener('resize', checkMobile); };
+  }, [getIsMobile]);
 
-  // Auto-detect performance profile if not provided
+  // Announce when the graph is too large for the requested profile and had to be auto-downgraded
   useEffect(() => {
-    if (performanceProfile) {
-      setCurrentPerformanceProfile(performanceProfile);
-    } else {
-      const capabilities = detectDeviceCapabilities();
-      setCurrentPerformanceProfile(determinePerformanceProfile(capabilities));
-    }
-  }, [performanceProfile]);
-
-  // Adjust render settings based on profile and graph size
-  useEffect(() => {
-    const adjustedProfile =
-      nodes.length > renderSettings.maxNodes ? 'low' : currentPerformanceProfile;
-    const settings = getPerformanceSettings(adjustedProfile, nodes.length);
-    setRenderSettings(settings);
-
-    if (nodes.length > renderSettings.maxNodes) {
+    if (wasAutoDowngraded) {
       announceToScreenReader(
-        `Performance adjusted to low quality mode for ${nodes.length} nodes`
+        `Performance adjusted to low quality mode for ${String(nodes.length)} nodes`
       );
     }
-  }, [currentPerformanceProfile, nodes.length, renderSettings.maxNodes]);
+  }, [wasAutoDowngraded, nodes.length]);
 
   // Performance monitoring
   useEffect(() => {
-    if (!showPerformanceOverlay) return;
-
     let frameCount = 0;
     let lastTime = performance.now();
     let animationFrameId: number;
@@ -149,7 +177,7 @@ export const AdaptiveGraphRenderer = ({
         const fps = Math.round((frameCount * FPS_MEASURE_INTERVAL_MS) / deltaTime);
         const frameTime = deltaTime / frameCount;
         const performanceLevel =
-          fps >= 50 ? 'good' : fps >= 30 ? 'ok' : 'poor';
+          fps >= GOOD_FPS_THRESHOLD ? 'good' : fps >= OK_FPS_THRESHOLD ? 'ok' : 'poor';
 
         setPerformanceMetrics({
           fps,
@@ -173,8 +201,10 @@ export const AdaptiveGraphRenderer = ({
       animationFrameId = requestAnimationFrame(measurePerformance);
     };
 
+    if (!showPerformanceOverlay) return undefined;
+
     animationFrameId = requestAnimationFrame(measurePerformance);
-    return () => cancelAnimationFrame(animationFrameId);
+    return () => { cancelAnimationFrame(animationFrameId); };
   }, [
     showPerformanceOverlay,
     currentPerformanceProfile,
@@ -189,19 +219,16 @@ export const AdaptiveGraphRenderer = ({
 
       const size =
         renderSettings.nodeDetail === 'high'
-          ? 8
+          ? NODE_SIZE_HIGH
           : renderSettings.nodeDetail === 'medium'
-            ? 6
-            : 4;
-      const opacity = renderSettings.animationEnabled ? 1 : 0.8;
+            ? NODE_SIZE_MEDIUM
+            : NODE_SIZE_LOW;
+      const opacity = renderSettings.animationEnabled ? 1 : STATIC_NODE_OPACITY;
 
       context.globalAlpha = opacity;
       context.beginPath();
       context.arc(node.x, node.y, size, 0, 2 * Math.PI);
-      context.fillStyle =
-        HASH_BASED_ENTITY_COLORS[
-          node.entityType as keyof typeof HASH_BASED_ENTITY_COLORS
-        ] || 'var(--mantine-color-gray-5)';
+      context.fillStyle = HASH_BASED_ENTITY_COLORS[node.entityType];
       context.fill();
 
       if (
@@ -215,7 +242,7 @@ export const AdaptiveGraphRenderer = ({
 
       if (renderSettings.labelEnabled && globalScale > LABEL_VISIBILITY_SCALE) {
         const fontSize = Math.max(FONT_SIZE_SCALE / globalScale, MIN_FONT_SIZE);
-        context.font = `${fontSize}px Sans-Serif`;
+        context.font = `${String(fontSize)}px Sans-Serif`;
         context.textAlign = 'center';
         context.textBaseline = 'top';
         context.fillStyle = 'var(--mantine-color-text)';
@@ -234,11 +261,11 @@ export const AdaptiveGraphRenderer = ({
 
       const lineWidth =
         renderSettings.linkDetail === 'high'
-          ? 2
+          ? LINK_WIDTH_HIGH
           : renderSettings.linkDetail === 'medium'
-            ? 1.5
-            : 1;
-      const opacity = renderSettings.animationEnabled ? 0.6 : 0.4;
+            ? LINK_WIDTH_MEDIUM
+            : LINK_WIDTH_LOW;
+      const opacity = renderSettings.animationEnabled ? ANIMATED_LINK_OPACITY : STATIC_LINK_OPACITY;
 
       context.globalAlpha = opacity;
       context.strokeStyle = 'var(--mantine-color-gray-5)';
@@ -275,11 +302,11 @@ export const AdaptiveGraphRenderer = ({
   );
 
   const handleNodeHover = useCallback(
-    (node: unknown | null) => {
+    (node: unknown) => {
       if (node === null) {
         onNodeHover?.(null);
       } else if (isGraphCallbackNode(node)) {
-        onNodeHover?.(node as GraphNode);
+        onNodeHover?.(node);
       }
     },
     [onNodeHover]
@@ -293,39 +320,39 @@ export const AdaptiveGraphRenderer = ({
   const touchHandlers = useTouchGestures(
     {
       onSwipe: (direction: string) => {
-        if (!hasZoomMethod(graphReference.current)) return;
-        const currentZoom = graphReference.current.zoom();
+        if (!hasZoomMethod(graphRef.current)) return;
+        const currentZoom = graphRef.current.zoom();
         const newZoom =
           direction === 'up' || direction === 'left'
-            ? Math.min(currentZoom * 1.1, ZOOM_MAX)
-            : Math.max(currentZoom * 0.9, ZOOM_MIN);
-        graphReference.current.zoom(newZoom, ZOOM_ANIMATION_DURATION * 2);
+            ? Math.min(currentZoom * SWIPE_ZOOM_IN_MULTIPLIER, ZOOM_MAX)
+            : Math.max(currentZoom * SWIPE_ZOOM_OUT_MULTIPLIER, ZOOM_MIN);
+        graphRef.current.zoom(newZoom, ZOOM_ANIMATION_DURATION * 2);
         setZoomLevel(newZoom);
         announceToScreenReader(
-          `Zoom ${direction === 'up' || direction === 'left' ? 'in' : 'out'} to ${Math.round(newZoom * 100)}%`
+          `Zoom ${direction === 'up' || direction === 'left' ? 'in' : 'out'} to ${String(Math.round(newZoom * PERCENTAGE_MULTIPLIER))}%`
         );
       },
       onDoubleTap: () => {
-        if (!hasZoomMethod(graphReference.current)) {
+        if (!hasZoomMethod(graphRef.current)) {
         	return;
         }
 
-        const currentZoom = graphReference.current.zoom();
-        const newZoom = currentZoom === 1 ? 2 : 1;
-        graphReference.current.zoom(newZoom, ZOOM_ANIMATION_DURATION * 2);
+        const currentZoom = graphRef.current.zoom();
+        const newZoom = currentZoom === 1 ? DOUBLE_TAP_ZOOM_LEVEL : 1;
+        graphRef.current.zoom(newZoom, ZOOM_ANIMATION_DURATION * 2);
         setZoomLevel(newZoom);
         announceToScreenReader(
           `Zoom ${newZoom === 1 ? 'out to fit' : 'in to 200%'}`
         );
       },
       onPinch: (scale: number) => {
-        if (!hasZoomMethod(graphReference.current)) {
+        if (!hasZoomMethod(graphRef.current)) {
         	return;
         }
 
-        const currentZoom = graphReference.current.zoom();
+        const currentZoom = graphRef.current.zoom();
         const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, currentZoom * scale));
-        graphReference.current.zoom(newZoom, 0);
+        graphRef.current.zoom(newZoom, 0);
         setZoomLevel(newZoom);
       },
       onLongPress: () => {
@@ -345,22 +372,22 @@ export const AdaptiveGraphRenderer = ({
   // Notify parent when graph is ready
   useEffect(() => {
     const checkReference = () => {
-      if (graphReference.current !== undefined && onGraphReady) {
-        onGraphReady(graphReference.current as unknown);
+      if (graphRef.current !== undefined && onGraphReady) {
+        onGraphReady(graphRef.current);
       }
     };
     checkReference();
     const timeoutId = setTimeout(checkReference, GRAPH_READY_CHECK_DELAY_MS);
-    return () => clearTimeout(timeoutId);
+    return () => { clearTimeout(timeoutId); };
   }, [onGraphReady]);
 
   // Pause/resume simulation based on settings
   useEffect(() => {
-    if (graphReference.current !== undefined) {
+    if (graphRef.current !== undefined) {
       if (enableSimulation && renderSettings.animationEnabled) {
-        graphReference.current.resumeAnimation();
+        graphRef.current.resumeAnimation();
       } else {
-        graphReference.current.pauseAnimation();
+        graphRef.current.pauseAnimation();
       }
     }
   }, [enableSimulation, renderSettings.animationEnabled]);
@@ -390,35 +417,35 @@ export const AdaptiveGraphRenderer = ({
 
   // Mobile control handlers
   const handleMobileZoomIn = useCallback(() => {
-    if (!hasZoomMethod(graphReference.current)) {
+    if (!hasZoomMethod(graphRef.current)) {
     	return;
     }
 
-    const currentZoom = graphReference.current.zoom();
+    const currentZoom = graphRef.current.zoom();
     const newZoom = Math.min(ZOOM_MAX, currentZoom + ZOOM_STEP);
-    graphReference.current.zoom(newZoom, ZOOM_ANIMATION_DURATION);
+    graphRef.current.zoom(newZoom, ZOOM_ANIMATION_DURATION);
     setZoomLevel(newZoom);
-    announceToScreenReader(`Zoom in to ${Math.round(newZoom * 100)}%`);
+    announceToScreenReader(`Zoom in to ${String(Math.round(newZoom * PERCENTAGE_MULTIPLIER))}%`);
   }, []);
 
   const handleMobileZoomOut = useCallback(() => {
-    if (!hasZoomMethod(graphReference.current)) {
+    if (!hasZoomMethod(graphRef.current)) {
     	return;
     }
 
-    const currentZoom = graphReference.current.zoom();
+    const currentZoom = graphRef.current.zoom();
     const newZoom = Math.max(ZOOM_MIN, currentZoom - ZOOM_STEP);
-    graphReference.current.zoom(newZoom, ZOOM_ANIMATION_DURATION);
+    graphRef.current.zoom(newZoom, ZOOM_ANIMATION_DURATION);
     setZoomLevel(newZoom);
-    announceToScreenReader(`Zoom out to ${Math.round(newZoom * 100)}%`);
+    announceToScreenReader(`Zoom out to ${String(Math.round(newZoom * PERCENTAGE_MULTIPLIER))}%`);
   }, []);
 
   const handleMobileZoomToFit = useCallback(() => {
-    if (graphReference.current === undefined) {
+    if (graphRef.current === undefined) {
     	return;
     }
 
-    graphReference.current.zoomToFit(ZOOM_TO_FIT_DURATION);
+    graphRef.current.zoomToFit(ZOOM_TO_FIT_DURATION);
     setZoomLevel(1);
   }, []);
 
@@ -444,7 +471,7 @@ export const AdaptiveGraphRenderer = ({
 
   return (
     <Box
-      ref={containerReference}
+      ref={containerRef}
       pos="relative"
       style={{
         width: width ?? '100%',
@@ -455,13 +482,13 @@ export const AdaptiveGraphRenderer = ({
         backgroundColor: 'var(--mantine-color-body)',
       }}
       role="application"
-      aria-label={`Interactive graph with ${nodes.length} nodes and ${edges.length} edges. ${renderSettings.animationEnabled ? 'Animation enabled' : 'Animation disabled for performance'}.`}
+      aria-label={`Interactive graph with ${String(nodes.length)} nodes and ${String(edges.length)} edges. ${renderSettings.animationEnabled ? 'Animation enabled' : 'Animation disabled for performance'}.`}
       {...(isMobile ? touchHandlers.handlers : {})}
     >
       <LoadingOverlay visible={false} />
 
       <ForceGraph2D
-        ref={graphReference}
+        ref={graphRef}
         width={width}
         height={height}
         graphData={graphData}
@@ -475,8 +502,8 @@ export const AdaptiveGraphRenderer = ({
         enableZoomInteraction={!isMobile}
         enablePanInteraction={!isMobile}
         cooldownTime={renderSettings.simulationCooldown}
-        d3AlphaDecay={renderSettings.animationEnabled ? 0.0228 : 0.1}
-        d3VelocityDecay={renderSettings.animationEnabled ? 0.4 : 0.8}
+        d3AlphaDecay={renderSettings.animationEnabled ? ANIMATED_ALPHA_DECAY : STATIC_ALPHA_DECAY}
+        d3VelocityDecay={renderSettings.animationEnabled ? ANIMATED_VELOCITY_DECAY : STATIC_VELOCITY_DECAY}
       />
 
       <DeviceIndicator

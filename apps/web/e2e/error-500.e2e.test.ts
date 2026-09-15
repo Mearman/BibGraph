@@ -2,7 +2,6 @@
  * E2E tests for 500 (Server Error) scenarios
  *
  * Tests handling of server-side errors using route interception
- * @module error-500.e2e
  * @see spec-020 Phase 5: Error scenario coverage
  */
 
@@ -11,7 +10,7 @@ import { expect,test } from '@playwright/test';
 import { waitForAppReady } from '@/test/helpers/app-ready';
 
 test.describe('@error 500 Server Errors', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(({ page }) => {
     // Set up console error monitoring
     page.on('console', (message) => {
       if (message.type() === 'error') {
@@ -22,8 +21,8 @@ test.describe('@error 500 Server Errors', () => {
 
   test('should handle 500 response gracefully', async ({ page }) => {
     // Intercept API calls and return 500 error
-    await page.route('**/api.openalex.org/**', (route) => {
-      route.fulfill({
+    await page.route('**/api.openalex.org/**', async (route) => {
+      await route.fulfill({
         status: 500,
         contentType: 'application/json',
         body: JSON.stringify({ error: 'Internal Server Error' }),
@@ -45,16 +44,16 @@ test.describe('@error 500 Server Errors', () => {
     let requestCount = 0;
 
     // Intercept API calls - fail first time, succeed after
-    await page.route('**/api.openalex.org/**', (route) => {
+    await page.route('**/api.openalex.org/**', async (route) => {
       requestCount++;
       if (requestCount <= 1) {
-        route.fulfill({
+        await route.fulfill({
           status: 500,
           contentType: 'application/json',
           body: JSON.stringify({ error: 'Internal Server Error' }),
         });
       } else {
-        route.continue();
+        await route.continue();
       }
     });
 
@@ -76,8 +75,8 @@ test.describe('@error 500 Server Errors', () => {
   });
 
   test('should display user-friendly error message on 500', async ({ page }) => {
-    await page.route('**/api.openalex.org/**', (route) => {
-      route.fulfill({
+    await page.route('**/api.openalex.org/**', async (route) => {
+      await route.fulfill({
         status: 500,
         contentType: 'application/json',
         body: JSON.stringify({ error: 'Internal Server Error' }),
@@ -98,8 +97,8 @@ test.describe('@error 500 Server Errors', () => {
   });
 
   test('should handle 502 Bad Gateway error', async ({ page }) => {
-    await page.route('**/api.openalex.org/**', (route) => {
-      route.fulfill({
+    await page.route('**/api.openalex.org/**', async (route) => {
+      await route.fulfill({
         status: 502,
         contentType: 'application/json',
         body: JSON.stringify({ error: 'Bad Gateway' }),
@@ -115,8 +114,8 @@ test.describe('@error 500 Server Errors', () => {
   });
 
   test('should handle 503 Service Unavailable error', async ({ page }) => {
-    await page.route('**/api.openalex.org/**', (route) => {
-      route.fulfill({
+    await page.route('**/api.openalex.org/**', async (route) => {
+      await route.fulfill({
         status: 503,
         contentType: 'application/json',
         body: JSON.stringify({ error: 'Service Unavailable' }),

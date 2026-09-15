@@ -43,29 +43,32 @@ export const ShareModal = ({ shareUrl, listTitle, onClose }: ShareModalPropertie
     	return;
     }
 
-    setQrCodeUrl(QR_CODE_PENDING);
-    void QRCode.toDataURL(shareUrl, {
-      width: 200,
-      margin: 1,
-      color: {
-        dark: "#000000",
-        light: "#FFFFFF",
-      },
-    })
-      .then((url) => {
+    // Wrapped in an async function (rather than setting state directly in the effect body) so the initial "pending" state update runs deferred, alongside the eventual result/error update, instead of synchronously during the effect's own render pass.
+    const generateQrCode = async () => {
+      setQrCodeUrl(QR_CODE_PENDING);
+      try {
+        const url = await QRCode.toDataURL(shareUrl, {
+          width: 200,
+          margin: 1,
+          color: {
+            dark: "#000000",
+            light: "#FFFFFF",
+          },
+        });
         setQrCodeUrl(url);
         logger.debug("catalogue-ui", "QR code generated successfully", {
           urlLength: shareUrl.length
         });
-        return void 0;
-      })
-      .catch((error) => {
+      } catch (error) {
         logger.error("catalogue-ui", "Failed to generate QR code", {
           urlLength: shareUrl.length,
           error
         });
         setQrCodeUrl("");
-      });
+      }
+    };
+
+    void generateQrCode();
   }, [showQR, shareUrl]);
 
   const handleOpenLink = () => {
@@ -117,7 +120,7 @@ export const ShareModal = ({ shareUrl, listTitle, onClose }: ShareModalPropertie
           <Button
             variant={showQR ? "filled" : "outline"}
             leftSection={<IconQrcode size={ICON_SIZE.MD} />}
-            onClick={() => setShowQR(!showQR)}
+            onClick={() => { setShowQR(!showQR); }}
             size="sm"
             aria-expanded={showQR}
             aria-controls="qr-code-section"

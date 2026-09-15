@@ -20,21 +20,12 @@ interface Visible {
 }
 
 interface ThreeGeometry {
-  dispose(): void;
+  dispose: () => void;
 }
 
 interface ThreeMaterial {
-  dispose(): void;
+  dispose: () => void;
 }
-
-interface ThreeMesh extends Visible {
-  position: { set(x: number, y: number, z: number): void };
-  rotation: { set(x: number, y: number, z: number): void };
-  scale: { set(x: number, y: number, z: number): void };
-  geometry?: ThreeGeometry;
-  material?: ThreeMaterial | ThreeMaterial[];
-}
-
 
 // Default pool configuration
 const DEFAULT_CONFIG: PoolConfig = {
@@ -43,26 +34,24 @@ const DEFAULT_CONFIG: PoolConfig = {
   autoExpand: true,
 };
 
+// Radix used when rendering a colour's numeric value as a hex string pool key
+const HEX_RADIX = 16;
+
+// Rough per-object memory estimate, in bytes, used by estimateMemoryUsage()
+const ESTIMATED_BYTES_PER_OBJECT = 1024;
+
 // Type guard functions
 const isVisible = (object: unknown): object is Visible => typeof object === 'object' && object !== null && 'visible' in object;
-
-const isThreeMesh = (object: unknown): object is ThreeMesh => isVisible(object) &&
-         'position' in object &&
-         'rotation' in object &&
-         'scale' in object &&
-         typeof (object as ThreeMesh).position.set === 'function' &&
-         typeof (object as ThreeMesh).rotation.set === 'function' &&
-         typeof (object as ThreeMesh).scale.set === 'function';
 
 const hasGeometry = (object: unknown): object is { geometry: ThreeGeometry } => {
   if (typeof object !== 'object' || object === null || !('geometry' in object)) {
     return false;
   }
-  const geometry = (object as { geometry: unknown }).geometry;
+  const geometry = (object).geometry;
   return geometry !== null &&
          typeof geometry === 'object' &&
          'dispose' in geometry &&
-         typeof (geometry as { dispose: unknown }).dispose === 'function';
+         typeof (geometry).dispose === 'function';
 };
 
 const hasMaterial = (object: unknown): object is { material: ThreeMaterial | ThreeMaterial[] } => typeof object === 'object' &&
@@ -70,24 +59,24 @@ const hasMaterial = (object: unknown): object is { material: ThreeMaterial | Thr
          'material' in object &&
          object.material !== null;
 
-const isDisposable = (object: unknown): object is { dispose(): void } => typeof object === 'object' &&
+const isDisposable = (object: unknown): object is { dispose: () => void } => typeof object === 'object' &&
          object !== null &&
          'dispose' in object &&
-         typeof (object as { dispose: unknown }).dispose === 'function';
+         typeof (object).dispose === 'function';
 
 /**
  * Simple object pool for Three.js objects
  */
 class SimpleObjectPool<T extends object = object> {
   private pool: T[] = [];
-  private inUse: Set<T> = new Set();
-  private config: PoolConfig;
+  private readonly inUse = new Set<T>();
+  private readonly config: PoolConfig;
   private stats: { created: number; reused: number } = { created: 0, reused: 0 };
 
   constructor(
-    private createFn: () => T,
-    private resetFn: (object: T) => void,
-    config: Partial<PoolConfig> = {}
+    private readonly createFn: () => T,
+    private readonly resetFn: (object: T) => void,
+    config: Readonly<Partial<PoolConfig>> = {}
   ) {
     this.config = { ...DEFAULT_CONFIG, ...config };
 
@@ -132,21 +121,8 @@ class SimpleObjectPool<T extends object = object> {
 
     this.inUse.delete(object);
 
-    // Reset object state
-    if (this.resetFn) {
-      this.resetFn(object);
-    } else {
-      if (object && typeof object === 'object') {
-        if (isVisible(object)) {
-          object.visible = false;
-        }
-        if (isThreeMesh(object)) {
-          object.position.set(0, 0, 0);
-          object.rotation.set(0, 0, 0);
-          object.scale.set(1, 1, 1);
-        }
-      }
-    }
+    // Reset object state - resetFn is a required constructor parameter, always callable
+    this.resetFn(object);
 
     // Return to pool if not at max capacity
     if (this.pool.length < this.config.maxSize) {
@@ -158,24 +134,22 @@ class SimpleObjectPool<T extends object = object> {
   }
 
   private disposeObject(object: T): void {
-    if (!object || typeof object !== 'object') return;
+    if (typeof object !== 'object') return;
 
     // Try to safely dispose Three.js objects
-    const geometryObject = object as { geometry?: unknown };
-    if (hasGeometry(geometryObject)) {
-      geometryObject.geometry.dispose();
+    if (hasGeometry(object)) {
+      object.geometry.dispose();
     }
 
-    const materialObject = object as { material?: unknown };
-    if (hasMaterial(materialObject)) {
-      if (Array.isArray(materialObject.material)) {
-        for (const mat of materialObject.material) {
+    if (hasMaterial(object)) {
+      if (Array.isArray(object.material)) {
+        for (const mat of object.material) {
           if (isDisposable(mat)) {
             mat.dispose();
           }
         }
       } else {
-        const material = materialObject.material;
+        const material = object.material;
         if (isDisposable(material)) {
           material.dispose();
         }
@@ -208,19 +182,19 @@ class SimpleObjectPool<T extends object = object> {
  * Manager for multiple object pools
  */
 export class SimpleThreeObjectPool {
-  private spherePools: Map<string, SimpleObjectPool<THREE.SphereGeometry>> = new Map();
-  private materialPools: Map<string, SimpleObjectPool<THREE.MeshStandardMaterial>> = new Map();
-  private meshPools: Map<string, SimpleObjectPool<THREE.Mesh>> = new Map();
+  private readonly spherePools = new Map<string, SimpleObjectPool<THREE.SphereGeometry>>();
+  private readonly materialPools = new Map<string, SimpleObjectPool<THREE.MeshStandardMaterial>>();
+  private readonly meshPools = new Map<string, SimpleObjectPool<THREE.Mesh>>();
 
   // Get sphere geometry
-  getSphereGeometry(segments: number = 16): THREE.SphereGeometry {
-    const key = `sphere_${segments}`;
+  getSphereGeometry(segments = 16): THREE.SphereGeometry {
+    const key = `sphere_${String(segments)}`;
     let pool = this.spherePools.get(key);
 
     if (!pool) {
       pool = new SimpleObjectPool<THREE.SphereGeometry>(
         () => new THREE.SphereGeometry(1, segments, segments),
-        () => {}, // No reset needed for geometry
+        () => { /* No reset needed for geometry */ },
         { initialSize: 20, maxSize: 100 }
       );
       this.spherePools.set(key, pool);
@@ -229,8 +203,8 @@ export class SimpleThreeObjectPool {
     return pool.acquire();
   }
 
-  releaseSphereGeometry(geometry: THREE.SphereGeometry, segments: number = 16): void {
-    const key = `sphere_${segments}`;
+  releaseSphereGeometry(geometry: THREE.SphereGeometry, segments = 16): void {
+    const key = `sphere_${String(segments)}`;
     const pool = this.spherePools.get(key);
     if (pool) {
       pool.release(geometry);
@@ -240,8 +214,8 @@ export class SimpleThreeObjectPool {
   }
 
   // Get material
-  getMaterial(color: number = 0x4287F5): THREE.MeshStandardMaterial {
-    const key = `material_${color.toString(16)}`;
+  getMaterial(color = 0x4287F5): THREE.MeshStandardMaterial {
+    const key = `material_${color.toString(HEX_RADIX)}`;
     let pool = this.materialPools.get(key);
 
     if (!pool) {
@@ -265,7 +239,7 @@ export class SimpleThreeObjectPool {
   }
 
   releaseMaterial(material: THREE.MeshStandardMaterial, color: number): void {
-    const key = `material_${color.toString(16)}`;
+    const key = `material_${color.toString(HEX_RADIX)}`;
     const pool = this.materialPools.get(key);
     if (pool) {
       pool.release(material);
@@ -275,8 +249,8 @@ export class SimpleThreeObjectPool {
   }
 
   // Get mesh (sphere + material)
-  getNodeMesh(radius: number = 1, color: number = 0x4287F5, segments: number = 16): THREE.Mesh {
-    const key = `mesh_${radius}_${color.toString(16)}_${segments}`;
+  getNodeMesh(radius = 1, color = 0x4287F5, segments = 16): THREE.Mesh {
+    const key = `mesh_${String(radius)}_${color.toString(HEX_RADIX)}_${String(segments)}`;
     let pool = this.meshPools.get(key);
 
     if (!pool) {
@@ -306,16 +280,16 @@ export class SimpleThreeObjectPool {
   }
 
   releaseNodeMesh(mesh: THREE.Mesh, radius: number, color: number, segments: number): void {
-    const key = `mesh_${radius}_${color.toString(16)}_${segments}`;
+    const key = `mesh_${String(radius)}_${color.toString(HEX_RADIX)}_${String(segments)}`;
     const pool = this.meshPools.get(key);
     if (pool) {
       pool.release(mesh);
     } else {
       // Dispose manually
-      mesh.geometry?.dispose();
+      mesh.geometry.dispose();
       if (Array.isArray(mesh.material)) {
         for (const mat of mesh.material) mat.dispose();
-      } else if (mesh.material) {
+      } else {
         mesh.material.dispose();
       }
     }
@@ -341,9 +315,9 @@ export class SimpleThreeObjectPool {
 
   // Clear all pools
   clearAll(): void {
-    this.spherePools.forEach(pool => pool.clear());
-    this.materialPools.forEach(pool => pool.clear());
-    this.meshPools.forEach(pool => pool.clear());
+    this.spherePools.forEach(pool => { pool.clear(); });
+    this.materialPools.forEach(pool => { pool.clear(); });
+    this.meshPools.forEach(pool => { pool.clear(); });
 
     this.spherePools.clear();
     this.materialPools.clear();
@@ -363,7 +337,7 @@ export class SimpleThreeObjectPool {
     this.materialPools.forEach(addPoolStats);
     this.meshPools.forEach(addPoolStats);
 
-    return totalObjects * 1024; // Rough estimate: 1KB per object
+    return totalObjects * ESTIMATED_BYTES_PER_OBJECT;
   }
 }
 

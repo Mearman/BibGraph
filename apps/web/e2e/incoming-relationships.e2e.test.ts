@@ -1,7 +1,6 @@
 /**
  * E2E tests for incoming relationship visualization
  * Tests viewing incoming citations, authorships, affiliations, publications, and funding
- * @module incoming-relationships.e2e
  * @see specs/016-entity-relationship-viz/spec.md (User Story 1)
  */
 
@@ -81,7 +80,7 @@ test.describe('Incoming Relationships - Work Citations', () => {
     await expect(page).toHaveURL(/\/works\/W\d+/);
 
     // New page should display the citation title
-    if (citationTitle) {
+    if (citationTitle !== null) {
       await expect(page.locator('h1')).toContainText(citationTitle);
     }
   });

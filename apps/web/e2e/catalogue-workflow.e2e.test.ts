@@ -1,7 +1,6 @@
 /**
  * E2E Workflow tests for catalogue/list management
  * Tests the complete lifecycle of creating, populating, viewing, and managing catalogue lists
- * @module catalogue-workflow.e2e
  */
 
 import AxeBuilder from '@axe-core/playwright';
@@ -10,10 +9,8 @@ import { expect,test } from '@playwright/test';
 import { waitForAppReady } from '@/test/helpers/app-ready';
 
 test.describe('@workflow Catalogue Workflow', () => {
-	const testListTitle = `Test List ${Date.now()}`;
-	const testBibliographyTitle = `Test Bibliography ${Date.now()}`;
-	let createdListId: string | null = null;
-	const createdBibliographyId: string | null = null;
+	const testListTitle = `Test List ${String(Date.now())}`;
+	const testBibliographyTitle = `Test Bibliography ${String(Date.now())}`;
 
 	test('should pass accessibility checks (WCAG 2.1 AA)', async ({ page }) => {
 		// Navigate to catalogues page
@@ -25,65 +22,6 @@ test.describe('@workflow Catalogue Workflow', () => {
 			.analyze();
 
 		expect(accessibilityScanResults.violations).toEqual([]);
-	});
-
-	test.afterEach(async ({ page }) => {
-		// Clean up: delete created lists if they exist
-		if (!(createdListId || createdBibliographyId)) {
-			return;
-		}
-
-		await page.goto('#/catalogue');
-		await waitForAppReady(page);
-
-		// Attempt to delete the created list
-		if (createdListId) {
-			try {
-				// Select the list
-				const listCard = page.locator(`[data-testid="list-card-${createdListId}"]`);
-				if (await listCard.count() > 0) {
-					await listCard.click();
-					// Removed: waitForTimeout - use locator assertions instead
-					// Click delete button
-					const deleteButton = page.locator(`[data-testid="delete-list-${createdListId}"]`);
-					if (await deleteButton.count() > 0) {
-						await deleteButton.click();
-
-						// Confirm deletion
-						const confirmButton = page.getByRole('button', { name: /delete/i }).last();
-						await confirmButton.click();
-						// Removed: waitForTimeout - use locator assertions instead
-					}
-				}
-			} catch (error) {
-				// Ignore cleanup errors
-				console.log('Cleanup error for list:', error);
-			}
-		}
-
-		if (createdBibliographyId) {
-			try {
-				// Select the bibliography
-				const bibCard = page.locator(`[data-testid="list-card-${createdBibliographyId}"]`);
-				if (await bibCard.count() > 0) {
-					await bibCard.click();
-					// Removed: waitForTimeout - use locator assertions instead
-					// Click delete button
-					const deleteButton = page.locator(`[data-testid="delete-list-${createdBibliographyId}"]`);
-					if (await deleteButton.count() > 0) {
-						await deleteButton.click();
-
-						// Confirm deletion
-						const confirmButton = page.getByRole('button', { name: /delete/i }).last();
-						await confirmButton.click();
-						// Removed: waitForTimeout - use locator assertions instead
-					}
-				}
-			} catch (error) {
-				// Ignore cleanup errors
-				console.log('Cleanup error for bibliography:', error);
-			}
-		}
 	});
 
 	test('should create a new general list', async ({ page }) => {
@@ -404,9 +342,6 @@ test.describe('@workflow Catalogue Workflow', () => {
 			const listCardAfterDelete = page.getByText(testListTitle);
 			await expect(listCardAfterDelete).toBeHidden();
 		}
-
-		// Clear the stored ID since we deleted it
-		createdListId = null;
 	});
 
 	test('should handle adding duplicate entity to list', async ({ page }) => {

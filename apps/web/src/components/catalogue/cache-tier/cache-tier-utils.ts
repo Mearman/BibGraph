@@ -1,37 +1,39 @@
 /**
  * Utility functions for Cache Tier components
- * @module components/catalogue/cache-tier/cache-tier-utils
  */
 
 import type { CachedEntityEntry } from "@bibgraph/client/internal/static-data-provider";
 
 import type { EntityTypeCount } from "./cache-tier-types";
 
+const MS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+
 /**
  * Formats bytes into human-readable string (B, KB, MB, GB)
- * @param bytes
  */
 export const formatBytes = (bytes: number): string => {
   if (bytes === 0) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB"];
   const index = Math.floor(Math.log(bytes) / Math.log(k));
-  return Number.parseFloat((bytes / Math.pow(k, index)).toFixed(2)) + " " + sizes[index];
+  return `${String(Number.parseFloat((bytes / Math.pow(k, index)).toFixed(2)))} ${sizes[index]}`;
 };
 
 /**
  * Formats a timestamp into a relative time string (e.g., "5m ago", "2h ago")
- * @param timestamp
  */
 export const formatTimeAgo = (timestamp: number): string => {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  const seconds = Math.floor((Date.now() - timestamp) / MS_PER_SECOND);
+  if (seconds < SECONDS_PER_MINUTE) return `${String(seconds)}s ago`;
+  const minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
+  if (minutes < MINUTES_PER_HOUR) return `${String(minutes)}m ago`;
+  const hours = Math.floor(minutes / MINUTES_PER_HOUR);
+  if (hours < HOURS_PER_DAY) return `${String(hours)}h ago`;
+  const days = Math.floor(hours / HOURS_PER_DAY);
+  return `${String(days)}d ago`;
 };
 
 /**
@@ -54,7 +56,6 @@ const ENTITY_TYPE_COLORS: Record<string, string> = {
 
 /**
  * Returns the Mantine color associated with an entity type
- * @param entityType
  */
 export const getEntityTypeColor = (entityType: string): string => {
   return ENTITY_TYPE_COLORS[entityType] || "gray";
@@ -62,9 +63,8 @@ export const getEntityTypeColor = (entityType: string): string => {
 
 /**
  * Groups cached entities by their type and returns counts sorted descending
- * @param entities
  */
-export const groupByEntityType = (entities: CachedEntityEntry[]): EntityTypeCount[] => {
+export const groupByEntityType = (entities: readonly CachedEntityEntry[]): EntityTypeCount[] => {
   const counts: Record<string, number> = {};
   for (const entity of entities) {
     counts[entity.entityType] = (counts[entity.entityType] || 0) + 1;
@@ -76,7 +76,6 @@ export const groupByEntityType = (entities: CachedEntityEntry[]): EntityTypeCoun
 
 /**
  * Generates a test ID from a title string
- * @param title
  */
 export const generateTestId = (title: string): string => {
   return `cache-tier-card-${title.toLowerCase().replaceAll(/\s+/g, "-")}`;

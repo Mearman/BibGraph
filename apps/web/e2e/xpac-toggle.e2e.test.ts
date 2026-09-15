@@ -16,6 +16,8 @@
 
 import { expect,test } from '@playwright/test';
 
+const RAPID_TOGGLE_COUNT = 3;
+
 test.describe('Xpac Toggle Functionality', () => {
   test('should show XpacToggle in Settings page', async ({ page }) => {
     // Navigate to settings page
@@ -43,7 +45,7 @@ test.describe('Xpac Toggle Functionality', () => {
 
   test('should remove include_xpac parameter when toggled off', async ({ page }) => {
     // Track API requests to verify parameters
-    const apiRequests: Array<{ url: string; params: URLSearchParams }> = [];
+    const apiRequests: { url: string; params: URLSearchParams }[] = [];
 
     page.on('request', (request) => {
       const url = request.url();
@@ -95,12 +97,12 @@ test.describe('Xpac Toggle Functionality', () => {
 
     expect(requestsWithXpac).toHaveLength(0);
 
-    console.log(`✅ Verified ${workRequests.length} work requests without include_xpac parameter`);
+    console.log(`✅ Verified ${String(workRequests.length)} work requests without include_xpac parameter`);
   });
 
   test('should add include_xpac parameter when toggled back on', async ({ page }) => {
     // Track API requests to verify parameters
-    const apiRequests: Array<{ url: string; params: URLSearchParams }> = [];
+    const apiRequests: { url: string; params: URLSearchParams }[] = [];
 
     page.on('request', (request) => {
       const url = request.url();
@@ -160,7 +162,7 @@ test.describe('Xpac Toggle Functionality', () => {
 
     expect(requestsWithXpac.length).toBeGreaterThan(0);
 
-    console.log(`✅ Verified ${requestsWithXpac.length}/${workRequests.length} work requests include include_xpac=true`);
+    console.log(`✅ Verified ${String(requestsWithXpac.length)}/${String(workRequests.length)} work requests include include_xpac=true`);
   });
 
   test('should persist xpac setting across page reloads', async ({ page }) => {
@@ -231,7 +233,7 @@ test.describe('Xpac Toggle Functionality', () => {
 
   test('should sync xpac setting with other settings in the same session', async ({ page }) => {
     // Track API requests
-    const apiRequests: Array<{ url: string; params: URLSearchParams }> = [];
+    const apiRequests: { url: string; params: URLSearchParams }[] = [];
 
     page.on('request', (request) => {
       const url = request.url();
@@ -311,12 +313,12 @@ test.describe('Xpac Toggle Functionality', () => {
     const switchInput = xpacToggle.locator('input[type="checkbox"]');
 
     // Perform rapid toggles
-    for (let index = 0; index < 3; index++) {
+    for (let index = 0; index < RAPID_TOGGLE_COUNT; index++) {
       const isChecked = await switchInput.isChecked();
       await switchInput.click();
       // Verify the state changed
-      const newIsChecked = switchInput;
-      await expect(newIsChecked).toBeChecked({ checked: !isChecked });
+      
+      await expect(switchInput).toBeChecked({ checked: !isChecked });
       // Removed: waitForTimeout - use locator assertions instead
     }
 
@@ -378,7 +380,7 @@ test.describe('Xpac Toggle Functionality', () => {
 
   test('should include xpac parameter for author works when xpac is enabled', async ({ page }) => {
     // Track API requests
-    const apiRequests: Array<{ url: string; params: URLSearchParams }> = [];
+    const apiRequests: { url: string; params: URLSearchParams }[] = [];
 
     page.on('request', (request) => {
       const url = request.url();
@@ -422,7 +424,7 @@ test.describe('Xpac Toggle Functionality', () => {
       );
 
       expect(worksRequestsWithXpac.length).toBeGreaterThan(0);
-      console.log(`✅ Author works requests include include_xpac=true: ${worksRequestsWithXpac.length}/${worksRequests.length}`);
+      console.log(`✅ Author works requests include include_xpac=true: ${String(worksRequestsWithXpac.length)}/${String(worksRequests.length)}`);
     } else {
       console.log('ℹ️ No works requests captured (may be using cache)');
     }
@@ -430,7 +432,7 @@ test.describe('Xpac Toggle Functionality', () => {
 
   test('should not include xpac parameter for author works when xpac is disabled', async ({ page }) => {
     // Track API requests
-    const apiRequests: Array<{ url: string; params: URLSearchParams }> = [];
+    const apiRequests: { url: string; params: URLSearchParams }[] = [];
 
     page.on('request', (request) => {
       const url = request.url();

@@ -2,7 +2,6 @@
  * E2E tests for network failure scenarios
  *
  * Tests handling of network disconnection, connection failures, and offline mode
- * @module error-network.e2e
  * @see spec-020 Phase 5: Error scenario coverage
  */
 
@@ -10,11 +9,13 @@ import { expect,test } from '@playwright/test';
 
 import { waitForAppReady } from '@/test/helpers/app-ready';
 
+const SLOW_NETWORK_DELAY_MS = 5000;
+
 test.describe('@error Network Errors', () => {
   test('should handle network failure gracefully', async ({ page }) => {
     // Abort all API requests to simulate network failure
-    await page.route('**/api.openalex.org/**', (route) => {
-      route.abort('failed');
+    await page.route('**/api.openalex.org/**', async (route) => {
+      await route.abort('failed');
     });
 
     await page.goto('#/works/W2741809807');
@@ -38,8 +39,8 @@ test.describe('@error Network Errors', () => {
   });
 
   test('should handle connection reset error', async ({ page }) => {
-    await page.route('**/api.openalex.org/**', (route) => {
-      route.abort('connectionreset');
+    await page.route('**/api.openalex.org/**', async (route) => {
+      await route.abort('connectionreset');
     });
 
     await page.goto('#/authors/A5017898742');
@@ -51,8 +52,8 @@ test.describe('@error Network Errors', () => {
   });
 
   test('should handle internet disconnected error', async ({ page }) => {
-    await page.route('**/api.openalex.org/**', (route) => {
-      route.abort('internetdisconnected');
+    await page.route('**/api.openalex.org/**', async (route) => {
+      await route.abort('internetdisconnected');
     });
 
     await page.goto('#/institutions/I33213144');
@@ -66,12 +67,12 @@ test.describe('@error Network Errors', () => {
   test('should provide retry option on network failure', async ({ page }) => {
     let requestCount = 0;
 
-    await page.route('**/api.openalex.org/**', (route) => {
+    await page.route('**/api.openalex.org/**', async (route) => {
       requestCount++;
       if (requestCount <= 1) {
-        route.abort('failed');
+        await route.abort('failed');
       } else {
-        route.continue();
+        await route.continue();
       }
     });
 
@@ -91,11 +92,11 @@ test.describe('@error Network Errors', () => {
   test('should recover when network is restored', async ({ page }) => {
     let isBlockNetwork = true;
 
-    await page.route('**/api.openalex.org/**', (route) => {
+    await page.route('**/api.openalex.org/**', async (route) => {
       if (isBlockNetwork) {
-        route.abort('failed');
+        await route.abort('failed');
       } else {
-        route.continue();
+        await route.continue();
       }
     });
 
@@ -121,8 +122,8 @@ test.describe('@error Network Errors', () => {
   });
 
   test('should handle DNS resolution failure', async ({ page }) => {
-    await page.route('**/api.openalex.org/**', (route) => {
-      route.abort('namenotresolved');
+    await page.route('**/api.openalex.org/**', async (route) => {
+      await route.abort('namenotresolved');
     });
 
     await page.goto('#/works/W2741809807');
@@ -134,8 +135,8 @@ test.describe('@error Network Errors', () => {
   });
 
   test('should handle timeout errors gracefully', async ({ page }) => {
-    await page.route('**/api.openalex.org/**', (route) => {
-      route.abort('timedout');
+    await page.route('**/api.openalex.org/**', async (route) => {
+      await route.abort('timedout');
     });
 
     await page.goto('#/sources/S2764455272');
@@ -149,8 +150,8 @@ test.describe('@error Network Errors', () => {
   test('should handle slow network connections', async ({ page }) => {
     // Simulate slow network by delaying responses
     await page.route('**/api.openalex.org/**', async (route) => {
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      route.continue();
+      await new Promise((resolve) => { setTimeout(resolve, SLOW_NETWORK_DELAY_MS); });
+      await route.continue();
     });
 
     await page.goto('#/works/W2741809807');
@@ -169,13 +170,13 @@ test.describe('@error Network Errors', () => {
   test('should handle intermittent connection failures', async ({ page }) => {
     let requestCount = 0;
 
-    await page.route('**/api.openalex.org/**', (route) => {
+    await page.route('**/api.openalex.org/**', async (route) => {
       requestCount++;
       // Fail every other request
       if (requestCount % 2 === 1) {
-        route.abort('failed');
+        await route.abort('failed');
       } else {
-        route.continue();
+        await route.continue();
       }
     });
 
@@ -196,8 +197,8 @@ test.describe('@error Network Errors', () => {
     // Wait for initial content to load
     // Removed: waitForTimeout - use locator assertions instead
     // Now block network
-    await page.route('**/api.openalex.org/**', (route) => {
-      route.abort('failed');
+    await page.route('**/api.openalex.org/**', async (route) => {
+      await route.abort('failed');
     });
 
     // Navigate to another page
@@ -214,8 +215,8 @@ test.describe('@error Network Errors', () => {
     await waitForAppReady(page);
 
     // Block network before searching
-    await page.route('**/api.openalex.org/**', (route) => {
-      route.abort('failed');
+    await page.route('**/api.openalex.org/**', async (route) => {
+      await route.abort('failed');
     });
 
     // Attempt search
@@ -236,11 +237,11 @@ test.describe('@error Network Errors', () => {
     // Allow initial page load
     let isBlockNetwork = false;
 
-    await page.route('**/api.openalex.org/**', (route) => {
+    await page.route('**/api.openalex.org/**', async (route) => {
       if (isBlockNetwork) {
-        route.abort('failed');
+        await route.abort('failed');
       } else {
-        route.continue();
+        await route.continue();
       }
     });
 
@@ -267,15 +268,15 @@ test.describe('@error Network Errors', () => {
   });
 
   test('should display user-friendly error messages for network failures', async ({ page }) => {
-    await page.route('**/api.openalex.org/**', (route) => {
-      route.abort('failed');
+    await page.route('**/api.openalex.org/**', async (route) => {
+      await route.abort('failed');
     });
 
     await page.goto('#/works/W2741809807');
     await waitForAppReady(page);
 
     // Check for user-friendly messaging (not technical error codes)
-    const bodyText = await page.textContent('body');
+    const bodyText = await page.locator('body').textContent();
 
     // Should NOT show raw technical errors
     expect(bodyText).not.toContain('ERR_CONNECTION_REFUSED');
@@ -283,9 +284,9 @@ test.describe('@error Network Errors', () => {
 
     // Should show user-friendly messages (at least one of these patterns)
     const friendlyPatterns = [
-      /connection|network|offline/i.test(bodyText || ''),
-      /retry|try again|unavailable/i.test(bodyText || ''),
-      /failed to load|unable to connect/i.test(bodyText || ''),
+      /connection|network|offline/i.test(bodyText ?? ''),
+      /retry|try again|unavailable/i.test(bodyText ?? ''),
+      /failed to load|unable to connect/i.test(bodyText ?? ''),
     ];
 
     expect(friendlyPatterns.some(Boolean)).toBe(true);

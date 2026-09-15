@@ -1,13 +1,11 @@
 /**
  * Minimal Hierarchical Layout Algorithm
  *
- * A Reingold-Tilford inspired tree layout for graph visualization.
- * Extracted locally to avoid dependency on external graph algorithm packages.
- *
- * @module utils/hierarchical-layout
+ * A Reingold-Tilford inspired tree layout for graph visualization. Extracted locally to avoid dependency on external graph algorithm packages.
  */
 
 import type { GraphEdge, GraphNode } from '@bibgraph/types';
+import { RelationType } from '@bibgraph/types';
 
 /**
  * Layout configuration options
@@ -54,12 +52,12 @@ const DEFAULT_LEVEL_SPACING = 150;
 const DEFAULT_NODE_SPACING = 80;
 
 const isParentChildEdge = (edge: GraphEdge): boolean => {
-  return edge.type === 'REFERENCE' || edge.type === 'AUTHORSHIP' || edge.type === 'AFFILIATION';
+  return edge.type === RelationType.REFERENCE || edge.type === RelationType.AUTHORSHIP || edge.type === RelationType.AFFILIATION;
 };
 
 const buildTreeStructure = (
-  nodes: GraphNode[],
-  edges: GraphEdge[],
+  nodes: readonly GraphNode[],
+  edges: readonly GraphEdge[],
   rootNodeId: string | null
 ): { rootNodeId: string; children: Map<string, string[]> } => {
   const children = new Map<string, string[]>();
@@ -70,7 +68,7 @@ const buildTreeStructure = (
     let parent: string;
     let child: string;
 
-    if (edge.type === 'AUTHORSHIP' || edge.type === 'AFFILIATION') {
+    if (edge.type === RelationType.AUTHORSHIP || edge.type === RelationType.AFFILIATION) {
       parent = source;
       child = target;
     } else {
@@ -90,7 +88,7 @@ const buildTreeStructure = (
     const nodeIds = new Set(nodes.map((n) => n.id));
     const childIds = new Set(parents.keys());
     const rootCandidate = [...nodeIds].find((id) => !childIds.has(id));
-    root = rootCandidate ?? nodes[0]?.id ?? '';
+    root = rootCandidate ?? nodes[0]?.id;
   }
 
   return { rootNodeId: root, children };
@@ -145,9 +143,9 @@ const assignChildPositions = (
  * @returns Layout result with positioned nodes
  */
 export const hierarchicalLayout = (
-  nodes: GraphNode[],
-  edges: GraphEdge[],
-  options: HierarchicalLayoutOptions = {}
+  nodes: readonly GraphNode[],
+  edges: readonly GraphEdge[],
+  options: Readonly<HierarchicalLayoutOptions> = {}
 ): HierarchicalLayoutResult => {
   const levelSpacing = options.levelSpacing ?? DEFAULT_LEVEL_SPACING;
   const nodeSpacing = options.nodeSpacing ?? DEFAULT_NODE_SPACING;

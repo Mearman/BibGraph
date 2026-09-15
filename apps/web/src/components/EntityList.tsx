@@ -67,6 +67,36 @@ export interface EntityListProps {
 
 // Entity transformation functions are now provided by @bibgraph/utils
 
+/**
+ * Narrows an unknown value to a plain, non-array object.
+ */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+// The institutions API only accepts sorting by these fields; `EntityListProps.searchParams.sort` is a plain `string` shared across every entity type, so it must be narrowed before being forwarded to `getInstitutions`.
+const INSTITUTION_SORT_FIELDS = [
+  "display_name",
+  "cited_by_count",
+  "works_count",
+  "updated_date",
+  "created_date",
+] as const;
+type InstitutionSortField = (typeof INSTITUTION_SORT_FIELDS)[number];
+const INSTITUTION_SORT_FIELD_SET: ReadonlySet<string> = new Set(INSTITUTION_SORT_FIELDS);
+const isInstitutionSortField = (value: string | undefined): value is InstitutionSortField =>
+  value !== undefined && INSTITUTION_SORT_FIELD_SET.has(value);
+
+/**
+ * Renders a table cell value as a string. Plain objects have no meaningful `toString`, so they are serialized with `JSON.stringify` instead of falling through to `"[object Object]"`.
+ */
+const stringifyCellValue = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return JSON.stringify(value);
+};
+
 export const EntityList = ({
   viewMode = "table",
   onViewModeChange,
@@ -80,6 +110,9 @@ export const EntityList = ({
   const [currentPage, setCurrentPage] = useState(1);
   const { announceStatus, announceAction } = useScreenReader();
   const { getAriaLabel } = useAriaAttributes();
+  const entityListTitle = title !== undefined && title !== ""
+    ? title
+    : entityType.charAt(0).toUpperCase() + entityType.slice(1);
 
   const onError = React.useCallback((error: Error) => {
     logger.error("EntityList", `Failed to fetch ${entityType}`, { error });
@@ -109,19 +142,23 @@ export const EntityList = ({
             const keys = col.key.split(".");
             let value: unknown = row;
             for (const key of keys) {
-              value = value?.[key as keyof typeof value];
+              if (!isRecord(value)) {
+                value = undefined;
+                break;
+              }
+              value = value[key];
             }
             return value;
           },
       header: col.header,
       cell: col.render
-        ? (info) => col.render?.(info.getValue(), info.row.original)
-        : (info) => String(info.getValue() ?? ""),
+        ? async (info) => col.render?.(info.getValue(), info.row.original)
+        : (info) => stringifyCellValue(info.getValue()),
     }));
   }, [columns]);
 
   const fetchData = React.useCallback(async () => {
-    let response: OpenAlexResponse<Entity> | null = null;
+    let response: OpenAlexResponse<Entity>;
 
     switch (entityType) {
       case "funders":
@@ -147,21 +184,20 @@ export const EntityList = ({
         });
         break;
       case "sources": {
-        const sourcesFilter = urlFilters
+        const sourcesFilter = urlFilters !== undefined
           ? buildFilterString(urlFilters)
           : searchParams?.filter;
-        // Type assertion needed: URL filter strings are valid but don't match strict SourcesFilters type
+        // getSources takes a structured `filters` object (unlike the other entity APIs, which take a pre-built `filter` string), so a string here can never actually satisfy it - only forward it when it is genuinely a filters object.
         response = await openAlex.client.sources.getSources({
           per_page: searchParams?.per_page ?? perPage,
           page: searchParams?.page ?? currentPage,
           sort: searchParams?.sort,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...(sourcesFilter && { filters: sourcesFilter as any }),
+          ...(isRecord(sourcesFilter) && { filters: sourcesFilter }),
         });
         break;
       }
       case "works": {
-        const worksFilter = urlFilters
+        const worksFilter = urlFilters !== undefined
           ? buildFilterString(urlFilters)
           : searchParams?.filter;
         response = await openAlex.client.works.getWorks({
@@ -173,7 +209,7 @@ export const EntityList = ({
         break;
       }
       case "authors": {
-        const authorsFilter = urlFilters
+        const authorsFilter = urlFilters !== undefined
           ? buildFilterString(urlFilters)
           : searchParams?.filter;
         response = await openAlex.client.authors.getAuthors({
@@ -185,16 +221,17 @@ export const EntityList = ({
         break;
       }
       case "institutions": {
-        const institutionsFilter = urlFilters
+        const institutionsFilter = urlFilters !== undefined
           ? buildFilterString(urlFilters)
           : searchParams?.filter;
-        // Type assertion needed: URL params are valid but don't match strict InstitutionSearchOptions types
+        // getInstitutions takes a structured `filters` object (unlike the other entity APIs, which take a pre-built `filter` string), so a string here can never actually satisfy it - only forward it when it is genuinely a filters object.
+        const institutionsSort = searchParams?.sort;
         response = await openAlex.client.institutions.getInstitutions({
           per_page: searchParams?.per_page ?? perPage,
           page: searchParams?.page ?? currentPage,
-          filter: institutionsFilter,
-          sort: searchParams?.sort,
-        } as Parameters<typeof openAlex.client.institutions.getInstitutions>[0]);
+          ...(isInstitutionSortField(institutionsSort) && { sort: institutionsSort }),
+          ...(isRecord(institutionsFilter) && { filters: institutionsFilter }),
+        });
         break;
       }
       case "concepts":
@@ -209,7 +246,7 @@ export const EntityList = ({
         });
         break;
       case "topics": {
-        const topicsFilter = urlFilters
+        const topicsFilter = urlFilters !== undefined
           ? buildFilterString(urlFilters)
           : searchParams?.filter;
         response = await openAlex.client.topics.getMultiple({
@@ -231,45 +268,38 @@ export const EntityList = ({
           group_by: searchParams?.group_by,
         });
         break;
-      default:
+      case "domains":
+      case "fields":
+      case "subfields":
+        // @bibgraph/client has no domains/fields/subfields entity APIs yet.
         throw new Error(`Unsupported entity type: ${entityType}`);
+      default:
+        throw new Error("Unsupported entity type");
     }
 
-    if (response) {
-      // Handle response with or without meta field (static cache may not include meta)
-      if (response.meta) {
-        setPaginationInfo({
-          totalCount: response.meta.count,
-          totalPages: Math.ceil(response.meta.count / response.meta.per_page)
-        });
-      } else {
-        // Fallback for responses without meta (e.g. from static cache)
-        logger.warn("EntityList", `Response missing meta field for ${entityType}, using defaults`);
-        setPaginationInfo({
-          totalCount: response.results?.length || 0,
-          totalPages: 1 // Assume single page if no meta
-        });
-      }
-      return response.results || [];
-    }
-
-    throw new Error(`No response received for ${entityType}`);
+    // OpenAlexResponse always carries `meta` and `results`, so there is nothing to fall back to here.
+    setPaginationInfo({
+      totalCount: response.meta.count,
+      totalPages: Math.ceil(response.meta.count / response.meta.per_page),
+    });
+    return response.results;
   }, [entityType, perPage, urlFilters, searchParams, currentPage]);
 
   React.useEffect(() => {
-    asyncOperation.execute(fetchData);
+    void asyncOperation.execute(fetchData);
+    // `asyncOperation.execute` (not the whole `asyncOperation` object): the hook returns a fresh object each render, so depending on the object would re-fire this effect on every render and loop fetches forever, while `execute` itself is useCallback-stable.
   }, [fetchData, asyncOperation.execute]);
 
   // Announce when data loading completes
   React.useEffect(() => {
     if (!asyncOperation.loading && !asyncOperation.error && asyncOperation.data) {
-      announceStatus(`Loaded ${asyncOperation.data.length} ${entityType} items`);
+      announceStatus(`Loaded ${String(asyncOperation.data.length)} ${entityType} items`);
     }
   }, [asyncOperation.loading, asyncOperation.error, asyncOperation.data, entityType, announceStatus]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    announceAction(`Navigated to page ${page} of ${paginationInfo.totalPages}`);
+    announceAction(`Navigated to page ${String(page)} of ${String(paginationInfo.totalPages)}`);
   };
 
   const handleViewModeChange = (newViewMode: TableViewMode) => {
@@ -280,17 +310,17 @@ export const EntityList = ({
   // Enhanced loading state with skeleton
   if (asyncOperation.loading) {
     return (
-      <div role="region" aria-label={`${title || entityType} loading`}>
+      <div role="region" aria-label={`${entityListTitle} loading`}>
         <Group justify="space-between" mb="md">
           <h1 id="entity-list-title">
-            {title || entityType.charAt(0).toUpperCase() + entityType.slice(1)}
+            {entityListTitle}
           </h1>
           {onViewModeChange && (
             <div role="group" aria-label="View mode selection" style={{ opacity: 0.5, pointerEvents: 'none' }}>
               <TableViewModeToggle
                 value={viewMode}
                 onChange={handleViewModeChange}
-                aria-label={getAriaLabel("view mode toggle", `Change display view for ${title || entityType}`)}
+                aria-label={getAriaLabel("view mode toggle", `Change display view for ${entityListTitle}`)}
               />
             </div>
           )}
@@ -299,7 +329,7 @@ export const EntityList = ({
         <SearchResultsSkeleton
           viewType={viewMode}
           items={perPage}
-          title={`Loading ${title || entityType}...`}
+          title={`Loading ${entityListTitle}...`}
         />
       </div>
     );
@@ -308,17 +338,17 @@ export const EntityList = ({
   // Error state
   if (asyncOperation.error) {
     return (
-      <div role="region" aria-label={`${title || entityType} error`}>
+      <div role="region" aria-label={`${entityListTitle} error`}>
         <Group justify="space-between" mb="md">
           <h1 id="entity-list-title">
-            {title || entityType.charAt(0).toUpperCase() + entityType.slice(1)}
+            {entityListTitle}
           </h1>
           {onViewModeChange && (
             <div role="group" aria-label="View mode selection" style={{ opacity: 0.5, pointerEvents: 'none' }}>
               <TableViewModeToggle
                 value={viewMode}
                 onChange={handleViewModeChange}
-                aria-label={getAriaLabel("view mode toggle", `Change display view for ${title || entityType}`)}
+                aria-label={getAriaLabel("view mode toggle", `Change display view for ${entityListTitle}`)}
               />
             </div>
           )}
@@ -336,10 +366,10 @@ export const EntityList = ({
           }}
         >
           <Text mb="md">
-            Failed to load {title || entityType}. Please try again.
+            Failed to load {entityListTitle}. Please try again.
           </Text>
           <button
-            onClick={() => asyncOperation.execute(fetchData)}
+            onClick={() => { void asyncOperation.execute(fetchData); }}
             aria-label="Retry loading"
             style={{
               padding: '0.5rem 1rem',
@@ -360,17 +390,17 @@ export const EntityList = ({
   // No data state
   if (!asyncOperation.data || asyncOperation.data.length === 0) {
     return (
-      <div role="region" aria-label={`${title || entityType} empty`}>
+      <div role="region" aria-label={`${entityListTitle} empty`}>
         <Group justify="space-between" mb="md">
           <h1 id="entity-list-title">
-            {title || entityType.charAt(0).toUpperCase() + entityType.slice(1)}
+            {entityListTitle}
           </h1>
           {onViewModeChange && (
             <div role="group" aria-label="View mode selection" style={{ opacity: 0.5, pointerEvents: 'none' }}>
               <TableViewModeToggle
                 value={viewMode}
                 onChange={handleViewModeChange}
-                aria-label={getAriaLabel("view mode toggle", `Change display view for ${title || entityType}`)}
+                aria-label={getAriaLabel("view mode toggle", `Change display view for ${entityListTitle}`)}
               />
             </div>
           )}
@@ -388,7 +418,7 @@ export const EntityList = ({
           }}
         >
           <Text>
-            No {title || entityType} found.
+            No {title !== undefined && title !== "" ? title : entityType} found.
           </Text>
         </div>
       </div>
@@ -409,7 +439,6 @@ export const EntityList = ({
     transformEntityToListItem(item, entityType),
   );
 
-  const entityListTitle = title || entityType.charAt(0).toUpperCase() + entityType.slice(1);
 
   return (
     <div role="region" aria-label={`${entityListTitle} list`}>
@@ -437,19 +466,19 @@ export const EntityList = ({
           <DataTable
             data={tableData}
             columns={tableColumns}
-            aria-label={`${entityListTitle} table with ${data.length} rows`}
+            aria-label={`${entityListTitle} table with ${String(data.length)} rows`}
           />
         )}
         {viewMode === "list" && (
           <EntityListView
             items={listItems}
-            aria-label={`${entityListTitle} list with ${data.length} items`}
+            aria-label={`${entityListTitle} list with ${String(data.length)} items`}
           />
         )}
         {viewMode === "grid" && (
           <EntityGrid
             items={gridItems}
-            aria-label={`${entityListTitle} grid with ${data.length} items`}
+            aria-label={`${entityListTitle} grid with ${String(data.length)} items`}
           />
         )}
       </div>
@@ -471,7 +500,7 @@ export const EntityList = ({
               total={paginationInfo.totalPages}
               size="sm"
               withEdges
-              aria-label={`Pagination for ${entityListTitle}, currently page ${currentPage} of ${paginationInfo.totalPages}`}
+              aria-label={`Pagination for ${entityListTitle}, currently page ${String(currentPage)} of ${String(paginationInfo.totalPages)}`}
             />
           </Group>
         </nav>

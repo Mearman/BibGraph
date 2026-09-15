@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const FunderRoute = lazy(() =>
+const FunderRoute = lazy(async () =>
   import("./$funderId.lazy").then((m) => ({ default: m.default })),
 );
 

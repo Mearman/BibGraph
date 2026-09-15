@@ -29,8 +29,17 @@ import React, { useState } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from '@/config/style-constants';
 
-
 // Types are imported from @bibgraph/utils
+
+// Upload progress percentages shown at each stage of the upload/parse flow
+const PROGRESS_UPLOAD_STARTED = 10;
+const PROGRESS_PARSING = 30;
+const PROGRESS_PARSED = 70;
+const PROGRESS_COMPLETE = 100;
+// Delay before resetting the upload modal after a successful upload, in milliseconds
+const UPLOAD_RESET_DELAY_MS = 1000;
+// Number of bytes per kilobyte, used to format file sizes
+const BYTES_PER_KB = 1024;
 
 const DatasetsManagement = () => {
   const [datasets, setDatasets] = useState<STARDataset[]>([]);
@@ -53,10 +62,10 @@ const DatasetsManagement = () => {
 
     try {
       // Show initial progress
-      setUploadProgress(10);
+      setUploadProgress(PROGRESS_UPLOAD_STARTED);
 
       // Parse file using actual file parser
-      setUploadProgress(30);
+      setUploadProgress(PROGRESS_PARSING);
       const parseResult = await parseSTARFile();
 
       // Check for parsing errors
@@ -81,7 +90,7 @@ const DatasetsManagement = () => {
         }
       }
 
-      setUploadProgress(70);
+      setUploadProgress(PROGRESS_PARSED);
 
       // Create dataset from parse result
       const reviewTopic =
@@ -93,7 +102,7 @@ const DatasetsManagement = () => {
         reviewTopic,
       });
 
-      setUploadProgress(100);
+      setUploadProgress(PROGRESS_COMPLETE);
 
       // Add to datasets
       setDatasets((previous) => [...previous, newDataset]);
@@ -104,7 +113,7 @@ const DatasetsManagement = () => {
         setUploadProgress(0);
         setUploadFile(null);
         setShowUploadModal(false);
-      }, 1000);
+      }, UPLOAD_RESET_DELAY_MS);
     } catch (error) {
       logError(
         logger,
@@ -117,7 +126,7 @@ const DatasetsManagement = () => {
     }
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Readonly<Date>) => {
     return new Intl.DateTimeFormat("en-US", {
       month: "short",
       day: "numeric",
@@ -219,7 +228,7 @@ const DatasetsManagement = () => {
               {"description" in dataset.metadata &&
                 typeof dataset.metadata.description === "string" && (
                   <Text size="xs" c="dimmed" mb="md" lineClamp={3}>
-                    {dataset.metadata["description"]}
+                    {dataset.metadata.description}
                   </Text>
                 )}
 
@@ -282,7 +291,7 @@ const DatasetsManagement = () => {
                     Selected file: {uploadFile.name}
                   </Text>
                   <Text size="xs" c="dimmed">
-                    Size: {(uploadFile.size / 1024).toFixed(1)} KB
+                    Size: {(uploadFile.size / BYTES_PER_KB).toFixed(1)} KB
                   </Text>
                 </Stack>
               </Paper>
@@ -306,7 +315,9 @@ const DatasetsManagement = () => {
           ) : (
             <FileInput
               accept=".csv,.json,.xlsx,.xls"
-              onChange={(file) => handleFileUpload(file)}
+              onChange={(file) => {
+                handleFileUpload(file);
+              }}
               placeholder={
                 <Stack align="center" gap="md" p="xl">
                   <IconUpload size={ICON_SIZE.EMPTY_STATE_SM} style={{ color: "var(--mantine-color-blue-6)" }} />

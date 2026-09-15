@@ -14,7 +14,6 @@ const DEFAULT_MODE: ViewMode = '2D';
 
 /**
  * Parse stored view mode with validation
- * @param stored
  */
 const parseStoredViewMode = (stored: string | null): ViewMode => {
   if (stored === '2D' || stored === '3D') {

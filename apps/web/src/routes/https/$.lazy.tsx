@@ -13,7 +13,7 @@ import { ICON_SIZE } from "@/config/style-constants";
 
 /**
  * Parse query parameters from a URL string
- * @param urlString Full URL string with potential query parameters
+ * @param urlString - Full URL string with potential query parameters
  * @returns Object with path and search params
  */
 const parseUrlPathAndSearch = (urlString: string): {
@@ -43,12 +43,12 @@ const parseUrlPathAndSearch = (urlString: string): {
 
 const HttpsRoute = () => {
   const { _splat: splat } = useParams({ from: "/https/$" });
-  const externalId = splat || "";
+  const externalId = splat ?? "";
   const routeSearch = useSearch({ from: "/https/$" });
   const navigate = useNavigate();
 
   useEffect(() => {
-    const resolveExternalId = async () => {
+    const resolveExternalId = () => {
       try {
         // Decode the parameter
         let decodedId = decodeURIComponent(externalId);
@@ -74,7 +74,7 @@ const HttpsRoute = () => {
 
           // Try to detect entity type and normalize ID
           const detection = EntityDetectionService.detectEntity(decodedId);
-          if (detection?.entityType && detection?.normalizedId) {
+          if (detection?.entityType && detection.normalizedId) {
             logger.debug(
               "routing",
               "Detected entity from https URL, navigating",
@@ -91,7 +91,7 @@ const HttpsRoute = () => {
             const mergedSearch = { ...urlSearch, ...routeSearch };
 
             // Navigate to the proper entity route with encoded ID and search params
-            navigate({
+            void navigate({
               to: `/${detection.entityType}/${encodeURIComponent(detection.normalizedId)}`,
               search: mergedSearch,
               replace: true,

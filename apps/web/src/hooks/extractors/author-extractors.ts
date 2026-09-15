@@ -1,9 +1,7 @@
 /**
  * Author entity relationship extractors
- * @module extractors/author-extractors
  */
 
-import type { EntityType } from '@bibgraph/types';
 import { RelationType } from '@bibgraph/types';
 
 import type { RelationshipItem, RelationshipSection } from '@/types/relationship';
@@ -12,123 +10,126 @@ import { RELATIONSHIP_TYPE_LABELS } from '@/types/relationship';
 import {
   createRelationshipItem,
   createRelationshipSection,
-  safeStringId,
 } from '../relationship-helpers';
-
-/**
- * Extract relationships from Author entity
- * @param data - Raw author data from OpenAlex API
- * @param authorId - The author's OpenAlex ID
- * @param outgoing - Array to push outgoing relationship sections to
- */
-export const extractAuthorRelationships = (
-  data: Record<string, unknown>,
-  authorId: string,
-  outgoing: RelationshipSection[],
-): void => {
-  extractAuthorAffiliations(data, authorId, outgoing);
-  extractAuthorTopics(data, authorId, outgoing);
-};
+import { isPlainObject, readArray, readObject, readString } from './unknown-helpers';
 
 /**
  * AFFILIATION: Author → Institutions
  * @param data - Raw author data
  * @param authorId - The author's OpenAlex ID
- * @param outgoing - Array to push relationship sections to
+ * @returns Relationship sections extracted from the author's affiliations, or an empty array if none are present
  */
 const extractAuthorAffiliations = (
   data: Record<string, unknown>,
   authorId: string,
-  outgoing: RelationshipSection[],
-): void => {
-  const affiliations = data.affiliations as
-    | Array<{
-        institution?: {
-          id?: string;
-          display_name?: string;
-          ror?: string;
-          country_code?: string;
-          type?: string;
-        };
-        years?: number[];
-      }>
-    | undefined;
-
-  if (affiliations && affiliations.length > 0) {
-    const affiliationItems: RelationshipItem[] = affiliations
-      .filter((aff) => aff.institution?.id && aff.institution?.display_name)
-      .map((aff) => {
-        const institution = aff.institution;
-        return createRelationshipItem(
-          authorId,
-          safeStringId(institution?.id),
-          'authors' as EntityType,
-          'institutions' as EntityType,
-          RelationType.AFFILIATION,
-          'outbound',
-          safeStringId(institution?.display_name),
-        );
-      });
-
-    if (affiliationItems.length > 0) {
-      outgoing.push(
-        createRelationshipSection(
-          RelationType.AFFILIATION,
-          'outbound',
-          RELATIONSHIP_TYPE_LABELS[RelationType.AFFILIATION],
-          affiliationItems,
-        ),
-      );
-    }
+): RelationshipSection[] => {
+  const affiliations = readArray(data, 'affiliations');
+  if (affiliations === undefined || affiliations.length === 0) {
+    return [];
   }
+
+  const affiliationItems: RelationshipItem[] = [];
+  for (const affiliation of affiliations) {
+    if (!isPlainObject(affiliation)) {
+      continue;
+    }
+    const institution = readObject(affiliation, 'institution');
+    if (institution === undefined) {
+      continue;
+    }
+    const institutionId = readString(institution, 'id');
+    const institutionName = readString(institution, 'display_name');
+    if (institutionId === undefined || institutionName === undefined) {
+      continue;
+    }
+    affiliationItems.push(
+      createRelationshipItem(
+        authorId,
+        institutionId,
+        'authors',
+        'institutions',
+        RelationType.AFFILIATION,
+        'outbound',
+        institutionName,
+      ),
+    );
+  }
+
+  if (affiliationItems.length === 0) {
+    return [];
+  }
+
+  return [
+    createRelationshipSection(
+      RelationType.AFFILIATION,
+      'outbound',
+      RELATIONSHIP_TYPE_LABELS[RelationType.AFFILIATION],
+      affiliationItems,
+    ),
+  ];
 };
 
 /**
  * AUTHOR_RESEARCHES: Author → Topics
  * @param data - Raw author data
  * @param authorId - The author's OpenAlex ID
- * @param outgoing - Array to push relationship sections to
+ * @returns Relationship sections extracted from the author's research topics, or an empty array if none are present
  */
 const extractAuthorTopics = (
   data: Record<string, unknown>,
   authorId: string,
-  outgoing: RelationshipSection[],
-): void => {
-  const topics = data.topics as
-    | Array<{
-        id?: string;
-        display_name?: string;
-        count?: number;
-        score?: number;
-      }>
-    | undefined;
-
-  if (topics && topics.length > 0) {
-    const topicItems: RelationshipItem[] = topics
-      .filter((topic) => topic.id && topic.display_name)
-      .map((topic) => {
-        const topicId = safeStringId(topic.id);
-        const topicName = safeStringId(topic.display_name);
-        return createRelationshipItem(
-          authorId,
-          topicId,
-          'authors' as EntityType,
-          'topics' as EntityType,
-          RelationType.AUTHOR_RESEARCHES,
-          'outbound',
-          topicName,
-        );
-      });
-
-    if (topicItems.length > 0) {
-      outgoing.push(
-        createRelationshipSection(
-          RelationType.AUTHOR_RESEARCHES,
-          'outbound',
-          'Research Topics',
-          topicItems,
-        ),
-      );
-    }
+): RelationshipSection[] => {
+  const topics = readArray(data, 'topics');
+  if (topics === undefined || topics.length === 0) {
+    return [];
   }
+
+  const topicItems: RelationshipItem[] = [];
+  for (const topic of topics) {
+    if (!isPlainObject(topic)) {
+      continue;
+    }
+    const topicId = readString(topic, 'id');
+    const topicName = readString(topic, 'display_name');
+    if (topicId === undefined || topicName === undefined) {
+      continue;
+    }
+    topicItems.push(
+      createRelationshipItem(
+        authorId,
+        topicId,
+        'authors',
+        'topics',
+        RelationType.AUTHOR_RESEARCHES,
+        'outbound',
+        topicName,
+      ),
+    );
+  }
+
+  if (topicItems.length === 0) {
+    return [];
+  }
+
+  return [
+    createRelationshipSection(
+      RelationType.AUTHOR_RESEARCHES,
+      'outbound',
+      'Research Topics',
+      topicItems,
+    ),
+  ];
+};
+
+/**
+ * Extract relationships from Author entity
+ * @param data - Raw author data from OpenAlex API
+ * @param authorId - The author's OpenAlex ID
+ * @returns Outgoing relationship sections extracted from the author's data
+ */
+export const extractAuthorRelationships = (
+  data: Record<string, unknown>,
+  authorId: string,
+): RelationshipSection[] => {
+  return [...extractAuthorAffiliations(data, authorId), ...extractAuthorTopics(data, authorId)];
 };

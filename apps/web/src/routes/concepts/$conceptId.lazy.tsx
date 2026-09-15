@@ -1,5 +1,4 @@
 import { cachedOpenAlex } from "@bibgraph/client";
-import { type Concept, type ConceptField } from "@bibgraph/types";
 import { Alert } from "@mantine/core";
 import { IconAlertCircle } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
@@ -26,35 +25,35 @@ const ConceptRoute = () => {
   const conceptId = decodeEntityId(rawConceptId);
 
   // Parse select parameter - only send select when explicitly provided in URL
-  const selectFields = selectParameter && typeof selectParameter === 'string'
-    ? selectParameter.split(',').map(field => field.trim()) as ConceptField[]
+  const selectFields = typeof selectParameter === 'string' && selectParameter !== ''
+    ? selectParameter.split(',').map(field => field.trim())
     : undefined;
 
   // Fetch concept data
   const { data: concept, isLoading, error } = useQuery({
     queryKey: ["concept", conceptId, selectParameter, selectFields],
     queryFn: async () => {
-      if (!conceptId) {
+      if (conceptId === undefined || conceptId === '') {
         throw new Error("Concept ID is required");
       }
       const response = await cachedOpenAlex.client.concepts.getConcept(
         conceptId,
         selectFields ? { select: selectFields } : {}
       );
-      return response as Concept;
+      return response;
     },
-    enabled: !!conceptId && conceptId !== "random",
+    enabled: conceptId !== undefined && conceptId !== '' && conceptId !== "random",
   });
 
   // Get relationship counts for summary display - MUST be called before early returns (Rules of Hooks)
   const { incomingCount, outgoingCount } = useEntityRelationshipQueries(
-    conceptId || "",
+    conceptId ?? "",
     'concepts'
   );
 
   // Handle loading state
   if (isLoading) {
-    return <LoadingState entityType="Concept" entityId={conceptId || ''} config={ENTITY_TYPE_CONFIGS.concepts} />;
+    return <LoadingState entityType="Concept" entityId={conceptId ?? ''} config={ENTITY_TYPE_CONFIGS.concepts} />;
   }
 
   // Handle error state
@@ -63,7 +62,7 @@ const ConceptRoute = () => {
       <ErrorState
         error={error}
         entityType="Concept"
-        entityId={conceptId || ''}
+        entityId={conceptId ?? ''}
       />
     );
   }
@@ -73,7 +72,7 @@ const ConceptRoute = () => {
     <EntityDetailLayout
       config={ENTITY_TYPE_CONFIGS.concepts}
       entityType="concepts"
-      entityId={conceptId || ''}
+      entityId={conceptId ?? ''}
       displayName={concept.display_name || "Concept"}
       selectParam={typeof selectParameter === 'string' ? selectParameter : undefined}
       viewMode={viewMode}
@@ -90,8 +89,8 @@ const ConceptRoute = () => {
         This concept data may be incomplete or outdated.
       </Alert>
       <RelationshipCounts incomingCount={incomingCount} outgoingCount={outgoingCount} />
-      <IncomingRelationships entityId={conceptId || ""} entityType="concepts" />
-      <OutgoingRelationships entityId={conceptId || ""} entityType="concepts" />
+      <IncomingRelationships entityId={conceptId ?? ""} entityType="concepts" />
+      <OutgoingRelationships entityId={conceptId ?? ""} entityType="concepts" />
     </EntityDetailLayout>
   );
 };

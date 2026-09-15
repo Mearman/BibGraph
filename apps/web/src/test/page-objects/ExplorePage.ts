@@ -8,15 +8,18 @@
  * @see spec-020 Phase 1: Utility pages
  */
 
-import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
 import { waitForGraphReady } from "../helpers/app-ready";
 import { BaseSPAPageObject } from "./BaseSPAPageObject";
 
+const NODE_CLICK_WAIT_MS = 500;
+const ZOOM_ANIMATION_WAIT_MS = 300;
+const NODE_POLL_INTERVAL_MS = 100;
+
 export class ExplorePage extends BaseSPAPageObject {
-	// Explore-specific selectors
-	protected readonly exploreSelectors = {
+	// Explore-specific selectors (public: accessed directly by e2e tests for granular assertions)
+	public readonly exploreSelectors = {
 		graphContainer: "[data-testid='graph-container']",
 		graphContainerFallback: "svg",
 		graphNode: "[data-testid='graph-node']",
@@ -29,10 +32,6 @@ export class ExplorePage extends BaseSPAPageObject {
 		resetZoom: "[data-testid='reset-zoom']",
 		nodeTooltip: "[data-testid='node-tooltip']",
 	};
-
-	constructor(page: Page) {
-		super(page);
-	}
 
 	/**
 	 * Navigate to the Explore page
@@ -76,7 +75,6 @@ export class ExplorePage extends BaseSPAPageObject {
 
 	/**
 	 * Click a graph node by index
-	 * @param index
 	 */
 	async clickNode(index: number): Promise<void> {
 		// Try primary selector first
@@ -92,7 +90,7 @@ export class ExplorePage extends BaseSPAPageObject {
 		}
 
 		// Wait for any tooltip or state update
-		await this.page.waitForTimeout(500);
+		await this.page.waitForTimeout(NODE_CLICK_WAIT_MS);
 	}
 
 	/**
@@ -100,7 +98,7 @@ export class ExplorePage extends BaseSPAPageObject {
 	 */
 	async zoomIn(): Promise<void> {
 		await this.click(this.exploreSelectors.zoomIn);
-		await this.page.waitForTimeout(300); // Allow zoom animation
+		await this.page.waitForTimeout(ZOOM_ANIMATION_WAIT_MS); // Allow zoom animation
 	}
 
 	/**
@@ -108,7 +106,7 @@ export class ExplorePage extends BaseSPAPageObject {
 	 */
 	async zoomOut(): Promise<void> {
 		await this.click(this.exploreSelectors.zoomOut);
-		await this.page.waitForTimeout(300); // Allow zoom animation
+		await this.page.waitForTimeout(ZOOM_ANIMATION_WAIT_MS); // Allow zoom animation
 	}
 
 	/**
@@ -116,7 +114,7 @@ export class ExplorePage extends BaseSPAPageObject {
 	 */
 	async resetZoom(): Promise<void> {
 		await this.click(this.exploreSelectors.resetZoom);
-		await this.page.waitForTimeout(300); // Allow zoom animation
+		await this.page.waitForTimeout(ZOOM_ANIMATION_WAIT_MS); // Allow zoom animation
 	}
 
 	/**
@@ -170,8 +168,6 @@ export class ExplorePage extends BaseSPAPageObject {
 
 	/**
 	 * Wait for graph to have at least a minimum number of nodes
-	 * @param minCount
-	 * @param timeout
 	 */
 	async waitForMinimumNodes(minCount: number, timeout = 10_000): Promise<void> {
 		const startTime = Date.now();
@@ -181,10 +177,10 @@ export class ExplorePage extends BaseSPAPageObject {
 			if (nodeCount >= minCount) {
 				return;
 			}
-			await this.page.waitForTimeout(100);
+			await this.page.waitForTimeout(NODE_POLL_INTERVAL_MS);
 		}
 
-		throw new Error(`Graph did not reach minimum ${minCount} nodes within ${timeout}ms`);
+		throw new Error(`Graph did not reach minimum ${String(minCount)} nodes within ${String(timeout)}ms`);
 	}
 }
 

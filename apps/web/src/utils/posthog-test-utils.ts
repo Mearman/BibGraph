@@ -14,12 +14,18 @@ interface PostHogInstance {
   capture: (eventName: string, properties?: Record<string, unknown>) => void;
 }
 
-/**
- * Window with PostHog instance
- */
-interface WindowWithPostHog {
-  posthog?: PostHogInstance;
+// Matches the ambient Window.posthog augmentation already declared in web-vitals.ts - this avoids a duplicate `declare global` block while keeping the type used here.
+declare global {
+  interface Window {
+    posthog?: PostHogInstance;
+  }
 }
+
+// How long to wait after sending a test event before checking whether it was captured
+const CAPTURE_TEST_WAIT_MS = 100;
+
+// Delay before auto-running the integration test, to give PostHog time to initialize
+const AUTO_TEST_DELAY_MS = 2000;
 
 /**
  * Test PostHog configuration and privacy settings
@@ -35,7 +41,7 @@ export const testPostHogConfiguration = (): {
 
   // Check if PostHog is enabled
   const hasApiKey = Boolean(POSTHOG_API_KEY && POSTHOG_API_KEY !== 'your-posthog-api-key');
-  const hasValidHost = Boolean(POSTHOG_HOST && POSTHOG_HOST.includes('posthog.com'));
+  const hasValidHost = POSTHOG_HOST.includes('posthog.com');
   const isConfigured = POSTHOG_ENABLED && hasApiKey && hasValidHost;
 
   if (!POSTHOG_ENABLED) {
@@ -93,7 +99,7 @@ export const testPostHogAvailability = (): {
     };
   }
 
-  const posthog = (window as unknown as WindowWithPostHog).posthog;
+  const posthog = window.posthog;
   const isInitialized = posthog !== undefined && typeof posthog.capture === 'function';
 
   if (!isInitialized) {
@@ -131,15 +137,12 @@ export const testPrivacyCompliance = (): {
   // Check for API key (indicates personal data collection possibility)
   const hasNoPersonalData = !POSTHOG_API_KEY || POSTHOG_API_KEY === 'your-posthog-api-key';
 
-  // Note: We can't directly check cookieless_mode or property_blacklist from runtime
-  // These are configuration settings, but we can make assumptions based on our implementation
+  // Note: We can't directly check cookieless_mode or property_blacklist from runtime. These are configuration settings we can't verify here, so they're reported as fixed facts about our posthog.ts configuration rather than folded into isCompliant below.
   const isUsesCookielessMode = true; // Based on our posthog.ts configuration
   const hasPropertyBlacklist = true; // Based on our posthog.ts configuration
 
-  const isCompliant = usesEuHost && isUsesCookielessMode && hasPropertyBlacklist;
-
   return {
-    isCompliant,
+    isCompliant: usesEuHost,
     checks: {
       usesEuHost,
       hasNoPersonalData,
@@ -153,7 +156,7 @@ export const testPrivacyCompliance = (): {
 /**
  * Test PostHog event capture functionality
  */
-export const testPostHogEventCapture = (): Promise<{
+export const testPostHogEventCapture = async (): Promise<{
   canCapture: boolean;
   eventSent: boolean;
   issues: string[];
@@ -169,7 +172,7 @@ export const testPostHogEventCapture = (): Promise<{
       return;
     }
 
-    const posthog = (window as unknown as WindowWithPostHog).posthog;
+    const posthog = window.posthog;
     if (!posthog || typeof posthog.capture !== 'function') {
       resolve({
         canCapture: false,
@@ -191,7 +194,7 @@ export const testPostHogEventCapture = (): Promise<{
           posthog.capture = originalCapture;
           return;
         }
-        return originalCapture.call(posthog, eventName, properties);
+        originalCapture.call(posthog, eventName, properties);
       };
 
       // Send test event
@@ -207,10 +210,11 @@ export const testPostHogEventCapture = (): Promise<{
           eventSent: isEventCaptured,
           issues: isEventCaptured ? [] : ['Test event was not captured'],
         });
-      }, 100);
+      }, CAPTURE_TEST_WAIT_MS);
 
     } catch (error) {
-      issues.push(`Error during capture test: ${error}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      issues.push(`Error during capture test: ${errorMessage}`);
       resolve({
         canCapture: false,
         eventSent: false,
@@ -345,6 +349,6 @@ export const testAndLogPostHogIntegration = async (): Promise<void> => {
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   // Wait for PostHog to initialize
   setTimeout(() => {
-    testAndLogPostHogIntegration();
-  }, 2000);
+    void testAndLogPostHogIntegration();
+  }, AUTO_TEST_DELAY_MS);
 }

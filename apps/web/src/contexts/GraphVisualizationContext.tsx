@@ -16,7 +16,7 @@ import type { GraphVisualizationState } from '@/hooks/use-graph-visualization';
 import { useGraphVisualization } from '@/hooks/use-graph-visualization';
 import type { UseMultiSourceGraphResult } from '@/hooks/use-multi-source-graph';
 import { useMultiSourceGraph } from '@/hooks/use-multi-source-graph';
-import { type BackgroundStrategy,settingsStoreInstance } from '@/stores/settings-store';
+import { type BackgroundStrategy,settingsStore } from '@/stores/settings-store';
 
 /**
  * Combined context value with both graph data and visualization state
@@ -29,10 +29,13 @@ export interface GraphVisualizationContextValue {
 export const GraphVisualizationContext = createContext<GraphVisualizationContextValue | null>(null);
 
 /**
+Interval, in milliseconds, at which background-strategy settings are polled for changes.
+ */
+const SETTINGS_POLL_INTERVAL_MS = 2000;
+
+/**
  * Provider component that creates and shares graph visualization state
  * Also handles auto-population of labels and relationship discovery
- * @param root0
- * @param root0.children
  */
 export const GraphVisualizationProvider = ({ children }: { children: ReactNode }) => {
   const graphData = useMultiSourceGraph();
@@ -44,7 +47,7 @@ export const GraphVisualizationProvider = ({ children }: { children: ReactNode }
   // Load strategy from settings on mount and subscribe to changes
   useEffect(() => {
     const loadStrategy = async () => {
-      const settings = await settingsStoreInstance.getSettings();
+      const settings = await settingsStore.getSettings();
       setBackgroundStrategy(settings.backgroundStrategy);
     };
     void loadStrategy();
@@ -52,19 +55,19 @@ export const GraphVisualizationProvider = ({ children }: { children: ReactNode }
     // Poll for changes every 2 seconds (simple approach without event system)
     const intervalId = setInterval(() => {
       void loadStrategy();
-    }, 2000);
+    }, SETTINGS_POLL_INTERVAL_MS);
 
-    return () => clearInterval(intervalId);
+    return () => { clearInterval(intervalId); };
   }, []);
 
   // Callbacks for auto-population
   const handleLabelsResolved = useCallback((updates: Map<string, string>) => {
     graphData.updateNodeLabels(updates);
-  }, [graphData.updateNodeLabels]);
+  }, [graphData]);
 
-  const handleEdgesDiscovered = useCallback((newEdges: GraphEdge[]) => {
+  const handleEdgesDiscovered = useCallback((newEdges: readonly GraphEdge[]) => {
     graphData.addDiscoveredEdges(newEdges);
-  }, [graphData.addDiscoveredEdges]);
+  }, [graphData]);
 
   // Wire up auto-population - watches graph and resolves labels/discovers relationships
   useGraphAutoPopulation({

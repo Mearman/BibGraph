@@ -1,10 +1,9 @@
 import { cachedOpenAlex } from "@bibgraph/client";
-import { type Work, type WorkField } from "@bibgraph/types";
 import { EntityDetectionService } from "@bibgraph/utils";
 import { logger } from "@bibgraph/utils/logger";
 import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute,useParams, useSearch  } from "@tanstack/react-router";
-import { useEffect,useState } from "react";
+import { useMemo,useState } from "react";
 
 import { CitationContextPreview,type DetailViewMode, EntityDetailLayout, ErrorState, LoadingState, RelatedEntitiesSection } from "@/components/entity-detail";
 import { ENTITY_TYPE_CONFIGS } from "@/components/entity-detail/EntityTypeConfig";
@@ -17,6 +16,57 @@ import { usePdfUrl } from "@/hooks/use-pdf-url";
 import { usePrettyUrl } from "@/hooks/use-pretty-url";
 import { useUrlNormalization } from "@/hooks/use-url-normalization";
 import { decodeEntityId } from "@/utils/url-decoding";
+
+const MIN_HASH_SEGMENTS_FOR_ENTITY_ID = 3;
+
+/**
+ * Detect whether a decoded work ID is an external canonical ID (DOI, ORCID, etc.) and, if so, resolve it to a normalized OpenAlex ID. Pure and synchronous.
+ */
+const detectExternalWorkId = (
+  candidateId: string
+): { normalizedWorkId: string | null; externalIdError: string | null } => {
+  // Check if this is an external canonical ID that needs processing
+  if (/^https?:\/\//i.test(candidateId) ||
+      /^doi:/i.test(candidateId) ||
+      /^orcid:/i.test(candidateId) ||
+      /^ror:/i.test(candidateId) ||
+      /^pmid:/i.test(candidateId)) {
+    try {
+      logger.debug("routing", "Processing external work ID", {
+        workId: candidateId
+      }, "WorkRoute");
+
+      const detection = EntityDetectionService.detectEntity(candidateId);
+
+      if (detection?.entityType === "works" && detection.normalizedId) {
+        logger.debug("routing", "Successfully detected work entity", {
+          original: candidateId,
+          normalized: detection.normalizedId,
+          detectionMethod: detection.detectionMethod
+        }, "WorkRoute");
+
+        return { normalizedWorkId: detection.normalizedId, externalIdError: null };
+      }
+
+      const errorMessage = `Invalid work ID format: ${candidateId}`;
+      logger.error("routing", "Failed to detect work entity", {
+        workId: candidateId,
+        detection
+      }, "WorkRoute");
+      return { normalizedWorkId: null, externalIdError: errorMessage };
+    } catch (error) {
+      const errorMessage = `Error processing work ID: ${candidateId}`;
+      logger.error("routing", "Error processing external work ID", {
+        workId: candidateId,
+        error
+      }, "WorkRoute");
+      return { normalizedWorkId: null, externalIdError: errorMessage };
+    }
+  }
+
+  // This is already a normalized OpenAlex ID
+  return { normalizedWorkId: candidateId, externalIdError: null };
+};
 
 const WorkRoute = () => {
   const { _splat: rawWorkId } = useParams({ from: "/works/$_" });
@@ -33,147 +83,62 @@ const WorkRoute = () => {
       // First strip query parameters from the hash, then extract the entity ID
       const hashWithoutQuery = window.location.hash.split('?', 1)[0];
       const hashParts = hashWithoutQuery.split('/');
-      return hashParts.length >= 3 ? hashParts.slice(2).join('/') : '';
+      return hashParts.length >= MIN_HASH_SEGMENTS_FOR_ENTITY_ID ? hashParts.slice(2).join('/') : '';
     }
     return '';
   };
 
-  const workId = rawWorkId || getWorkIdFromHash();
+  const workId = rawWorkId !== undefined && rawWorkId !== '' ? rawWorkId : getWorkIdFromHash();
   const decodedWorkId = decodeEntityId(workId);
 
-  // Handle external canonical IDs (DOIs, ORCID, etc.)
-  const [normalizedWorkId, setNormalizedWorkId] = useState<string | null>(null);
-  const [isProcessingExternalId, setIsProcessingExternalId] = useState(false);
-  const [externalIdError, setExternalIdError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const processExternalId = async () => {
-      if (!decodedWorkId) return;
-
-      // Check if this is an external canonical ID that needs processing
-      if (/^https?:\/\//i.test(decodedWorkId) ||
-          /^doi:/i.test(decodedWorkId) ||
-          /^orcid:/i.test(decodedWorkId) ||
-          /^ror:/i.test(decodedWorkId) ||
-          /^pmid:/i.test(decodedWorkId)) {
-
-        setIsProcessingExternalId(true);
-        setExternalIdError(null);
-
-        try {
-          logger.debug("routing", "Processing external work ID", {
-            workId: decodedWorkId
-          }, "WorkRoute");
-
-          const detection = EntityDetectionService.detectEntity(decodedWorkId);
-
-          if (detection?.entityType === "works" && detection?.normalizedId) {
-            logger.debug("routing", "Successfully detected work entity", {
-              original: decodedWorkId,
-              normalized: detection.normalizedId,
-              detectionMethod: detection.detectionMethod
-            }, "WorkRoute");
-
-            setNormalizedWorkId(detection.normalizedId);
-          } else {
-            const errorMessage = `Invalid work ID format: ${decodedWorkId}`;
-            logger.error("routing", "Failed to detect work entity", {
-              workId: decodedWorkId,
-              detection
-            }, "WorkRoute");
-            setExternalIdError(errorMessage);
-          }
-        } catch (error) {
-          const errorMessage = `Error processing work ID: ${decodedWorkId}`;
-          logger.error("routing", "Error processing external work ID", {
-            workId: decodedWorkId,
-            error
-          }, "WorkRoute");
-          setExternalIdError(errorMessage);
-        } finally {
-          setIsProcessingExternalId(false);
-        }
-      } else {
-        // This is already a normalized OpenAlex ID
-        setNormalizedWorkId(decodedWorkId);
-      }
-    };
-
-    processExternalId();
-  }, [decodedWorkId]);
+  // Handle external canonical IDs (DOIs, ORCID, etc.) - detection is a pure synchronous function of decodedWorkId, so it is derived directly rather than tracked via an effect + state.
+  const { normalizedWorkId, externalIdError } = useMemo(
+    () => decodedWorkId === undefined
+      ? { normalizedWorkId: null, externalIdError: null }
+      : detectExternalWorkId(decodedWorkId),
+    [decodedWorkId]
+  );
 
   // Update URL with pretty display version if needed
   // Use the extracted workId since rawWorkId from TanStack Router doesn't work with hash routing
   usePrettyUrl("works", workId, decodedWorkId);
 
   // Parse select parameter - only send select when explicitly provided in URL
-  const selectFields = selectParameter && typeof selectParameter === 'string'
-    ? selectParameter.split(',').map(field => field.trim()) as WorkField[]
+  const selectFields = typeof selectParameter === 'string'
+    ? selectParameter.split(',').map(field => field.trim())
     : undefined;
 
   // Fetch work data using normalized ID
   const { data: work, isLoading, error } = useQuery({
     queryKey: ["work", normalizedWorkId, selectParameter, selectFields],
     queryFn: async () => {
-      if (!normalizedWorkId) {
+      if (normalizedWorkId === null) {
         throw new Error("Work ID is required");
       }
       const response = await cachedOpenAlex.client.works.getWork(
         normalizedWorkId,
         selectFields ? { select: selectFields } : {}
       );
-      return response as Work;
+      return response;
     },
-    enabled: !!normalizedWorkId && normalizedWorkId !== "random" && !isProcessingExternalId,
+    enabled: normalizedWorkId !== null && normalizedWorkId !== "random",
   });
 
   // Get relationship counts for summary display - MUST be called before early returns (Rules of Hooks)
   const { incomingCount, outgoingCount, incoming: incomingSections, outgoing: outgoingSections } = useEntityRelationshipQueries(
-    normalizedWorkId || '',
+    normalizedWorkId ?? '',
     'works'
   );
 
   // Get PDF URL from OpenAlex or Unpaywall - MUST be called before early returns (Rules of Hooks)
-  const pdfResult = usePdfUrl(work as Work | null | undefined, {
+  const pdfResult = usePdfUrl(work, {
     skip: !work,
   });
 
   const config = ENTITY_TYPE_CONFIGS.works;
 
-  // Show processing state for external canonical IDs
-  if (isProcessingExternalId) {
-    return (
-      <div
-        style={{
-          padding: "40px 20px",
-          textAlign: "center",
-          fontSize: "16px",
-        }}
-      >
-        <div style={{ marginBottom: "20px", fontSize: "18px" }}>
-          Processing Work ID
-        </div>
-        <div
-          style={{
-            fontFamily: "monospace",
-            backgroundColor: "var(--mantine-color-gray-1)",
-            padding: "10px",
-            borderRadius: "4px",
-            marginBottom: "20px",
-            wordBreak: "break-all",
-          }}
-        >
-          {decodedWorkId}
-        </div>
-        <div style={{ fontSize: "14px", color: "var(--mantine-color-dimmed)" }}>
-          Detecting entity type and resolving to OpenAlex ID
-        </div>
-      </div>
-    );
-  }
-
   // Show error for external ID processing failures
-  if (externalIdError) {
+  if (externalIdError !== null) {
     return (
       <div
         style={{
@@ -209,14 +174,14 @@ const WorkRoute = () => {
   }
 
   if (isLoading) {
-    return <LoadingState entityType="Work" entityId={decodedWorkId || ''} config={config} />;
+    return <LoadingState entityType="Work" entityId={decodedWorkId ?? ''} config={config} />;
   }
 
   if (error) {
-    return <ErrorState entityType="Work" entityId={decodedWorkId || ''} error={error} />;
+    return <ErrorState entityType="Work" entityId={decodedWorkId ?? ''} error={error} />;
   }
 
-  if (!work || !normalizedWorkId) {
+  if (!work || normalizedWorkId === null) {
     return null;
   }
 
@@ -225,18 +190,18 @@ const WorkRoute = () => {
       config={config}
       entityType="works"
       entityId={normalizedWorkId}
-      displayName={work.display_name || work.title || "Work"}
-      selectParam={(selectParameter as string) || ''}
+      displayName={work.display_name || (work.title ?? '') || "Work"}
+      selectParam={typeof selectParameter === 'string' ? selectParameter : ''}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
-      data={work as Record<string, unknown>}
+      data={work}
     >
       {/* PDF Viewer - show when PDF is available or loading */}
-      {(pdfResult.pdfUrl || pdfResult.isLoading || pdfResult.error) && (
+      {(pdfResult.pdfUrl !== null || pdfResult.isLoading || pdfResult.error !== null) && (
         <PdfViewer
           pdfUrl={pdfResult.pdfUrl}
           isLoading={pdfResult.isLoading}
-          title={work.display_name || work.title || "PDF Document"}
+          title={work.display_name || (work.title ?? '') || "PDF Document"}
           error={pdfResult.error}
           source={pdfResult.source ?? undefined}
           defaultCollapsed={false}

@@ -1,6 +1,7 @@
 import { expect,test } from '@playwright/test';
 
-const BASE_URL = process.env.BASE_URL || (process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173');
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = process.env.BASE_URL ?? (IS_CI ? 'http://localhost:4173' : 'http://localhost:5173');
 
 /**
  * External Canonical ID Loading Tests
@@ -22,8 +23,10 @@ const BASE_URL = process.env.BASE_URL || (process.env.CI ? 'http://localhost:417
  * verify that routing works correctly and error pages display the correct ID.
  */
 
+const TEST_SUITE_TIMEOUT_MS = 60_000;
+
 test.describe('External Canonical ID Loading', () => {
-  test.setTimeout(60_000);
+  test.setTimeout(TEST_SUITE_TIMEOUT_MS);
 
   test('should route OpenAlex ID correctly and load work data: /#/works/W...', async ({ page }) => {
     // Test basic OpenAlex ID routing to ensure core functionality works
@@ -37,7 +40,7 @@ test.describe('External Canonical ID Loading', () => {
 
     // Wait for content to load
     // Removed: waitForTimeout - use locator assertions instead
-    const pageContent = await page.locator('body').textContent() || '';
+    const pageContent = await page.locator('body').textContent() ?? '';
 
     // Verify NOT stuck on "Resolving identifier" page
     expect(pageContent).not.toContain('Resolving identifier');
@@ -79,7 +82,7 @@ test.describe('External Canonical ID Loading', () => {
     await page.goto(testUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.locator('main').waitFor({ timeout: 20_000 });
     // Removed: waitForTimeout - use locator assertions instead
-    const pageContent = await page.locator('body').textContent() || '';
+    const pageContent = await page.locator('body').textContent() ?? '';
 
     // Verify NOT stuck on "Resolving identifier"
     expect(pageContent).not.toContain('Resolving identifier');
@@ -123,7 +126,7 @@ test.describe('External Canonical ID Loading', () => {
     await page.goto(testUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.locator('main').waitFor({ timeout: 20_000 });
     // Removed: waitForTimeout - use locator assertions instead
-    const pageContent = await page.locator('body').textContent() || '';
+    const pageContent = await page.locator('body').textContent() ?? '';
 
     // Verify NOT stuck on "Resolving identifier"
     expect(pageContent).not.toContain('Resolving identifier');
@@ -164,7 +167,7 @@ test.describe('External Canonical ID Loading', () => {
     await page.goto(testUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.locator('main').waitFor({ timeout: 20_000 });
     // Removed: waitForTimeout - use locator assertions instead
-    const pageContent = await page.locator('body').textContent() || '';
+    const pageContent = await page.locator('body').textContent() ?? '';
 
     // Verify NOT stuck on "Resolving identifier"
     expect(pageContent).not.toContain('Resolving identifier');
@@ -204,7 +207,7 @@ test.describe('External Canonical ID Loading', () => {
     await page.goto(testUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.locator('main').waitFor({ timeout: 20_000 });
     // Removed: waitForTimeout - use locator assertions instead
-    const pageContent = await page.locator('body').textContent() || '';
+    const pageContent = await page.locator('body').textContent() ?? '';
 
     // Verify NOT stuck on "Resolving identifier"
     expect(pageContent).not.toContain('Resolving identifier');
@@ -246,7 +249,7 @@ test.describe('External Canonical ID Loading', () => {
     await page.goto(testUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.locator('main').waitFor({ timeout: 20_000 });
     // Removed: waitForTimeout - use locator assertions instead
-    const pageContent = await page.locator('body').textContent() || '';
+    const pageContent = await page.locator('body').textContent() ?? '';
 
     // Verify NOT stuck on "Resolving identifier"
     expect(pageContent).not.toContain('Resolving identifier');

@@ -7,7 +7,7 @@
 import type {
  EntityType,  GraphEdge,
   GraphNode } from "@bibgraph/types";
-import { RelationType } from "@bibgraph/types";
+import { ENTITY_TYPES,RelationType } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils/logger";
 import Dexie, { type Table } from "dexie";
 
@@ -153,12 +153,44 @@ const CONFIG_KEYS = {
   SELECTED_EDGES: "selectedRepositoryEdges",
 } as const;
 
+const isRecordObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+// Returning a real function-boundary type here (rather than an inline variable annotation) is necessary: TypeScript's control-flow analysis narrows a `const` declaration's usable type to its initializer's inferred type, not a wider explicit annotation, so a bare `const node: GraphNode | undefined = nodes[id]` still reads as non-nullable at every subsequent use, whereas a function call's return type isn't narrowed that way by its caller. This genuinely matters here: an edge's source/target id can outlive its node (e.g. the node was removed from the repository but the edge wasn't).
+const getGraphNodeById = (nodes: Record<string, GraphNode>, id: string): GraphNode | undefined => nodes[id];
+
+const mergeBooleanFilterFromJson = <K extends string>(
+  keys: readonly K[],
+  initial: Readonly<Record<K, boolean>>,
+  json: string,
+): Record<K, boolean> => {
+  const parsed: unknown = JSON.parse(json);
+  const merged: Record<K, boolean> = { ...initial };
+  if (!isRecordObject(parsed)) return merged;
+  for (const key of keys) if (key in parsed) merged[key] = Boolean(parsed[key]);
+  return merged;
+};
+
+const mergeNodeTypeFilterFromJson = (json: string): Record<EntityType, boolean> =>
+  mergeBooleanFilterFromJson(ENTITY_TYPES, createInitialNodeTypeFilter(), json);
+
+const mergeEdgeTypeFilterFromJson = (json: string): Record<RelationType, boolean> =>
+  mergeBooleanFilterFromJson(Object.values(RelationType), createInitialEdgeTypeFilter(), json);
+
+const parseBooleanRecordFromJson = (json: string): Record<string, boolean> => {
+  const parsed: unknown = JSON.parse(json);
+  if (!isRecordObject(parsed)) return {};
+  const result: Record<string, boolean> = {};
+  for (const [key, value] of Object.entries(parsed)) result[key] = Boolean(value);
+  return result;
+};
+
 /**
  * Pure Dexie repository store service
  */
 class RepoStore {
-  private db: RepoDB;
-  private logger = logger;
+  private readonly db: RepoDB;
+  private readonly logger = logger;
 
   constructor() {
     this.db = getDB();
@@ -176,7 +208,7 @@ class RepoStore {
       ]);
 
       // Load config
-      const config: Partial<RepositoryState> = { ...DEFAULT_REPOSITORY_STATE };
+      const config: RepositoryState = { ...DEFAULT_REPOSITORY_STATE };
 
       for (const record of configRecords) {
         switch (record.key) {
@@ -187,22 +219,16 @@ class RepoStore {
             config.searchQuery = record.value;
             break;
           case CONFIG_KEYS.NODE_TYPE_FILTER:
-            config.nodeTypeFilter = {
-              ...createInitialNodeTypeFilter(),
-              ...JSON.parse(record.value),
-            };
+            config.nodeTypeFilter = mergeNodeTypeFilterFromJson(record.value);
             break;
           case CONFIG_KEYS.EDGE_TYPE_FILTER:
-            config.edgeTypeFilter = {
-              ...createInitialEdgeTypeFilter(),
-              ...JSON.parse(record.value),
-            };
+            config.edgeTypeFilter = mergeEdgeTypeFilterFromJson(record.value);
             break;
           case CONFIG_KEYS.SELECTED_NODES:
-            config.selectedRepositoryNodes = JSON.parse(record.value);
+            config.selectedRepositoryNodes = parseBooleanRecordFromJson(record.value);
             break;
           case CONFIG_KEYS.SELECTED_EDGES:
-            config.selectedRepositoryEdges = JSON.parse(record.value);
+            config.selectedRepositoryEdges = parseBooleanRecordFromJson(record.value);
             break;
         }
       }
@@ -223,7 +249,7 @@ class RepoStore {
         ...config,
         repositoryNodes: repoNodes,
         repositoryEdges: repoEdges,
-      } as RepositoryState;
+      };
 
       // Compute derived state
       state.filteredNodes = this.computeFilteredNodes(state);
@@ -239,7 +265,7 @@ class RepoStore {
 
       return state;
     } catch (error) {
-      this.logger?.error("repository", "Failed to load repository state", {
+      this.logger.error("repository", "Failed to load repository state", {
         error,
       });
       return { ...DEFAULT_REPOSITORY_STATE };
@@ -248,7 +274,6 @@ class RepoStore {
 
   /**
    * Set repository mode
-   * @param enabled
    */
   async setRepositoryMode(enabled: boolean): Promise<void> {
     try {
@@ -267,7 +292,7 @@ class RepoStore {
         },
       );
     } catch (error) {
-      this.logger?.error("repository", "Failed to set repository mode", {
+      this.logger.error("repository", "Failed to set repository mode", {
         enabled,
         error,
       });
@@ -277,12 +302,10 @@ class RepoStore {
 
   /**
    * Add nodes and edges to repository
-   * @param nodes
-   * @param edges
    */
   async addToRepository(
-    nodes: GraphNode[],
-    edges: GraphEdge[] = [],
+    nodes: readonly GraphNode[],
+    edges: readonly GraphEdge[] = [],
   ): Promise<void> {
     try {
       let addedNodes = 0;
@@ -321,7 +344,7 @@ class RepoStore {
         totalEdges: await this.db.edges.count(),
       });
     } catch (error) {
-      this.logger?.error("repository", "Failed to add to repository", {
+      this.logger.error("repository", "Failed to add to repository", {
         error,
       });
       throw error;
@@ -330,12 +353,10 @@ class RepoStore {
 
   /**
    * Remove nodes and edges from repository
-   * @param nodeIds
-   * @param edgeIds
    */
   async removeFromRepository(
-    nodeIds: string[],
-    edgeIds: string[] = [],
+    nodeIds: readonly string[],
+    edgeIds: readonly string[] = [],
   ): Promise<void> {
     try {
       // Remove nodes
@@ -350,16 +371,12 @@ class RepoStore {
 
       // Update selections (remove deleted items)
       const state = await this.getRepositoryState();
-      const updatedSelectedNodes = { ...state.selectedRepositoryNodes };
-      const updatedSelectedEdges = { ...state.selectedRepositoryEdges };
-
-      for (const nodeId of nodeIds) {
-        delete updatedSelectedNodes[nodeId];
-      }
-
-      for (const edgeId of edgeIds) {
-        delete updatedSelectedEdges[edgeId];
-      }
+      const updatedSelectedNodes = Object.fromEntries(
+        Object.entries(state.selectedRepositoryNodes).filter(([id]) => !nodeIds.includes(id)),
+      );
+      const updatedSelectedEdges = Object.fromEntries(
+        Object.entries(state.selectedRepositoryEdges).filter(([id]) => !edgeIds.includes(id)),
+      );
 
       await Promise.all([
         this.setSelectedRepositoryNodes(updatedSelectedNodes),
@@ -371,7 +388,7 @@ class RepoStore {
         removedEdges: edgeIds.length,
       });
     } catch (error) {
-      this.logger?.error("repository", "Failed to remove from repository", {
+      this.logger.error("repository", "Failed to remove from repository", {
         error,
       });
       throw error;
@@ -392,14 +409,13 @@ class RepoStore {
 
       this.logger.debug("repository", "Cleared repository");
     } catch (error) {
-      this.logger?.error("repository", "Failed to clear repository", { error });
+      this.logger.error("repository", "Failed to clear repository", { error });
       throw error;
     }
   }
 
   /**
    * Set search query
-   * @param query
    */
   async setSearchQuery(query: string): Promise<void> {
     try {
@@ -409,7 +425,7 @@ class RepoStore {
         updatedAt: new Date(),
       });
     } catch (error) {
-      this.logger?.error("repository", "Failed to set search query", {
+      this.logger.error("repository", "Failed to set search query", {
         query,
         error,
       });
@@ -419,8 +435,6 @@ class RepoStore {
 
   /**
    * Set node type filter
-   * @param entityType
-   * @param enabled
    */
   async setNodeTypeFilter(
     entityType: EntityType,
@@ -436,7 +450,7 @@ class RepoStore {
         updatedAt: new Date(),
       });
     } catch (error) {
-      this.logger?.error("repository", "Failed to set node type filter", {
+      this.logger.error("repository", "Failed to set node type filter", {
         entityType,
         enabled,
         error,
@@ -447,8 +461,6 @@ class RepoStore {
 
   /**
    * Set edge type filter
-   * @param relationType
-   * @param enabled
    */
   async setEdgeTypeFilter(
     relationType: RelationType,
@@ -467,7 +479,7 @@ class RepoStore {
         updatedAt: new Date(),
       });
     } catch (error) {
-      this.logger?.error("repository", "Failed to set edge type filter", {
+      this.logger.error("repository", "Failed to set edge type filter", {
         relationType,
         enabled,
         error,
@@ -499,15 +511,13 @@ class RepoStore {
         }),
       ]);
     } catch (error) {
-      this.logger?.error("repository", "Failed to reset filters", { error });
+      this.logger.error("repository", "Failed to reset filters", { error });
       throw error;
     }
   }
 
   /**
    * Select/deselect repository node
-   * @param nodeId
-   * @param selected
    */
   async selectRepositoryNode(nodeId: string, selected: boolean): Promise<void> {
     try {
@@ -519,7 +529,7 @@ class RepoStore {
 
       await this.setSelectedRepositoryNodes(updatedSelections);
     } catch (error) {
-      this.logger?.error("repository", "Failed to select repository node", {
+      this.logger.error("repository", "Failed to select repository node", {
         nodeId,
         selected,
         error,
@@ -530,8 +540,6 @@ class RepoStore {
 
   /**
    * Select/deselect repository edge
-   * @param edgeId
-   * @param selected
    */
   async selectRepositoryEdge(edgeId: string, selected: boolean): Promise<void> {
     try {
@@ -543,7 +551,7 @@ class RepoStore {
 
       await this.setSelectedRepositoryEdges(updatedSelections);
     } catch (error) {
-      this.logger?.error("repository", "Failed to select repository edge", {
+      this.logger.error("repository", "Failed to select repository edge", {
         edgeId,
         selected,
         error,
@@ -566,7 +574,7 @@ class RepoStore {
 
       await this.setSelectedRepositoryNodes(selections);
     } catch (error) {
-      this.logger?.error("repository", "Failed to select all nodes", { error });
+      this.logger.error("repository", "Failed to select all nodes", { error });
       throw error;
     }
   }
@@ -585,7 +593,7 @@ class RepoStore {
 
       await this.setSelectedRepositoryEdges(selections);
     } catch (error) {
-      this.logger?.error("repository", "Failed to select all edges", { error });
+      this.logger.error("repository", "Failed to select all edges", { error });
       throw error;
     }
   }
@@ -600,7 +608,7 @@ class RepoStore {
         this.setSelectedRepositoryEdges({}),
       ]);
     } catch (error) {
-      this.logger?.error("repository", "Failed to clear all selections", {
+      this.logger.error("repository", "Failed to clear all selections", {
         error,
       });
       throw error;
@@ -610,7 +618,7 @@ class RepoStore {
   // Private helper methods
 
   private async setSelectedRepositoryNodes(
-    selections: Record<string, boolean>,
+    selections: Readonly<Record<string, boolean>>,
   ): Promise<void> {
     await this.db.config.put({
       key: CONFIG_KEYS.SELECTED_NODES,
@@ -620,7 +628,7 @@ class RepoStore {
   }
 
   private async setSelectedRepositoryEdges(
-    selections: Record<string, boolean>,
+    selections: Readonly<Record<string, boolean>>,
   ): Promise<void> {
     await this.db.config.put({
       key: CONFIG_KEYS.SELECTED_EDGES,
@@ -650,7 +658,7 @@ class RepoStore {
       if (state.searchQuery) {
         const query = state.searchQuery.toLowerCase();
         return (
-          node.label?.toLowerCase().includes(query) ||
+          node.label.toLowerCase().includes(query) ||
           node.id.toLowerCase().includes(query)
         );
       }
@@ -679,12 +687,12 @@ class RepoStore {
       // Filter by search query (search in connected node labels)
       if (state.searchQuery) {
         const query = state.searchQuery.toLowerCase();
-        const sourceNode = state.repositoryNodes[edge.source];
-        const targetNode = state.repositoryNodes[edge.target];
+        const sourceNode = getGraphNodeById(state.repositoryNodes, edge.source);
+        const targetNode = getGraphNodeById(state.repositoryNodes, edge.target);
 
         return (
-          sourceNode?.label?.toLowerCase().includes(query) ||
-          targetNode?.label?.toLowerCase().includes(query) ||
+          (sourceNode?.label.toLowerCase().includes(query) ?? false) ||
+          (targetNode?.label.toLowerCase().includes(query) ?? false) ||
           edge.id.toLowerCase().includes(query)
         );
       }
@@ -718,7 +726,7 @@ class RepoStore {
 
       this.logger.debug("repository", "Migration completed");
     } catch (error) {
-      this.logger?.error("repository", "Migration failed", { error });
+      this.logger.error("repository", "Migration failed", { error });
     }
   }
 }

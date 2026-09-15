@@ -2,8 +2,6 @@
  * Graph Page State Components
  *
  * Loading, error, and empty states for the graph page.
- *
- * @module components/graph/GraphPageStates
  */
 
 import type { GraphDataSourceState } from '@bibgraph/utils';
@@ -30,8 +28,6 @@ interface GraphLoadingStateProperties {
 
 /**
  * Loading state for graph page - shown while data sources are loading
- * @param root0
- * @param root0.message
  */
 export const GraphLoadingState: React.FC<GraphLoadingStateProperties> = ({
   message = 'Loading data sources...',
@@ -51,9 +47,6 @@ interface GraphErrorStateProperties {
 
 /**
  * Error state for graph page - shown when data loading fails
- * @param root0
- * @param root0.error
- * @param root0.onRetry
  */
 export const GraphErrorState: React.FC<GraphErrorStateProperties> = ({
   error,
@@ -90,15 +83,6 @@ interface GraphEmptyStateWithPanelProperties {
 
 /**
  * Empty state with source panel - shown when no sources are enabled or no entities exist
- * @param root0
- * @param root0.variant
- * @param root0.sources
- * @param root0.enabledSourceIds
- * @param root0.onToggleSource
- * @param root0.onEnableAll
- * @param root0.onDisableAll
- * @param root0.onRefresh
- * @param root0.loading
  */
 export const GraphEmptyStateWithPanel: React.FC<GraphEmptyStateWithPanelProperties> = ({
   variant,
@@ -110,7 +94,7 @@ export const GraphEmptyStateWithPanel: React.FC<GraphEmptyStateWithPanelProperti
   onRefresh,
   loading,
 }) => (
-  <Flex h={`calc(100vh - ${LAYOUT.HEADER_HEIGHT}px)`}>
+  <Flex h={`calc(100vh - ${String(LAYOUT.HEADER_HEIGHT)}px)`}>
     <GraphSourcePanel
       sources={sources}
       enabledSourceIds={enabledSourceIds}

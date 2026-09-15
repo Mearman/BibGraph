@@ -2,7 +2,6 @@
  * E2E tests for 404 (Not Found) error scenarios
  *
  * Tests handling of non-existent entities and routes
- * @module error-404.e2e
  * @see spec-020 Phase 5: Error scenario coverage
  */
 
@@ -14,7 +13,7 @@ import { ErrorPage } from "@/test/page-objects/ErrorPage";
 test.describe("@error 404 Not Found Errors", () => {
 	let errorPage: ErrorPage;
 
-	test.beforeEach(async ({ page }) => {
+	test.beforeEach(({ page }) => {
 		errorPage = new ErrorPage(page);
 	});
 

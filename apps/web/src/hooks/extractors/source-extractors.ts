@@ -1,9 +1,7 @@
 /**
  * Source entity relationship extractors
- * @module extractors/source-extractors
  */
 
-import type { EntityType } from '@bibgraph/types';
 import { RelationType } from '@bibgraph/types';
 
 import type { RelationshipItem, RelationshipSection } from '@/types/relationship';
@@ -12,101 +10,100 @@ import { RELATIONSHIP_TYPE_LABELS } from '@/types/relationship';
 import {
   createRelationshipItem,
   createRelationshipSection,
-  safeStringId,
 } from '../relationship-helpers';
-
-/**
- * Extract relationships from Source entity
- * @param data - Raw source data from OpenAlex API
- * @param sourceId - The source's OpenAlex ID
- * @param outgoing - Array to push outgoing relationship sections to
- */
-export const extractSourceRelationships = (
-  data: Record<string, unknown>,
-  sourceId: string,
-  outgoing: RelationshipSection[],
-): void => {
-  extractSourceHostOrganization(data, sourceId, outgoing);
-  extractSourceTopics(data, sourceId, outgoing);
-};
+import { isPlainObject, readArray, readString } from './unknown-helpers';
 
 /**
  * HOST_ORGANIZATION: Source → Publisher
  * @param data - Raw source data
  * @param sourceId - The source's OpenAlex ID
- * @param outgoing - Array to push relationship sections to
+ * @returns Relationship sections extracted from the source's host organization, or an empty array if there is none
  */
 const extractSourceHostOrganization = (
   data: Record<string, unknown>,
   sourceId: string,
-  outgoing: RelationshipSection[],
-): void => {
-  const hostOrganization = data.host_organization as string | undefined;
-  const hostOrganizationName = data.host_organization_name as string | undefined;
+): RelationshipSection[] => {
+  const hostOrganization = readString(data, 'host_organization');
+  const hostOrganizationName = readString(data, 'host_organization_name');
 
-  if (hostOrganization && hostOrganizationName) {
-    const publisherItem = createRelationshipItem(
-      sourceId,
-      hostOrganization,
-      'sources' as EntityType,
-      'publishers' as EntityType,
+  if (hostOrganization === undefined || hostOrganizationName === undefined) {
+    return [];
+  }
+
+  const publisherItem = createRelationshipItem(
+    sourceId,
+    hostOrganization,
+    'sources',
+    'publishers',
+    RelationType.HOST_ORGANIZATION,
+    'outbound',
+    hostOrganizationName,
+  );
+
+  return [
+    createRelationshipSection(
       RelationType.HOST_ORGANIZATION,
       'outbound',
-      hostOrganizationName,
-    );
-
-    outgoing.push(
-      createRelationshipSection(
-        RelationType.HOST_ORGANIZATION,
-        'outbound',
-        RELATIONSHIP_TYPE_LABELS[RelationType.HOST_ORGANIZATION],
-        [publisherItem],
-      ),
-    );
-  }
+      RELATIONSHIP_TYPE_LABELS[RelationType.HOST_ORGANIZATION],
+      [publisherItem],
+    ),
+  ];
 };
 
 /**
  * TOPIC: Source → Topics
  * @param data - Raw source data
  * @param sourceId - The source's OpenAlex ID
- * @param outgoing - Array to push relationship sections to
+ * @returns Relationship sections extracted from the source's topic coverage, or an empty array if there are none
  */
 const extractSourceTopics = (
   data: Record<string, unknown>,
   sourceId: string,
-  outgoing: RelationshipSection[],
-): void => {
-  const topics = data.topics as
-    | Array<{
-        id?: string;
-        display_name?: string;
-        count?: number;
-        score?: number;
-      }>
-    | undefined;
-
-  if (topics && topics.length > 0) {
-    const topicItems: RelationshipItem[] = topics
-      .filter((topic) => topic.id && topic.display_name)
-      .map((topic) => {
-        const topicId = safeStringId(topic.id);
-        const topicName = safeStringId(topic.display_name);
-        return createRelationshipItem(
-          sourceId,
-          topicId,
-          'sources' as EntityType,
-          'topics' as EntityType,
-          RelationType.TOPIC,
-          'outbound',
-          topicName,
-        );
-      });
-
-    if (topicItems.length > 0) {
-      outgoing.push(
-        createRelationshipSection(RelationType.TOPIC, 'outbound', 'Topic Coverage', topicItems),
-      );
-    }
+): RelationshipSection[] => {
+  const topics = readArray(data, 'topics');
+  if (topics === undefined || topics.length === 0) {
+    return [];
   }
+
+  const topicItems: RelationshipItem[] = [];
+  for (const topic of topics) {
+    if (!isPlainObject(topic)) {
+      continue;
+    }
+    const topicId = readString(topic, 'id');
+    const topicName = readString(topic, 'display_name');
+    if (topicId === undefined || topicName === undefined) {
+      continue;
+    }
+    topicItems.push(
+      createRelationshipItem(
+        sourceId,
+        topicId,
+        'sources',
+        'topics',
+        RelationType.TOPIC,
+        'outbound',
+        topicName,
+      ),
+    );
+  }
+
+  if (topicItems.length === 0) {
+    return [];
+  }
+
+  return [createRelationshipSection(RelationType.TOPIC, 'outbound', 'Topic Coverage', topicItems)];
+};
+
+/**
+ * Extract relationships from Source entity
+ * @param data - Raw source data from OpenAlex API
+ * @param sourceId - The source's OpenAlex ID
+ * @returns Outgoing relationship sections extracted from the source's data
+ */
+export const extractSourceRelationships = (
+  data: Record<string, unknown>,
+  sourceId: string,
+): RelationshipSection[] => {
+  return [...extractSourceHostOrganization(data, sourceId), ...extractSourceTopics(data, sourceId)];
 };

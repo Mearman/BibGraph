@@ -3,8 +3,6 @@
  *
  * Types and utilities for path highlighting presets in graph visualization.
  * Provides different path analysis modes for exploring relationships.
- *
- * @module lib/path-presets
  */
 
 /**
@@ -18,7 +16,7 @@ export type PathPreset =
 
 /**
  * Find all nodes reachable from a source node using BFS
- * @param graph - Adjacency list representation of graph (nodeId -> Set of neighbor nodeIds)
+ * @param graph - Adjacency list representation of graph (nodeId -\> Set of neighbor nodeIds)
  * @param sourceId - Source node ID
  * @param targetId - Optional target node ID to limit search depth
  * @param maxDepth - Maximum depth to traverse (default: unlimited)
@@ -31,11 +29,15 @@ export const findReachableNodes = (
   maxDepth?: number,
 ): string[] => {
   const visited = new Set<string>();
-  const queue: Array<{ nodeId: string; depth: number }> = [{ nodeId: sourceId, depth: 0 }];
+  const queue: { nodeId: string; depth: number }[] = [{ nodeId: sourceId, depth: 0 }];
   const result: string[] = [];
 
   while (queue.length > 0) {
-    const { nodeId, depth } = queue.shift() as { nodeId: string; depth: number };
+    const next = queue.shift();
+    if (next === undefined) {
+      break;
+    }
+    const { nodeId, depth } = next;
 
     if (visited.has(nodeId)) {
       continue;
@@ -45,7 +47,7 @@ export const findReachableNodes = (
     result.push(nodeId);
 
     // Stop if we reached target
-    if (targetId && nodeId === targetId) {
+    if (targetId !== undefined && targetId !== "" && nodeId === targetId) {
       break;
     }
 
@@ -92,7 +94,10 @@ export const findShortestPath = (
   parentMap.set(sourceId, null);
 
   while (queue.length > 0) {
-    const nodeId = queue.shift() as string;
+    const nodeId = queue.shift();
+    if (nodeId === undefined) {
+      break;
+    }
 
     if (nodeId === targetId) {
       // Reconstruct path

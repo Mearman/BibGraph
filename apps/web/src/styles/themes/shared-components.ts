@@ -1,4 +1,4 @@
-import { rem } from '@mantine/core'
+import { ActionIcon, Avatar, Badge, Button, Card, Checkbox, Chip, Container, Input, Loader, Notification, Radio, rem, Select, Textarea } from '@mantine/core'
 
 // Container sizes for custom Container component
 const CONTAINER_SIZES: Record<string, string> = {
@@ -11,192 +11,160 @@ const CONTAINER_SIZES: Record<string, string> = {
   xxl: rem("1600px"),
 }
 
+// Color keys that render as neutral (black/white contrast) rather than a themed hue
+const NEUTRAL_COLOR_KEYS = new Set(["zinc", "slate", "gray", "neutral", "stone"])
+
 // Shared component definitions used by all themes
 export const sharedComponents = {
-  Container: {
-    vars: (_, { size, fluid }) => ({
+  Container: Container.extend({
+    vars: (_theme, { size, fluid }) => ({
       root: {
-        '--container-size': fluid
+        '--container-size': fluid === true
           ? '100%'
           : (size !== undefined && size in CONTAINER_SIZES
             ? CONTAINER_SIZES[size]
             : rem(size)),
       },
     }),
-  },
+  }),
 
-  Button: {
+  Button: Button.extend({
     vars: (theme, properties) => {
-      const color = properties.color && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
+      const color = properties.color !== undefined && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
       const variant = properties.variant ?? 'filled'
-      const isNeutralColor = color && ["zinc", "slate", "gray", "neutral", "stone"].includes(color)
+      const isNeutralColor = color !== undefined && NEUTRAL_COLOR_KEYS.has(color)
 
       return {
         root: {
           '--button-color': (() => {
             if (variant === 'filled') {
-              return color ? `var(--mantine-color-${color}-contrast)` : 'var(--mantine-primary-color-contrast)'
+              return color !== undefined ? `var(--mantine-color-${color}-contrast)` : 'var(--mantine-primary-color-contrast)'
             }
             if (variant === 'white') {
               return isNeutralColor ? 'var(--mantine-color-black)' : undefined
             }
+            return undefined
           })(),
         },
       }
     },
-  },
+  }),
 
-  Card: {
-    vars: (theme, properties) => {
-      const variant = properties.variant ?? 'default'
-      const colorKey = properties.color && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
-      const isNeutralColor = colorKey && ["zinc", "slate", "gray", "neutral", "stone"].includes(colorKey)
-
-      return {
-        root: {
-          '--card-bg': (() => {
-            if (variant === 'filled' && colorKey) {
-              return 'var(--mantine-color-' + colorKey + '-light)'
-            }
-            if (variant === 'outline') {
-              return 'var(--mantine-color-body)'
-            }
-            return 'var(--mantine-color-body)'
-          })(),
-          '--card-border-color': (() => {
-            if (variant === 'outline' && colorKey) {
-              return 'var(--mantine-color-' + colorKey + '-outline)'
-            }
-            if (variant === 'filled' && isNeutralColor) {
-              return 'transparent'
-            }
-            return 'var(--mantine-color-default-border)'
-          })(),
-          '--card-shadow': variant === 'filled' ? 'none' : theme.shadows.lg,
-          '--card-radius': 'var(--mantine-radius-default)',
-          '--card-padding': variant === 'compact' ? 'var(--mantine-spacing-md)' : 'var(--mantine-spacing-xl)',
-        },
-      }
-    },
+  // Card has no `variant` or `color` prop, so the theme-dependent values below are constant
+  Card: Card.extend({
     defaultProps: {
       p: 'xl',
       shadow: 'xl',
       withBorder: true,
     },
-    styles: {
+    styles: (theme) => ({
       root: {
-        backgroundColor: 'var(--card-bg)',
-        border: '1px solid var(--card-border-color)',
-        boxShadow: 'var(--card-shadow)',
-        borderRadius: 'var(--card-radius)',
-        padding: 'var(--card-padding)',
+        backgroundColor: 'var(--mantine-color-body)',
+        border: '1px solid var(--mantine-color-default-border)',
+        boxShadow: theme.shadows.lg,
+        borderRadius: 'var(--mantine-radius-default)',
+        padding: 'var(--mantine-spacing-xl)',
         position: 'relative',
         overflow: 'hidden',
         transition: 'all 0.2s ease',
         '&:hover': {
-          boxShadow: 'var(--card-shadow), 0 0 0 1px var(--mantine-color-primary-outline)',
+          boxShadow: `${theme.shadows.lg}, 0 0 0 1px var(--mantine-color-primary-outline)`,
         },
       },
-    },
-  },
+    }),
+  }),
 
   Paper: {
     defaultProps: {
       shadow: 'xl',
     },
-    vars: (theme) => ({
-      root: {
-        'paper-bg': 'var(--mantine-color-body)',
-        'paper-shadow': theme.shadows.md,
-      },
-    }),
   },
 
-  Input: {
-    vars: (theme, properties) => {
-      const hasError = properties.error
+  Input: Input.extend({
+    styles: (theme, properties) => {
+      const hasError = properties.error !== undefined && properties.error !== null && properties.error !== false
 
       return {
         input: {
-          'input-bg': 'var(--mantine-color-body)',
-          'input-border-color': hasError
+          '--input-bg': 'var(--mantine-color-body)',
+          '--input-border-color': hasError
             ? theme.colors.red[6]
             : 'var(--mantine-color-default-border)',
-          'input-placeholder-color': 'var(--mantine-color-placeholder)',
+          '--input-placeholder-color': 'var(--mantine-color-placeholder)',
         }
       }
     },
-  },
+  }),
 
-  Select: {
+  Select: Select.extend({
     defaultProps: {
       checkIconPosition: "right",
     },
-    vars: (theme, properties) => {
-      const hasError = properties.error
+    styles: (theme, properties) => {
+      const hasError = properties.error !== undefined && properties.error !== null && properties.error !== false
 
       return {
         input: {
-          'select-bg': 'var(--mantine-color-body)',
-          'select-border-color': hasError
+          '--select-bg': 'var(--mantine-color-body)',
+          '--select-border-color': hasError
             ? theme.colors.red[6]
             : 'var(--mantine-color-default-border)',
-          'select-placeholder-color': 'var(--mantine-color-placeholder)',
+          '--select-placeholder-color': 'var(--mantine-color-placeholder)',
         }
       }
     },
-  },
+  }),
 
-  Textarea: {
-    vars: (theme, properties) => {
-      const hasError = properties.error
+  Textarea: Textarea.extend({
+    styles: (theme, properties) => {
+      const hasError = properties.error !== undefined && properties.error !== null && properties.error !== false
 
       return {
-        textarea: {
-          'textarea-bg': 'var(--mantine-color-body)',
-          'textarea-border-color': hasError
+        input: {
+          '--textarea-bg': 'var(--mantine-color-body)',
+          '--textarea-border-color': hasError
             ? theme.colors.red[6]
             : 'var(--mantine-color-default-border)',
-          'textarea-placeholder-color': 'var(--mantine-color-placeholder)',
+          '--textarea-placeholder-color': 'var(--mantine-color-placeholder)',
         }
       }
     },
-  },
+  }),
 
-  Checkbox: {
+  Checkbox: Checkbox.extend({
     vars: (theme, properties) => {
-      const colorKey = properties.color && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
+      const colorKey = properties.color !== undefined && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
       return {
         root: {
-          '--checkbox-color': colorKey
+          '--checkbox-color': colorKey !== undefined
             ? `var(--mantine-color-${colorKey}-filled)`
             : 'var(--mantine-primary-color-filled)',
-          '--checkbox-icon-color': colorKey
+          '--checkbox-icon-color': colorKey !== undefined
             ? `var(--mantine-color-${colorKey}-contrast)`
             : 'var(--mantine-primary-color-contrast)',
         },
       }
     },
-  },
+  }),
 
-  Radio: {
+  Radio: Radio.extend({
     vars: (theme, properties) => ({
       root: {
-        '--radio-color': properties.color
+        '--radio-color': properties.color !== undefined
           ? Object.keys(theme.colors).includes(properties.color)
-            ? ["zinc", "slate", "gray", "neutral", "stone"].includes(properties.color)
+            ? NEUTRAL_COLOR_KEYS.has(properties.color)
               ? "var(--mantine-color-body)"
               : `var(--mantine-color-${properties.color}-filled)`
             : properties.color
           : "var(--mantine-primary-color-filled)",
-        '--radio-icon-color': properties.color
+        '--radio-icon-color': properties.color !== undefined
           ? (Object.keys(theme.colors).includes(properties.color)
             ? `var(--mantine-color-${properties.color}-contrast)`
             : properties.color)
           : "var(--mantine-primary-color-contrast)",
       },
     }),
-  },
+  }),
 
   Switch: {
     styles: () => ({
@@ -214,31 +182,11 @@ export const sharedComponents = {
     defaultProps: {
       withBorder: true,
     },
-    vars: (theme) => ({
-      content: {
-        'modal-bg': 'var(--mantine-color-body)',
-        'modal-shadow': theme.shadows.xl,
-      },
-    }),
   },
 
-  Drawer: {
-    vars: (theme) => ({
-      content: {
-        'drawer-bg': 'var(--mantine-color-body)',
-        'drawer-shadow': theme.shadows.lg,
-      },
-    }),
-  },
+  Drawer: {},
 
-  Popover: {
-    vars: (theme) => ({
-      dropdown: {
-        'popover-bg': 'var(--mantine-color-body)',
-        'popover-shadow': theme.shadows.lg,
-      },
-    }),
-  },
+  Popover: {},
 
   Tooltip: {
     vars: () => ({
@@ -249,76 +197,77 @@ export const sharedComponents = {
     }),
   },
 
-  Notification: {
-    vars: (theme, properties) => {
-      const colorKey = properties.color && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
+  Notification: Notification.extend({
+    styles: (theme, properties) => {
+      const colorKey = properties.color !== undefined && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
       return {
         root: {
-          '--notification-bg': colorKey ? `var(--mantine-color-${colorKey}-light)` : 'var(--mantine-primary-color-light)',
-          '--notification-border': colorKey ? `var(--mantine-color-${colorKey}-outline)` : 'var(--mantine-primary-color-outline)',
-          '--notification-color': colorKey ? `var(--mantine-color-${colorKey}-light-color)` : 'var(--mantine-primary-color-light-color)',
+          '--notification-bg': colorKey !== undefined ? `var(--mantine-color-${colorKey}-light)` : 'var(--mantine-primary-color-light)',
+          '--notification-border': colorKey !== undefined ? `var(--mantine-color-${colorKey}-outline)` : 'var(--mantine-primary-color-outline)',
+          '--notification-color': colorKey !== undefined ? `var(--mantine-color-${colorKey}-light-color)` : 'var(--mantine-primary-color-light-color)',
         }
       }
     },
-  },
+  }),
 
-  Loader: {
+  Loader: Loader.extend({
     vars: (theme, properties) => {
-      const colorKey = properties.color && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
+      const colorKey = properties.color !== undefined && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
       return {
         root: {
-          '--loader-color': colorKey
+          '--loader-color': colorKey !== undefined
             ? `var(--mantine-color-${colorKey}-filled)`
             : 'var(--mantine-primary-color-filled)',
         },
       }
     },
-  },
+  }),
 
-  ActionIcon: {
+  ActionIcon: ActionIcon.extend({
     vars: (theme, properties) => {
-      const colorKey = properties.color && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
-      const isNeutralColor = colorKey && ["zinc", "slate", "gray", "neutral", "stone"].includes(colorKey)
+      const colorKey = properties.color !== undefined && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
+      const isNeutralColor = colorKey !== undefined && NEUTRAL_COLOR_KEYS.has(colorKey)
       const variant = properties.variant ?? "filled"
 
       return {
         root: {
           '--ai-color': (() => {
             if (variant === "filled") {
-              return colorKey
+              return colorKey !== undefined
                 ? `var(--mantine-color-${colorKey}-contrast)`
                 : "var(--mantine-primary-color-contrast)"
             }
             if (variant === "white") {
               return isNeutralColor ? "var(--mantine-color-black)" : undefined
             }
+            return undefined
           })(),
         },
       }
     }
-  },
+  }),
 
-  Badge: {
+  Badge: Badge.extend({
     vars: (theme, properties) => {
-      const colorKey = properties.color && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
-      const isNeutralColor = colorKey && ["zinc", "slate", "gray", "neutral", "stone"].includes(colorKey)
+      const colorKey = properties.color !== undefined && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
+      const isNeutralColor = colorKey !== undefined && NEUTRAL_COLOR_KEYS.has(colorKey)
       const variant = properties.variant ?? "filled"
 
       return {
         root: {
-          '--badge-bg': variant === "filled" && colorKey ? `var(--mantine-color-${colorKey}-filled)` : undefined,
+          '--badge-bg': variant === "filled" && colorKey !== undefined ? `var(--mantine-color-${colorKey}-filled)` : undefined,
           '--badge-color':
             variant === "filled"
-              ? (colorKey ? `var(--mantine-color-${colorKey}-contrast)` : 'var(--mantine-primary-color-contrast)')
+              ? (colorKey !== undefined ? `var(--mantine-color-${colorKey}-contrast)` : 'var(--mantine-primary-color-contrast)')
               : (variant === "white") && isNeutralColor ? `var(--mantine-color-black)` : undefined,
         },
       }
     },
-  },
+  }),
 
-  Chip: {
+  Chip: Chip.extend({
     vars: (theme, properties) => {
-      const colorKey = properties.color && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
+      const colorKey = properties.color !== undefined && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
       const variant = properties.variant ?? "filled"
 
       return {
@@ -326,71 +275,71 @@ export const sharedComponents = {
           '--chip-bg':
             variant === "light"
               ? undefined
-              : (colorKey
+              : (colorKey !== undefined
                 ? `var(--mantine-color-${colorKey}-filled)`
                 : "var(--mantine-primary-color-filled)"),
           '--chip-color':
             variant === "filled"
-              ? (colorKey
+              ? (colorKey !== undefined
                 ? `var(--mantine-color-${colorKey}-contrast)`
                 : "var(--mantine-primary-color-contrast)")
               : undefined,
         },
       }
     },
-  },
+  }),
 
   // All remaining component definitions...
-  Avatar: {
+  Avatar: Avatar.extend({
     vars: (theme, properties) => {
-      const colorKey = properties.color && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
-      const isNeutralColor = colorKey && ["zinc", "slate", "gray", "neutral", "stone"].includes(colorKey)
+      const colorKey = properties.color !== undefined && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
+      const isNeutralColor = colorKey !== undefined && NEUTRAL_COLOR_KEYS.has(colorKey)
       const variant = properties.variant ?? "light"
 
       return {
         root: {
           '--avatar-bg':
             variant === "filled"
-              ? (colorKey
+              ? (colorKey !== undefined
                 ? `var(--mantine-color-${colorKey}-filled)`
                 : "var(--mantine-primary-color-filled)")
               : variant === "light"
-                ? colorKey
+                ? colorKey !== undefined
                   ? `var(--mantine-color-${colorKey}-light)`
                   : "var(--mantine-primary-color-light)"
                 : undefined,
 
           '--avatar-color':
             variant === "filled"
-              ? (colorKey
+              ? (colorKey !== undefined
                 ? `var(--mantine-color-${colorKey}-contrast)`
                 : "var(--mantine-primary-color-contrast)")
               : variant === "light"
-                ? colorKey
+                ? colorKey !== undefined
                   ? `var(--mantine-color-${colorKey}-light-color)`
                   : "var(--mantine-primary-color-light-color)"
                 : variant === "white"
                   ? isNeutralColor
                     ? `var(--mantine-color-black)`
-                    : colorKey
+                    : colorKey !== undefined
                       ? `var(--mantine-color-${colorKey}-outline)`
                       : "var(--mantine-primary-color-filled)"
                   : variant === "outline" || variant === "transparent"
-                    ? colorKey
+                    ? colorKey !== undefined
                       ? `var(--mantine-color-${colorKey}-outline)`
                       : "var(--mantine-primary-color-filled)"
                     : undefined,
 
           '--avatar-bd':
             variant === "outline"
-              ? (colorKey
+              ? (colorKey !== undefined
                 ? `1px solid var(--mantine-color-${colorKey}-outline)`
                 : "1px solid var(--mantine-primary-color-filled)")
               : undefined,
         },
       }
     },
-  },
+  }),
 
   // Layout components
   AppShell: {
@@ -666,7 +615,5 @@ export const sharedComponents = {
     },
   },
 
-  // Additional utility components and form components...
-  // (Continuing with the rest of the component definitions would make this file very long)
-  // For brevity, I'm showing the key structure - we'd move all component definitions here
+  // Additional utility components and form components... (Continuing with the rest of the component definitions would make this file very long) For brevity, I'm showing the key structure - we'd move all component definitions here
 }

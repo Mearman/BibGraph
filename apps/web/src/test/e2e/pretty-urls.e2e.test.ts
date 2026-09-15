@@ -1,6 +1,7 @@
 import { expect,test } from '@playwright/test';
 
-const BASE_URL = process.env.BASE_URL || (process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173');
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = process.env.BASE_URL ?? (IS_CI ? 'http://localhost:4173' : 'http://localhost:5173');
 
 /**
  * Pretty URL Display Tests
@@ -13,8 +14,10 @@ const BASE_URL = process.env.BASE_URL || (process.env.CI ? 'http://localhost:417
  * - URL updates to: /#/works/https://doi.org/10.7717/peerj.4375
  */
 
+const TEST_SUITE_TIMEOUT_MS = 90_000;
+
 test.describe('Pretty URL Display', () => {
-  test.setTimeout(90_000);
+  test.setTimeout(TEST_SUITE_TIMEOUT_MS);
 
   test('should display pretty (decoded) DOI URL in address bar', async ({ page }) => {
     const encodedDoi = 'https%3A%2F%2Fdoi.org%2F10.7717%2Fpeerj.4375';

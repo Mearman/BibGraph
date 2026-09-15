@@ -7,7 +7,6 @@ import { EntityList } from "@/components/EntityList";
 import type { TableViewMode } from "@/components/TableViewModeToggle";
 import type { ColumnConfig } from "@/components/types";
 import { ICON_SIZE } from "@/config/style-constants";
-import type { OpenAlexSearchParams } from "@/lib/route-schemas";
 
 const conceptsColumns: ColumnConfig[] = [
   { key: "display_name", header: "Name" },
@@ -18,7 +17,7 @@ const conceptsColumns: ColumnConfig[] = [
 ];
 
 const ConceptsListRoute = () => {
-  const search = useSearch({ from: "/concepts/" }) as OpenAlexSearchParams;
+  const search = useSearch({ from: "/concepts/" });
   const [viewMode, setViewMode] = useState<TableViewMode>("table");
 
   return (

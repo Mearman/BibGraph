@@ -8,6 +8,16 @@ import { expect, test } from "@playwright/test";
 
 import { waitForAppReady } from "@/test/helpers/app-ready";
 
+const MOBILE_VIEWPORT_WIDTH_PX = 320;
+const TABLET_VIEWPORT_WIDTH_PX = 768;
+const DESKTOP_VIEWPORT_WIDTH_PX = 1920;
+const UHD_VIEWPORT_WIDTH_PX = 3840;
+const MAX_CARD_WIDTH_PX = 1000;
+const VIEWPORT_WIDTH_UTILIZATION_RATIO = 0.9;
+const MIN_TOUCH_TARGET_PX = 44;
+const MIN_SPACING_PX = 8;
+const SPACING_TOLERANCE_PX = 5;
+
 test.describe("Homepage E2E Tests @manual", () => {
   test("should load homepage without infinite loops", async ({ page }) => {
     // Set up error tracking before navigation
@@ -189,8 +199,8 @@ test.describe("Homepage E2E Tests @manual", () => {
 
     // Verify search input is focusable and has correct attributes
     await searchInput.focus();
-    const ariaLabel = searchInput;
-    await expect(ariaLabel).toHaveAttribute("aria-label", "Search academic literature");
+    
+    await expect(searchInput).toHaveAttribute("aria-label", "Search academic literature");
 
     // Note: Homepage is a landing page without full app layout
     // Theme toggle and sidebar controls are only in MainLayout (non-homepage routes)
@@ -224,7 +234,7 @@ test.describe("Homepage E2E Tests @manual", () => {
       const cardBox = await card.boundingBox();
       expect(cardBox).toBeTruthy();
       if (cardBox) {
-        expect(cardBox.width).toBeLessThanOrEqual(320);
+        expect(cardBox.width).toBeLessThanOrEqual(MOBILE_VIEWPORT_WIDTH_PX);
       }
     });
 
@@ -249,7 +259,7 @@ test.describe("Homepage E2E Tests @manual", () => {
       expect(cardBox).toBeTruthy();
       if (cardBox) {
         // Card should be less than viewport width (allowing for centering)
-        expect(cardBox.width).toBeLessThanOrEqual(768);
+        expect(cardBox.width).toBeLessThanOrEqual(TABLET_VIEWPORT_WIDTH_PX);
         // Card should have some margin on sides (not full width on tablet)
         expect(cardBox.x).toBeGreaterThan(0);
       }
@@ -276,9 +286,9 @@ test.describe("Homepage E2E Tests @manual", () => {
       expect(cardBox).toBeTruthy();
       if (cardBox) {
         // Card should be significantly less than viewport width (respects maxWidth)
-        expect(cardBox.width).toBeLessThan(1000);
+        expect(cardBox.width).toBeLessThan(MAX_CARD_WIDTH_PX);
         // Card should not be taking full viewport width
-        expect(cardBox.width).toBeLessThan(1920 * 0.9);
+        expect(cardBox.width).toBeLessThan(DESKTOP_VIEWPORT_WIDTH_PX * VIEWPORT_WIDTH_UTILIZATION_RATIO);
       }
     });
 
@@ -303,9 +313,9 @@ test.describe("Homepage E2E Tests @manual", () => {
       expect(cardBox).toBeTruthy();
       if (cardBox) {
         // Card should maintain maxWidth constraint
-        expect(cardBox.width).toBeLessThan(1000);
+        expect(cardBox.width).toBeLessThan(MAX_CARD_WIDTH_PX);
         // Card should not be taking full viewport width
-        expect(cardBox.width).toBeLessThan(3840 * 0.9);
+        expect(cardBox.width).toBeLessThan(UHD_VIEWPORT_WIDTH_PX * VIEWPORT_WIDTH_UTILIZATION_RATIO);
       }
     });
   });
@@ -330,7 +340,7 @@ test.describe("Homepage E2E Tests @manual", () => {
       expect(inputBox).toBeTruthy();
       if (inputBox) {
         // Minimum touch target size is 44px
-        expect(inputBox.height).toBeGreaterThanOrEqual(44);
+        expect(inputBox.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
       }
     });
 
@@ -350,8 +360,8 @@ test.describe("Homepage E2E Tests @manual", () => {
       expect(buttonBox).toBeTruthy();
       if (buttonBox) {
         // Minimum touch target size is 44x44px
-        expect(buttonBox.height).toBeGreaterThanOrEqual(44);
-        expect(buttonBox.width).toBeGreaterThanOrEqual(44);
+        expect(buttonBox.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
+        expect(buttonBox.width).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
       }
     });
 
@@ -381,7 +391,7 @@ test.describe("Homepage E2E Tests @manual", () => {
       if (inputBox && buttonBox) {
         // Vertical spacing between input and button should be at least 8px
         const spacing = buttonBox.y - (inputBox.y + inputBox.height);
-        expect(spacing).toBeGreaterThanOrEqual(8);
+        expect(spacing).toBeGreaterThanOrEqual(MIN_SPACING_PX);
       }
     });
 
@@ -406,7 +416,7 @@ test.describe("Homepage E2E Tests @manual", () => {
       expect(cardBox).toBeTruthy();
       if (cardBox) {
         // Card should fit within viewport
-        expect(cardBox.width).toBeLessThanOrEqual(320);
+        expect(cardBox.width).toBeLessThanOrEqual(MOBILE_VIEWPORT_WIDTH_PX);
       }
     });
   });
@@ -446,11 +456,11 @@ test.describe("Homepage E2E Tests @manual", () => {
         const spacing2 = xyFlowBox.x - (openAlexBox.x + openAlexBox.width);
 
         // Spacing should be consistent (within 5px tolerance for rendering variations)
-        expect(Math.abs(spacing1 - spacing2)).toBeLessThanOrEqual(5);
+        expect(Math.abs(spacing1 - spacing2)).toBeLessThanOrEqual(SPACING_TOLERANCE_PX);
 
         // Minimum spacing should be at least 8px (Mantine "xs" gap)
-        expect(spacing1).toBeGreaterThanOrEqual(8);
-        expect(spacing2).toBeGreaterThanOrEqual(8);
+        expect(spacing1).toBeGreaterThanOrEqual(MIN_SPACING_PX);
+        expect(spacing2).toBeGreaterThanOrEqual(MIN_SPACING_PX);
       }
     });
 
@@ -490,7 +500,7 @@ test.describe("Homepage E2E Tests @manual", () => {
       if (reactBox && xyFlowBox) {
         // All badges should be within viewport width
         expect(reactBox.x).toBeGreaterThanOrEqual(0);
-        expect(xyFlowBox.x + xyFlowBox.width).toBeLessThanOrEqual(320);
+        expect(xyFlowBox.x + xyFlowBox.width).toBeLessThanOrEqual(MOBILE_VIEWPORT_WIDTH_PX);
       }
     });
 

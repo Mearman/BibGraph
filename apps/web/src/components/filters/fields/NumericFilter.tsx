@@ -32,11 +32,11 @@ export const NumericFilter = ({
       compact={compact}
       fieldId={fieldId}
     >
-      {(properties: BaseFilterRenderProps<number>) => (
+      {(properties: Readonly<BaseFilterRenderProps<number>>) => (
         <NumberInput
           id={properties.fieldId}
           value={properties.value || 0}
-          onChange={(value_) => properties.onChange(typeof value_ === "number" ? value_ : 0)}
+          onChange={(value_) => { properties.onChange(typeof value_ === "number" ? value_ : 0); }}
           placeholder={config.placeholder}
           disabled={properties.disabled}
           size={properties.compact ? "xs" : "sm"}

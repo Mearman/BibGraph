@@ -96,12 +96,12 @@ test.describe("Data Version Selector November Availability", () => {
     const optionTexts: string[] = [];
     for (let index = 0; index < optionCount; index++) {
       const text = await options.nth(index).textContent();
-      if (text) {
+      if (text !== null && text !== '') {
         optionTexts.push(text.trim());
       }
     }
 
-    console.log(`Found ${optionCount} options in selector`, optionTexts);
+    console.log(`Found ${String(optionCount)} options in selector`, optionTexts);
 
     // Verify the expected options exist
     const hasAutoOption = optionTexts.some(
@@ -161,10 +161,10 @@ test.describe("Data Version Selector November Availability", () => {
       );
     } else {
       // Description may be visible in different element structure
-      const bodyText = await page.textContent("body");
+      const bodyText = (await page.locator("body").textContent()) ?? "";
       const hasTransitionInfo =
-        bodyText?.includes("November") &&
-        bodyText?.includes("transition");
+        bodyText.includes("November") &&
+        bodyText.includes("transition");
       expect(hasTransitionInfo).toBe(true);
       console.log(
         "✅ Transition period information is displayed on the page",
@@ -221,8 +221,8 @@ test.describe("Data Version Selector November Availability", () => {
 
     // Removed: waitForTimeout - use locator assertions instead
     // Verify it changed to Auto
-    const autoValue = selector;
-    await expect(autoValue).toHaveValue("auto");
+    
+    await expect(selector).toHaveValue("auto");
 
     console.log("✅ Successfully changed data version back to Auto");
   });
@@ -337,7 +337,7 @@ test.describe("Data Version Selector November Availability", () => {
       // Check if there are no violations, or if violations are expected
       if (accessibilityScanResults.violations.length > 0) {
         console.log(
-          `Found ${accessibilityScanResults.violations.length} accessibility issues:`,
+          `Found ${String(accessibilityScanResults.violations.length)} accessibility issues:`,
           accessibilityScanResults.violations,
         );
       }
@@ -445,7 +445,7 @@ test.describe("Data Version Selector November Availability", () => {
       );
     } else {
       // Label might be rendered differently
-      const bodyText = await page.textContent("body");
+      const bodyText = await page.locator("body").textContent();
       expect(bodyText).toContain("OpenAlex Data Version");
       console.log("✅ Correct label text is present on the page");
     }
@@ -522,7 +522,7 @@ test.describe("Data Version Selector November Availability", () => {
     expect(boundingBox!.height).toBeGreaterThan(0);
 
     console.log(
-      `✅ Selector renders correctly on mobile (${boundingBox!.width}x${boundingBox!.height}px)`,
+      `✅ Selector renders correctly on mobile (${String(boundingBox!.width)}x${String(boundingBox!.height)}px)`,
     );
 
     // Reset to desktop viewport

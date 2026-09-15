@@ -6,11 +6,10 @@
  * - Load from list
  * - Delete snapshots
  * - Share via URL
- *
- * @module components/graph/snapshots/GraphSnapshots
  */
 
-import type { GraphNode } from '@bibgraph/types';
+import type { GraphEdge, GraphNode } from '@bibgraph/types';
+import { RelationType } from '@bibgraph/types';
 import {
   ActionIcon,
   Badge,
@@ -40,6 +39,32 @@ import type { GraphLayoutType } from '@/hooks/useGraphLayout';
 import { useGraphSnapshots } from '@/hooks/useGraphSnapshots';
 
 const AUTO_SAVE_LIMIT = 5;
+
+// Relative-time thresholds used by formatDate below.
+const MS_PER_MINUTE = 60000;
+const MS_PER_HOUR = 3600000;
+const MS_PER_DAY = 86400000;
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const DAYS_PER_WEEK = 7;
+
+const GRAPH_LAYOUT_TYPES: readonly GraphLayoutType[] = ['force', 'hierarchical', 'circular', 'bipartite', 'timeline'];
+
+const isGraphLayoutType = (value: string): value is GraphLayoutType =>
+  GRAPH_LAYOUT_TYPES.some((type) => type === value);
+
+const isGraphEdgeArray = (value: unknown): value is GraphEdge[] => {
+  if (!Array.isArray(value)) return false;
+  const relationTypes: readonly string[] = Object.values(RelationType);
+  return value.every((entry: unknown) => {
+    if (typeof entry !== 'object' || entry === null) return false;
+    if (!('id' in entry) || typeof entry.id !== 'string') return false;
+    if (!('source' in entry) || typeof entry.source !== 'string') return false;
+    if (!('target' in entry) || typeof entry.target !== 'string') return false;
+    if (!('type' in entry) || typeof entry.type !== 'string') return false;
+    return relationTypes.includes(entry.type);
+  });
+};
 
 interface GraphSnapshotsProperties {
   /**
@@ -91,16 +116,6 @@ interface GraphSnapshotsProperties {
 
 /**
  * Graph snapshots management component
- * @param root0
- * @param root0.nodes
- * @param root0.edges
- * @param root0.zoom
- * @param root0.panX
- * @param root0.panY
- * @param root0.layoutType
- * @param root0.nodePositions
- * @param root0.annotations
- * @param root0.onLoadSnapshot
  */
 export const GraphSnapshots: React.FC<GraphSnapshotsProperties> = ({
   nodes,
@@ -126,17 +141,17 @@ export const GraphSnapshots: React.FC<GraphSnapshotsProperties> = ({
   } = useGraphSnapshots();
 
   // Format date for display
-  const formatDate = useCallback((date: Date) => {
+  const formatDate = useCallback((date: Readonly<Date>) => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    const diffMins = Math.floor(diffMs / MS_PER_MINUTE);
+    const diffHours = Math.floor(diffMs / MS_PER_HOUR);
+    const diffDays = Math.floor(diffMs / MS_PER_DAY);
 
     if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffMins < MINUTES_PER_HOUR) return `${String(diffMins)}m ago`;
+    if (diffHours < HOURS_PER_DAY) return `${String(diffHours)}h ago`;
+    if (diffDays < DAYS_PER_WEEK) return `${String(diffDays)}d ago`;
 
     return date.toLocaleDateString();
   }, []);
@@ -144,7 +159,8 @@ export const GraphSnapshots: React.FC<GraphSnapshotsProperties> = ({
   // Parse edges from JSON string
   const parsedEdges = useMemo(() => {
     try {
-      return JSON.parse(edges);
+      const parsed: unknown = JSON.parse(edges);
+      return isGraphEdgeArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -205,7 +221,7 @@ export const GraphSnapshots: React.FC<GraphSnapshotsProperties> = ({
         zoom: snapshot.zoom,
         panX: snapshot.panX,
         panY: snapshot.panY,
-        layoutType: snapshot.layoutType as GraphLayoutType,
+        layoutType: isGraphLayoutType(snapshot.layoutType) ? snapshot.layoutType : layoutType,
         nodePositions: snapshot.nodePositions,
         annotations: snapshot.annotations,
       });
@@ -224,7 +240,7 @@ export const GraphSnapshots: React.FC<GraphSnapshotsProperties> = ({
         color: 'red',
       });
     }
-  }, [loadSnapshot, onLoadSnapshot, close]);
+  }, [loadSnapshot, onLoadSnapshot, close, layoutType]);
 
   // Handle delete snapshot
   const handleDeleteSnapshot = useCallback(async (id: string) => {
@@ -262,10 +278,10 @@ export const GraphSnapshots: React.FC<GraphSnapshotsProperties> = ({
             <TextInput
               placeholder="Snapshot name (optional)"
               value={snapshotName}
-              onChange={(event) => setSnapshotName(event.currentTarget.value)}
+              onChange={(event) => { setSnapshotName(event.currentTarget.value); }}
               style={{ flex: 1 }}
             />
-            <Button onClick={handleSaveSnapshot} leftSection={<IconCamera size={ICON_SIZE.SM} />}>
+            <Button onClick={() => { void handleSaveSnapshot(); }} leftSection={<IconCamera size={ICON_SIZE.SM} />}>
               Save
             </Button>
           </Group>
@@ -299,7 +315,7 @@ export const GraphSnapshots: React.FC<GraphSnapshotsProperties> = ({
                         <ActionIcon
                           variant="subtle"
                           size="sm"
-                          onClick={() => handleLoadSnapshot(snapshot.id)}
+                          onClick={() => { void handleLoadSnapshot(snapshot.id); }}
                           aria-label="Load snapshot"
                         >
                           <IconDownload size={ICON_SIZE.SM} />
@@ -310,7 +326,7 @@ export const GraphSnapshots: React.FC<GraphSnapshotsProperties> = ({
                           variant="subtle"
                           color="red"
                           size="sm"
-                          onClick={() => handleDeleteSnapshot(snapshot.id)}
+                          onClick={() => { void handleDeleteSnapshot(snapshot.id); }}
                           aria-label="Delete snapshot"
                         >
                           <IconTrash size={ICON_SIZE.SM} />
@@ -355,7 +371,7 @@ export const GraphSnapshots: React.FC<GraphSnapshotsProperties> = ({
                           <ActionIcon
                             variant="subtle"
                             size="sm"
-                            onClick={() => handleLoadSnapshot(snapshot.id)}
+                            onClick={() => { void handleLoadSnapshot(snapshot.id); }}
                             aria-label="Load auto-save"
                           >
                             <IconDownload size={ICON_SIZE.SM} />

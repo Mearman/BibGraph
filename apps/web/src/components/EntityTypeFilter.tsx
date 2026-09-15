@@ -38,7 +38,7 @@ export interface EntityTypeFilterProps {
   /**
   Callback when filter changes
    */
-  onChange: (types: EntityType[]) => void;
+  onChange: (types: readonly EntityType[]) => void;
 
   /**
   Available entity types to show (defaults to AUTOCOMPLETE_ENTITY_TYPES)
@@ -56,8 +56,7 @@ export interface EntityTypeFilterProps {
   inline?: boolean;
 
   /**
-   * Whether to show Select All / Clear All buttons
-   * @default true
+   * Whether to show Select All / Clear All buttons. Defaults to `true`.
    */
   showButtons?: boolean;
 }
@@ -65,13 +64,6 @@ export interface EntityTypeFilterProps {
 /**
  * Component for filtering by entity type
  * Displays checkboxes or chips for each EntityType
- * @param root0
- * @param root0.selectedTypes
- * @param root0.onChange
- * @param root0.availableTypes
- * @param root0.title
- * @param root0.inline
- * @param root0.showButtons
  */
 export const EntityTypeFilter = ({
   selectedTypes,
@@ -80,7 +72,7 @@ export const EntityTypeFilter = ({
   title = "Entity Types",
   inline = false,
   showButtons = true,
-}) => {
+}: EntityTypeFilterProps) => {
   // Handle checkbox toggle
   const handleToggle = (type: EntityType) => {
     const isCurrentlySelected = selectedTypes.includes(type);
@@ -130,7 +122,7 @@ export const EntityTypeFilter = ({
               variant={isChecked ? "filled" : "outline"}
               color={metadata.color}
               style={{ cursor: "pointer" }}
-              onClick={() => handleToggle(type)}
+              onClick={() => { handleToggle(type); }}
               data-testid={`filter-badge-${type}`}
             >
               {metadata.plural}
@@ -209,7 +201,7 @@ export const EntityTypeFilter = ({
                   </Badge>
                 }
                 checked={isChecked}
-                onChange={() => handleToggle(type)}
+                onChange={() => { handleToggle(type); }}
                 data-testid={`filter-checkbox-${type}`}
               />
             );

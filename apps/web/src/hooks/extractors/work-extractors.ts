@@ -1,9 +1,7 @@
 /**
  * Work entity relationship extractors
- * @module extractors/work-extractors
  */
 
-import type { EntityType } from '@bibgraph/types';
 import { RelationType } from '@bibgraph/types';
 
 import type { RelationshipItem, RelationshipSection } from '@/types/relationship';
@@ -12,389 +10,414 @@ import { RELATIONSHIP_TYPE_LABELS } from '@/types/relationship';
 import {
   createRelationshipItem,
   createRelationshipSection,
-  safeStringId,
 } from '../relationship-helpers';
-
-/**
- * Extract relationships from Work entity
- * @param data - Raw work data from OpenAlex API
- * @param workId - The work's OpenAlex ID
- * @param outgoing - Array to push outgoing relationship sections to
- * @param incoming - Array to push incoming relationship sections to
- */
-export const extractWorkRelationships = (
-  data: Record<string, unknown>,
-  workId: string,
-  outgoing: RelationshipSection[],
-  incoming: RelationshipSection[],
-): void => {
-  extractWorkAuthorships(data, workId, outgoing);
-  extractWorkPublication(data, workId, outgoing);
-  extractWorkReferences(data, workId, outgoing);
-  extractWorkTopics(data, workId, outgoing);
-  extractWorkCitations(data, incoming);
-  extractWorkGrants(data, workId, outgoing);
-  extractWorkKeywords(data, workId, outgoing);
-  extractWorkConcepts(data, workId, outgoing);
-};
+import { isPlainObject, readArray, readNumber, readObject, readString, readStringArray } from './unknown-helpers';
 
 /**
  * AUTHORSHIP: Work → Authors
  * @param data - Raw work data
  * @param workId - The work's OpenAlex ID
- * @param outgoing - Array to push relationship sections to
+ * @returns Relationship sections extracted from the work's authorships, or an empty array if there are none
  */
 const extractWorkAuthorships = (
   data: Record<string, unknown>,
   workId: string,
-  outgoing: RelationshipSection[],
-): void => {
-  const authorships = data.authorships as
-    | Array<{
-        author?: {
-          id?: string;
-          display_name?: string;
-          orcid?: string;
-        };
-        author_position?: string;
-        is_corresponding?: boolean;
-      }>
-    | undefined;
-
-  if (authorships && authorships.length > 0) {
-    const authorItems: RelationshipItem[] = authorships
-      .filter((auth) => auth.author?.id && auth.author?.display_name)
-      .map((auth) => {
-        const author = auth.author;
-        return createRelationshipItem(
-          workId,
-          safeStringId(author?.id),
-          'works' as EntityType,
-          'authors' as EntityType,
-          RelationType.AUTHORSHIP,
-          'outbound',
-          safeStringId(author?.display_name),
-        );
-      });
-
-    if (authorItems.length > 0) {
-      outgoing.push(
-        createRelationshipSection(
-          RelationType.AUTHORSHIP,
-          'outbound',
-          RELATIONSHIP_TYPE_LABELS[RelationType.AUTHORSHIP],
-          authorItems,
-        ),
-      );
-    }
+): RelationshipSection[] => {
+  const authorships = readArray(data, 'authorships');
+  if (authorships === undefined || authorships.length === 0) {
+    return [];
   }
+
+  const authorItems: RelationshipItem[] = [];
+  for (const authorship of authorships) {
+    if (!isPlainObject(authorship)) {
+      continue;
+    }
+    const author = readObject(authorship, 'author');
+    if (author === undefined) {
+      continue;
+    }
+    const authorId = readString(author, 'id');
+    const authorName = readString(author, 'display_name');
+    if (authorId === undefined || authorName === undefined) {
+      continue;
+    }
+    authorItems.push(
+      createRelationshipItem(
+        workId,
+        authorId,
+        'works',
+        'authors',
+        RelationType.AUTHORSHIP,
+        'outbound',
+        authorName,
+      ),
+    );
+  }
+
+  if (authorItems.length === 0) {
+    return [];
+  }
+
+  return [
+    createRelationshipSection(
+      RelationType.AUTHORSHIP,
+      'outbound',
+      RELATIONSHIP_TYPE_LABELS[RelationType.AUTHORSHIP],
+      authorItems,
+    ),
+  ];
 };
 
 /**
  * PUBLICATION: Work → Source
  * @param data - Raw work data
  * @param workId - The work's OpenAlex ID
- * @param outgoing - Array to push relationship sections to
+ * @returns Relationship sections extracted from the work's primary publication location, or an empty array if there is none
  */
 const extractWorkPublication = (
   data: Record<string, unknown>,
   workId: string,
-  outgoing: RelationshipSection[],
-): void => {
-  const primaryLocation = data.primary_location as
-    | {
-        source?: {
-          id?: string;
-          display_name?: string;
-          issn_l?: string;
-          type?: string;
-        };
-      }
-    | undefined;
+): RelationshipSection[] => {
+  const primaryLocation = readObject(data, 'primary_location');
+  if (primaryLocation === undefined) {
+    return [];
+  }
 
-  if (primaryLocation?.source?.id && primaryLocation?.source?.display_name) {
-    const sourceItem = createRelationshipItem(
-      workId,
-      primaryLocation.source.id,
-      'works' as EntityType,
-      'sources' as EntityType,
+  const source = readObject(primaryLocation, 'source');
+  if (source === undefined) {
+    return [];
+  }
+
+  const sourceId = readString(source, 'id');
+  const sourceName = readString(source, 'display_name');
+  if (sourceId === undefined || sourceName === undefined) {
+    return [];
+  }
+
+  const sourceItem = createRelationshipItem(
+    workId,
+    sourceId,
+    'works',
+    'sources',
+    RelationType.PUBLICATION,
+    'outbound',
+    sourceName,
+  );
+
+  return [
+    createRelationshipSection(
       RelationType.PUBLICATION,
       'outbound',
-      primaryLocation.source.display_name,
-    );
-
-    outgoing.push(
-      createRelationshipSection(
-        RelationType.PUBLICATION,
-        'outbound',
-        RELATIONSHIP_TYPE_LABELS[RelationType.PUBLICATION],
-        [sourceItem],
-      ),
-    );
-  }
+      RELATIONSHIP_TYPE_LABELS[RelationType.PUBLICATION],
+      [sourceItem],
+    ),
+  ];
 };
 
 /**
  * REFERENCE: Work → Referenced Works
  * @param data - Raw work data
  * @param workId - The work's OpenAlex ID
- * @param outgoing - Array to push relationship sections to
+ * @returns Relationship sections extracted from the work's references, or an empty array if there are none
  */
 const extractWorkReferences = (
   data: Record<string, unknown>,
   workId: string,
-  outgoing: RelationshipSection[],
-): void => {
-  const referencedWorks = data.referenced_works as string[] | undefined;
-  if (referencedWorks && referencedWorks.length > 0) {
-    const referenceItems: RelationshipItem[] = referencedWorks.map((referenceWorkId) =>
-      createRelationshipItem(
-        workId,
-        referenceWorkId,
-        'works' as EntityType,
-        'works' as EntityType,
-        RelationType.REFERENCE,
-        'outbound',
-        referenceWorkId, // Only have ID, not display name
-      ),
-    );
-
-    outgoing.push(
-      createRelationshipSection(
-        RelationType.REFERENCE,
-        'outbound',
-        RELATIONSHIP_TYPE_LABELS[RelationType.REFERENCE],
-        referenceItems,
-        true, // Partial data - only IDs available
-      ),
-    );
+): RelationshipSection[] => {
+  const referencedWorks = readStringArray(data, 'referenced_works');
+  if (referencedWorks === undefined || referencedWorks.length === 0) {
+    return [];
   }
+
+  const referenceItems: RelationshipItem[] = referencedWorks.map((referenceWorkId) =>
+    createRelationshipItem(
+      workId,
+      referenceWorkId,
+      'works',
+      'works',
+      RelationType.REFERENCE,
+      'outbound',
+      referenceWorkId, // Only have ID, not display name
+    ),
+  );
+
+  return [
+    createRelationshipSection(
+      RelationType.REFERENCE,
+      'outbound',
+      RELATIONSHIP_TYPE_LABELS[RelationType.REFERENCE],
+      referenceItems,
+      true, // Partial data - only IDs available
+    ),
+  ];
 };
 
 /**
  * TOPIC: Work → Topics
  * @param data - Raw work data
  * @param workId - The work's OpenAlex ID
- * @param outgoing - Array to push relationship sections to
+ * @returns Relationship sections extracted from the work's topics, or an empty array if there are none
  */
 const extractWorkTopics = (
   data: Record<string, unknown>,
   workId: string,
-  outgoing: RelationshipSection[],
-): void => {
-  const workTopics = data.topics as
-    | Array<{
-        id?: string;
-        display_name?: string;
-        score?: number;
-      }>
-    | undefined;
-
-  if (workTopics && workTopics.length > 0) {
-    const topicItems: RelationshipItem[] = workTopics
-      .filter((topic) => topic.id && topic.display_name)
-      .map((topic) => {
-        const topicId = safeStringId(topic.id);
-        const topicName = safeStringId(topic.display_name);
-        return createRelationshipItem(
-          workId,
-          topicId,
-          'works' as EntityType,
-          'topics' as EntityType,
-          RelationType.TOPIC,
-          'outbound',
-          topicName,
-        );
-      });
-
-    if (topicItems.length > 0) {
-      outgoing.push(
-        createRelationshipSection(
-          RelationType.TOPIC,
-          'outbound',
-          RELATIONSHIP_TYPE_LABELS[RelationType.TOPIC],
-          topicItems,
-        ),
-      );
-    }
+): RelationshipSection[] => {
+  const workTopics = readArray(data, 'topics');
+  if (workTopics === undefined || workTopics.length === 0) {
+    return [];
   }
+
+  const topicItems: RelationshipItem[] = [];
+  for (const topic of workTopics) {
+    if (!isPlainObject(topic)) {
+      continue;
+    }
+    const topicId = readString(topic, 'id');
+    const topicName = readString(topic, 'display_name');
+    if (topicId === undefined || topicName === undefined) {
+      continue;
+    }
+    topicItems.push(
+      createRelationshipItem(
+        workId,
+        topicId,
+        'works',
+        'topics',
+        RelationType.TOPIC,
+        'outbound',
+        topicName,
+      ),
+    );
+  }
+
+  if (topicItems.length === 0) {
+    return [];
+  }
+
+  return [
+    createRelationshipSection(
+      RelationType.TOPIC,
+      'outbound',
+      RELATIONSHIP_TYPE_LABELS[RelationType.TOPIC],
+      topicItems,
+    ),
+  ];
 };
 
 /**
  * Citations (incoming references) - count only
  * @param data - Raw work data
- * @param incoming - Array to push relationship sections to
+ * @returns Relationship sections representing incoming citations, or an empty array if the work has none
  */
-const extractWorkCitations = (
-  data: Record<string, unknown>,
-  incoming: RelationshipSection[],
-): void => {
-  const citedByCount = data.cited_by_count as number | undefined;
-  if (citedByCount && citedByCount > 0) {
-    incoming.push(
-      createRelationshipSection(
-        RelationType.REFERENCE,
-        'inbound',
-        'Citations',
-        [],
-        true, // Partial data - count only, no actual items
-      ),
-    );
+const extractWorkCitations = (data: Record<string, unknown>): RelationshipSection[] => {
+  const citedByCount = readNumber(data, 'cited_by_count');
+  if (citedByCount === undefined || citedByCount <= 0) {
+    return [];
   }
+
+  return [
+    createRelationshipSection(
+      RelationType.REFERENCE,
+      'inbound',
+      'Citations',
+      [],
+      true, // Partial data - count only, no actual items
+    ),
+  ];
 };
 
 /**
  * FUNDED_BY: Work → Funders
  * @param data - Raw work data
  * @param workId - The work's OpenAlex ID
- * @param outgoing - Array to push relationship sections to
+ * @returns Relationship sections extracted from the work's grants, or an empty array if there are none
  */
 const extractWorkGrants = (
   data: Record<string, unknown>,
   workId: string,
-  outgoing: RelationshipSection[],
-): void => {
-  const grants = data.grants as
-    | Array<{
-        funder?: string;
-        funder_display_name?: string;
-        award_id?: string | null;
-      }>
-    | undefined;
-
-  if (grants && grants.length > 0) {
-    const grantItems: RelationshipItem[] = grants
-      .filter((grant) => grant.funder && grant.funder_display_name)
-      .map((grant) => {
-        const funderId = grant.funder || '';
-        const funderName = grant.funder_display_name || '';
-        return createRelationshipItem(
-          workId,
-          funderId,
-          'works' as EntityType,
-          'funders' as EntityType,
-          RelationType.FUNDED_BY,
-          'outbound',
-          funderName,
-        );
-      });
-
-    if (grantItems.length > 0) {
-      outgoing.push(
-        createRelationshipSection(
-          RelationType.FUNDED_BY,
-          'outbound',
-          RELATIONSHIP_TYPE_LABELS[RelationType.FUNDED_BY],
-          grantItems,
-        ),
-      );
-    }
+): RelationshipSection[] => {
+  const grants = readArray(data, 'grants');
+  if (grants === undefined || grants.length === 0) {
+    return [];
   }
+
+  const grantItems: RelationshipItem[] = [];
+  for (const grant of grants) {
+    if (!isPlainObject(grant)) {
+      continue;
+    }
+    const funderId = readString(grant, 'funder');
+    const funderName = readString(grant, 'funder_display_name');
+    if (funderId === undefined || funderName === undefined) {
+      continue;
+    }
+    grantItems.push(
+      createRelationshipItem(
+        workId,
+        funderId,
+        'works',
+        'funders',
+        RelationType.FUNDED_BY,
+        'outbound',
+        funderName,
+      ),
+    );
+  }
+
+  if (grantItems.length === 0) {
+    return [];
+  }
+
+  return [
+    createRelationshipSection(
+      RelationType.FUNDED_BY,
+      'outbound',
+      RELATIONSHIP_TYPE_LABELS[RelationType.FUNDED_BY],
+      grantItems,
+    ),
+  ];
 };
 
 /**
  * WORK_HAS_KEYWORD: Work → Keywords
  * @param data - Raw work data
  * @param workId - The work's OpenAlex ID
- * @param outgoing - Array to push relationship sections to
+ * @returns Relationship sections extracted from the work's keywords, or an empty array if there are none
  */
 const extractWorkKeywords = (
   data: Record<string, unknown>,
   workId: string,
-  outgoing: RelationshipSection[],
-): void => {
-  const keywords = data.keywords as
-    | Array<{
-        id?: string;
-        display_name?: string;
-        score?: number;
-      }>
-    | undefined;
-
-  if (keywords && keywords.length > 0) {
-    const keywordItems: RelationshipItem[] = keywords
-      .filter((keyword) => keyword.id && keyword.display_name)
-      .map((keyword) => {
-        const keywordId = safeStringId(keyword.id);
-        const keywordName = safeStringId(keyword.display_name);
-        return createRelationshipItem(
-          workId,
-          keywordId,
-          'works' as EntityType,
-          'keywords' as EntityType,
-          RelationType.WORK_HAS_KEYWORD,
-          'outbound',
-          keywordName,
-        );
-      });
-
-    if (keywordItems.length > 0) {
-      outgoing.push(
-        createRelationshipSection(
-          RelationType.WORK_HAS_KEYWORD,
-          'outbound',
-          RELATIONSHIP_TYPE_LABELS[RelationType.WORK_HAS_KEYWORD],
-          keywordItems,
-        ),
-      );
-    }
+): RelationshipSection[] => {
+  const keywords = readArray(data, 'keywords');
+  if (keywords === undefined || keywords.length === 0) {
+    return [];
   }
+
+  const keywordItems: RelationshipItem[] = [];
+  for (const keyword of keywords) {
+    if (!isPlainObject(keyword)) {
+      continue;
+    }
+    const keywordId = readString(keyword, 'id');
+    const keywordName = readString(keyword, 'display_name');
+    if (keywordId === undefined || keywordName === undefined) {
+      continue;
+    }
+    keywordItems.push(
+      createRelationshipItem(
+        workId,
+        keywordId,
+        'works',
+        'keywords',
+        RelationType.WORK_HAS_KEYWORD,
+        'outbound',
+        keywordName,
+      ),
+    );
+  }
+
+  if (keywordItems.length === 0) {
+    return [];
+  }
+
+  return [
+    createRelationshipSection(
+      RelationType.WORK_HAS_KEYWORD,
+      'outbound',
+      RELATIONSHIP_TYPE_LABELS[RelationType.WORK_HAS_KEYWORD],
+      keywordItems,
+    ),
+  ];
 };
 
 /**
  * CONCEPT: Work → Concepts (legacy)
  * @param data - Raw work data
  * @param workId - The work's OpenAlex ID
- * @param outgoing - Array to push relationship sections to
+ * @returns Relationship sections extracted from the work's concepts, deduplicated by ID, or an empty array if there are none
  */
 const extractWorkConcepts = (
   data: Record<string, unknown>,
   workId: string,
-  outgoing: RelationshipSection[],
-): void => {
-  const concepts = data.concepts as
-    | Array<{
-        id?: string;
-        display_name?: string;
-        score?: number;
-        level?: number;
-        wikidata?: string;
-      }>
-    | undefined;
-
-  if (concepts && concepts.length > 0) {
-    // Deduplicate concepts by ID (OpenAlex API may return duplicates)
-    const seenConceptIds = new Set<string>();
-    const conceptItems: RelationshipItem[] = concepts
-      .filter((concept) => {
-        if (!concept.id || !concept.display_name) return false;
-        if (seenConceptIds.has(concept.id)) return false;
-        seenConceptIds.add(concept.id);
-        return true;
-      })
-      .map((concept) => {
-        const conceptId = safeStringId(concept.id);
-        const conceptName = safeStringId(concept.display_name);
-        return createRelationshipItem(
-          workId,
-          conceptId,
-          'works' as EntityType,
-          'concepts' as EntityType,
-          RelationType.CONCEPT,
-          'outbound',
-          conceptName,
-        );
-      });
-
-    if (conceptItems.length > 0) {
-      outgoing.push(
-        createRelationshipSection(
-          RelationType.CONCEPT,
-          'outbound',
-          RELATIONSHIP_TYPE_LABELS[RelationType.CONCEPT],
-          conceptItems,
-        ),
-      );
-    }
+): RelationshipSection[] => {
+  const concepts = readArray(data, 'concepts');
+  if (concepts === undefined || concepts.length === 0) {
+    return [];
   }
+
+  // Deduplicate concepts by ID (OpenAlex API may return duplicates)
+  const seenConceptIds = new Set<string>();
+  const conceptItems: RelationshipItem[] = [];
+  for (const concept of concepts) {
+    if (!isPlainObject(concept)) {
+      continue;
+    }
+    const conceptId = readString(concept, 'id');
+    const conceptName = readString(concept, 'display_name');
+    if (conceptId === undefined || conceptName === undefined || seenConceptIds.has(conceptId)) {
+      continue;
+    }
+    seenConceptIds.add(conceptId);
+    conceptItems.push(
+      createRelationshipItem(
+        workId,
+        conceptId,
+        'works',
+        'concepts',
+        RelationType.CONCEPT,
+        'outbound',
+        conceptName,
+      ),
+    );
+  }
+
+  if (conceptItems.length === 0) {
+    return [];
+  }
+
+  return [
+    createRelationshipSection(
+      RelationType.CONCEPT,
+      'outbound',
+      RELATIONSHIP_TYPE_LABELS[RelationType.CONCEPT],
+      conceptItems,
+    ),
+  ];
+};
+
+export interface WorkRelationships {
+  /**
+  Outgoing relationship sections (this work → other entities)
+   */
+  outgoing: RelationshipSection[];
+
+  /**
+  Incoming relationship sections (other entities → this work)
+   */
+  incoming: RelationshipSection[];
+}
+
+/**
+ * Extract relationships from Work entity
+ * @param data - Raw work data from OpenAlex API
+ * @param workId - The work's OpenAlex ID
+ * @returns Outgoing and incoming relationship sections extracted from the work's data
+ */
+export const extractWorkRelationships = (
+  data: Record<string, unknown>,
+  workId: string,
+): WorkRelationships => {
+  return {
+    outgoing: [
+      ...extractWorkAuthorships(data, workId),
+      ...extractWorkPublication(data, workId),
+      ...extractWorkReferences(data, workId),
+      ...extractWorkTopics(data, workId),
+      ...extractWorkGrants(data, workId),
+      ...extractWorkKeywords(data, workId),
+      ...extractWorkConcepts(data, workId),
+    ],
+    incoming: [...extractWorkCitations(data)],
+  };
 };

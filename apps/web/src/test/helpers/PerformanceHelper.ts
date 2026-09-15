@@ -13,13 +13,12 @@ interface MemoryUsage {
 }
 
 export class PerformanceHelper {
-	private timers: Map<string, number> = new Map();
+	private readonly timers = new Map<string, number>();
 
-	constructor(private page: Page) {}
+	constructor(private readonly page: Page) {}
 
 	/**
 	 * Start a performance timer with a label
-	 * @param label
 	 */
 	startTimer(label: string): void {
 		this.timers.set(label, Date.now());
@@ -27,7 +26,6 @@ export class PerformanceHelper {
 
 	/**
 	 * Stop a timer and return elapsed time in milliseconds
-	 * @param label
 	 * @throws Error if timer was not started
 	 */
 	stopTimer(label: string): number {
@@ -46,7 +44,8 @@ export class PerformanceHelper {
 	async getNavigationTiming(): Promise<PerformanceMetrics> {
 		const metrics = await this.page.evaluate(() => {
 			// Use the modern PerformanceNavigationTiming API
-			const [navigationTiming] = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
+			const navigationEntries = performance.getEntriesByType("navigation");
+			const navigationTiming = navigationEntries.length > 0 ? navigationEntries[0] : undefined;
 
 			// Get paint timing entries
 			const paintEntries = performance.getEntriesByType("paint");
@@ -58,8 +57,8 @@ export class PerformanceHelper {
 			);
 
 			return {
-				loadTime: navigationTiming ? navigationTiming.loadEventEnd : 0,
-				domContentLoaded: navigationTiming ? navigationTiming.domContentLoadedEventEnd : 0,
+				loadTime: navigationTiming !== undefined ? navigationTiming.loadEventEnd : 0,
+				domContentLoaded: navigationTiming !== undefined ? navigationTiming.domContentLoadedEventEnd : 0,
 				firstPaint: firstPaint?.startTime,
 				firstContentfulPaint: firstContentfulPaint?.startTime,
 			};
@@ -70,7 +69,6 @@ export class PerformanceHelper {
 
 	/**
 	 * Navigate to a URL and measure page load performance
-	 * @param url
 	 */
 	async measurePageLoad(url: string): Promise<PerformanceMetrics> {
 		await this.page.goto(url, { waitUntil: "load" });
@@ -79,14 +77,13 @@ export class PerformanceHelper {
 
 	/**
 	 * Assert that page load time is under a threshold
-	 * @param maxMs
 	 * @throws Error if load time exceeds threshold
 	 */
 	async assertLoadTimeUnder(maxMs: number): Promise<void> {
 		const metrics = await this.getNavigationTiming();
 		if (metrics.loadTime > maxMs) {
 			throw new Error(
-				`Page load time (${metrics.loadTime}ms) exceeded threshold (${maxMs}ms)`
+				`Page load time (${String(metrics.loadTime)}ms) exceeded threshold (${String(maxMs)}ms)`
 			);
 		}
 	}
@@ -97,16 +94,20 @@ export class PerformanceHelper {
 	 */
 	async getMemoryUsage(): Promise<MemoryUsage | null> {
 		const memory = await this.page.evaluate(() => {
-			// @ts-expect-error - performance.memory is Chrome-specific
-			if (performance.memory === undefined) {
+			// performance.memory is a non-standard, Chrome-specific extension not declared on the DOM lib's Performance interface, so it is narrowed via a local type guard.
+			interface PerformanceWithMemory extends Performance {
+				memory: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number };
+			}
+
+			const hasMemoryInfo = (perf: Performance): perf is PerformanceWithMemory => "memory" in perf;
+
+			if (!hasMemoryInfo(performance)) {
 				return null;
 			}
 
-			// @ts-expect-error - performance.memory is Chrome-specific
-			const memoryInfo = performance.memory;
 			return {
-				usedJSHeapSize: memoryInfo.usedJSHeapSize,
-				totalJSHeapSize: memoryInfo.totalJSHeapSize,
+				usedJSHeapSize: performance.memory.usedJSHeapSize,
+				totalJSHeapSize: performance.memory.totalJSHeapSize,
 			};
 		});
 
@@ -115,7 +116,6 @@ export class PerformanceHelper {
 
 	/**
 	 * Log current timer value to console
-	 * @param label
 	 * @throws Error if timer was not started
 	 */
 	logPerformance(label: string): void {
@@ -124,13 +124,12 @@ export class PerformanceHelper {
 			throw new Error(`Timer "${label}" was not started`);
 		}
 		const elapsed = Date.now() - startTime;
-		console.log(`[Performance] ${label}: ${elapsed}ms`);
+		console.log(`[Performance] ${label}: ${String(elapsed)}ms`);
 	}
 }
 
 /**
  * Factory function to create a PerformanceHelper instance
- * @param page
  */
 export const performanceHelper = (page: Page): PerformanceHelper => {
 	return new PerformanceHelper(page);

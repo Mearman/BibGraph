@@ -115,11 +115,11 @@ test.describe('@utility Search Page', () => {
 
 	test('should display page description with helpful information', async ({ page }) => {
 		// Verify page description is visible and informative
-		const pageDescription = page.getByText(/search across all openalex entities/i);
-		await expect(pageDescription).toBeVisible();
+		const descriptionLocator = page.getByText(/search across all openalex entities/i);
+		await expect(descriptionLocator).toBeVisible();
 
 		// Verify it mentions key entity types
-		const descriptionText = await pageDescription.textContent();
+		const descriptionText = await descriptionLocator.textContent();
 		expect(descriptionText).toMatch(/authors|institutions|sources|topics|works/i);
 	});
 

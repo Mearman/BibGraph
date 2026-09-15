@@ -7,6 +7,8 @@
 
 import { useCallback, useEffect, useRef,useState } from 'react';
 
+import { MS_PER_SECOND } from './time-constants';
+
 export interface PerformanceStats {
   /**
   Current frames per second
@@ -37,7 +39,7 @@ export interface PerformanceStats {
    */
   visibleEdges: number;
   /**
-  Performance level: 'good' (60+ fps), 'ok' (30-60), 'poor' (<30)
+  Performance level: 'good' (60+ fps), 'ok' (30-60), 'poor' (below 30)
    */
   performanceLevel: 'good' | 'ok' | 'poor';
   /**
@@ -66,7 +68,7 @@ export interface UseGraph3DPerformanceOptions {
   /**
   Callback when performance drops below threshold
    */
-  onPerformanceDrop?: (stats: PerformanceStats) => void;
+  onPerformanceDrop?: (stats: Readonly<PerformanceStats>) => void;
   /**
   FPS threshold for performance drop callback (default: 30)
    */
@@ -89,16 +91,24 @@ const DEFAULT_STATS: PerformanceStats = {
 /**
  * Calculate jank score based on frame time variance
  * Higher variance = more stuttering/jank
- * @param frameTimes
  */
-const calculateJankScore = (frameTimes: number[]): number => {
+const JANK_FRAME_THRESHOLD_MULTIPLIER = 1.5;
+const JANK_RATIO_WEIGHT = 50;
+const JANK_VARIANCE_WEIGHT_CAP = 50;
+const JANK_VARIANCE_SCALE = 25;
+const BYTES_PER_KB = 1024;
+const ROUNDING_PRECISION = 100;
+const GOOD_FPS_THRESHOLD = 55;
+const OK_FPS_THRESHOLD = 30;
+
+const calculateJankScore = (frameTimes: readonly number[]): number => {
   if (frameTimes.length < 2) return 0;
 
   const avg = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
   const targetFrameTime = 16.67; // 60fps target
 
   // Calculate how many frames exceeded the target by a significant margin
-  const jankFrames = frameTimes.filter(t => t > targetFrameTime * 1.5).length;
+  const jankFrames = frameTimes.filter(t => t > targetFrameTime * JANK_FRAME_THRESHOLD_MULTIPLIER).length;
   const jankRatio = jankFrames / frameTimes.length;
 
   // Calculate variance
@@ -106,31 +116,47 @@ const calculateJankScore = (frameTimes: number[]): number => {
   const standardDeviation = Math.sqrt(variance);
 
   // Combine jank ratio and standard deviation into a 0-100 score
-  const jankFromRatio = jankRatio * 50;
-  const jankFromVariance = Math.min(50, standardDeviation / targetFrameTime * 25);
+  const jankFromRatio = jankRatio * JANK_RATIO_WEIGHT;
+  const jankFromVariance = Math.min(JANK_VARIANCE_WEIGHT_CAP, standardDeviation / targetFrameTime * JANK_VARIANCE_SCALE);
 
   return Math.round(jankFromRatio + jankFromVariance);
 };
 
 /**
- * Get memory usage if Performance API is available
+ * Reads the non-standard `performance.memory.usedJSHeapSize` some browsers expose, or null when the API is unavailable
+ */
+const readUsedJSHeapSize = (perf: unknown): number | null => {
+  if (typeof perf !== 'object' || perf === null || !('memory' in perf)) {
+    return null;
+  }
+
+  const memory = perf.memory;
+  if (typeof memory !== 'object' || memory === null || !('usedJSHeapSize' in memory)) {
+    return null;
+  }
+
+  const usedJSHeapSize = memory.usedJSHeapSize;
+  return typeof usedJSHeapSize === 'number' ? usedJSHeapSize : null;
+};
+
+/**
+ * Get memory usage if the non-standard `performance.memory` API is available
  */
 const getMemoryUsage = (): number | null => {
-  // @ts-expect-error - memory is non-standard
-  if (performance.memory) {
-    // @ts-expect-error - memory is non-standard
-    return Math.round(performance.memory.usedJSHeapSize / 1024 / 1024 * 100) / 100;
+  const usedJSHeapSize = readUsedJSHeapSize(performance);
+  if (usedJSHeapSize === null) {
+    return null;
   }
-  return null;
+
+  return Math.round(usedJSHeapSize / BYTES_PER_KB / BYTES_PER_KB * ROUNDING_PRECISION) / ROUNDING_PRECISION;
 };
 
 /**
  * Determine performance level from FPS
- * @param fps
  */
 const getPerformanceLevel = (fps: number): 'good' | 'ok' | 'poor' => {
-  if (fps >= 55) return 'good';
-  if (fps >= 30) return 'ok';
+  if (fps >= GOOD_FPS_THRESHOLD) return 'good';
+  if (fps >= OK_FPS_THRESHOLD) return 'ok';
   return 'poor';
 };
 
@@ -193,7 +219,9 @@ export interface UseGraph3DPerformanceReturn {
  * }
  * ```
  */
-export const useGraph3DPerformance = (options: UseGraph3DPerformanceOptions = {}): UseGraph3DPerformanceReturn => {
+const PERFORMANCE_DROP_CALLBACK_COOLDOWN_MS = 5000;
+
+export const useGraph3DPerformance = (options: Readonly<UseGraph3DPerformanceOptions> = {}): UseGraph3DPerformanceReturn => {
   const {
     enabled = true,
     sampleSize = 60,
@@ -252,7 +280,7 @@ export const useGraph3DPerformance = (options: UseGraph3DPerformanceOptions = {}
 
   // Update stats periodically
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return undefined;
 
     const updateStats = () => {
       const frameTimes = frameTimesReference.current;
@@ -262,7 +290,7 @@ export const useGraph3DPerformance = (options: UseGraph3DPerformanceOptions = {}
       }
 
       const avgFrameTime = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
-      const fps = Math.round(1000 / avgFrameTime);
+      const fps = Math.round(MS_PER_SECOND / avgFrameTime);
       const minFrameTime = Math.min(...frameTimes);
       const maxFrameTime = Math.max(...frameTimes);
       const jankScore = calculateJankScore(frameTimes);
@@ -271,9 +299,9 @@ export const useGraph3DPerformance = (options: UseGraph3DPerformanceOptions = {}
 
       const newStats: PerformanceStats = {
         fps,
-        avgFrameTime: Math.round(avgFrameTime * 100) / 100,
-        minFrameTime: Math.round(minFrameTime * 100) / 100,
-        maxFrameTime: Math.round(maxFrameTime * 100) / 100,
+        avgFrameTime: Math.round(avgFrameTime * ROUNDING_PRECISION) / ROUNDING_PRECISION,
+        minFrameTime: Math.round(minFrameTime * ROUNDING_PRECISION) / ROUNDING_PRECISION,
+        maxFrameTime: Math.round(maxFrameTime * ROUNDING_PRECISION) / ROUNDING_PRECISION,
         memoryMB,
         visibleNodes: visibleCountsReference.current.nodes,
         visibleEdges: visibleCountsReference.current.edges,
@@ -288,7 +316,7 @@ export const useGraph3DPerformance = (options: UseGraph3DPerformanceOptions = {}
       if (
         onPerformanceDrop &&
         fps < fpsThreshold &&
-        Date.now() - lastDropCallbackReference.current > 5000 // Don't spam callback
+        Date.now() - lastDropCallbackReference.current > PERFORMANCE_DROP_CALLBACK_COOLDOWN_MS // Don't spam callback
       ) {
         lastDropCallbackReference.current = Date.now();
         onPerformanceDrop(newStats);
@@ -332,7 +360,6 @@ export interface PerformanceOverlayProps {
 
 /**
  * Get CSS styles for performance level indicator
- * @param level
  */
 export const getPerformanceLevelColor = (level: 'good' | 'ok' | 'poor'): string => {
   switch (level) {
@@ -349,19 +376,18 @@ export const getPerformanceLevelColor = (level: 'good' | 'ok' | 'poor'): string 
 
 /**
  * Format performance stats for display
- * @param stats
  */
-export const formatPerformanceStats = (stats: PerformanceStats): string[] => {
+export const formatPerformanceStats = (stats: Readonly<PerformanceStats>): string[] => {
   const lines: string[] = [
-    `FPS: ${stats.fps}`,
+    `FPS: ${String(stats.fps)}`,
     `Frame Time: ${stats.avgFrameTime.toFixed(2)}ms`,
-    `Nodes: ${stats.visibleNodes}`,
-    `Edges: ${stats.visibleEdges}`,
-    `Jank: ${stats.jankScore}%`,
+    `Nodes: ${String(stats.visibleNodes)}`,
+    `Edges: ${String(stats.visibleEdges)}`,
+    `Jank: ${String(stats.jankScore)}%`,
   ];
 
   if (stats.memoryMB !== null) {
-    lines.push(`Memory: ${stats.memoryMB}MB`);
+    lines.push(`Memory: ${String(stats.memoryMB)}MB`);
   }
 
   return lines;

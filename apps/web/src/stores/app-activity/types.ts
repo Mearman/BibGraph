@@ -135,9 +135,9 @@ export interface AppActivityContextType {
     entityId?: string,
     queryParameters?: Record<string, unknown>,
   ) => void;
-  setTypeFilter: (types: string[]) => void;
-  setCategoryFilter: (categories: string[]) => void;
-  setSeverityFilter: (severities: string[]) => void;
+  setTypeFilter: (types: readonly string[]) => void;
+  setCategoryFilter: (categories: readonly string[]) => void;
+  setSeverityFilter: (severities: readonly string[]) => void;
   setSearchTerm: (term: string) => void;
   setTimeRange: (minutes: number) => void;
   clearFilters: () => void;

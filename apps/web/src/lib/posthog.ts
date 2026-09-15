@@ -14,9 +14,19 @@ import type { PostHogConfig } from 'posthog-js'
  * - Manual event capture: No automatic data collection
  */
 
+// Minimum API key length treated as plausibly valid (guards against placeholder/truncated values)
+const MIN_POSTHOG_API_KEY_LENGTH = 10;
+const POSTHOG_API_KEY_PREVIEW_LENGTH = 10;
+
+/**
+ * Read a Vite env var as a string, falling back when it is unset. `import.meta.env` values are untyped for keys Vite doesn't know about ahead of time, so this is the single point where that boundary is narrowed to a real `string`.
+ */
+const readEnvString = (value: unknown, fallback: string): string =>
+  typeof value === 'string' && value !== '' ? value : fallback;
+
 // Environment variables for PostHog configuration
-export const POSTHOG_API_KEY = import.meta.env.VITE_PUBLIC_POSTHOG_API_KEY || ''
-export const POSTHOG_HOST = import.meta.env.VITE_PUBLIC_POSTHOG_HOST || 'https://eu.i.posthog.com'
+export const POSTHOG_API_KEY = readEnvString(import.meta.env.VITE_PUBLIC_POSTHOG_API_KEY, '')
+export const POSTHOG_HOST = readEnvString(import.meta.env.VITE_PUBLIC_POSTHOG_HOST, 'https://eu.i.posthog.com')
 
 // Enable PostHog only if API key is provided (development check)
 export const POSTHOG_ENABLED = Boolean(POSTHOG_API_KEY && POSTHOG_API_KEY !== 'your-posthog-api-key')
@@ -25,9 +35,9 @@ export const POSTHOG_ENABLED = Boolean(POSTHOG_API_KEY && POSTHOG_API_KEY !== 'y
 if (import.meta.env.DEV) {
   console.debug('📊 PostHog Configuration:', {
     POSTHOG_ENABLED,
-    POSTHOG_API_KEY: POSTHOG_API_KEY ? `${POSTHOG_API_KEY.slice(0, 10)}...` : 'NOT SET',
+    POSTHOG_API_KEY: POSTHOG_API_KEY ? `${POSTHOG_API_KEY.slice(0, POSTHOG_API_KEY_PREVIEW_LENGTH)}...` : 'NOT SET',
     POSTHOG_HOST,
-    shouldInitialize: POSTHOG_ENABLED && typeof window !== 'undefined' && POSTHOG_API_KEY.length > 10 && hostnameMatches(POSTHOG_HOST, 'posthog.com')
+    shouldInitialize: POSTHOG_ENABLED && typeof window !== 'undefined' && POSTHOG_API_KEY.length > MIN_POSTHOG_API_KEY_LENGTH && hostnameMatches(POSTHOG_HOST, 'posthog.com')
   });
 }
 
@@ -209,27 +219,31 @@ export interface AcademicEventProperties {
 }
 
 /**
- * Validate event properties to prevent accidental personal data capture
- * @param properties
+ * Validate event properties to prevent accidental personal data capture. Rebuilds the object from only the fields {@link AcademicEventProperties} declares, so any extra field a caller accidentally attaches (e.g. `email`, `query`) is dropped rather than merely deny-listed.
  */
-export const validateEventProperties = (properties: AcademicEventProperties): AcademicEventProperties => {
-  // Remove any potential personal data that might accidentally be included
-  const sanitized = { ...properties }
-
-  // Remove any potentially sensitive fields that might have been accidentally added
-  const sensitiveKeys = ['query', 'title', 'name', 'email', 'id', 'url', 'path']
-  for (const key of sensitiveKeys) {
-    delete (sanitized as Record<string, unknown>)[key]
-  }
-
-  return sanitized
-};
+export const validateEventProperties = (properties: Readonly<AcademicEventProperties>): AcademicEventProperties => ({
+  entity_type: properties.entity_type,
+  feature_name: properties.feature_name,
+  search_category: properties.search_category,
+  result_count: properties.result_count,
+  has_filters: properties.has_filters,
+  entity_category: properties.entity_category,
+  node_type: properties.node_type,
+  interaction_type: properties.interaction_type,
+  graph_size: properties.graph_size,
+  load_time_ms: properties.load_time_ms,
+  cache_hit: properties.cache_hit,
+  error_type: properties.error_type,
+  research_phase: properties.research_phase,
+  workflow_step: properties.workflow_step,
+  error_category: properties.error_category,
+  user_agent_group: properties.user_agent_group,
+});
 
 /**
- * PostHog initialization check
- * Returns true if PostHog should be initialized with valid configuration
+ * PostHog initialization check Returns true if PostHog should be initialized with valid configuration
  */
 export const shouldInitializePostHog = (): boolean => POSTHOG_ENABLED &&
          typeof window !== 'undefined' &&
-         POSTHOG_API_KEY.length > 10 && // Basic validation
+         POSTHOG_API_KEY.length > MIN_POSTHOG_API_KEY_LENGTH && // Basic validation
          hostnameMatches(POSTHOG_HOST, 'posthog.com');

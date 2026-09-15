@@ -22,6 +22,12 @@ import {
 } from '@/test/helpers/app-ready';
 import { SearchPage } from '@/test/page-objects/SearchPage';
 
+const SEARCH_PERFORMANCE_TARGET_MS = 3000;
+const MIN_TOUCH_TARGET_PX = 44;
+const MIN_INLINE_LINK_TAP_TARGET_PX = 24; // Slightly smaller acceptable for inline text links
+const MOBILE_VIEWPORT_WIDTH_PX = 375;
+const MOBILE_VIEWPORT_HEIGHT_PX = 667;
+
 test.describe('@workflow Search Workflow', () => {
 	let searchPage: SearchPage;
 
@@ -302,7 +308,7 @@ test.describe('@workflow Search Workflow', () => {
 
 		// Log entity types found (for debugging)
 		const uniqueTypes = new Set(badgeTexts);
-		console.log(`Found ${uniqueTypes.size} unique entity types:`, [...uniqueTypes]);
+		console.log(`Found ${String(uniqueTypes.size)} unique entity types:`, [...uniqueTypes]);
 
 		// Verify at least one valid entity type is present
 		const hasValidEntityType = badgeTexts.some((text) =>
@@ -389,9 +395,7 @@ test.describe('@workflow Search Workflow', () => {
 	});
 
 	test('should complete search within performance target (<3s)', async ({ page }) => {
-		const searchPage = new SearchPage(page);
-		await searchPage.gotoSearch();
-		await waitForAppReady(page);
+		// Search page is already loaded via beforeEach
 
 		// Enter search query
 		const testQuery = 'machine learning';
@@ -405,10 +409,10 @@ test.describe('@workflow Search Workflow', () => {
 		const endTime = Date.now();
 
 		const searchTime = endTime - startTime;
-		console.log(`Search execution time: ${searchTime}ms`);
+		console.log(`Search execution time: ${String(searchTime)}ms`);
 
 		// Target: <3000ms for search results
-		expect(searchTime).toBeLessThan(3000);
+		expect(searchTime).toBeLessThan(SEARCH_PERFORMANCE_TARGET_MS);
 
 		// Verify results were returned
 		const resultCount = await searchPage.getResultCount();
@@ -438,7 +442,7 @@ test.describe('@workflow @mobile Search Workflow - Mobile Viewport', () => {
 		const inputBox = await searchInput.boundingBox();
 		expect(inputBox).not.toBeNull();
 		if (inputBox) {
-			expect(inputBox.height).toBeGreaterThanOrEqual(44);
+			expect(inputBox.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
 		}
 
 		// Verify search button is visible and touch-friendly
@@ -448,8 +452,8 @@ test.describe('@workflow @mobile Search Workflow - Mobile Viewport', () => {
 		const buttonBox = await searchButton.boundingBox();
 		expect(buttonBox).not.toBeNull();
 		if (buttonBox) {
-			expect(buttonBox.height).toBeGreaterThanOrEqual(44);
-			expect(buttonBox.width).toBeGreaterThanOrEqual(44);
+			expect(buttonBox.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
+			expect(buttonBox.width).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
 		}
 	});
 
@@ -475,7 +479,7 @@ test.describe('@workflow @mobile Search Workflow - Mobile Viewport', () => {
 
 		// Verify viewport width is respected (no horizontal scrolling)
 		const viewportSize = page.viewportSize();
-		expect(viewportSize?.width).toBe(375);
+		expect(viewportSize?.width).toBe(MOBILE_VIEWPORT_WIDTH_PX);
 
 		// Verify table content is responsive and visible
 		const firstResultRow = resultsContainer.locator('tbody tr').first();
@@ -521,7 +525,7 @@ test.describe('@workflow @mobile Search Workflow - Mobile Viewport', () => {
 
 		// Verify entity detail page is responsive on mobile
 		const viewportSize = page.viewportSize();
-		expect(viewportSize?.width).toBe(375);
+		expect(viewportSize?.width).toBe(MOBILE_VIEWPORT_WIDTH_PX);
 	});
 
 	test('should have touch-friendly tap targets for all interactive elements', async ({
@@ -543,7 +547,7 @@ test.describe('@workflow @mobile Search Workflow - Mobile Viewport', () => {
 		const inputBox = await searchInput.boundingBox();
 		expect(inputBox).not.toBeNull();
 		if (inputBox) {
-			expect(inputBox.height).toBeGreaterThanOrEqual(44);
+			expect(inputBox.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
 		}
 
 		// Verify search button meets touch target size
@@ -551,8 +555,8 @@ test.describe('@workflow @mobile Search Workflow - Mobile Viewport', () => {
 		const buttonBox = await searchButton.boundingBox();
 		expect(buttonBox).not.toBeNull();
 		if (buttonBox) {
-			expect(buttonBox.height).toBeGreaterThanOrEqual(44);
-			expect(buttonBox.width).toBeGreaterThanOrEqual(44);
+			expect(buttonBox.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
+			expect(buttonBox.width).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
 		}
 
 		// Verify result rows are touch-friendly (clickable area should be large)
@@ -565,7 +569,7 @@ test.describe('@workflow @mobile Search Workflow - Mobile Viewport', () => {
 		expect(rowBox).not.toBeNull();
 		if (rowBox) {
 			// Result rows should have reasonable height for touch interaction
-			expect(rowBox.height).toBeGreaterThanOrEqual(44);
+			expect(rowBox.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
 		}
 
 		// Verify links within results have adequate tap targets
@@ -577,7 +581,7 @@ test.describe('@workflow @mobile Search Workflow - Mobile Viewport', () => {
 			expect(linkBox).not.toBeNull();
 			if (linkBox) {
 				// Links should be touch-friendly
-				expect(linkBox.height).toBeGreaterThanOrEqual(24); // Slightly smaller acceptable for inline text links
+				expect(linkBox.height).toBeGreaterThanOrEqual(MIN_INLINE_LINK_TAP_TARGET_PX);
 			}
 		}
 	});
@@ -596,8 +600,8 @@ test.describe('@workflow @mobile Search Workflow - Mobile Viewport', () => {
 
 		// Verify viewport is mobile
 		let viewportSize = page.viewportSize();
-		expect(viewportSize?.width).toBe(375);
-		expect(viewportSize?.height).toBe(667);
+		expect(viewportSize?.width).toBe(MOBILE_VIEWPORT_WIDTH_PX);
+		expect(viewportSize?.height).toBe(MOBILE_VIEWPORT_HEIGHT_PX);
 
 		// Record result count
 		const initialResultCount = await searchPage.getResultCount();
@@ -609,7 +613,7 @@ test.describe('@workflow @mobile Search Workflow - Mobile Viewport', () => {
 
 		// Verify still on mobile viewport
 		viewportSize = page.viewportSize();
-		expect(viewportSize?.width).toBe(375);
+		expect(viewportSize?.width).toBe(MOBILE_VIEWPORT_WIDTH_PX);
 
 		// Navigate back
 		await page.goBack();
@@ -623,7 +627,7 @@ test.describe('@workflow @mobile Search Workflow - Mobile Viewport', () => {
 
 		// Verify results are still displayed with mobile layout
 		viewportSize = page.viewportSize();
-		expect(viewportSize?.width).toBe(375);
+		expect(viewportSize?.width).toBe(MOBILE_VIEWPORT_WIDTH_PX);
 
 		const resultCountAfterBack = await searchPage.getResultCount();
 		expect(resultCountAfterBack).toBe(initialResultCount);

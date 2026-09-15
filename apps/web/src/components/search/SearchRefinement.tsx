@@ -23,7 +23,9 @@ export const SearchRefinement = ({
     <TextInput
       placeholder="Search within results..."
       value={refinementQuery}
-      onChange={(e) => onRefinementChange(e.currentTarget.value)}
+      onChange={(e) => {
+        onRefinementChange(e.currentTarget.value);
+      }}
       leftSection={<IconSearch size={ICON_SIZE.SM} />}
       rightSection={
         refinementQuery && (
@@ -31,7 +33,9 @@ export const SearchRefinement = ({
             size="sm"
             variant="transparent"
             color="gray"
-            onClick={() => onRefinementChange('')}
+            onClick={() => {
+              onRefinementChange('');
+            }}
             aria-label="Clear refinement"
           >
             <IconX size={ICON_SIZE.XS} />

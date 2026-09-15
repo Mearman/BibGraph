@@ -59,7 +59,7 @@ export const CatalogueListCard = ({ list, onClose }: CatalogueListCardProperties
           <Text size="sm" fw={500} lineClamp={1}>
             {list.title}
           </Text>
-          {list.description && (
+          {list.description !== undefined && list.description !== "" && (
             <Text size="xs" c="dimmed" lineClamp={1}>
               {list.description}
             </Text>

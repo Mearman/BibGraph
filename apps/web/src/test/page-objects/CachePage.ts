@@ -4,11 +4,9 @@
  * Page object for the Cache Management feature (US-25, US-26).
  * Handles cache display, storage stats, and cache clearing operations.
  *
- * Hierarchy: BasePageObject -> BaseSPAPageObject -> CachePage
+ * Hierarchy: BasePageObject -\> BaseSPAPageObject -\> CachePage
  * @see US-25, US-26
  */
-
-import type { Page } from "@playwright/test";
 
 import { BaseSPAPageObject } from "./BaseSPAPageObject";
 
@@ -26,10 +24,6 @@ export class CachePage extends BaseSPAPageObject {
 		cachedEntityPreview: "[data-testid='cached-entity-preview']",
 		rebuildButton: "[data-testid='rebuild-cache']",
 	};
-
-	constructor(page: Page) {
-		super(page);
-	}
 
 	async gotoCache(): Promise<void> {
 		await this.goto("#/cache");

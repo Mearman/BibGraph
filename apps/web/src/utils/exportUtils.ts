@@ -11,10 +11,8 @@ import { ENTITY_TYPE_COLORS as HASH_BASED_ENTITY_COLORS } from '@/styles/hash-co
 
 /**
  * Convert search results to CSV format
- * @param results
- * @param filename
  */
-export const exportToCSV = (results: AutocompleteResult[], filename?: string): void => {
+export const exportToCSV = (results: readonly AutocompleteResult[], filename?: string): void => {
   if (results.length === 0) return;
 
   // CSV headers
@@ -47,8 +45,10 @@ export const exportToCSV = (results: AutocompleteResult[], filename?: string): v
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
 
+  const downloadFilename = filename !== undefined && filename !== '' ? filename : `search-results-${String(Date.now())}.csv`;
+
   link.setAttribute('href', url);
-  link.setAttribute('download', filename || `search-results-${Date.now()}.csv`);
+  link.setAttribute('download', downloadFilename);
   link.style.visibility = 'hidden';
   document.body.append(link);
   link.click();
@@ -57,21 +57,20 @@ export const exportToCSV = (results: AutocompleteResult[], filename?: string): v
 
 /**
  * Convert a work result to BibTeX format
- * @param result
  */
-const workToBibTeX = (result: AutocompleteResult): string => {
+const workToBibTeX = (result: Readonly<AutocompleteResult>): string => {
   const id = result.id.replace('https://openalex.org/', '').toUpperCase();
   const bibKey = `work${id}`.replaceAll(/[^a-z0-9]/gi, '');
 
   let bibtex = `@misc{${bibKey},\n`;
   bibtex += `  title = {${result.display_name}},\n`;
 
-  if (result.hint) {
+  if (result.hint !== undefined && result.hint !== '') {
     bibtex += `  howpublished = {${result.hint}},\n`;
   }
 
-  if (result.cited_by_count) {
-    bibtex += `  citations = {${result.cited_by_count}},\n`;
+  if (result.cited_by_count !== undefined && result.cited_by_count !== 0) {
+    bibtex += `  citations = {${String(result.cited_by_count)}},\n`;
   }
 
   bibtex += `  url = {${result.id}},\n`;
@@ -82,21 +81,22 @@ const workToBibTeX = (result: AutocompleteResult): string => {
 
 /**
  * Convert author result to BibTeX format
- * @param result
  */
-const authorToBibTeX = (result: AutocompleteResult): string => {
+const authorToBibTeX = (result: Readonly<AutocompleteResult>): string => {
   const id = result.id.replace('https://openalex.org/', '').toUpperCase();
-  const bibKey = `${result.display_name.split(' ').pop() || 'author'}${id}`.replaceAll(/[^a-z0-9]/gi, '');
+  const lastNamePart = result.display_name.split(' ').pop();
+  const authorLabel = lastNamePart !== undefined && lastNamePart !== '' ? lastNamePart : 'author';
+  const bibKey = `${authorLabel}${id}`.replaceAll(/[^a-z0-9]/gi, '');
 
   let bibtex = `@misc{${bibKey},\n`;
   bibtex += `  author = {${result.display_name}},\n`;
 
-  if (result.cited_by_count) {
-    bibtex += `  citations = {${result.cited_by_count}},\n`;
+  if (result.cited_by_count !== undefined && result.cited_by_count !== 0) {
+    bibtex += `  citations = {${String(result.cited_by_count)}},\n`;
   }
 
-  if (result.works_count) {
-    bibtex += `  works = {${result.works_count}},\n`;
+  if (result.works_count !== undefined && result.works_count !== 0) {
+    bibtex += `  works = {${String(result.works_count)}},\n`;
   }
 
   bibtex += `  url = {${result.id},\n`;
@@ -107,10 +107,8 @@ const authorToBibTeX = (result: AutocompleteResult): string => {
 
 /**
  * Convert search results to BibTeX format
- * @param results
- * @param filename
  */
-export const exportToBibTeX = (results: AutocompleteResult[], filename?: string): void => {
+export const exportToBibTeX = (results: readonly AutocompleteResult[], filename?: string): void => {
   if (results.length === 0) return;
 
   // Convert results to BibTeX entries
@@ -128,22 +126,25 @@ export const exportToBibTeX = (results: AutocompleteResult[], filename?: string)
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
 
+  const downloadFilename = filename !== undefined && filename !== '' ? filename : `search-results-${String(Date.now())}.bib`;
+
   link.setAttribute('href', url);
-  link.setAttribute('download', filename || `search-results-${Date.now()}.bib`);
+  link.setAttribute('download', downloadFilename);
   link.style.visibility = 'hidden';
   document.body.append(link);
   link.click();
   link.remove();
 };
 
+// Length of the YYYY-MM-DD prefix sliced from an ISO timestamp for use in filenames
+const ISO_DATE_LENGTH = 10;
+
 /**
  * Get export filename based on current search query
- * @param query
- * @param format
  */
 export const getExportFilename = (query: string, format: 'csv' | 'bib'): string => {
   const sanitizedQuery = query.trim().replaceAll(/[^a-z0-9]/gi, '-').toLowerCase();
-  const timestamp = new Date().toISOString().slice(0, 10);
+  const timestamp = new Date().toISOString().slice(0, ISO_DATE_LENGTH);
   return sanitizedQuery
     ? `${sanitizedQuery}-results-${timestamp}.${format}`
     : `search-results-${timestamp}.${format}`;
@@ -180,8 +181,8 @@ interface SVGExportOptions {
  * @returns SVG markup as string
  */
 export const generateGraphSVG = (
-  nodes: GraphNode[],
-  edges: GraphEdge[],
+  nodes: readonly GraphNode[],
+  edges: readonly GraphEdge[],
   options: SVGExportOptions,
 ): string => {
   const { width, height, padding = 20, includeLegend = false, nodePositions } = options;
@@ -193,8 +194,8 @@ export const generateGraphSVG = (
   let maxY = -Infinity;
 
   for (const node of nodes) {
-    const x = nodePositions?.get(node.id)?.x ?? node.x ?? 0;
-    const y = nodePositions?.get(node.id)?.y ?? node.y ?? 0;
+    const x = nodePositions?.get(node.id)?.x ?? node.x;
+    const y = nodePositions?.get(node.id)?.y ?? node.y;
 
     minX = Math.min(minX, x);
     maxX = Math.max(maxX, x);
@@ -224,7 +225,7 @@ export const generateGraphSVG = (
   const svgElements: string[] = [];
 
   // Background
-  svgElements.push(`<rect width="${width}" height="${height}" fill="white"/>`);
+  svgElements.push(`<rect width="${String(width)}" height="${String(height)}" fill="white"/>`);
 
   // Edges (draw before nodes so they appear behind)
   for (const edge of edges) {
@@ -233,42 +234,47 @@ export const generateGraphSVG = (
 
     if (!sourceNode || !targetNode) continue;
 
-    const x1 = (nodePositions?.get(sourceNode.id)?.x ?? sourceNode.x ?? 0) * scale + offsetX;
-    const y1 = (nodePositions?.get(sourceNode.id)?.y ?? sourceNode.y ?? 0) * scale + offsetY;
-    const x2 = (nodePositions?.get(targetNode.id)?.x ?? targetNode.x ?? 0) * scale + offsetX;
-    const y2 = (nodePositions?.get(targetNode.id)?.y ?? targetNode.y ?? 0) * scale + offsetY;
+    const x1 = (nodePositions?.get(sourceNode.id)?.x ?? sourceNode.x) * scale + offsetX;
+    const y1 = (nodePositions?.get(sourceNode.id)?.y ?? sourceNode.y) * scale + offsetY;
+    const x2 = (nodePositions?.get(targetNode.id)?.x ?? targetNode.x) * scale + offsetX;
+    const y2 = (nodePositions?.get(targetNode.id)?.y ?? targetNode.y) * scale + offsetY;
 
     const edgeColor = '#94a3b8';
     const edgeWidth = 1;
 
     svgElements.push(
-      `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${edgeColor}" stroke-width="${edgeWidth}" opacity="0.6"/>`,
+      `<line x1="${String(x1)}" y1="${String(y1)}" x2="${String(x2)}" y2="${String(y2)}" stroke="${edgeColor}" stroke-width="${String(edgeWidth)}" opacity="0.6"/>`,
     );
   }
 
   // Nodes
   const NODE_RADIUS = 5;
   for (const node of nodes) {
-    const x = (nodePositions?.get(node.id)?.x ?? node.x ?? 0) * scale + offsetX;
-    const y = (nodePositions?.get(node.id)?.y ?? node.y ?? 0) * scale + offsetY;
+    const x = (nodePositions?.get(node.id)?.x ?? node.x) * scale + offsetX;
+    const y = (nodePositions?.get(node.id)?.y ?? node.y) * scale + offsetY;
 
     const nodeColor = HASH_BASED_ENTITY_COLORS[node.entityType];
 
     svgElements.push(
-      `<circle cx="${x}" cy="${y}" r="${NODE_RADIUS}" fill="${nodeColor}" stroke="#333" stroke-width="0.5"/>`,
+      `<circle cx="${String(x)}" cy="${String(y)}" r="${String(NODE_RADIUS)}" fill="${nodeColor}" stroke="#333" stroke-width="0.5"/>`,
     );
   }
 
   // Legend
   if (includeLegend) {
     const entityTypes = new Set(nodes.map((n) => n.entityType));
-    const legendX = width - 150;
+    const legendPanelWidth = 150;
+    const legendPadding = 10;
     const legendY = 20;
     const legendItemHeight = 25;
+    const legendItemMarkerYOffset = 7;
+    const legendTextXOffset = 15;
+    const legendTextYOffset = 11;
+    const legendX = width - legendPanelWidth;
 
     // Legend background
     svgElements.push(
-      `<rect x="${legendX - 10}" y="${legendY - 10}" width="140" height="${entityTypes.size * legendItemHeight + 20}" fill="white" stroke="#ccc" stroke-width="1" opacity="0.9"/>`,
+      `<rect x="${String(legendX - legendPadding)}" y="${String(legendY - legendPadding)}" width="140" height="${String(entityTypes.size * legendItemHeight + legendY)}" fill="white" stroke="#ccc" stroke-width="1" opacity="0.9"/>`,
     );
 
     // Legend items
@@ -277,10 +283,10 @@ export const generateGraphSVG = (
       const itemY = legendY + itemIndex * legendItemHeight;
 
       svgElements.push(
-        `<circle cx="${legendX}" cy="${itemY + 7}" r="5" fill="${HASH_BASED_ENTITY_COLORS[entityType]}"/>`,
+        `<circle cx="${String(legendX)}" cy="${String(itemY + legendItemMarkerYOffset)}" r="${String(NODE_RADIUS)}" fill="${HASH_BASED_ENTITY_COLORS[entityType]}"/>`,
       );
       svgElements.push(
-        `<text x="${legendX + 15}" y="${itemY + 11}" font-family="sans-serif" font-size="12" fill="#333">${entityType}</text>`,
+        `<text x="${String(legendX + legendTextXOffset)}" y="${String(itemY + legendTextYOffset)}" font-family="sans-serif" font-size="12" fill="#333">${entityType}</text>`,
       );
 
       itemIndex++;
@@ -289,7 +295,7 @@ export const generateGraphSVG = (
 
   // Wrap in SVG tag
   const svgContent = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+<svg xmlns="http://www.w3.org/2000/svg" width="${String(width)}" height="${String(height)}" viewBox="0 0 ${String(width)} ${String(height)}">
   ${svgElements.join('\n  ')}
 </svg>`;
 
@@ -304,10 +310,10 @@ export const generateGraphSVG = (
  * @param filename - Name for the downloaded file (without .svg extension)
  */
 export const downloadGraphSVG = (
-  nodes: GraphNode[],
-  edges: GraphEdge[],
+  nodes: readonly GraphNode[],
+  edges: readonly GraphEdge[],
   options: SVGExportOptions,
-  filename: string = `graph-${new Date().toISOString().split('T', 1)[0]}-${new Date().toISOString().split('T', 2)[1].split('.', 1)[0].replaceAll(':', '-')}`,
+  filename = `graph-${new Date().toISOString().split('T', 1)[0]}-${new Date().toISOString().split('T', 2)[1].split('.', 1)[0].replaceAll(':', '-')}`,
 ): void => {
   const svgContent = generateGraphSVG(nodes, edges, options);
 

@@ -24,7 +24,19 @@ export interface TouchPosition {
   time: number;
 }
 
-export const useMobileGestures = (config: SwipeConfig = {}) => {
+const SWIPE_RESET_DELAY_MS = 100;
+
+/**
+ * Reads the legacy, non-standard `msMaxTouchPoints` property some older browsers expose on `navigator`, returning 0 when it's absent or not a number
+ */
+const readMsMaxTouchPoints = (candidate: unknown): number => {
+  if (typeof candidate !== 'object' || candidate === null || !('msMaxTouchPoints' in candidate)) {
+    return 0;
+  }
+  return typeof candidate.msMaxTouchPoints === 'number' ? candidate.msMaxTouchPoints : 0;
+};
+
+export const useMobileGestures = (config: Readonly<SwipeConfig> = {}) => {
   const {
     threshold = 50,
     restraint = 100,
@@ -44,15 +56,14 @@ export const useMobileGestures = (config: SwipeConfig = {}) => {
 
   // Detect touch device on mount
   useEffect(() => {
-    const nav = navigator || {};
     const hasTouch = 'ontouchstart' in window ||
-                   (nav.maxTouchPoints && nav.maxTouchPoints > 0) ||
-                   ((nav as { msMaxTouchPoints?: number }).msMaxTouchPoints || 0) > 0;
+                   (typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 0) ||
+                   readMsMaxTouchPoints(navigator) > 0;
     setIsTouchDevice(hasTouch);
   }, []);
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
-    if (!e.touches || e.touches.length === 0) return;
+    if (e.touches.length === 0) return;
 
     const touch = e.touches[0];
     touchStart.current = {
@@ -71,7 +82,7 @@ export const useMobileGestures = (config: SwipeConfig = {}) => {
   }, []);
 
   const handleTouchEnd = useCallback((e: TouchEvent) => {
-    if (!e.changedTouches || e.changedTouches.length === 0) return;
+    if (e.changedTouches.length === 0) return;
 
     if (!touchStart.current) return;
 
@@ -106,7 +117,7 @@ export const useMobileGestures = (config: SwipeConfig = {}) => {
           left: false,
           right: false
         });
-      }, 100);
+      }, SWIPE_RESET_DELAY_MS);
     }
 
     touchStart.current = null;
@@ -115,7 +126,7 @@ export const useMobileGestures = (config: SwipeConfig = {}) => {
 
   // Add event listeners
   useEffect(() => {
-    if (!isTouchDevice) return;
+    if (!isTouchDevice) return undefined;
 
     const element = document.documentElement;
 
@@ -143,9 +154,6 @@ export const useMobileGestures = (config: SwipeConfig = {}) => {
 /**
  * Hook for touch-friendly sidebar controls
  * Enhances mobile sidebar interaction with touch gestures
- * @param onOpen
- * @param onClose
- * @param isOpen
  */
 export const useTouchSidebar = (onOpen: () => void, onClose: () => void, isOpen: boolean) => {
   const { isTouchDevice, swipedRight, swipedLeft } = useMobileGestures({
@@ -179,8 +187,6 @@ export const useTouchSidebar = (onOpen: () => void, onClose: () => void, isOpen:
 
 /**
  * Hook for mobile-optimized long press detection
- * @param onLongPress
- * @param delay
  */
 export const useLongPress = (onLongPress: () => void, delay = 500) => {
   const [isLongPressing, setIsLongPressing] = useState(false);

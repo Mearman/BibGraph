@@ -5,7 +5,8 @@
  * - Click a node to fetch its relationships from OpenAlex
  * - Track expansion state (loading, expanded, error)
  * - Integrate with PersistentGraph for persistent storage
- * @module lib/graph-index/use-node-expansion
+ *
+ * Module: lib/graph-index/use-node-expansion
  */
 
 import type { NodeExpansionResult } from '@bibgraph/client';
@@ -135,7 +136,7 @@ export const useNodeExpansion = (): UseNodeExpansionResult => {
     async (nodeId: string, entityType?: EntityType): Promise<NodeExpansionResult> => {
       // Check if already expanding
       const currentState = expansionStates.get(nodeId);
-      if (currentState?.loading) {
+      if (currentState?.loading === true) {
         logger.debug(LOG_PREFIX, `Node ${nodeId} is already being expanded`);
         return {
           success: false,

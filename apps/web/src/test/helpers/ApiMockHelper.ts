@@ -17,9 +17,23 @@ import type { Page, Route } from '@playwright/test';
  * await mockHelper.clearAllMocks();
  * ```
  */
+/**
+ * Optional configuration for {@link ApiMockHelper.mockApiRoute}.
+ */
+interface MockApiRouteOptions {
+	/**
+	 * HTTP status code (default: 200)
+	 */
+	status?: number;
+	/**
+	 * Delay in milliseconds before responding (default: 0)
+	 */
+	delay?: number;
+}
+
 export class ApiMockHelper {
 	private readonly page: Page;
-	private readonly mockedPatterns: Array<string | RegExp> = [];
+	private readonly mockedPatterns: (string | RegExp)[] = [];
 
 	constructor(page: Page) {
 		this.page = page;
@@ -30,19 +44,17 @@ export class ApiMockHelper {
 	 * @param urlPattern - URL pattern (string or RegExp) to intercept
 	 * @param response - Response data to return (will be JSON stringified)
 	 * @param options - Optional configuration
-	 * @param options.status - HTTP status code (default: 200)
-	 * @param options.delay - Delay in milliseconds before responding (default: 0)
 	 */
 	async mockApiRoute(
 		urlPattern: string | RegExp,
 		response: unknown,
-		options?: { status?: number; delay?: number }
+		options?: MockApiRouteOptions
 	): Promise<void> {
 		const { status = 200, delay = 0 } = options ?? {};
 
-		await this.page.route(urlPattern, async (route: Route) => {
+		await this.page.route(urlPattern, async (route: Readonly<Route>) => {
 			if (delay > 0) {
-				await new Promise((resolve) => setTimeout(resolve, delay));
+				await new Promise((resolve) => { setTimeout(resolve, delay); });
 			}
 
 			await route.fulfill({
@@ -66,7 +78,7 @@ export class ApiMockHelper {
 		status: number,
 		message: string
 	): Promise<void> {
-		await this.page.route(urlPattern, async (route: Route) => {
+		await this.page.route(urlPattern, async (route: Readonly<Route>) => {
 			await route.fulfill({
 				status,
 				contentType: 'application/json',
@@ -85,7 +97,7 @@ export class ApiMockHelper {
 	 * @param urlPattern - URL pattern (string or RegExp) to intercept
 	 */
 	async mockNetworkFailure(urlPattern: string | RegExp): Promise<void> {
-		await this.page.route(urlPattern, async (route: Route) => {
+		await this.page.route(urlPattern, async (route: Readonly<Route>) => {
 			await route.abort('failed');
 		});
 
@@ -101,8 +113,8 @@ export class ApiMockHelper {
 		urlPattern: string | RegExp,
 		delay: number
 	): Promise<void> {
-		await this.page.route(urlPattern, async (route: Route) => {
-			await new Promise((resolve) => setTimeout(resolve, delay));
+		await this.page.route(urlPattern, async (route: Readonly<Route>) => {
+			await new Promise((resolve) => { setTimeout(resolve, delay); });
 			await route.abort('timedout');
 		});
 

@@ -15,7 +15,7 @@ const RORInstitutionRoute = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const resolveROR = async () => {
+    const resolveROR = () => {
       try {
         // Decode the ROR parameter
         const decodedROR = decodeURIComponent(ror);
@@ -55,7 +55,7 @@ const RORInstitutionRoute = () => {
       }
     };
 
-    void resolveROR();
+    resolveROR();
   }, [ror, navigate]);
 
   return (

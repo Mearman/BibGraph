@@ -8,10 +8,11 @@
  */
 
 import type { GraphNode } from '@bibgraph/types';
-import React, { useCallback } from 'react';
+import type React from 'react';
+import { useCallback } from 'react';
 
 import { CAMERA_3D, TIMING } from '../constants';
-import type { ForceGraphNode } from './types';
+import type { ForceGraph3DInstanceHandle, ForceGraphNode } from './types';
 
 export interface UseGraph3DInteractionsOptions {
   /**
@@ -33,8 +34,7 @@ export interface UseGraph3DInteractionsOptions {
   /**
   Reference to the ForceGraph3D instance
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  graphRef: React.RefObject<any>;
+  graphRef: React.RefObject<ForceGraph3DInstanceHandle | undefined>;
 }
 
 export interface UseGraph3DInteractionsReturn {
@@ -65,12 +65,6 @@ export interface UseGraph3DInteractionsReturn {
  *
  * Wraps ForceGraphNode events to expose the original GraphNode to consumers.
  * Provides keyboard navigation for accessibility (T045).
- * @param root0
- * @param root0.onNodeClick
- * @param root0.onNodeRightClick
- * @param root0.onNodeHover
- * @param root0.onBackgroundClick
- * @param root0.graphRef
  */
 export const useGraph3DInteractions = ({
   onNodeClick,

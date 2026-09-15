@@ -5,6 +5,7 @@
 
 import type { CatalogueEntity } from "@bibgraph/utils";
 
+import type { EntityMetadata } from "@/types/catalogue";
 import {
   isAuthorMetadata,
   isConceptMetadata,
@@ -31,105 +32,80 @@ export const PROVENANCE_LABELS: Record<string, string> = {
  * Formats entity metadata for display based on entity type
  * Note: Metadata is only available when entities are enriched with OpenAlex data.
  * For base CatalogueEntity objects from storage, this will show entity ID.
- * @param entity
  */
-export const formatEntityMetadata = (entity: CatalogueEntity): string => {
-  // Type guard: Check if entity has metadata property (enriched entity)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const enrichedEntity = entity as CatalogueEntity & { metadata?: any };
+export const formatEntityMetadata = (
+  entity: CatalogueEntity & { metadata?: EntityMetadata }
+): string => {
+  // Enriched entities carry a `metadata` field; base CatalogueEntity objects from storage do not.
+  const { metadata } = entity;
 
-  if (!enrichedEntity.metadata) {
+  if (metadata === undefined) {
     // Fallback for non-enriched entities - show entity type info
     return `Entity: ${entity.entityId}`;
   }
 
-  const { metadata } = enrichedEntity;
-
   if (isWorkMetadata(metadata)) {
-    const parts: string[] = [];
-    if (metadata.citedByCount !== undefined) {
-      parts.push(`${metadata.citedByCount} citations`);
-    }
-    if (metadata.publicationYear) {
-      parts.push(`${metadata.publicationYear}`);
+    const parts: string[] = [`${String(metadata.citedByCount)} citations`];
+    if (metadata.publicationYear !== undefined) {
+      parts.push(String(metadata.publicationYear));
     }
     return parts.join(" • ") || "No citation data";
   }
 
   if (isAuthorMetadata(metadata)) {
-    const parts: string[] = [];
-    if (metadata.worksCount !== undefined) {
-      parts.push(`${metadata.worksCount} works`);
-    }
+    const parts: string[] = [`${String(metadata.worksCount)} works`];
     if (metadata.hIndex !== undefined) {
-      parts.push(`h-index: ${metadata.hIndex}`);
+      parts.push(`h-index: ${String(metadata.hIndex)}`);
     }
     return parts.join(" • ") || "No works data";
   }
 
   if (isInstitutionMetadata(metadata)) {
-    const parts: string[] = [];
-    if (metadata.worksCount !== undefined) {
-      parts.push(`${metadata.worksCount} works`);
-    }
-    if (metadata.countryCode) {
+    const parts: string[] = [`${String(metadata.worksCount)} works`];
+    if (metadata.countryCode !== undefined && metadata.countryCode !== "") {
       parts.push(metadata.countryCode);
     }
     return parts.join(" • ") || "No works data";
   }
 
   if (isSourceMetadata(metadata)) {
-    const parts: string[] = [];
-    if (metadata.worksCount !== undefined) {
-      parts.push(`${metadata.worksCount} works`);
-    }
-    if (metadata.issn && metadata.issn.length > 0) {
-      parts.push(`ISSN: ${metadata.issn[0]}`);
+    const parts: string[] = [`${String(metadata.worksCount)} works`];
+    const firstIssn = metadata.issn?.[0];
+    if (firstIssn !== undefined) {
+      parts.push(`ISSN: ${firstIssn}`);
     }
     return parts.join(" • ") || "No works data";
   }
 
   if (isTopicMetadata(metadata)) {
-    const parts: string[] = [];
-    if (metadata.worksCount !== undefined) {
-      parts.push(`${metadata.worksCount} works`);
-    }
-    if (metadata.citedByCount !== undefined) {
-      parts.push(`${metadata.citedByCount} citations`);
-    }
+    const parts: string[] = [
+      `${String(metadata.worksCount)} works`,
+      `${String(metadata.citedByCount)} citations`,
+    ];
     return parts.join(" • ") || "No data";
   }
 
   if (isFunderMetadata(metadata)) {
-    const parts: string[] = [];
-    if (metadata.worksCount !== undefined) {
-      parts.push(`${metadata.worksCount} works`);
-    }
-    if (metadata.citedByCount !== undefined) {
-      parts.push(`${metadata.citedByCount} citations`);
-    }
+    const parts: string[] = [
+      `${String(metadata.worksCount)} works`,
+      `${String(metadata.citedByCount)} citations`,
+    ];
     return parts.join(" • ") || "No data";
   }
 
   if (isPublisherMetadata(metadata)) {
-    const parts: string[] = [];
-    if (metadata.worksCount !== undefined) {
-      parts.push(`${metadata.worksCount} works`);
-    }
-    if (metadata.citedByCount !== undefined) {
-      parts.push(`${metadata.citedByCount} citations`);
-    }
+    const parts: string[] = [
+      `${String(metadata.worksCount)} works`,
+      `${String(metadata.citedByCount)} citations`,
+    ];
     return parts.join(" • ") || "No data";
   }
 
   if (isConceptMetadata(metadata)) {
-    const parts: string[] = [];
-    if (metadata.worksCount !== undefined) {
-      parts.push(`${metadata.worksCount} works`);
-    }
-    if (metadata.citedByCount !== undefined) {
-      parts.push(`${metadata.citedByCount} citations`);
-    }
+    const parts: string[] = [
+      `${String(metadata.worksCount)} works`,
+      `${String(metadata.citedByCount)} citations`,
+    ];
     return parts.join(" • ") || "No data";
   }
 
@@ -143,10 +119,10 @@ export const formatEntityMetadata = (entity: CatalogueEntity): string => {
  * @returns User-friendly display string
  */
 export const formatNotesForDisplay = (notes: string | undefined): string => {
-  if (!notes) return "No notes";
+  if (notes === undefined || notes === "") return "No notes";
 
   // Check for graph list serialized format: "provenance:TYPE|label:LABEL"
-  const provenanceMatch = notes.match(/^provenance:([^|]+)(?:\|label:.+)?$/);
+  const provenanceMatch = /^provenance:([^|]+)(?:\|label:.+)?$/.exec(notes);
   if (provenanceMatch) {
     const [, provenanceType] = provenanceMatch;
     return PROVENANCE_LABELS[provenanceType] || provenanceType;

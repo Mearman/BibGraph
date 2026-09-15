@@ -14,7 +14,7 @@ import {
 } from "@mantine/core";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
@@ -27,8 +27,8 @@ const textConceptsSearchSchema = z.object({
 
 
 const TextConceptsRoute = () => {
-  const urlSearch = Route.useSearch();
-  const initialTitle = useMemo(() => urlSearch.title || "", [urlSearch.title]);
+  const urlSearch = useSearch({ from: "/text/concepts/" });
+  const initialTitle = useMemo(() => urlSearch.title ?? "", [urlSearch.title]);
   const [title, setTitle] = useState(initialTitle);
 
   useEffect(() => {
@@ -58,15 +58,15 @@ const TextConceptsRoute = () => {
 
       logger.debug("text", "Extracting concepts from title", { title });
 
-      const concepts = await cachedOpenAlex.client.textAnalysis.getConcepts({
+      const extractedconcepts = await cachedOpenAlex.client.textAnalysis.getConcepts({
         title,
       });
 
       logger.debug("text", "Concepts extracted", {
-        count: concepts.length,
+        count: extractedconcepts.length,
       });
 
-      return concepts;
+      return extractedconcepts;
     },
     enabled: title.trim().length > 0,
     staleTime: 60_000,
@@ -98,7 +98,7 @@ const TextConceptsRoute = () => {
           label="Title or Text"
           placeholder="Enter a research title or abstract to extract concepts..."
           value={title}
-          onChange={(event) => handleTitleChange(event.currentTarget.value)}
+          onChange={(event) => { handleTitleChange(event.currentTarget.value); }}
           minRows={3}
           autosize
         />
@@ -179,7 +179,7 @@ const TextConceptsRoute = () => {
                     <Text size="xs" c="dimmed">
                       Level: {concept.level}
                     </Text>
-                    {concept.wikidata && (
+                    {concept.wikidata !== undefined && (
                       <Text size="xs" c="dimmed">
                         Wikidata: {concept.wikidata}
                       </Text>

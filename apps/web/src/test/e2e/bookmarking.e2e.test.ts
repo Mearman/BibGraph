@@ -6,7 +6,8 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Bookmark Functionality E2E Tests", () => {
-  const BASE_URL = process.env.CI ? "http://localhost:4173" : "http://localhost:5173";
+  const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+  const BASE_URL = IS_CI ? "http://localhost:4173" : "http://localhost:5173";
 
   // Test entities from different types
   const TEST_ENTITIES = [
@@ -15,6 +16,9 @@ test.describe("Bookmark Functionality E2E Tests", () => {
     { type: "institutions", id: "I27837315", name: "Test Institution" },
     { type: "sources", id: "S137773608", name: "Test Source" },
   ];
+
+  const BOOKMARKS_LOAD_WAIT_MS = 2000;
+  const RAPID_BOOKMARK_CLICK_COUNT = 3;
 
   test.beforeEach(async ({ page, context }) => {
     // Clear storage before each test to ensure clean state
@@ -211,7 +215,7 @@ test.describe("Bookmark Functionality E2E Tests", () => {
 
       // Check that page content has loaded (either bookmarks or empty state)
       const pageContent = await page.locator('body').textContent();
-      if (!pageContent) {
+      if (pageContent === null) {
         throw new Error("Expected page content but got null");
       }
       const hasValidContent = pageContent.includes('No bookmarks') ||
@@ -299,7 +303,7 @@ test.describe("Bookmark Functionality E2E Tests", () => {
       });
 
       // Should show empty state (look for any text indicating no bookmarks)
-      await page.waitForTimeout(2000); // Wait for bookmarks to load
+      await page.waitForTimeout(BOOKMARKS_LOAD_WAIT_MS); // Wait for bookmarks to load
 
       // Check page content for empty state indicators
       const pageContent = await page.content();
@@ -363,7 +367,7 @@ test.describe("Bookmark Functionality E2E Tests", () => {
       await expect(bookmarkButton).toBeVisible({ timeout: 10_000 });
 
       // Try bookmarking multiple times rapidly
-      for (let index = 0; index < 3; index++) {
+      for (let index = 0; index < RAPID_BOOKMARK_CLICK_COUNT; index++) {
         await bookmarkButton.click();
         // Removed: waitForTimeout - use locator assertions instead
       }

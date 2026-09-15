@@ -3,7 +3,7 @@ import { lazy } from "react";
 
 import { LazyRoute } from "../../components/routing/LazyRoute";
 
-const OpenAlexUrlComponent = lazy(() => import("./$.lazy"));
+const OpenAlexUrlComponent = lazy(async () => import("./$.lazy"));
 
 export const Route = createFileRoute("/openalex-url/$")({
   component: () => (

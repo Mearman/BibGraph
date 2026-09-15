@@ -1,6 +1,5 @@
 /**
- * Citation Impact Chart component
- * Displays citation impact over time with various metrics
+ * Citation Impact Chart component Displays citation impact over time with various metrics
  *
  * Shows:
  * - Line chart: citations over time (yearly cumulative)
@@ -36,26 +35,54 @@ interface CitationImpactChartProperties {
 
 type ChartType = 'line' | 'bar';
 
+const CHART_TYPES: ReadonlySet<string> = new Set<ChartType>(["line", "bar"]);
+const isChartType = (value: string): value is ChartType => CHART_TYPES.has(value);
+
 interface YearlyData {
   year: number;
   count: number;
   cumulative: number;
 }
 
+// h-index placeholder formula: scales with the square root of total works.
+const H_INDEX_ESTIMATE_MULTIPLIER = 10;
+
+// FWCI placeholder formula: citations-per-work halved as a rough field-baseline adjustment.
+const FWCI_BASELINE_DIVISOR = 2;
+const FWCI_DECIMAL_PLACES = 2;
+
+// Multiplier converting a single-sided padding/dimension value into the total for both sides.
+const PADDING_SIDES = 2;
+
+// Exported SVG dimensions and layout.
+const EXPORT_WIDTH = 800;
+const EXPORT_HEIGHT = 400;
+const EXPORT_PADDING = 60;
+const EXPORT_TITLE_Y = 30;
+const EXPORT_TITLE_FONT_SIZE = 18;
+const EXPORT_LABEL_FONT_SIZE = 12;
+const EXPORT_LINE_STROKE_WIDTH = 3;
+const EXPORT_POINT_RADIUS = 5;
+const EXPORT_POINT_STROKE_WIDTH = 2;
+const EXPORT_BAR_STROKE_WIDTH = 1;
+const EXPORT_BAR_RADIUS = 2;
+const EXPORT_AXIS_STROKE_WIDTH = 1;
+const EXPORT_YEAR_LABEL_Y_OFFSET = 20;
+const EXPORT_Y_AXIS_LABEL_X_OFFSET = 10;
+const EXPORT_Y_AXIS_LABEL_Y_NUDGE = 4;
+// The Y-axis is labeled at this many equal divisions between 0 and the max value.
+const EXPORT_Y_AXIS_TICK_DIVISIONS = 5;
+
 /**
- * Extract yearly citation data from entities
- * NOTE: Since CatalogueEntity doesn't include full citation data,
- * this generates placeholder data based on addedAt timestamps
- * In production, would fetch actual citation metrics from OpenAlex API
- * @param entities
+ * Extract yearly citation data from entities NOTE: Since CatalogueEntity doesn't include full citation data, this generates placeholder data based on addedAt timestamps In production, would fetch actual citation metrics from OpenAlex API
  */
-const extractYearlyData = (entities: CatalogueEntity[]): YearlyData[] => {
+const extractYearlyData = (entities: readonly CatalogueEntity[]): YearlyData[] => {
   const yearCounts = new Map<number, number>();
 
   // Count entities by year (using addedAt as placeholder for publication year)
   for (const entity of entities) {
     const year = entity.addedAt.getFullYear();
-    yearCounts.set(year, (yearCounts.get(year) || 0) + 1);
+    yearCounts.set(year, (yearCounts.get(year) ?? 0) + 1);
   }
 
   // Sort years
@@ -66,7 +93,7 @@ const extractYearlyData = (entities: CatalogueEntity[]): YearlyData[] => {
   let cumulative = 0;
 
   for (const year of sortedYears) {
-    const count = yearCounts.get(year) || 0;
+    const count = yearCounts.get(year) ?? 0;
     cumulative += count;
     data.push({ year, count, cumulative });
   }
@@ -75,28 +102,160 @@ const extractYearlyData = (entities: CatalogueEntity[]): YearlyData[] => {
 };
 
 /**
- * Calculate h-index from yearly data
- * h-index = h such that h publications have at least h citations each
- * @param data
+ * Calculate h-index from yearly data h-index = h such that h publications have at least h citations each
  */
-const calculateHIndex = (data: YearlyData[]): number => {
+const calculateHIndex = (data: readonly YearlyData[]): number => {
   // Placeholder calculation - in production would use actual citation counts
   const totalWorks = data.reduce((sum, d) => sum + d.count, 0);
-  return Math.min(totalWorks, Math.floor(Math.sqrt(totalWorks * 10)));
+  return Math.min(totalWorks, Math.floor(Math.sqrt(totalWorks * H_INDEX_ESTIMATE_MULTIPLIER)));
 };
 
 /**
- * Calculate FWCI (Field-Weighted Citation Impact)
- * FWCI = ratio of total citations to expected citations for field
- * @param data
+ * Calculate FWCI (Field-Weighted Citation Impact) FWCI = ratio of total citations to expected citations for field
  */
-const calculateFWCI = (data: YearlyData[]): number => {
+const calculateFWCI = (data: readonly YearlyData[]): number => {
   // Placeholder calculation - in production would use field-specific baselines
   const totalCitations = data.reduce((sum, d) => sum + d.cumulative, 0);
   const totalWorks = data.reduce((sum, d) => sum + d.count, 0);
   if (totalWorks === 0) return 0;
-  return Number.parseFloat((totalCitations / totalWorks / 2).toFixed(2));
+  return Number.parseFloat((totalCitations / totalWorks / FWCI_BASELINE_DIVISOR).toFixed(FWCI_DECIMAL_PLACES));
 };
+
+/**
+ * Generate an SVG string for exporting the citation impact chart (line or bar) as a downloadable file.
+ */
+const generateCitationChartSVG = (
+  type: ChartType,
+  data: readonly YearlyData[],
+  maxCount: number,
+  maxCumulative: number
+): string => {
+  const chartWidth = EXPORT_WIDTH - EXPORT_PADDING * PADDING_SIDES;
+  const chartHeight = EXPORT_HEIGHT - EXPORT_PADDING * PADDING_SIDES;
+
+  const years = data.map((d) => d.year);
+  const minYear = Math.min(...years);
+  const maxYear = Math.max(...years);
+
+  const getX = (year: number) => EXPORT_PADDING + ((year - minYear) / (maxYear - minYear || 1)) * chartWidth;
+  const getY = (value: number, max: number) => EXPORT_HEIGHT - EXPORT_PADDING - (value / max) * chartHeight;
+
+  let paths = '';
+
+  if (type === 'line') {
+    // Cumulative line
+    const linePoints = data.map(d => `${String(getX(d.year))},${String(getY(d.cumulative, maxCumulative))}`).join(' ');
+    paths = `<polyline
+      fill="none"
+      stroke="#3b82f6"
+      stroke-width="${String(EXPORT_LINE_STROKE_WIDTH)}"
+      points="${linePoints}"
+    />`;
+
+    // Data points
+    paths += data.map(d => `
+      <circle
+        cx="${String(getX(d.year))}"
+        cy="${String(getY(d.cumulative, maxCumulative))}"
+        r="${String(EXPORT_POINT_RADIUS)}"
+        fill="#3b82f6"
+        stroke="white"
+        stroke-width="${String(EXPORT_POINT_STROKE_WIDTH)}"
+      />
+    `).join('');
+
+    // Area fill
+    const lastPoint = data[data.length - 1];
+    const areaPoints = `${String(EXPORT_PADDING)},${String(EXPORT_HEIGHT - EXPORT_PADDING)} ${linePoints} ${String(getX(lastPoint.year))},${String(EXPORT_HEIGHT - EXPORT_PADDING)}`;
+    paths = `<polygon
+      fill="rgba(59, 130, 246, 0.1)"
+      points="${areaPoints}"
+    />` + paths;
+  } else {
+    // Bar chart for yearly counts
+    const barWidth = chartWidth / data.length / PADDING_SIDES;
+    paths = data.map(d => `
+      <rect
+        x="${String(getX(d.year) - barWidth / PADDING_SIDES)}"
+        y="${String(getY(d.count, maxCount))}"
+        width="${String(barWidth)}"
+        height="${String((d.count / maxCount) * chartHeight)}"
+        fill="#3b82f6"
+        stroke="white"
+        stroke-width="${String(EXPORT_BAR_STROKE_WIDTH)}"
+        rx="${String(EXPORT_BAR_RADIUS)}"
+      />
+    `).join('');
+  }
+
+  // Axes
+  const xAxisY = EXPORT_HEIGHT - EXPORT_PADDING;
+  paths += `<line x1="${String(EXPORT_PADDING)}" y1="${String(xAxisY)}" x2="${String(EXPORT_WIDTH - EXPORT_PADDING)}" y2="${String(xAxisY)}" stroke="#666" stroke-width="${String(EXPORT_AXIS_STROKE_WIDTH)}"/>`;
+  paths += `<line x1="${String(EXPORT_PADDING)}" y1="${String(EXPORT_PADDING)}" x2="${String(EXPORT_PADDING)}" y2="${String(xAxisY)}" stroke="#666" stroke-width="${String(EXPORT_AXIS_STROKE_WIDTH)}"/>`;
+
+  // Year labels
+  paths += data.map(d => `
+    <text
+      x="${String(getX(d.year))}"
+      y="${String(EXPORT_HEIGHT - EXPORT_PADDING + EXPORT_YEAR_LABEL_Y_OFFSET)}"
+      text-anchor="middle"
+      font-size="${String(EXPORT_LABEL_FONT_SIZE)}"
+      fill="#666"
+    >${String(d.year)}</text>
+  `).join('');
+
+  // Y-axis labels
+  const maxValue = type === 'line' ? maxCumulative : maxCount;
+  for (let index = 0; index <= EXPORT_Y_AXIS_TICK_DIVISIONS; index++) {
+    const value = Math.round((maxValue / EXPORT_Y_AXIS_TICK_DIVISIONS) * index);
+    const y = getY(value, maxValue);
+    paths += `
+      <text
+        x="${String(EXPORT_PADDING - EXPORT_Y_AXIS_LABEL_X_OFFSET)}"
+        y="${String(y + EXPORT_Y_AXIS_LABEL_Y_NUDGE)}"
+        text-anchor="end"
+        font-size="${String(EXPORT_LABEL_FONT_SIZE)}"
+        fill="#666"
+      >${String(value)}</text>
+    `;
+  }
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${String(EXPORT_WIDTH)}" height="${String(EXPORT_HEIGHT)}" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="white"/>
+  <text x="${String(EXPORT_WIDTH / PADDING_SIDES)}" y="${String(EXPORT_TITLE_Y)}" text-anchor="middle" font-size="${String(EXPORT_TITLE_FONT_SIZE)}" font-weight="bold" fill="#333">
+    ${type === 'line' ? 'Cumulative Citations Over Time' : 'Yearly Citation Count'}
+  </text>
+  ${paths}
+</svg>`;
+};
+
+// Inline (on-screen) chart layout constants.
+const CHART_GROUP_TRANSLATE_X = 60;
+const CHART_GROUP_TRANSLATE_Y = 40;
+const CHART_AREA_WIDTH = 680;
+const CHART_AREA_HEIGHT = 300;
+const CHART_AREA_PADDING = 40;
+const CHART_TITLE_FONT_SIZE = 16;
+const GRID_TICK_COUNT = 5;
+const GRID_TICKS: readonly number[] = Array.from({ length: GRID_TICK_COUNT }, (_, index) => index / (GRID_TICK_COUNT - 1));
+const GRID_STROKE_DASH = "4";
+const DATA_POINT_RADIUS = 6;
+const DATA_POINT_STROKE_WIDTH = 2;
+const LINE_STROKE_WIDTH = 3;
+// Bars occupy this fraction of the space between year ticks.
+const BAR_WIDTH_RATIO = 0.6;
+const BAR_RADIUS = 2;
+const BAR_LABEL_FONT_SIZE = 12;
+const BAR_LABEL_OFFSET = 10;
+const AXIS_STROKE_WIDTH = 1;
+const YEAR_LABEL_FONT_SIZE = 12;
+const YEAR_LABEL_Y_OFFSET = 20;
+// Show every Nth year label to avoid crowding the axis.
+const YEAR_LABEL_SAMPLE_STRIDE = 2;
+const Y_AXIS_LABEL_FONT_SIZE = 12;
+const Y_AXIS_LABEL_X_OFFSET = 10;
+const Y_AXIS_LABEL_Y_NUDGE = 4;
 
 export const CitationImpactChart = ({ entities, onClose }: CitationImpactChartProperties) => {
   const [chartType, setChartType] = useState<ChartType>('line');
@@ -114,7 +273,7 @@ export const CitationImpactChart = ({ entities, onClose }: CitationImpactChartPr
   const handleExportPNG = () => {
     try {
       // Create SVG string for chart
-      const svgContent = generateSVG(chartType, yearlyData, maxYearlyCount, maxCumulative);
+      const svgContent = generateCitationChartSVG(chartType, yearlyData, maxYearlyCount, maxCumulative);
       const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
@@ -133,116 +292,6 @@ export const CitationImpactChart = ({ entities, onClose }: CitationImpactChartPr
     } catch (error) {
       logger.error('charts-citation', 'Failed to export chart', { error });
     }
-  };
-
-  /**
-   * Generate SVG chart
-   * @param type
-   * @param data
-   * @param maxCount
-   * @param maxCumulative
-   */
-  const generateSVG = (type: ChartType, data: YearlyData[], maxCount: number, maxCumulative: number): string => {
-    const width = 800;
-    const height = 400;
-    const padding = 60;
-    const chartWidth = width - padding * 2;
-    const chartHeight = height - padding * 2;
-
-    const years = data.map(d => d.year);
-    const minYear = Math.min(...years);
-    const maxYear = Math.max(...years);
-
-    const getX = (year: number) => padding + ((year - minYear) / (maxYear - minYear || 1)) * chartWidth;
-    const getY = (value: number, max: number) => height - padding - (value / max) * chartHeight;
-
-    let paths = '';
-
-    if (type === 'line') {
-      // Cumulative line
-      const linePoints = data.map(d => `${getX(d.year)},${getY(d.cumulative, maxCumulative)}`).join(' ');
-      paths = `<polyline
-        fill="none"
-        stroke="#3b82f6"
-        stroke-width="3"
-        points="${linePoints}"
-      />`;
-
-      // Data points
-      paths += data.map(d => `
-        <circle
-          cx="${getX(d.year)}"
-          cy="${getY(d.cumulative, maxCumulative)}"
-          r="5"
-          fill="#3b82f6"
-          stroke="white"
-          stroke-width="2"
-        />
-      `).join('');
-
-      // Area fill
-      const areaPoints = `${padding},${height - padding} ${linePoints} ${getX(data[data.length - 1].year)},${height - padding}`;
-      paths = `<polygon
-        fill="rgba(59, 130, 246, 0.1)"
-        points="${areaPoints}"
-      />` + paths;
-    } else {
-      // Bar chart for yearly counts
-      const barWidth = chartWidth / data.length / 2;
-      paths = data.map(d => `
-        <rect
-          x="${getX(d.year) - barWidth / 2}"
-          y="${getY(d.count, maxCount)}"
-          width="${barWidth}"
-          height="${(d.count / maxCount) * chartHeight}"
-          fill="#3b82f6"
-          stroke="white"
-          stroke-width="1"
-          rx="2"
-        />
-      `).join('');
-    }
-
-    // Axes
-    const xAxisY = height - padding;
-    paths += `<line x1="${padding}" y1="${xAxisY}" x2="${width - padding}" y2="${xAxisY}" stroke="#666" stroke-width="1"/>`;
-    paths += `<line x1="${padding}" y1="${padding}" x2="${padding}" y2="${xAxisY}" stroke="#666" stroke-width="1"/>`;
-
-    // Year labels
-    paths += data.map(d => `
-      <text
-        x="${getX(d.year)}"
-        y="${height - padding + 20}"
-        text-anchor="middle"
-        font-size="12"
-        fill="#666"
-      >${d.year}</text>
-    `).join('');
-
-    // Y-axis labels
-    const maxValue = type === 'line' ? maxCumulative : maxCount;
-    for (let index = 0; index <= 5; index++) {
-      const value = Math.round((maxValue / 5) * index);
-      const y = getY(value, maxValue);
-      paths += `
-        <text
-          x="${padding - 10}"
-          y="${y + 4}"
-          text-anchor="end"
-          font-size="12"
-          fill="#666"
-        >${value}</text>
-      `;
-    }
-
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-  <rect width="100%" height="100%" fill="white"/>
-  <text x="${width / 2}" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#333">
-    ${type === 'line' ? 'Cumulative Citations Over Time' : 'Yearly Citation Count'}
-  </text>
-  ${paths}
-</svg>`;
   };
 
   return (
@@ -308,13 +357,19 @@ export const CitationImpactChart = ({ entities, onClose }: CitationImpactChartPr
             <Radio
               value="line"
               checked={chartType === 'line'}
-              onChange={(e) => setChartType(e.currentTarget.value as ChartType)}
+              onChange={(e) => {
+                const { value } = e.currentTarget;
+                if (isChartType(value)) setChartType(value);
+              }}
               label="Line (Cumulative)"
             />
             <Radio
               value="bar"
               checked={chartType === 'bar'}
-              onChange={(e) => setChartType(e.currentTarget.value as ChartType)}
+              onChange={(e) => {
+                const { value } = e.currentTarget;
+                if (isChartType(value)) setChartType(value);
+              }}
               label="Bar (Yearly)"
             />
           </Group>
@@ -322,51 +377,48 @@ export const CitationImpactChart = ({ entities, onClose }: CitationImpactChartPr
       </Card>
 
       {/* Chart Visualization */}
-      <Card padding="md" radius="sm" style={{ border: BORDER_STYLE_GRAY_3 }} h={400}>
+      <Card padding="md" radius="sm" style={{ border: BORDER_STYLE_GRAY_3 }} h={EXPORT_HEIGHT}>
         {yearlyData.length > 0 ? (
           <svg
             width="100%"
             height="100%"
-            viewBox="0 0 800 400"
+            viewBox={`0 0 ${String(EXPORT_WIDTH)} ${String(EXPORT_HEIGHT)}`}
             style={{ overflow: 'visible' }}
           >
             {/* Background */}
             <rect width="100%" height="100%" fill="white" />
 
             {/* Title */}
-            <text x="400" y="30" textAnchor="middle" fontSize="16" fontWeight="bold" fill="#333">
+            <text x={String(EXPORT_WIDTH / PADDING_SIDES)} y={String(EXPORT_TITLE_Y)} textAnchor="middle" fontSize={String(CHART_TITLE_FONT_SIZE)} fontWeight="bold" fill="#333">
               {chartType === 'line' ? 'Cumulative Citations Over Time' : 'Yearly Citation Count'}
             </text>
 
             {/* Chart Area */}
-            <g transform="translate(60, 40)">
+            <g transform={`translate(${String(CHART_GROUP_TRANSLATE_X)}, ${String(CHART_GROUP_TRANSLATE_Y)})`}>
               {(() => {
-                const width = 680;
-                const height = 300;
-                const padding = 40;
-                const chartWidth = width - padding * 2;
-                const chartHeight = height - padding * 2;
+                const chartWidth = CHART_AREA_WIDTH - CHART_AREA_PADDING * PADDING_SIDES;
+                const chartHeight = CHART_AREA_HEIGHT - CHART_AREA_PADDING * PADDING_SIDES;
 
                 const years = yearlyData.map(d => d.year);
                 const minYear = Math.min(...years);
                 const maxYear = Math.max(...years);
                 const yearRange = maxYear - minYear || 1;
 
-                const getX = (year: number) => padding + ((year - minYear) / yearRange) * chartWidth;
-                const getY = (value: number, max: number) => height - padding - (value / max) * chartHeight;
+                const getX = (year: number) => CHART_AREA_PADDING + ((year - minYear) / yearRange) * chartWidth;
+                const getY = (value: number, max: number) => CHART_AREA_HEIGHT - CHART_AREA_PADDING - (value / max) * chartHeight;
 
                 const maxValue = chartType === 'line' ? maxCumulative : maxYearlyCount;
 
                 // Grid lines
-                const gridLines = [0, 0.25, 0.5, 0.75, 1].map(ratio => (
+                const gridLines = GRID_TICKS.map(tick => (
                   <line
-                    key={ratio}
-                    x1={padding}
-                    y1={getY(maxValue * ratio, maxValue)}
-                    x2={width - padding}
-                    y2={getY(maxValue * ratio, maxValue)}
+                    key={`grid-${String(tick)}`}
+                    x1={CHART_AREA_PADDING}
+                    y1={getY(maxValue * tick, maxValue)}
+                    x2={CHART_AREA_WIDTH - CHART_AREA_PADDING}
+                    y2={getY(maxValue * tick, maxValue)}
                     stroke="#e5e7eb"
-                    strokeDasharray="4"
+                    strokeDasharray={GRID_STROKE_DASH}
                   />
                 ));
 
@@ -374,20 +426,21 @@ export const CitationImpactChart = ({ entities, onClose }: CitationImpactChartPr
                 let chartContent;
 
                 if (chartType === 'line') {
-                  const linePoints = yearlyData.map(d => `${getX(d.year)},${getY(d.cumulative, maxCumulative)}`).join(' ');
+                  const linePoints = yearlyData.map(d => `${String(getX(d.year))},${String(getY(d.cumulative, maxCumulative))}`).join(' ');
+                  const lastDatum = yearlyData[yearlyData.length - 1];
 
                   chartContent = (
                     <g>
                       {/* Area fill */}
                       <polygon
-                        points={`${padding},${height - padding} ${linePoints} ${getX(yearlyData[yearlyData.length - 1].year)},${height - padding}`}
+                        points={`${String(CHART_AREA_PADDING)},${String(CHART_AREA_HEIGHT - CHART_AREA_PADDING)} ${linePoints} ${String(getX(lastDatum.year))},${String(CHART_AREA_HEIGHT - CHART_AREA_PADDING)}`}
                         fill="rgba(59, 130, 246, 0.1)"
                       />
                       {/* Line */}
                       <polyline
                         fill="none"
                         stroke="#3b82f6"
-                        strokeWidth="3"
+                        strokeWidth={LINE_STROKE_WIDTH}
                         points={linePoints}
                       />
                       {/* Data points */}
@@ -396,34 +449,34 @@ export const CitationImpactChart = ({ entities, onClose }: CitationImpactChartPr
                           key={d.year}
                           cx={getX(d.year)}
                           cy={getY(d.cumulative, maxCumulative)}
-                          r="6"
+                          r={DATA_POINT_RADIUS}
                           fill="#3b82f6"
                           stroke="white"
-                          strokeWidth="2"
+                          strokeWidth={DATA_POINT_STROKE_WIDTH}
                         />
                       ))}
                     </g>
                   );
                 } else {
-                  const barWidth = (chartWidth / yearlyData.length) * 0.6;
+                  const barWidth = (chartWidth / yearlyData.length) * BAR_WIDTH_RATIO;
 
                   chartContent = (
                     <g>
                       {yearlyData.map(d => (
                         <g key={d.year}>
                           <rect
-                            x={getX(d.year) - barWidth / 2}
+                            x={getX(d.year) - barWidth / PADDING_SIDES}
                             y={getY(d.count, maxYearlyCount)}
                             width={barWidth}
-                            height={height - padding - getY(d.count, maxYearlyCount)}
+                            height={CHART_AREA_HEIGHT - CHART_AREA_PADDING - getY(d.count, maxYearlyCount)}
                             fill="#3b82f6"
-                            rx="2"
+                            rx={BAR_RADIUS}
                           />
                           <text
                             x={getX(d.year)}
-                            y={getY(d.count, maxYearlyCount) - 10}
+                            y={getY(d.count, maxYearlyCount) - BAR_LABEL_OFFSET}
                             textAnchor="middle"
-                            fontSize="12"
+                            fontSize={BAR_LABEL_FONT_SIZE}
                             fill="#666"
                           >
                             {d.count}
@@ -437,21 +490,21 @@ export const CitationImpactChart = ({ entities, onClose }: CitationImpactChartPr
                 // Axes
                 const axes = (
                   <g>
-                    <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#666" strokeWidth="1" />
-                    <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#666" strokeWidth="1" />
+                    <line x1={CHART_AREA_PADDING} y1={CHART_AREA_HEIGHT - CHART_AREA_PADDING} x2={CHART_AREA_WIDTH - CHART_AREA_PADDING} y2={CHART_AREA_HEIGHT - CHART_AREA_PADDING} stroke="#666" strokeWidth={AXIS_STROKE_WIDTH} />
+                    <line x1={CHART_AREA_PADDING} y1={CHART_AREA_PADDING} x2={CHART_AREA_PADDING} y2={CHART_AREA_HEIGHT - CHART_AREA_PADDING} stroke="#666" strokeWidth={AXIS_STROKE_WIDTH} />
                   </g>
                 );
 
                 // Year labels (every 2-3 years to avoid crowding)
                 const yearLabels = yearlyData
-                  .filter((_, index) => index % 2 === 0)
+                  .filter((_, index) => index % YEAR_LABEL_SAMPLE_STRIDE === 0)
                   .map(d => (
                     <text
                       key={d.year}
                       x={getX(d.year)}
-                      y={height - padding + 20}
+                      y={CHART_AREA_HEIGHT - CHART_AREA_PADDING + YEAR_LABEL_Y_OFFSET}
                       textAnchor="middle"
-                      fontSize="12"
+                      fontSize={YEAR_LABEL_FONT_SIZE}
                       fill="#666"
                     >
                       {d.year}
@@ -459,15 +512,15 @@ export const CitationImpactChart = ({ entities, onClose }: CitationImpactChartPr
                   ));
 
                 // Y-axis labels
-                const yAxisLabels = [0, 0.25, 0.5, 0.75, 1].map(ratio => {
-                  const value = Math.round(maxValue * ratio);
+                const yAxisLabels = GRID_TICKS.map(tick => {
+                  const value = Math.round(maxValue * tick);
                   return (
                     <text
-                      key={ratio}
-                      x={padding - 10}
-                      y={getY(value, maxValue) + 4}
+                      key={`y-axis-${String(tick)}`}
+                      x={CHART_AREA_PADDING - Y_AXIS_LABEL_X_OFFSET}
+                      y={getY(value, maxValue) + Y_AXIS_LABEL_Y_NUDGE}
                       textAnchor="end"
-                      fontSize="12"
+                      fontSize={Y_AXIS_LABEL_FONT_SIZE}
                       fill="#666"
                     >
                       {value}

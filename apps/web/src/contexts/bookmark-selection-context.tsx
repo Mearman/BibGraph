@@ -4,16 +4,16 @@
 
 import React, { createContext, type ReactNode, use, useCallback, useMemo, useReducer } from "react";
 
-export type BookmarkSelectionState = {
+export interface BookmarkSelectionState {
   selectedIds: Set<string>;
   isAllSelected: boolean;
   totalCount: number;
-};
+}
 
 export type BookmarkSelectionAction =
   | { type: "SELECT_BOOKMARK"; payload: string }
   | { type: "DESELECT_BOOKMARK"; payload: string }
-  | { type: "SELECT_ALL"; payload: string[] }
+  | { type: "SELECT_ALL"; payload: readonly string[] }
   | { type: "DESELECT_ALL" }
   | { type: "TOGGLE_SELECTION"; payload: string }
   | { type: "SET_TOTAL_COUNT"; payload: number };
@@ -183,11 +183,11 @@ export const useBookmarkSelectionActions = () => {
   const { dispatch } = useBookmarkSelection();
 
   return {
-    selectBookmark: useCallback((id: string) => dispatch({ type: "SELECT_BOOKMARK", payload: id }), [dispatch]),
-    deselectBookmark: useCallback((id: string) => dispatch({ type: "DESELECT_BOOKMARK", payload: id }), [dispatch]),
-    toggleSelection: useCallback((id: string) => dispatch({ type: "TOGGLE_SELECTION", payload: id }), [dispatch]),
-    selectAll: useCallback((ids: string[]) => dispatch({ type: "SELECT_ALL", payload: ids }), [dispatch]),
-    deselectAll: useCallback(() => dispatch({ type: "DESELECT_ALL" }), [dispatch]),
-    setTotalCount: useCallback((count: number) => dispatch({ type: "SET_TOTAL_COUNT", payload: count }), [dispatch]),
+    selectBookmark: useCallback((id: string) => { dispatch({ type: "SELECT_BOOKMARK", payload: id }); }, [dispatch]),
+    deselectBookmark: useCallback((id: string) => { dispatch({ type: "DESELECT_BOOKMARK", payload: id }); }, [dispatch]),
+    toggleSelection: useCallback((id: string) => { dispatch({ type: "TOGGLE_SELECTION", payload: id }); }, [dispatch]),
+    selectAll: useCallback((ids: readonly string[]) => { dispatch({ type: "SELECT_ALL", payload: ids }); }, [dispatch]),
+    deselectAll: useCallback(() => { dispatch({ type: "DESELECT_ALL" }); }, [dispatch]),
+    setTotalCount: useCallback((count: number) => { dispatch({ type: "SET_TOTAL_COUNT", payload: count }); }, [dispatch]),
   };
 };

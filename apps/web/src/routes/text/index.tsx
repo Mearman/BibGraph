@@ -10,7 +10,7 @@ const textSearchSchema = z.object({
   text: z.string().optional().catch(undefined),
 });
 
-const TextAnalysisRoute = lazy(() => import("./index.lazy"));
+const TextAnalysisRoute = lazy(async () => import("./index.lazy"));
 
 export const Route = createFileRoute("/text/")({
   component: () => (

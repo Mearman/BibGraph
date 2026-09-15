@@ -10,9 +10,6 @@ interface ContentSkeletonProperties {
 /**
  * Flexible skeleton loading component for various content types
  * Improves perceived performance during data loading
- * @param root0
- * @param root0.variant
- * @param root0.count
  */
 export const ContentSkeleton = ({
   variant = "text",

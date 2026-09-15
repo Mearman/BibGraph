@@ -6,14 +6,12 @@
  * - Collaboration count as edge weight
  * - Click to navigate to author pages
  * - Limited to 30 co-authors for performance
- *
- * @module components/entity-detail
  */
 
 import type { Author } from '@bibgraph/types';
 import { Group, Paper, Stack, Text, Title } from '@mantine/core';
 import { IconNetwork } from '@tabler/icons-react';
-import { type CSSProperties, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { ICON_SIZE } from '@/config/style-constants';
 import { useThemeColors } from '@/hooks/use-theme-colors';
@@ -39,12 +37,15 @@ const MAX_COAUTHORS = 30;
 const GRAPH_WIDTH = 600;
 const GRAPH_HEIGHT = 400;
 const NODE_RADIUS = 8;
+const CIRCLE_LAYOUT_RADIUS_DIVISOR = 3;
+const HOVER_NODE_RADIUS_INCREASE = 3;
+const NODE_LABEL_OFFSET_Y = 15;
+const MAX_LABEL_LENGTH = 20;
 
 /**
  * Extract co-authors from author data
  * OpenAlex Author object includes counts_by_year but not direct co-author lists.
  * We'll need to parse the author's works to extract co-authors.
- * @param author
  */
 const extractCoAuthors = (author: Author | null): CoAuthorNode[] => {
   if (!author) return [];
@@ -59,15 +60,12 @@ const extractCoAuthors = (author: Author | null): CoAuthorNode[] => {
 
 /**
  * CollaborationNetwork Component
- * @param root0
- * @param root0.authorId
- * @param root0.author
  */
 export const CollaborationNetwork: React.FC<CollaborationNetworkProperties> = ({
   authorId,
   author,
 }) => {
-  const svgReference = useRef<SVGSVGElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const { getEntityColor } = useThemeColors();
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
@@ -101,129 +99,122 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProperties> = ({
   }
 
   useEffect(() => {
-    if (!svgReference.current || limitedCoAuthors.length === 0) return;
-
-    // Clear previous graph
-    const svg = svgReference.current;
-    svg.replaceChildren();
-
-    // Create node data
-    const nodes = [
-      { id: authorId, displayName: 'Current Author', isCenter: true },
-      ...limitedCoAuthors.map((coAuthor) => ({
-        id: coAuthor.id,
-        displayName: coAuthor.displayName,
-        isCenter: false,
-      })),
-    ];
-
-    // Create link data
-    const links = limitedCoAuthors.map((coAuthor) => ({
-      source: authorId,
-      target: coAuthor.id,
-      collaborationCount: coAuthor.collaborationCount,
-    }));
-
-    // Simple force-directed layout without D3 dependency
-    // Position nodes in a circle around center
-    const centerX = GRAPH_WIDTH / 2;
-    const centerY = GRAPH_HEIGHT / 2;
-    const radius = Math.min(GRAPH_WIDTH, GRAPH_HEIGHT) / 3;
-
-    const nodePositions = new Map<string, { x: number; y: number }>();
-
-    // Center node
-    nodePositions.set(authorId, { x: centerX, y: centerY });
-
-    // Co-authors in circle
-    for (const [index, coAuthor] of limitedCoAuthors.entries()) {
-      const angle = (2 * Math.PI * index) / limitedCoAuthors.length;
-      nodePositions.set(coAuthor.id, {
-        x: centerX + radius * Math.cos(angle),
-        y: centerY + radius * Math.sin(angle),
-      });
-    }
-
-    // Draw links
-    for (const link of links) {
-      const sourcePos = nodePositions.get(link.source as string);
-      const targetPos = nodePositions.get(link.target as string);
-
-      if (!sourcePos || !targetPos) continue;
-
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', sourcePos.x.toString());
-      line.setAttribute('y1', sourcePos.y.toString());
-      line.setAttribute('x2', targetPos.x.toString());
-      line.setAttribute('y2', targetPos.y.toString());
-      line.setAttribute('stroke', 'var(--mantine-color-gray-3)');
-      line.setAttribute('stroke-width', '1');
-      line.setAttribute('opacity', '0.5');
-      svg.append(line);
-    }
-
-    // Draw nodes
     const abortController = new AbortController();
 
-    for (const node of nodes) {
-      const pos = nodePositions.get(node.id);
-      if (!pos) continue;
+    if (svgRef.current && limitedCoAuthors.length > 0) {
+      const svg = svgRef.current;
+      svg.replaceChildren();
 
-      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      // Create node data
+      const nodes = [
+        { id: authorId, displayName: 'Current Author', isCenter: true },
+        ...limitedCoAuthors.map((coAuthor) => ({
+          id: coAuthor.id,
+          displayName: coAuthor.displayName,
+          isCenter: false,
+        })),
+      ];
 
-      // Node circle
-      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      circle.setAttribute('cx', pos.x.toString());
-      circle.setAttribute('cy', pos.y.toString());
-      circle.setAttribute('r', (node.isCenter ? NODE_RADIUS + 2 : NODE_RADIUS).toString());
-      circle.setAttribute('fill', getEntityColor(node.id));
-      circle.setAttribute('stroke', node.isCenter ? 'var(--mantine-color-blue-6)' : 'white');
-      circle.setAttribute('stroke-width', node.isCenter ? '3' : '2');
-      const style: CSSProperties = {
-        cursor: 'pointer',
-        transition: 'r 0.2s',
-      };
-      for (const [key, value] of Object.entries(style)) {
-        circle.style.setProperty(key, value);
+      // Create link data
+      const links = limitedCoAuthors.map((coAuthor) => ({
+        source: authorId,
+        target: coAuthor.id,
+        collaborationCount: coAuthor.collaborationCount,
+      }));
+
+      // Simple force-directed layout without D3 dependency Position nodes in a circle around center
+      const centerX = GRAPH_WIDTH / 2;
+      const centerY = GRAPH_HEIGHT / 2;
+      const radius = Math.min(GRAPH_WIDTH, GRAPH_HEIGHT) / CIRCLE_LAYOUT_RADIUS_DIVISOR;
+
+      const nodePositions = new Map<string, { x: number; y: number }>();
+
+      // Center node
+      nodePositions.set(authorId, { x: centerX, y: centerY });
+
+      // Co-authors in circle
+      for (const [index, coAuthor] of limitedCoAuthors.entries()) {
+        const angle = (2 * Math.PI * index) / limitedCoAuthors.length;
+        nodePositions.set(coAuthor.id, {
+          x: centerX + radius * Math.cos(angle),
+          y: centerY + radius * Math.sin(angle),
+        });
       }
 
-      // Hover effect
-      const handleMouseEnter = () => {
-        circle.setAttribute('r', (NODE_RADIUS + 3).toString());
-        setHoveredNode(node.id);
-      };
-      const handleMouseLeave = () => {
+      // Draw links
+      for (const link of links) {
+        const sourcePos = nodePositions.get(link.source);
+        const targetPos = nodePositions.get(link.target);
+
+        if (!sourcePos || !targetPos) continue;
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', sourcePos.x.toString());
+        line.setAttribute('y1', sourcePos.y.toString());
+        line.setAttribute('x2', targetPos.x.toString());
+        line.setAttribute('y2', targetPos.y.toString());
+        line.setAttribute('stroke', 'var(--mantine-color-gray-3)');
+        line.setAttribute('stroke-width', '1');
+        line.setAttribute('opacity', '0.5');
+        svg.append(line);
+      }
+
+      // Draw nodes
+      for (const node of nodes) {
+        const pos = nodePositions.get(node.id);
+        if (!pos) continue;
+
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+        // Node circle
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', pos.x.toString());
+        circle.setAttribute('cy', pos.y.toString());
         circle.setAttribute('r', (node.isCenter ? NODE_RADIUS + 2 : NODE_RADIUS).toString());
-        setHoveredNode(null);
-      };
+        circle.setAttribute('fill', getEntityColor(node.id));
+        circle.setAttribute('stroke', node.isCenter ? 'var(--mantine-color-blue-6)' : 'white');
+        circle.setAttribute('stroke-width', node.isCenter ? '3' : '2');
+        circle.style.cursor = 'pointer';
+        circle.style.transition = 'r 0.2s';
 
-      circle.addEventListener('mouseenter', handleMouseEnter, { signal: abortController.signal });
-      circle.addEventListener('mouseleave', handleMouseLeave, { signal: abortController.signal });
+        // Hover effect
+        const handleMouseEnter = () => {
+          circle.setAttribute('r', (NODE_RADIUS + HOVER_NODE_RADIUS_INCREASE).toString());
+          setHoveredNode(node.id);
+        };
+        const handleMouseLeave = () => {
+          circle.setAttribute('r', (node.isCenter ? NODE_RADIUS + 2 : NODE_RADIUS).toString());
+          setHoveredNode(null);
+        };
 
-      // Click to navigate
-      const handleClick = () => {
-        window.location.assign(`/authors/${node.id}`);
-      };
+        circle.addEventListener('mouseenter', handleMouseEnter, { signal: abortController.signal });
+        circle.addEventListener('mouseleave', handleMouseLeave, { signal: abortController.signal });
 
-      circle.addEventListener('click', handleClick, { signal: abortController.signal });
+        // Click to navigate
+        const handleClick = () => {
+          window.location.assign(`/authors/${node.id}`);
+        };
 
-      g.append(circle);
+        circle.addEventListener('click', handleClick, { signal: abortController.signal });
 
-      // Node label (only for center and hovered nodes)
-      if (node.isCenter || node.id === hoveredNode) {
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', pos.x.toString());
-        text.setAttribute('y', (pos.y + NODE_RADIUS + 15).toString());
-        text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('font-size', '12');
-        text.setAttribute('fill', 'var(--mantine-color-dimmed)');
-        text.textContent = node.displayName.length > 20
-          ? `${node.displayName.slice(0, 20)}...`
-          : node.displayName;
-        g.append(text);
+        g.append(circle);
+
+        // Node label (only for center and hovered nodes)
+        if (node.isCenter || node.id === hoveredNode) {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', pos.x.toString());
+          text.setAttribute('y', (pos.y + NODE_RADIUS + NODE_LABEL_OFFSET_Y).toString());
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('font-size', '12');
+          text.setAttribute('fill', 'var(--mantine-color-dimmed)');
+          text.textContent = node.displayName.length > MAX_LABEL_LENGTH
+            ? `${node.displayName.slice(0, MAX_LABEL_LENGTH)}...`
+            : node.displayName;
+          g.append(text);
+        }
+
+        svg.append(g);
       }
-
-      svg.append(g);
     }
 
     // Cleanup event listeners on unmount
@@ -246,7 +237,7 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProperties> = ({
         {/* Graph */}
         <Group justify="center">
           <svg
-            ref={svgReference}
+            ref={svgRef}
             width={GRAPH_WIDTH}
             height={GRAPH_HEIGHT}
             style={{

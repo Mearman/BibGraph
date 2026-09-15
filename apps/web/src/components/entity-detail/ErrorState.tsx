@@ -25,7 +25,7 @@ export const ErrorState = ({ entityType, entityId, error, onRetry }: ErrorStateP
   };
 
   const handleGoBack = () => {
-    navigate({ to: "/" });
+    void navigate({ to: "/", params: {} });
   };
 
   return (

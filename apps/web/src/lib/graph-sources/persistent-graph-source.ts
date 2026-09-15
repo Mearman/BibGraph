@@ -7,7 +7,6 @@
  *
  * Unlike cache sources which rebuild relationships on-demand, the persistent
  * graph stores pre-computed relationships that persist across sessions.
- * @module lib/graph-sources/persistent-graph-source
  */
 
 import { getPersistentGraph } from '@bibgraph/client';
@@ -104,5 +103,8 @@ export const createPersistentGraphSource = (): GraphDataSource => ({
       return stats.nodeCount;
     },
 
-    isAvailable: async (): Promise<boolean> => typeof indexedDB !== 'undefined',
+    isAvailable: async (): Promise<boolean> => {
+      await Promise.resolve();
+      return typeof indexedDB !== 'undefined';
+    },
   });

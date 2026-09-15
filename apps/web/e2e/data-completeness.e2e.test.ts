@@ -13,10 +13,77 @@ import {
 	waitForNoLoading,
 } from '@/test/helpers/app-ready';
 
-const BASE_URL = process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173';
+/**
+A single work as summarised in an OpenAlex works-list API response.
+ */
+interface WorkSummary {
+	readonly id: string;
+	readonly display_name: string;
+	readonly publication_year?: number;
+}
+
+interface WorksListResponse {
+	readonly results: readonly WorkSummary[];
+}
+
+const isWorkSummary = (value: unknown): value is WorkSummary => {
+	if (typeof value !== 'object' || value === null) return false;
+	if (!('id' in value) || typeof value.id !== 'string') return false;
+	if (!('display_name' in value) || typeof value.display_name !== 'string') return false;
+	if ('publication_year' in value && value.publication_year !== undefined && typeof value.publication_year !== 'number') return false;
+	return true;
+};
+
+const isWorksListResponse = (value: unknown): value is WorksListResponse => {
+	if (typeof value !== 'object' || value === null) return false;
+	if (!('results' in value) || !Array.isArray(value.results)) return false;
+	return value.results.every((item: unknown) => isWorkSummary(item));
+};
+
+/**
+A single OpenAlex author, as returned by the authors detail endpoint.
+ */
+interface AuthorDetail {
+	readonly id: string;
+	readonly display_name: string;
+	readonly orcid?: string;
+	readonly works_count?: number;
+	readonly cited_by_count?: number;
+	readonly last_known_institution?: { readonly display_name: string } | null;
+}
+
+const isAuthorDetail = (value: unknown): value is AuthorDetail => {
+	if (typeof value !== 'object' || value === null) return false;
+	if (!('id' in value) || typeof value.id !== 'string') return false;
+	if (!('display_name' in value) || typeof value.display_name !== 'string') return false;
+	return true;
+};
+
+/**
+A single concept as summarised in an OpenAlex concepts-list API response.
+ */
+interface ConceptSummary {
+	readonly display_name: string;
+}
+
+interface ConceptsListResponse {
+	readonly results: readonly ConceptSummary[];
+}
+
+const isConceptSummary = (value: unknown): value is ConceptSummary =>
+	typeof value === 'object' && value !== null && 'display_name' in value && typeof value.display_name === 'string';
+
+const isConceptsListResponse = (value: unknown): value is ConceptsListResponse => {
+	if (typeof value !== 'object' || value === null) return false;
+	if (!('results' in value) || !Array.isArray(value.results)) return false;
+	return value.results.every((item: unknown) => isConceptSummary(item));
+};
+
+const BASE_URL = process.env.CI !== undefined ? 'http://localhost:4173' : 'http://localhost:5173';
+const TEST_SUITE_TIMEOUT_MS = 60_000;
 
 test.describe('Data Completeness - Styled View vs API @manual', () => {
-	test.setTimeout(60_000);
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS);
 
 	test('works search - bioplastics filter should display all API data', async ({
 		page,
@@ -28,7 +95,8 @@ test.describe('Data Completeness - Styled View vs API @manual', () => {
 		// Fetch raw API response
 		const apiResponse = await request.get(apiUrl);
 		expect(apiResponse.ok()).toBeTruthy();
-		const apiData = await apiResponse.json();
+		const apiData: unknown = await apiResponse.json();
+		if (!isWorksListResponse(apiData)) throw new Error('Unexpected works list response shape');
 
 		expect(apiData.results).toBeDefined();
 		expect(Array.isArray(apiData.results)).toBeTruthy();
@@ -64,7 +132,7 @@ test.describe('Data Completeness - Styled View vs API @manual', () => {
 			expect(resultCards).toBeGreaterThan(0);
 
 			// Check for key metadata fields in the first result
-			if (firstResult.publication_year) {
+			if (firstResult.publication_year !== undefined) {
 				expect(mainTextContent).toContain(String(firstResult.publication_year));
 			}
 
@@ -83,7 +151,8 @@ test.describe('Data Completeness - Styled View vs API @manual', () => {
 		// Fetch raw API response
 		const apiResponse = await request.get(apiUrl);
 		expect(apiResponse.ok()).toBeTruthy();
-		const apiData = await apiResponse.json();
+		const apiData: unknown = await apiResponse.json();
+		if (!isAuthorDetail(apiData)) throw new Error('Unexpected author detail response shape');
 
 		expect(apiData.id).toContain(authorId);
 		expect(apiData.display_name).toBeTruthy();
@@ -105,20 +174,20 @@ test.describe('Data Completeness - Styled View vs API @manual', () => {
 		// Verify essential fields are displayed
 		expect(mainTextContent2).toContain(apiData.display_name);
 
-		if (apiData.orcid) {
+		if (apiData.orcid !== undefined) {
 			expect(mainTextContent2).toContain('ORCID');
 		}
 
-		if (apiData.works_count) {
+		if (apiData.works_count !== undefined) {
 			expect(mainTextContent2).toContain('works');
 		}
 
-		if (apiData.cited_by_count) {
+		if (apiData.cited_by_count !== undefined) {
 			expect(mainTextContent2).toContain('citations');
 		}
 
 		// Check for last known institution if present
-		if (apiData.last_known_institution?.display_name) {
+		if (apiData.last_known_institution?.display_name !== undefined) {
 			expect(mainTextContent2).toContain(
 				apiData.last_known_institution.display_name
 			);
@@ -135,7 +204,8 @@ test.describe('Data Completeness - Styled View vs API @manual', () => {
 		// Fetch raw API response
 		const apiResponse = await request.get(apiUrl);
 		expect(apiResponse.ok()).toBeTruthy();
-		const apiData = await apiResponse.json();
+		const apiData: unknown = await apiResponse.json();
+		if (!isConceptsListResponse(apiData)) throw new Error('Unexpected concepts list response shape');
 
 		expect(apiData.results).toBeDefined();
 		expect(apiData.results.length).toBeGreaterThan(0);
@@ -176,7 +246,8 @@ test.describe('Data Completeness - Styled View vs API @manual', () => {
 		// Fetch raw API response
 		const apiResponse = await request.get(apiUrl);
 		expect(apiResponse.ok()).toBeTruthy();
-		const apiData = await apiResponse.json();
+		const apiData: unknown = await apiResponse.json();
+		if (!isWorksListResponse(apiData)) throw new Error('Unexpected works list response shape');
 
 		expect(apiData.results).toBeDefined();
 		const firstWork = apiData.results[0];

@@ -26,8 +26,6 @@ import { waitForAppReady } from '@/test/helpers/app-ready';
 /**
  * Create a catalogue list so there is exportable content.
  * Uses the same working pattern as catalogue-basic-functionality tests.
- * @param page
- * @param listName
  */
 const createListForExport = async (page: Page, listName: string): Promise<void> => {
 	// Navigate to catalogue
@@ -40,7 +38,7 @@ const createListForExport = async (page: Page, listName: string): Promise<void> 
 	]);
 
 	// Open the "Create New List" menu dropdown
-	await page.click('button:has-text("Create New List")');
+	await page.locator('button:has-text("Create New List")').click();
 
 	// Click "Create Custom List" menu item
 	const createCustomItem = page.locator('[role="menuitem"]:has-text("Create Custom List")');
@@ -54,7 +52,7 @@ const createListForExport = async (page: Page, listName: string): Promise<void> 
 	await page.locator('#list-title').fill(listName);
 
 	// Submit - "Create List" button
-	await page.click('button:has-text("Create List")');
+	await page.locator('button:has-text("Create List")').click();
 	await expect(page.locator('[role="dialog"]')).toBeHidden({ timeout: 10_000 });
 
 	// Wait for the list card to appear in the catalogue grid
@@ -74,7 +72,6 @@ const createListForExport = async (page: Page, listName: string): Promise<void> 
  * Open the export modal from the SelectedListDetails panel.
  * The export button is on SelectedListDetails (data-testid="export-list-button").
  * Clicking it opens the ExportModal in a Mantine Modal with title="Export List".
- * @param page
  */
 const openExportModal = async (page: Page): Promise<void> => {
 	// Click the Export button on the SelectedListDetails panel.
@@ -90,8 +87,10 @@ const openExportModal = async (page: Page): Promise<void> => {
 	await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 10_000 });
 };
 
+const TEST_SUITE_TIMEOUT_MS = 120_000;
+
 test.describe('@workflow US-20 Export', () => {
-	test.setTimeout(120_000);
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS);
 
 	test.beforeEach(async ({ page }) => {
 		// Dismiss onboarding tour before any navigation
@@ -227,14 +226,16 @@ test.describe('@workflow US-20 Export', () => {
 		await exportSubmit.click();
 
 		// During export, verify the UI remains responsive
-		const isResponsive = await page.evaluate(() => {
+		const isResponsive = await page.evaluate(async () => {
+			const UI_RESPONSIVENESS_THRESHOLD_MS = 2_000;
+			const CHECK_DELAY_MS = 100;
 			return new Promise<boolean>((resolve) => {
 				const start = performance.now();
 				setTimeout(() => {
 					const elapsed = performance.now() - start;
-					// If elapsed is under 2 seconds, the UI is not blocked
-					resolve(elapsed < 2_000);
-				}, 100);
+					// If elapsed is under the threshold, the UI is not blocked
+					resolve(elapsed < UI_RESPONSIVENESS_THRESHOLD_MS);
+				}, CHECK_DELAY_MS);
 			});
 		});
 

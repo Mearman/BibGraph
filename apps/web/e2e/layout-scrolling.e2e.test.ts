@@ -13,6 +13,8 @@ import { expect,test } from "@playwright/test";
 
 import { waitForAppReady, waitForNoLoading } from "@/test/helpers/app-ready";
 
+const TEST_TIMEOUT_MS = 30_000;
+
 test.describe("Layout Scrolling Behavior @manual", () => {
   test.describe("User Story 1: Seamless Content Navigation", () => {
     /**
@@ -20,7 +22,7 @@ test.describe("Layout Scrolling Behavior @manual", () => {
      * Navigate to /bookmarks and verify no overflow scrollbar in main Box
      */
     test("main content area has no nested scrollbar", async ({ page }) => {
-      test.setTimeout(30_000);
+      test.setTimeout(TEST_TIMEOUT_MS);
 
       await page.goto("#/bookmarks");
       await waitForAppReady(page);
@@ -51,7 +53,7 @@ test.describe("Layout Scrolling Behavior @manual", () => {
     test("scrolling main content does not create nested scrollbars", async ({
       page,
     }) => {
-      test.setTimeout(30_000);
+      test.setTimeout(TEST_TIMEOUT_MS);
 
       await page.goto("#/bookmarks");
       await waitForAppReady(page);
@@ -83,7 +85,7 @@ test.describe("Layout Scrolling Behavior @manual", () => {
      * Verify calc(100vh - 60px) is respected
      */
     test("main content fills viewport height correctly", async ({ page }) => {
-      test.setTimeout(30_000);
+      test.setTimeout(TEST_TIMEOUT_MS);
 
       await page.goto("#/bookmarks");
       await waitForAppReady(page);
@@ -98,7 +100,7 @@ test.describe("Layout Scrolling Behavior @manual", () => {
 
         return {
           height: computed.height,
-          expectedHeight: `${viewportHeight - headerHeight}px`,
+          expectedHeight: `${String(viewportHeight - headerHeight)}px`,
           viewportHeight,
           headerHeight,
         };
@@ -124,7 +126,7 @@ test.describe("Layout Scrolling Behavior @manual", () => {
     test("left sidebar scrolls independently with 50+ bookmarks", async ({
       page,
     }) => {
-      test.setTimeout(30_000);
+      test.setTimeout(TEST_TIMEOUT_MS);
 
       // This test requires populating bookmarks
       // For now, we verify the overflow property exists
@@ -164,7 +166,7 @@ test.describe("Layout Scrolling Behavior @manual", () => {
     test("right sidebar scrolls independently with 50+ history items", async ({
       page,
     }) => {
-      test.setTimeout(30_000);
+      test.setTimeout(TEST_TIMEOUT_MS);
 
       await page.goto("#/bookmarks");
       await waitForAppReady(page);
@@ -202,7 +204,7 @@ test.describe("Layout Scrolling Behavior @manual", () => {
     test("scroll context switches seamlessly between sections", async ({
       page,
     }) => {
-      test.setTimeout(30_000);
+      test.setTimeout(TEST_TIMEOUT_MS);
 
       await page.goto("#/bookmarks");
       await waitForAppReady(page);
@@ -228,7 +230,7 @@ test.describe("Layout Scrolling Behavior @manual", () => {
     test("keyboard navigation works across scroll contexts", async ({
       page,
     }) => {
-      test.setTimeout(30_000);
+      test.setTimeout(TEST_TIMEOUT_MS);
 
       await page.goto("#/bookmarks");
       await waitForAppReady(page);

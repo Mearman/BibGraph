@@ -119,7 +119,7 @@ export const useCatalogueSharing = () => {
 				try {
 					const urlObject = new URL(url.startsWith('http') ? url : `https://dummy.com${url.startsWith('/') ? '' : '/'}${url}`);
 					const dataParameter = urlObject.searchParams.get('data');
-					if (!dataParameter) {
+					if (dataParameter === null) {
 						throw new Error("No 'data' parameter found in URL");
 					}
 					compressedData = dataParameter;
@@ -145,9 +145,9 @@ export const useCatalogueSharing = () => {
 			// Create new list from share data
 			const listId = await storageProvider.createList({
 				title: listData.list.title,
-				description: listData.list.description ? `${listData.list.description} (Imported from shared list)` : "Imported from shared list",
+				description: listData.list.description !== undefined && listData.list.description !== "" ? `${listData.list.description} (Imported from shared list)` : "Imported from shared list",
 				type: listData.list.type, // Preserves 'bibliography' type
-				tags: [...(listData.list.tags || []), "imported"],
+				tags: [...(listData.list.tags ?? []), "imported"],
 				isPublic: false, // Don't make imported lists public by default
 			});
 

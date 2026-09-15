@@ -15,6 +15,11 @@ import type { AddEntityParams as AddEntityParameters,CreateListParams as CreateL
 
 const CATALOGUE_LOGGER_CONTEXT = "catalogue-crud";
 
+interface MergeListEntityItem {
+	listId: string;
+	entity: CatalogueEntity;
+}
+
 // User-friendly error message mapping
 const getUserFriendlyErrorMessage = (error: unknown): string => {
 	const errorMessage = error instanceof Error ? error.message : String(error);
@@ -88,7 +93,6 @@ export interface UseCatalogueCRUDParams {
 /**
  * CRUD operations hook for catalogue lists and entities
  * Provides optimistic updates with rollback on error
- * @param params
  */
 export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 	const storageProvider = useStorageProvider();
@@ -118,8 +122,8 @@ export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 			title: parameters.title,
 			description: parameters.description,
 			type: parameters.type,
-			tags: parameters.tags || [],
-			isPublic: parameters.isPublic || false,
+			tags: parameters.tags ?? [],
+			isPublic: parameters.isPublic ?? false,
 			createdAt: new Date(),
 			updatedAt: new Date(),
 		};
@@ -242,7 +246,7 @@ export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 
 			showNotification({
 				title: "Success",
-				message: `Deleted "${listToDelete?.title || "list"}"`,
+				message: `Deleted "${listToDelete?.title ?? "list"}"`,
 				category: "success",
 			});
 		} catch (error) {
@@ -267,7 +271,7 @@ export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 	}, [lists, selectedList, showNotification, setLists, selectList, setIsDeletingList, storageProvider]);
 
 	// Add entity to list (optimistic update)
-	const addEntityToList = useCallback(async (parameters: AddEntityParameters): Promise<string> => {
+	const addEntityToList = useCallback(async (parameters: Readonly<AddEntityParameters>): Promise<string> => {
 		setIsAddingEntity(true);
 
 		// Create temporary optimistic entity for immediate UI feedback
@@ -329,18 +333,18 @@ export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 	// Add multiple entities to list
 	const addEntitiesToList = useCallback(async (
 		listId: string,
-		entities: Array<{
+		entitiesToAdd: readonly {
 			entityType: EntityType;
 			entityId: string;
 			notes?: string;
-		}>
+		}[]
 	): Promise<{ success: number; failed: number }> => {
 		try {
-			return await storageProvider.addEntitiesToList(listId, entities);
+			return await storageProvider.addEntitiesToList(listId, [...entitiesToAdd]);
 		} catch (error) {
 			logger.error(CATALOGUE_LOGGER_CONTEXT, "Failed to add multiple entities to catalogue list", {
 				listId,
-				entitiesCount: entities.length,
+				entitiesCount: entitiesToAdd.length,
 				error
 			});
 			throw error;
@@ -398,9 +402,9 @@ export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 	}, [entities, storageProvider, refreshEntities, showNotification, setEntities, setIsRemovingEntity]);
 
 	// Reorder entities in list
-	const reorderEntities = useCallback(async (listId: string, orderedEntityIds: string[]): Promise<void> => {
+	const reorderEntities = useCallback(async (listId: string, orderedEntityIds: readonly string[]): Promise<void> => {
 		try {
-			await storageProvider.reorderEntities(listId, orderedEntityIds);
+			await storageProvider.reorderEntities(listId, [...orderedEntityIds]);
 			// Refresh entities after reordering to update UI
 			await refreshEntities(listId);
 			logger.debug(CATALOGUE_LOGGER_CONTEXT, "Entities reordered and list refreshed", {
@@ -422,7 +426,7 @@ export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 		try {
 			await storageProvider.updateEntityNotes(entityRecordId, notes);
 			// Refresh entities to show updated notes
-			if (selectedList?.id) {
+			if (selectedList?.id !== undefined) {
 				await refreshEntities(selectedList.id);
 			}
 		} catch (error) {
@@ -436,8 +440,8 @@ export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 	}, [selectedList, storageProvider, refreshEntities]);
 
 	// Bulk remove entities from list
-	const bulkRemoveEntities = useCallback(async (listId: string, entityIds: string[]): Promise<void> => {
-		if (!entityIds || entityIds.length === 0) return;
+	const bulkRemoveEntities = useCallback(async (listId: string, entityIds: readonly string[]): Promise<void> => {
+		if (entityIds.length === 0) return;
 
 		try {
 			// Remove entities one by one
@@ -466,9 +470,9 @@ export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 	const bulkMoveEntities = useCallback(async (
 		sourceListId: string,
 		targetListId: string,
-		entityIds: string[]
+		entityIds: readonly string[]
 	): Promise<void> => {
-		if (!entityIds || entityIds.length === 0) return;
+		if (entityIds.length === 0) return;
 		if (sourceListId === targetListId) {
 			throw new Error("Source and target lists cannot be the same");
 		}
@@ -476,7 +480,7 @@ export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 		try {
 			// Get the entities from source list
 			const sourceEntities = await storageProvider.getListEntities(sourceListId);
-			const entitiesToMove = sourceEntities.filter(e => e.id && entityIds.includes(e.id));
+			const entitiesToMove = sourceEntities.filter(e => e.id !== undefined && entityIds.includes(e.id));
 
 			// Move entities one by one
 			for (const entity of entitiesToMove) {
@@ -489,7 +493,7 @@ export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 				});
 
 				// Remove from source list
-				if (entity.id) {
+				if (entity.id !== undefined) {
 					await storageProvider.removeEntityFromList(sourceListId, entity.id);
 				}
 			}
@@ -515,17 +519,14 @@ export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 
 	// Merge lists
 	const mergeLists = useCallback(async (
-		sourceListIds: string[],
+		sourceListIds: readonly string[],
 		mergeStrategy: 'union' | 'intersection' | 'combine',
 		newListName: string,
 		deduplicate: boolean
 	): Promise<string> => {
 		try {
 			// Fetch entities from all source lists
-			const allEntities: Array<{
-				listId: string;
-				entity: CatalogueEntity;
-			}> = [];
+			const allEntities: MergeListEntityItem[] = [];
 
 			for (const listId of sourceListIds) {
 				const listEntities = await storageProvider.getListEntities(listId);
@@ -535,7 +536,7 @@ export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 			}
 
 			// Apply merge strategy
-			let entitiesToMerge: Array<typeof allEntities[0]>;
+			let entitiesToMerge: MergeListEntityItem[];
 			const entityKey = (e: CatalogueEntity) => `${e.entityType}:${e.entityId}`;
 
 			if (mergeStrategy === 'intersection') {
@@ -543,11 +544,11 @@ export const useCatalogueCRUD = (params: UseCatalogueCRUDParams) => {
 				const entityCounts = new Map<string, number>();
 				for (const { entity } of allEntities) {
 					const key = entityKey(entity);
-					entityCounts.set(key, (entityCounts.get(key) || 0) + 1);
+					entityCounts.set(key, (entityCounts.get(key) ?? 0) + 1);
 				}
 				const requiredCount = sourceListIds.length;
 				entitiesToMerge = allEntities.filter(({ entity }) =>
-					(entityCounts.get(entityKey(entity)) || 0) >= requiredCount
+					(entityCounts.get(entityKey(entity)) ?? 0) >= requiredCount
 				);
 			} else if (mergeStrategy === 'union') {
 				// All unique entities

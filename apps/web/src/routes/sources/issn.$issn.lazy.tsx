@@ -15,7 +15,7 @@ const ISSNSourceRoute = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const resolveISSN = async () => {
+    const resolveISSN = () => {
       try {
         // Decode the ISSN parameter
         const decodedISSN = decodeURIComponent(issn);
@@ -49,7 +49,7 @@ const ISSNSourceRoute = () => {
       }
     };
 
-    void resolveISSN();
+    resolveISSN();
   }, [issn, navigate]);
 
   return (

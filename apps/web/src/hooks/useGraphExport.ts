@@ -2,8 +2,6 @@
  * Graph Export Hook
  *
  * Handles exporting graph visualizations to PNG and SVG formats.
- *
- * @module hooks/useGraphExport
  */
 
 import type { GraphEdge, GraphNode } from '@bibgraph/types';
@@ -52,8 +50,11 @@ interface UseGraphExportReturn {
 
 /**
  * Generate a timestamped filename for exports
- * @param extension
  */
+const DEFAULT_EXPORT_WIDTH = 1200;
+const DEFAULT_EXPORT_HEIGHT = 600;
+const EXPORT_HEIGHT_VIEWPORT_RATIO = 0.55;
+
 const generateExportFilename = (extension: 'png' | 'svg'): string => {
   const date = new Date().toISOString().split('T', 1)[0];
   const time = new Date().toISOString().split('T', 2)[1].split('.', 1)[0].replaceAll(':', '-');
@@ -62,11 +63,6 @@ const generateExportFilename = (extension: 'png' | 'svg'): string => {
 
 /**
  * Hook for exporting graph visualizations
- * @param root0
- * @param root0.graphContainerRef
- * @param root0.nodes
- * @param root0.edges
- * @param root0.nodePositions
  */
 export const useGraphExport = ({
   graphContainerRef,
@@ -141,8 +137,8 @@ export const useGraphExport = ({
     try {
       setIsExportingSVG(true);
 
-      const width = graphContainerRef.current?.clientWidth ?? 1200;
-      const height = typeof window !== 'undefined' ? window.innerHeight * 0.55 : 600;
+      const width = graphContainerRef.current?.clientWidth ?? DEFAULT_EXPORT_WIDTH;
+      const height = typeof window !== 'undefined' ? window.innerHeight * EXPORT_HEIGHT_VIEWPORT_RATIO : DEFAULT_EXPORT_HEIGHT;
 
       const filename = generateExportFilename('svg').replace('.svg', '');
 

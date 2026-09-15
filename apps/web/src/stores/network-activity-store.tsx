@@ -73,10 +73,15 @@ type NetworkActivityAction =
   | { type: "SET_TIME_RANGE"; payload: number }
   | { type: "CLEAR_FILTERS" };
 
+const MS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+const RECENT_REQUESTS_LIMIT = 50;
+
 // ID generator for requests
 const createRequestIdGenerator = (() => {
   let counter = 1;
-  return (prefix = "req") => `${prefix}-${counter++}`;
+  return (prefix = "req") => `${prefix}-${String(counter++)}`;
 })();
 
 // Initial state
@@ -91,6 +96,12 @@ const getInitialState = (): NetworkActivityState => ({
     timeRange: 24, // 24 hours default
   },
 });
+
+// Returning a real function-boundary type here (rather than an inline variable annotation) is necessary: TypeScript's control-flow analysis narrows a `const` declaration's usable type to its initializer's inferred type, not a wider explicit annotation, so a bare `const request: NetworkRequest | undefined = state.requests[id]` still reads as non-nullable at every subsequent use, whereas a function call's return type isn't narrowed that way by its caller.
+const getRequestById = (
+  requests: Record<string, NetworkRequest>,
+  id: string,
+): NetworkRequest | undefined => requests[id];
 
 // Reducer
 const networkActivityReducer = (
@@ -115,8 +126,8 @@ const networkActivityReducer = (
 
     case "UPDATE_REQUEST": {
       const { id, updates } = action.payload;
-      const request = state.requests[id];
-      if (!request) return state;
+      const request = getRequestById(state.requests, id);
+      if (request === undefined) return state;
 
       return {
         ...state,
@@ -132,8 +143,8 @@ const networkActivityReducer = (
 
     case "COMPLETE_REQUEST": {
       const { id, statusCode, size } = action.payload;
-      const request = state.requests[id];
-      if (!request) return state;
+      const request = getRequestById(state.requests, id);
+      if (request === undefined) return state;
 
       const endTime = Date.now();
       const duration = endTime - request.startTime;
@@ -156,8 +167,8 @@ const networkActivityReducer = (
 
     case "FAIL_REQUEST": {
       const { id, error, statusCode } = action.payload;
-      const request = state.requests[id];
-      if (!request) return state;
+      const request = getRequestById(state.requests, id);
+      if (request === undefined) return state;
 
       const endTime = Date.now();
       const duration = endTime - request.startTime;
@@ -342,21 +353,21 @@ export const useNetworkActivityActions = () => {
       );
 
       return id;
-    }, [context.dispatch]),
+    }, [context]),
 
     updateRequest: useCallback((id: string, updates: Partial<NetworkRequest>) => {
       context.dispatch({
         type: "UPDATE_REQUEST",
         payload: { id, updates }
       });
-    }, [context.dispatch]),
+    }, [context]),
 
     completeRequest: useCallback((id: string, statusCode?: number, size?: number) => {
       context.dispatch({
         type: "COMPLETE_REQUEST",
         payload: { id, statusCode, size }
       });
-    }, [context.dispatch]),
+    }, [context]),
 
     failRequest: useCallback((id: string, error: string, statusCode?: number) => {
       context.dispatch({
@@ -374,14 +385,14 @@ export const useNetworkActivityActions = () => {
         },
         "NetworkActivityStore",
       );
-    }, [context.dispatch]),
+    }, [context]),
 
     removeRequest: useCallback((id: string) => {
       context.dispatch({
         type: "REMOVE_REQUEST",
         payload: id
       });
-    }, [context.dispatch]),
+    }, [context]),
 
     clearOldRequests: useCallback(() => {
       const currentState = context.state;
@@ -403,7 +414,7 @@ export const useNetworkActivityActions = () => {
         },
         "NetworkActivityStore",
       );
-    }, [context.dispatch, context.state]),
+    }, [context]),
 
     clearAllRequests: useCallback(() => {
       context.dispatch({ type: "CLEAR_ALL_REQUESTS" });
@@ -414,47 +425,47 @@ export const useNetworkActivityActions = () => {
         {},
         "NetworkActivityStore",
       );
-    }, [context.dispatch]),
+    }, [context]),
 
     // Filter actions
-    setStatusFilter: useCallback((statuses: string[]) => {
+    setStatusFilter: useCallback((statuses: readonly string[]) => {
       context.dispatch({
         type: "SET_STATUS_FILTER",
-        payload: statuses
+        payload: [...statuses]
       });
-    }, [context.dispatch]),
+    }, [context]),
 
-    setTypeFilter: useCallback((types: string[]) => {
+    setTypeFilter: useCallback((types: readonly string[]) => {
       context.dispatch({
         type: "SET_TYPE_FILTER",
-        payload: types
+        payload: [...types]
       });
-    }, [context.dispatch]),
+    }, [context]),
 
-    setCategoryFilter: useCallback((categories: string[]) => {
+    setCategoryFilter: useCallback((categories: readonly string[]) => {
       context.dispatch({
         type: "SET_CATEGORY_FILTER",
-        payload: categories
+        payload: [...categories]
       });
-    }, [context.dispatch]),
+    }, [context]),
 
     setSearchTerm: useCallback((term: string) => {
       context.dispatch({
         type: "SET_SEARCH_TERM",
         payload: term
       });
-    }, [context.dispatch]),
+    }, [context]),
 
     setTimeRange: useCallback((hours: number) => {
       context.dispatch({
         type: "SET_TIME_RANGE",
         payload: hours
       });
-    }, [context.dispatch]),
+    }, [context]),
 
     clearFilters: useCallback(() => {
       context.dispatch({ type: "CLEAR_FILTERS" });
-    }, [context.dispatch]),
+    }, [context]),
   };
 };
 
@@ -467,18 +478,18 @@ export const useNetworkActivityStore = () => {
   const computedValues = useMemo(() => {
     const getActiveRequests = useCallback(() => {
       return Object.values(state.requests).filter((request) => request.status === "pending");
-    }, [state.requests]);
+    }, []);
 
     const getRecentRequests = useCallback(() => {
       return Object.values(state.requests)
         .sort((a, b) => b.startTime - a.startTime)
-        .slice(0, 50);
-    }, [state.requests]);
+        .slice(0, RECENT_REQUESTS_LIMIT);
+    }, []);
 
     const getNetworkStats = useCallback((): NetworkStats => {
       const requestList = Object.values(state.requests);
       const now = Date.now();
-      const oneSecondAgo = now - 1000;
+      const oneSecondAgo = now - MS_PER_SECOND;
 
       const recentRequests = requestList.filter(
         (request) => request.startTime > oneSecondAgo,
@@ -510,11 +521,11 @@ export const useNetworkActivityStore = () => {
           0,
         ),
       };
-    }, [state.requests]);
+    }, []);
 
     const getFilteredRequests = useCallback(() => {
       const requestList = Object.values(state.requests);
-      const cutoffTime = Date.now() - state.filters.timeRange * 60 * 60 * 1000;
+      const cutoffTime = Date.now() - state.filters.timeRange * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND;
 
       return requestList
         .filter((request) => {
@@ -562,7 +573,7 @@ export const useNetworkActivityStore = () => {
           return true;
         })
         .sort((a, b) => b.startTime - a.startTime);
-    }, [state.requests, state.filters]);
+    }, []);
 
     return {
       getActiveRequests,
@@ -594,12 +605,12 @@ export const selectActiveRequests = (state: NetworkActivityState) =>
 export const selectRecentRequests = (state: NetworkActivityState) =>
   Object.values(state.requests)
     .sort((a, b) => b.startTime - a.startTime)
-    .slice(0, 50);
+    .slice(0, RECENT_REQUESTS_LIMIT);
 
 export const selectNetworkStats = (state: NetworkActivityState): NetworkStats => {
   const requestList = Object.values(state.requests);
   const now = Date.now();
-  const oneSecondAgo = now - 1000;
+  const oneSecondAgo = now - MS_PER_SECOND;
 
   const recentRequests = requestList.filter(
     (request) => request.startTime > oneSecondAgo,
@@ -636,7 +647,7 @@ export const selectNetworkStats = (state: NetworkActivityState): NetworkStats =>
 
 export const selectFilteredRequests = (state: NetworkActivityState) => {
   const requestList = Object.values(state.requests);
-  const cutoffTime = Date.now() - state.filters.timeRange * 60 * 60 * 1000;
+  const cutoffTime = Date.now() - state.filters.timeRange * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND;
 
   return requestList
     .filter((request) => {

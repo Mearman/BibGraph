@@ -11,6 +11,7 @@
  */
 
 import AxeBuilder from '@axe-core/playwright';
+import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 
 import { waitForAppReady } from '@/test/helpers/app-ready';
@@ -18,7 +19,8 @@ import { StorageTestHelper } from '@/test/helpers/StorageTestHelper';
 import { HistoryPage } from '@/test/page-objects/HistoryPage';
 
 test.describe('@utility US-22 Visit History', () => {
-	const BASE_URL = process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173';
+	const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+	const BASE_URL = IS_CI ? 'http://localhost:4173' : 'http://localhost:5173';
 
 	const TEST_ENTITIES = [
 		{ type: 'authors', id: 'A5017898742' },
@@ -30,13 +32,15 @@ test.describe('@utility US-22 Visit History', () => {
 	let historyPage: HistoryPage;
 	let storage: StorageTestHelper;
 
+	const HISTORY_RECORD_DELAY_MS = 500;
+	const HISTORY_WAIT_TIMEOUT_MS = 30_000;
+	const MIN_CARD_TEXT_LENGTH = 5;
+
 	/**
 	 * Visit entity pages and wait for navigation to settle. Adds a short delay between visits to ensure history timestamps differ.
-	 * @param page
-	 * @param entities
 	 */
 	const visitEntities = async (
-		page: import('@playwright/test').Page,
+		page: Page,
 		entities: typeof TEST_ENTITIES,
 	): Promise<void> => {
 		for (const entity of entities) {
@@ -44,7 +48,7 @@ test.describe('@utility US-22 Visit History', () => {
 			await waitForAppReady(page);
 			await page.waitForLoadState('networkidle');
 			// Small delay to ensure history entry is recorded with distinct timestamp
-			await page.waitForTimeout(500);
+			await page.waitForTimeout(HISTORY_RECORD_DELAY_MS);
 		}
 	};
 
@@ -77,7 +81,7 @@ test.describe('@utility US-22 Visit History', () => {
 		await historyPage.gotoHistory();
 
 		// Wait for history entries to appear (hook timeout may prevent this)
-		const entryCount = await historyPage.waitForEntries(2, 30_000);
+		const entryCount = await historyPage.waitForEntries(2, HISTORY_WAIT_TIMEOUT_MS);
 
 		if (entryCount === 0) {
 			test.skip(true, 'History entries did not load — useUserInteractions hook likely timed out');
@@ -94,7 +98,7 @@ test.describe('@utility US-22 Visit History', () => {
 		// Verify the first card contains text content (entity name, timestamp, etc.)
 		const firstCardText = await entryCards.first().textContent();
 		expect(firstCardText).toBeTruthy();
-		expect.soft(firstCardText!.length).toBeGreaterThan(5);
+		expect.soft(firstCardText!.length).toBeGreaterThan(MIN_CARD_TEXT_LENGTH);
 	});
 
 	test('should list entries in reverse chronological order on /history', async ({ page }) => {
@@ -105,7 +109,7 @@ test.describe('@utility US-22 Visit History', () => {
 		await historyPage.gotoHistory();
 
 		// Wait for history entries to appear
-		const entryCount = await historyPage.waitForEntries(2, 30_000);
+		const entryCount = await historyPage.waitForEntries(2, HISTORY_WAIT_TIMEOUT_MS);
 
 		if (entryCount === 0) {
 			test.skip(true, 'History entries did not load — useUserInteractions hook likely timed out');
@@ -131,7 +135,7 @@ test.describe('@utility US-22 Visit History', () => {
 		const hasHistoryData = await page.evaluate(async () => {
 			const databases = await window.indexedDB.databases();
 			return databases.some(
-				(database) => database.name !== undefined && database.name !== null && database.name.length > 0
+				(database) => database.name !== undefined && database.name.length > 0
 			);
 		});
 		expect(hasHistoryData).toBe(true);
@@ -143,7 +147,7 @@ test.describe('@utility US-22 Visit History', () => {
 		// Navigate to history and verify entries persisted
 		await historyPage.gotoHistory();
 
-		const entryCount = await historyPage.waitForEntries(1, 30_000);
+		const entryCount = await historyPage.waitForEntries(1, HISTORY_WAIT_TIMEOUT_MS);
 		if (entryCount === 0) {
 			test.skip(true, 'History entries did not load after reload — useUserInteractions hook likely timed out');
 			return;
@@ -159,7 +163,7 @@ test.describe('@utility US-22 Visit History', () => {
 		await historyPage.gotoHistory();
 
 		// Wait for entries to appear before attempting to clear
-		const initialCount = await historyPage.waitForEntries(2, 30_000);
+		const initialCount = await historyPage.waitForEntries(2, HISTORY_WAIT_TIMEOUT_MS);
 
 		if (initialCount === 0) {
 			test.skip(true, 'History entries did not load — useUserInteractions hook likely timed out');
@@ -187,7 +191,7 @@ test.describe('@utility US-22 Visit History', () => {
 		await historyPage.gotoHistory();
 
 		// Wait for entries to appear before clicking
-		const entryCount = await historyPage.waitForEntries(1, 30_000);
+		const entryCount = await historyPage.waitForEntries(1, HISTORY_WAIT_TIMEOUT_MS);
 
 		if (entryCount === 0) {
 			test.skip(true, 'History entries did not load — useUserInteractions hook likely timed out');

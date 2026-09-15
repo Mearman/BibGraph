@@ -94,7 +94,7 @@ export const useSearchHistory = () => {
 
   /**
    * Add a search query to history
-   * @param query Search query to add
+   * @param query - Search query to add
    */
   const addSearchQuery = useCallback(async (query: string) => {
     if (!query.trim()) return;
@@ -115,7 +115,7 @@ export const useSearchHistory = () => {
 
   /**
    * Remove a search query from history
-   * @param id ID of the query to remove
+   * @param id - ID of the query to remove
    */
   const removeSearchQuery = useCallback(async (id: string) => {
     try {

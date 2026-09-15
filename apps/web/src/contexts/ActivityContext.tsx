@@ -25,11 +25,11 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [activities, setActivities] = useState<Activity[]>([]);
 
   const addActivity = useCallback((activity: Omit<Activity, 'id' | 'timestamp'>) => {
-    const newActivity = {
+    const newActivity: Activity = {
       ...activity,
       id: crypto.randomUUID(),
       timestamp: new Date(),
-    } as Activity;
+    };
 
     setActivities((previous) => {
       const updated = [newActivity, ...previous];
@@ -64,7 +64,7 @@ export const ActivityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     // Filter by search query
-    if (filter.searchQuery) {
+    if (filter.searchQuery !== undefined && filter.searchQuery !== '') {
       const query = filter.searchQuery.toLowerCase();
       filtered = filtered.filter((a) =>
         a.description.toLowerCase().includes(query)

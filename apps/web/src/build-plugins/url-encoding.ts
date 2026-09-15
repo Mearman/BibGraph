@@ -8,9 +8,13 @@ import type { ParsedKey } from "./types";
 import { getEntityPrefix } from "./types";
 
 /**
+Length of the `"https-:"` legacy protocol prefix used by the old custom URL-encoding scheme.
+ */
+const LEGACY_PROTOCOL_PREFIX_LENGTH = 7;
+
+/**
  * Convert a canonical URL to the encoded key format for consistent indexing
  * Uses standard URL encoding for safe filename generation
- * @param url
  */
 export const urlToEncodedKey = (url: string): string =>
   encodeURIComponent(url)
@@ -24,7 +28,6 @@ export const urlToEncodedKey = (url: string): string =>
 
 /**
  * Normalize URL by decoding URL-encoded characters for deduplication
- * @param url
  */
 export const normalizeUrlForDeduplication = (url: string): string => {
   try {
@@ -37,7 +40,6 @@ export const normalizeUrlForDeduplication = (url: string): string => {
 
 /**
  * Generate filename from parsed key using URL encoding
- * @param parsed
  */
 export const generateFilenameFromParsedKey = (
   parsed: ParsedKey,
@@ -57,7 +59,6 @@ export const generateFilenameFromParsedKey = (
 
 /**
  * Generate a descriptive filename from a canonical URL using proper URL encoding
- * @param canonicalUrl
  */
 export const generateDescriptiveFilename = (
   canonicalUrl: string,
@@ -71,11 +72,98 @@ export const generateDescriptiveFilename = (
 };
 
 /**
- * Determine the canonical query URL for a query file
- * This tries multiple approaches to decode the filename and reconstruct the original query
- * @param entityType
- * @param filename
- * @param fileContent
+Number of fields (`id`, `display_name`, `publication_year`) that signals a common author-select query pattern.
+ */
+const THREE_SELECTED_FIELDS_COUNT = 3;
+/**
+Result count that signals the API's default `per_page` was used explicitly.
+ */
+const DEFAULT_PER_PAGE_RESULT_COUNT = 50;
+/**
+Result count that signals the API's implicit default page size.
+ */
+const DEFAULT_QUERY_RESULT_COUNT = 25;
+/**
+Result count that signals a topic query with a larger page size.
+ */
+const TOPIC_QUERY_RESULT_COUNT = 200;
+
+/**
+ * Try to reverse-engineer the original query URL from the results
+ */
+const reverseEngineerQueryUrl = (
+  entityType: string,
+  queryResult: unknown,
+): string | null => {
+  if (
+    queryResult === null ||
+    typeof queryResult !== "object" ||
+    !("results" in queryResult) ||
+    !Array.isArray(queryResult.results)
+  ) {
+    return null;
+  }
+
+  const { results } = queryResult;
+  if (results.length === 0) return null;
+
+  // Check what fields are present in the first result
+  const firstResult: unknown = results[0];
+  if (firstResult === null || typeof firstResult !== "object") return null;
+
+  const ObjectSchema = z.record(z.string(), z.unknown());
+  const resultValidation = ObjectSchema.safeParse(firstResult);
+  if (!resultValidation.success) return null;
+
+  const fields = Object.keys(resultValidation.data);
+
+  // Common patterns to detect:
+
+  // Pattern 1: If only id, display_name, publication_year -> likely author.id query with select
+  if (
+    fields.length === THREE_SELECTED_FIELDS_COUNT &&
+    fields.includes("id") &&
+    fields.includes("display_name") &&
+    fields.includes("publication_year")
+  ) {
+    // This looks like filter=author.id:XXXX&select=id,display_name,publication_year Try to infer the author ID from the pattern or use a common one we know exists
+    return `https://api.openalex.org/${entityType}?filter=author.id:A5017898742&select=id,display_name,publication_year`;
+  }
+
+  // Pattern 2: If only id, display_name -> likely author.id query with select
+  if (
+    fields.length === 2 &&
+    fields.includes("id") &&
+    fields.includes("display_name")
+  ) {
+    return `https://api.openalex.org/${entityType}?filter=author.id:A5017898742&select=id,display_name`;
+  }
+
+  // Pattern 3: If only id -> likely author.id query with select=id
+  if (fields.length === 1 && fields.includes("id")) {
+    return `https://api.openalex.org/${entityType}?filter=author.id:A5017898742&select=id`;
+  }
+
+  // Pattern 4: If many fields but specific count, might be a per_page query
+  if (results.length === DEFAULT_PER_PAGE_RESULT_COUNT) {
+    return `https://api.openalex.org/${entityType}?filter=author.id:A5017898742&per_page=50`;
+  }
+
+  // Pattern 5: If 25 results, might be default query
+  if (results.length === DEFAULT_QUERY_RESULT_COUNT) {
+    return `https://api.openalex.org/${entityType}`;
+  }
+
+  // Pattern 6: If 200 results, might be topic query with sorting
+  if (results.length === TOPIC_QUERY_RESULT_COUNT) {
+    return `https://api.openalex.org/${entityType}?sort=works_count,cited_by_count&select=id,display_name,works_count,cited_by_count&per_page=200`;
+  }
+
+  return null;
+};
+
+/**
+ * Determine the canonical query URL for a query file This tries multiple approaches to decode the filename and reconstruct the original query
  */
 export const determineCanonicalQueryUrl = (
   entityType: string,
@@ -104,7 +192,7 @@ export const determineCanonicalQueryUrl = (
       logger.debug("general", "Decoding legacy custom URL encoding", {
         filename,
       });
-      let withoutProtocol = filename.slice(7); // Remove 'https-:'
+      let withoutProtocol = filename.slice(LEGACY_PROTOCOL_PREFIX_LENGTH); // Remove 'https-:'
       withoutProtocol = withoutProtocol
         .replaceAll(":", "/") // : → /
         .replaceAll("-", "=") // - → =
@@ -121,7 +209,7 @@ export const determineCanonicalQueryUrl = (
   try {
     const decoded = Buffer.from(filename, "base64url").toString("utf-8");
     const parameters: unknown = JSON.parse(decoded);
-    if (parameters && typeof parameters === "object" && !Array.isArray(parameters)) {
+    if (parameters !== null && typeof parameters === "object" && !Array.isArray(parameters)) {
       const searchParameters = new URLSearchParams();
       for (const [key, value] of Object.entries(parameters)) {
         if (Array.isArray(value)) {
@@ -144,7 +232,7 @@ export const determineCanonicalQueryUrl = (
     if (/^[0-9a-f]+$/i.test(filename)) {
       const decoded = Buffer.from(filename, "hex").toString("utf-8");
       const parameters: unknown = JSON.parse(decoded);
-      if (parameters && typeof parameters === "object" && !Array.isArray(parameters)) {
+      if (parameters !== null && typeof parameters === "object" && !Array.isArray(parameters)) {
         const searchParameters = new URLSearchParams();
         for (const [key, value] of Object.entries(parameters)) {
           if (Array.isArray(value)) {
@@ -164,10 +252,10 @@ export const determineCanonicalQueryUrl = (
   try {
     const queryResult: unknown = JSON.parse(fileContent);
     if (
-      queryResult &&
+      queryResult !== null &&
       typeof queryResult === "object" &&
       "meta" in queryResult &&
-      queryResult.meta &&
+      queryResult.meta !== null &&
       typeof queryResult.meta === "object" &&
       "request_url" in queryResult.meta &&
       typeof queryResult.meta.request_url === "string"
@@ -182,13 +270,13 @@ export const determineCanonicalQueryUrl = (
   try {
     const queryResult: unknown = JSON.parse(fileContent);
     if (
-      queryResult &&
+      queryResult !== null &&
       typeof queryResult === "object" &&
       "results" in queryResult &&
       Array.isArray(queryResult.results)
     ) {
       const reconstructedUrl = reverseEngineerQueryUrl(entityType, queryResult);
-      if (reconstructedUrl) {
+      if (reconstructedUrl !== null && reconstructedUrl !== "") {
         return reconstructedUrl;
       }
     }
@@ -219,87 +307,8 @@ export const determineCanonicalQueryUrl = (
 };
 
 /**
- * Try to reverse-engineer the original query URL from the results
- * @param entityType
- * @param queryResult
- */
-const reverseEngineerQueryUrl = (
-  entityType: string,
-  queryResult: unknown,
-): string | null => {
-  if (
-    !queryResult ||
-    typeof queryResult !== "object" ||
-    !("results" in queryResult) ||
-    !Array.isArray(queryResult.results)
-  ) {
-    return null;
-  }
-
-  const { results } = queryResult;
-  if (results.length === 0) return null;
-
-  // Check what fields are present in the first result
-  const firstResult: unknown = results[0];
-  if (!firstResult || typeof firstResult !== "object") return null;
-
-  const ObjectSchema = z.record(z.string(), z.unknown());
-  const resultValidation = ObjectSchema.safeParse(firstResult);
-  if (!resultValidation.success) return null;
-
-  const fields = Object.keys(resultValidation.data);
-
-  // Common patterns to detect:
-
-  // Pattern 1: If only id, display_name, publication_year -> likely author.id query with select
-  if (
-    fields.length === 3 &&
-    fields.includes("id") &&
-    fields.includes("display_name") &&
-    fields.includes("publication_year")
-  ) {
-    // This looks like filter=author.id:XXXX&select=id,display_name,publication_year
-    // Try to infer the author ID from the pattern or use a common one we know exists
-    return `https://api.openalex.org/${entityType}?filter=author.id:A5017898742&select=id,display_name,publication_year`;
-  }
-
-  // Pattern 2: If only id, display_name -> likely author.id query with select
-  if (
-    fields.length === 2 &&
-    fields.includes("id") &&
-    fields.includes("display_name")
-  ) {
-    return `https://api.openalex.org/${entityType}?filter=author.id:A5017898742&select=id,display_name`;
-  }
-
-  // Pattern 3: If only id -> likely author.id query with select=id
-  if (fields.length === 1 && fields.includes("id")) {
-    return `https://api.openalex.org/${entityType}?filter=author.id:A5017898742&select=id`;
-  }
-
-  // Pattern 4: If many fields but specific count, might be a per_page query
-  if (results.length === 50) {
-    return `https://api.openalex.org/${entityType}?filter=author.id:A5017898742&per_page=50`;
-  }
-
-  // Pattern 5: If 25 results, might be default query
-  if (results.length === 25) {
-    return `https://api.openalex.org/${entityType}`;
-  }
-
-  // Pattern 6: If 200 results, might be topic query with sorting
-  if (results.length === 200) {
-    return `https://api.openalex.org/${entityType}?sort=works_count,cited_by_count&select=id,display_name,works_count,cited_by_count&per_page=200`;
-  }
-
-  return null;
-};
-
-/**
  * Decode entity filename to canonical URL
  * Handles both new URL-encoded format and legacy custom encoding
- * @param entityId
- * @param entityType
  */
 export const decodeEntityFilename = (
   entityId: string,
@@ -317,7 +326,7 @@ export const decodeEntityFilename = (
     if (entityId.startsWith("https-:")) {
       // This is an encoded filename - decode it carefully
       // Remove the encoded protocol prefix
-      let withoutProtocol = entityId.slice(7); // Remove 'https-:'
+      let withoutProtocol = entityId.slice(LEGACY_PROTOCOL_PREFIX_LENGTH); // Remove 'https-:'
 
       // Replace colons with slashes in the path part (no query params for entities)
       withoutProtocol = withoutProtocol.replaceAll(":", "/");

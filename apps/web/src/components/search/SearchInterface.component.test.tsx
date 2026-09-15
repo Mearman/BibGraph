@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 /**
  * Component tests for SearchInterface component
- * @vitest-environment jsdom
  */
 
 import { MantineProvider } from "@mantine/core";
@@ -13,7 +13,13 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { AdvancedSearchFilters } from "./search-filters-types";
 import { SearchInterface } from "./SearchInterface";
+
+interface SearchQueryFilters {
+  query: string;
+  advanced?: AdvancedSearchFilters;
+}
 
 // Mock ResizeObserver before importing Mantine
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
@@ -25,7 +31,7 @@ global.ResizeObserver = vi.fn().mockImplementation(() => ({
 // Mock window.matchMedia before importing Mantine
 Object.defineProperty(window, "matchMedia", {
   writable: true,
-  value: vi.fn().mockImplementation((query) => ({
+  value: vi.fn().mockImplementation((query: string) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -77,7 +83,7 @@ const renderWithMantine = (component: React.ReactElement) => {
 };
 
 describe("SearchInterface", () => {
-  const mockOnSearch = vi.fn();
+  const mockOnSearch = vi.fn<(filters: SearchQueryFilters) => void>();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -254,7 +260,7 @@ describe("SearchInterface", () => {
     });
   });
 
-  it("should handle empty query on search", async () => {
+  it("should handle empty query on search", () => {
     renderWithMantine(<SearchInterface onSearch={mockOnSearch} />);
 
     // First add some content to enable the clear button

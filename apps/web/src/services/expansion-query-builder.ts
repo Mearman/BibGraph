@@ -1,6 +1,5 @@
 /**
- * Expansion query builder service
- * Converts expansion settings to OpenAlex API query parameters
+ * Expansion query builder service Converts expansion settings to OpenAlex API query parameters
  */
 
 import type {
@@ -21,101 +20,54 @@ export interface OpenAlexQueryParams {
 
 /**
  * Type guard to check if a value is an array with exactly 2 elements
- * @param value
  */
 const isTwoElementArray = (value: unknown): value is [unknown, unknown] => Array.isArray(value) && value.length === 2;
 
 /**
- * Build OpenAlex query parameters from expansion settings
- * @param root0
- * @param root0.settings
- * @param root0.baseSelect
+ * Format a value for use in OpenAlex filters
  */
-const buildQueryParameters = ({
-  settings,
-  baseSelect,
-}: {
-  settings: ExpansionSettings;
-  baseSelect?: string[];
-}): OpenAlexQueryParams => {
-  const parameters: OpenAlexQueryParams = {};
-
-  // Always use maximum per_page for efficiency, handle total limit separately
-  parameters.per_page = API.OPENALEX_MAX_PER_PAGE;
-
-  // Build sort string
-  const sortString = buildSortString(settings.sorts ?? []);
-  if (sortString) {
-    parameters.sort = sortString;
+const formatValue = (value: unknown): string => {
+  if (value === null || value === undefined) {
+    return "";
   }
 
-  // Build filter string
-  const filterString = buildFilterString(settings.filters ?? []);
-  if (filterString) {
-    parameters.filter = filterString;
+  if (typeof value === "string") {
+    // Escape special characters and spaces
+    return value.replaceAll(/[,:|]/g, String.raw`\$&`);
   }
 
-  // Set select fields if provided
-  if (baseSelect && baseSelect.length > 0) {
-    parameters.select = baseSelect;
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
   }
 
-  logger.debug(
-    "expansion",
-    "Built query parameters from settings",
-    {
-      settings: settings.target,
-      params: parameters,
-    },
-    "ExpansionQueryBuilder",
-  );
-
-  return parameters;
-};
-
-/**
- * Build sort string for OpenAlex API
- * Format: "property1:direction1,property2:direction2"
- * @param sorts
- */
-const buildSortString = (sorts: SortCriteria[]): string | undefined => {
-  if (sorts.length === 0) {
-    return undefined;
+  if (typeof value === "number") {
+    return value.toString();
   }
 
-  const sortedCriteria = [...sorts].sort((a, b) => a.priority - b.priority);
-
-  const sortParts = sortedCriteria.map(
-    (sort) => `${sort.property}:${sort.direction}`,
-  );
-
-  return sortParts.length > 0 ? sortParts.join(",") : undefined;
-};
-
-/**
- * Build filter string for OpenAlex API
- * Format: "property1:operator1:value1,property2:operator2:value2"
- * @param filters
- */
-const buildFilterString = (filters: FilterCriteria[]): string | undefined => {
-  const enabledFilters = filters.filter(
-    (filter) => filter.enabled && filter.property,
-  );
-
-  if (enabledFilters.length === 0) {
-    return undefined;
+  if (value instanceof Date) {
+    return value.getFullYear().toString();
   }
 
-  const filterParts = enabledFilters
-    .map((filter) => buildSingleFilter(filter))
-    .filter((part) => part !== null);
+  // Convert everything else to string safely
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
 
-  return filterParts.length > 0 ? filterParts.join(",") : undefined;
+  // For primitive types that can be safely stringified
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value);
+  }
+
+  // Fallback for any other type - return empty string to avoid [object Object]
+  return "";
 };
 
 /**
  * Build a single filter expression
- * @param filter
  */
 const buildSingleFilter = (filter: FilterCriteria): string | null => {
   const { property, operator, value } = filter;
@@ -195,47 +147,84 @@ const buildSingleFilter = (filter: FilterCriteria): string | null => {
 };
 
 /**
- * Format a value for use in OpenAlex filters
- * @param value
+ * Build filter string for OpenAlex API Format: "property1:operator1:value1,property2:operator2:value2"
  */
-const formatValue = (value: unknown): string => {
-  if (value === null || value === undefined) {
-    return "";
+const buildFilterString = (filters: readonly FilterCriteria[]): string | undefined => {
+  const enabledFilters = filters.filter(
+    (filter) => filter.enabled && filter.property !== "",
+  );
+
+  if (enabledFilters.length === 0) {
+    return undefined;
   }
 
-  if (typeof value === "string") {
-    // Escape special characters and spaces
-    return value.replaceAll(/[,:|]/g, String.raw`\$&`);
+  const filterParts = enabledFilters
+    .map((filter) => buildSingleFilter(filter))
+    .filter((part) => part !== null);
+
+  return filterParts.length > 0 ? filterParts.join(",") : undefined;
+};
+
+/**
+ * Build sort string for OpenAlex API Format: "property1:direction1,property2:direction2"
+ */
+const buildSortString = (sorts: readonly SortCriteria[]): string | undefined => {
+  if (sorts.length === 0) {
+    return undefined;
   }
 
-  if (typeof value === "boolean") {
-    return value ? "true" : "false";
+  const sortedCriteria = [...sorts].sort((a, b) => a.priority - b.priority);
+
+  const sortParts = sortedCriteria.map(
+    (sort) => `${sort.property}:${sort.direction}`,
+  );
+
+  return sortParts.length > 0 ? sortParts.join(",") : undefined;
+};
+
+/**
+ * Build OpenAlex query parameters from expansion settings
+ */
+const buildQueryParameters = ({
+  settings,
+  baseSelect,
+}: {
+  settings: ExpansionSettings;
+  baseSelect?: string[];
+}): OpenAlexQueryParams => {
+  const parameters: OpenAlexQueryParams = {};
+
+  // Always use maximum per_page for efficiency, handle total limit separately
+  parameters.per_page = API.OPENALEX_MAX_PER_PAGE;
+
+  // Build sort string
+  const sortString = buildSortString(settings.sorts ?? []);
+  if (sortString !== undefined) {
+    parameters.sort = sortString;
   }
 
-  if (typeof value === "number") {
-    return value.toString();
+  // Build filter string
+  const filterString = buildFilterString(settings.filters ?? []);
+  if (filterString !== undefined) {
+    parameters.filter = filterString;
   }
 
-  if (value instanceof Date) {
-    return value.getFullYear().toString();
+  // Set select fields if provided
+  if (baseSelect && baseSelect.length > 0) {
+    parameters.select = baseSelect;
   }
 
-  // Convert everything else to string safely
-  if (typeof value === "object") {
-    return JSON.stringify(value);
-  }
+  logger.debug(
+    "expansion",
+    "Built query parameters from settings",
+    {
+      settings: settings.target,
+      params: parameters,
+    },
+    "ExpansionQueryBuilder",
+  );
 
-  // For primitive types that can be safely stringified
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
-    return String(value);
-  }
-
-  // Fallback for any other type - return empty string to avoid [object Object]
-  return "";
+  return parameters;
 };
 
 // Helper functions to reduce cognitive complexity
@@ -254,7 +243,7 @@ const validateLimit = ({
     errors.push("Limit must be 0 (unlimited) or greater");
   }
   if (settings.limit > API.MAX_QUERY_LIMIT) {
-    errors.push(`Limit cannot exceed ${API.MAX_QUERY_LIMIT} for performance reasons`);
+    errors.push(`Limit cannot exceed ${String(API.MAX_QUERY_LIMIT)} for performance reasons`);
   }
 };
 
@@ -322,7 +311,6 @@ const validateFilters = ({
 
 /**
  * Validate expansion settings for OpenAlex compatibility
- * @param settings
  */
 const validateSettings = (settings: ExpansionSettings): {
   valid: boolean;
@@ -342,19 +330,18 @@ const validateSettings = (settings: ExpansionSettings): {
 
 /**
  * Get example query string for preview
- * @param settings
  */
 const getQueryPreview = (settings: ExpansionSettings): string => {
   const parameters = buildQueryParameters({ settings });
   const parts: string[] = [];
 
-  if (parameters.sort) {
+  if (parameters.sort !== undefined) {
     parts.push(`sort=${parameters.sort}`);
   }
-  if (parameters.filter) {
+  if (parameters.filter !== undefined) {
     parts.push(`filter=${parameters.filter}`);
   }
-  if (parameters.per_page) {
+  if (parameters.per_page !== undefined) {
     parts.push(`per_page=${parameters.per_page.toString()}`);
   }
 
@@ -363,9 +350,6 @@ const getQueryPreview = (settings: ExpansionSettings): string => {
 
 /**
  * Merge additional filters with expansion settings filters
- * @param root0
- * @param root0.baseFilters
- * @param root0.additionalFilters
  */
 const mergeFilters = ({
   baseFilters,
@@ -376,15 +360,15 @@ const mergeFilters = ({
 }): string | undefined => {
   const additionalFilterString = buildFilterString(additionalFilters);
 
-  if (!baseFilters && !additionalFilterString) {
+  if (baseFilters === undefined && additionalFilterString === undefined) {
     return undefined;
   }
 
-  if (!baseFilters) {
+  if (baseFilters === undefined) {
     return additionalFilterString;
   }
 
-  if (!additionalFilterString) {
+  if (additionalFilterString === undefined) {
     return baseFilters;
   }
 
@@ -393,9 +377,6 @@ const mergeFilters = ({
 
 /**
  * Create a copy of settings with modified filters (useful for context-specific queries)
- * @param root0
- * @param root0.settings
- * @param root0.additionalFilters
  */
 const withAdditionalFilters = ({
   settings,
@@ -410,9 +391,6 @@ const withAdditionalFilters = ({
 
 /**
  * Create a copy of settings with modified sort (useful for fallback sorting)
- * @param root0
- * @param root0.settings
- * @param root0.fallbackSort
  */
 const withFallbackSort = ({
   settings,

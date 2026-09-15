@@ -10,7 +10,6 @@
  * - Community detection and pathfinding algorithms
  * - Interactive node exploration
  * - Toggleable data sources
- * @module routes/graph
  */
 
 import type { GraphNode } from '@bibgraph/types';
@@ -42,7 +41,6 @@ import {
 } from '@tabler/icons-react';
 import { createLazyFileRoute } from '@tanstack/react-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { type ForceGraphMethods } from 'react-force-graph-2d';
 
 import { ForceGraph3DVisualization } from '@/components/graph/3d/ForceGraph3DVisualization';
 import { GraphAnnotations } from '@/components/graph/annotations';
@@ -63,7 +61,6 @@ import {
 import { OptimizedForceGraphVisualization } from '@/components/graph/OptimizedForceGraphVisualization';
 import { PathHighlightingPresets } from '@/components/graph/path-presets';
 import { GraphSnapshots } from '@/components/graph/snapshots';
-import type { DisplayMode } from '@/components/graph/types';
 import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 import { ICON_SIZE, LAYOUT } from '@/config/style-constants';
 import { useGraphVisualizationContext } from '@/contexts/GraphVisualizationContext';
@@ -73,6 +70,20 @@ import { useGraphExport } from '@/hooks/useGraphExport';
 import { type GraphLayoutType, useGraphLayout } from '@/hooks/useGraphLayout';
 import { useNodeExpansion } from '@/lib/graph-index';
 import type { PathPreset } from '@/lib/path-presets';
+
+// Duration (ms) of the camera pan animation triggered by clicking the mini-map.
+const MINI_MAP_PAN_DURATION_MS = 500;
+// Fallback graph container width (px) used before the container has been measured.
+const DEFAULT_GRAPH_CONTAINER_WIDTH_PX = 800;
+// Fraction of the viewport height the graph container occupies.
+const GRAPH_CONTAINER_HEIGHT_VIEWPORT_RATIO = 0.55;
+// Fallback graph container height (px) used when `window` is unavailable (e.g. during SSR).
+const DEFAULT_GRAPH_CONTAINER_HEIGHT_PX = 500;
+
+const isGraphMethods = (value: unknown): value is GraphMethods => {
+  if (typeof value !== 'object' || value === null) return false;
+  return 'zoomToFit' in value && typeof value.zoomToFit === 'function';
+};
 
 /**
  * Entity Graph Page Component
@@ -138,10 +149,10 @@ const EntityGraphPage = () => {
   } = visualization;
 
   // Graph methods ref for external control (zoomToFit, etc.)
-  const graphMethodsReference = useRef<GraphMethods | null>(null);
+  const graphMethodsRef = useRef<GraphMethods | null>(null);
 
   // Ref for the graph container to access canvas for export
-  const graphContainerReference = useRef<HTMLDivElement>(null);
+  const graphContainerRef = useRef<HTMLDivElement>(null);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(INITIAL_CONTEXT_MENU_STATE);
@@ -158,12 +169,12 @@ const EntityGraphPage = () => {
 
   // Layout state
   const [currentLayout, setCurrentLayout] = useState<GraphLayoutType>('force');
-  const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(() => new Map());
   const layout = useGraphLayout(nodes, edges, currentLayout);
 
   // Fit-to-view operations (shared logic for 2D/3D)
   const { fitToViewAll, fitToViewSelected } = useFitToView({
-    graphMethodsRef: graphMethodsReference,
+    graphMethodsRef: graphMethodsRef,
     viewMode,
     highlightedNodes,
   });
@@ -175,7 +186,7 @@ const EntityGraphPage = () => {
     handleExportPNG,
     handleExportSVG,
   } = useGraphExport({
-    graphContainerRef: graphContainerReference,
+    graphContainerRef: graphContainerRef,
     nodes,
     edges,
     nodePositions,
@@ -183,9 +194,9 @@ const EntityGraphPage = () => {
 
   // Handler for when graph methods become available
   const handleGraphReady = useCallback(
-    (methods: ForceGraphMethods | unknown) => {
-      if (methods && typeof methods === 'object' && methods !== null && 'zoomToFit' in methods && typeof (methods as ForceGraphMethods).zoomToFit === 'function') {
-        graphMethodsReference.current = methods as GraphMethods;
+    (methods: unknown) => {
+      if (isGraphMethods(methods)) {
+        graphMethodsRef.current = methods;
       }
     },
     []
@@ -258,8 +269,8 @@ const EntityGraphPage = () => {
 
   // Handle mini-map pan click
   const handleMiniMapPan = useCallback((x: number, y: number) => {
-    if (graphMethodsReference.current && typeof graphMethodsReference.current.centerAt === 'function') {
-      graphMethodsReference.current.centerAt(x, y, 500);
+    if (graphMethodsRef.current && typeof graphMethodsRef.current.centerAt === 'function') {
+      graphMethodsRef.current.centerAt(x, y, MINI_MAP_PAN_DURATION_MS);
     }
   }, []);
 
@@ -296,7 +307,7 @@ const EntityGraphPage = () => {
 
   // Error state
   if (error) {
-    return <GraphErrorState error={error} onRetry={refresh} />;
+    return <GraphErrorState error={error} onRetry={() => { void refresh(); }} />;
   }
 
   // Empty state - no sources enabled or no entities
@@ -309,7 +320,7 @@ const EntityGraphPage = () => {
         onToggleSource={toggleSource}
         onEnableAll={enableAll}
         onDisableAll={disableAll}
-        onRefresh={refresh}
+        onRefresh={() => { void refresh(); }}
         loading={loading}
       />
     );
@@ -325,14 +336,14 @@ const EntityGraphPage = () => {
         onToggleSource={toggleSource}
         onEnableAll={enableAll}
         onDisableAll={disableAll}
-        onRefresh={refresh}
+        onRefresh={() => { void refresh(); }}
         loading={loading}
       />
     );
   }
 
   return (
-    <Flex h={`calc(100vh - ${LAYOUT.HEADER_HEIGHT}px)`} style={{ overflow: 'hidden' }}>
+    <Flex h={`calc(100vh - ${String(LAYOUT.HEADER_HEIGHT)}px)`} style={{ overflow: 'hidden' }}>
       {/* Left: Source Panel */}
       <GraphSourcePanel
         sources={sources}
@@ -340,7 +351,7 @@ const EntityGraphPage = () => {
         onToggleSource={toggleSource}
         onEnableAll={enableAll}
         onDisableAll={disableAll}
-        onRefresh={refresh}
+        onRefresh={() => { void refresh(); }}
         loading={loading}
       />
 
@@ -391,7 +402,7 @@ const EntityGraphPage = () => {
                 </ActionIcon>
               </Tooltip>
               <Tooltip label="Refresh data">
-                <ActionIcon variant="light" onClick={refresh} loading={loading}>
+                <ActionIcon variant="light" onClick={() => { void refresh(); }} loading={loading}>
                   <IconRefresh size={ICON_SIZE.MD} />
                 </ActionIcon>
               </Tooltip>
@@ -408,7 +419,7 @@ const EntityGraphPage = () => {
                   <SegmentedControl
                     size="xs"
                     value={displayMode}
-                    onChange={(value) => setDisplayMode(value as DisplayMode)}
+                    onChange={(value) => { setDisplayMode(value); }}
                     data={[
                       { label: 'Highlight', value: 'highlight' },
                       { label: 'Filter', value: 'filter' },
@@ -445,12 +456,12 @@ const EntityGraphPage = () => {
                     </ActionIcon>
                   </Tooltip>
                   <Tooltip label={enableSimulation ? 'Pause simulation' : 'Resume simulation'}>
-                    <ActionIcon variant={enableSimulation ? 'filled' : 'light'} onClick={() => setEnableSimulation(!enableSimulation)}>
+                    <ActionIcon variant={enableSimulation ? 'filled' : 'light'} onClick={() => { setEnableSimulation(!enableSimulation); }}>
                       <IconEye size={ICON_SIZE.MD} />
                     </ActionIcon>
                   </Tooltip>
                   <Tooltip label={showAnnotations ? 'Hide annotations' : 'Show annotations'}>
-                    <ActionIcon variant={showAnnotations ? 'filled' : 'light'} onClick={() => setShowAnnotations(!showAnnotations)}>
+                    <ActionIcon variant={showAnnotations ? 'filled' : 'light'} onClick={() => { setShowAnnotations(!showAnnotations); }}>
                       <IconPencil size={ICON_SIZE.MD} />
                     </ActionIcon>
                   </Tooltip>
@@ -468,7 +479,7 @@ const EntityGraphPage = () => {
               </Group>
 
               {/* Graph Container */}
-              <Box ref={graphContainerReference} h={LAYOUT.GRAPH_VIEWPORT_HEIGHT} mih={350} style={{ border: '1px solid var(--mantine-color-gray-2)', overflow: 'hidden' }}>
+              <Box ref={graphContainerRef} h={LAYOUT.GRAPH_VIEWPORT_HEIGHT} mih={350} style={{ border: '1px solid var(--mantine-color-gray-2)', overflow: 'hidden' }}>
                 {viewMode === '2D' ? (
                   <OptimizedForceGraphVisualization
                     nodes={nodes}
@@ -522,8 +533,8 @@ const EntityGraphPage = () => {
 
                 {showAnnotations && viewMode === '2D' && (
                   <GraphAnnotations
-                    width={graphContainerReference.current?.clientWidth ?? 800}
-                    height={typeof window !== 'undefined' ? window.innerHeight * 0.55 : 500}
+                    width={graphContainerRef.current?.clientWidth ?? DEFAULT_GRAPH_CONTAINER_WIDTH_PX}
+                    height={typeof window !== 'undefined' ? window.innerHeight * GRAPH_CONTAINER_HEIGHT_VIEWPORT_RATIO : DEFAULT_GRAPH_CONTAINER_HEIGHT_PX}
                     annotations={annotations.annotations}
                     onAddAnnotation={async (annotation) => { await annotations.addAnnotation(annotation); }}
                     onClearAnnotations={async () => { await annotations.clearAnnotations(); }}
@@ -533,8 +544,8 @@ const EntityGraphPage = () => {
                 {viewMode === '2D' && (
                   <GraphMiniMap
                     nodes={nodes}
-                    containerWidth={graphContainerReference.current?.clientWidth ?? 800}
-                    containerHeight={typeof window !== 'undefined' ? window.innerHeight * 0.55 : 500}
+                    containerWidth={graphContainerRef.current?.clientWidth ?? DEFAULT_GRAPH_CONTAINER_WIDTH_PX}
+                    containerHeight={typeof window !== 'undefined' ? window.innerHeight * GRAPH_CONTAINER_HEIGHT_VIEWPORT_RATIO : DEFAULT_GRAPH_CONTAINER_HEIGHT_PX}
                     zoom={cameraPosition.zoom}
                     panX={cameraPosition.panX}
                     panY={cameraPosition.panY}
@@ -555,11 +566,11 @@ const EntityGraphPage = () => {
           </Group>
 
           {/* Path selection info */}
-          {(pathSource || pathTarget) && (
+          {(pathSource !== null || pathTarget !== null) && (
             <Alert icon={<IconInfoCircle size={ICON_SIZE.MD} />} color="blue" title="Path Selection">
               <Text size="sm">
-                {pathSource && !pathTarget && `Source selected: ${pathSource}. Click another node to set target.`}
-                {pathSource && pathTarget && `Source: ${pathSource} -> Target: ${pathTarget}`}
+                {pathSource !== null && pathTarget === null && `Source selected: ${pathSource}. Click another node to set target.`}
+                {pathSource !== null && pathTarget !== null && `Source: ${pathSource} -> Target: ${pathTarget}`}
               </Text>
             </Alert>
           )}

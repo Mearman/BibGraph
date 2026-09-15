@@ -17,7 +17,7 @@ import {
 } from "@tabler/icons-react";
 import { useState } from "react";
 
-import { AdvancedSearchFilters } from "./SearchFilters";
+import type { AdvancedSearchFilters } from "./search-filters-types";
 
 interface SearchFacetsProperties {
   filters?: AdvancedSearchFilters;
@@ -26,6 +26,8 @@ interface SearchFacetsProperties {
   onClearAll: () => void;
   isLoading?: boolean;
 }
+
+const MAX_VISIBLE_FACETS = 8;
 
 interface ActiveFilter {
   field: keyof AdvancedSearchFilters;
@@ -49,7 +51,7 @@ export const SearchFacets = ({
     const activeFilters: ActiveFilter[] = [];
 
     // Text-based filters
-    if (filters.title) {
+    if (filters.title !== undefined && filters.title !== "") {
       activeFilters.push({
         field: "title",
         label: "Title",
@@ -58,7 +60,7 @@ export const SearchFacets = ({
       });
     }
 
-    if (filters.abstract) {
+    if (filters.abstract !== undefined && filters.abstract !== "") {
       activeFilters.push({
         field: "abstract",
         label: "Abstract",
@@ -67,7 +69,7 @@ export const SearchFacets = ({
       });
     }
 
-    if (filters.author) {
+    if (filters.author !== undefined && filters.author !== "") {
       activeFilters.push({
         field: "author",
         label: "Author",
@@ -76,7 +78,7 @@ export const SearchFacets = ({
       });
     }
 
-    if (filters.institution) {
+    if (filters.institution !== undefined && filters.institution !== "") {
       activeFilters.push({
         field: "institution",
         label: "Institution",
@@ -85,7 +87,7 @@ export const SearchFacets = ({
       });
     }
 
-    if (filters.venue) {
+    if (filters.venue !== undefined && filters.venue !== "") {
       activeFilters.push({
         field: "venue",
         label: "Venue",
@@ -94,7 +96,7 @@ export const SearchFacets = ({
       });
     }
 
-    if (filters.keywords) {
+    if (filters.keywords !== undefined && filters.keywords !== "") {
       activeFilters.push({
         field: "keywords",
         label: "Keywords",
@@ -106,11 +108,19 @@ export const SearchFacets = ({
     // Date filters
     if (filters.publicationYear) {
       const { from, to } = filters.publicationYear;
-      if (from || to) {
+      let publicationYearValue: string | undefined;
+      if (from !== undefined && to !== undefined) {
+        publicationYearValue = `${String(from)}-${String(to)}`;
+      } else if (from !== undefined) {
+        publicationYearValue = `>= ${String(from)}`;
+      } else if (to !== undefined) {
+        publicationYearValue = `<= ${String(to)}`;
+      }
+      if (publicationYearValue !== undefined) {
         activeFilters.push({
           field: "publicationYear",
           label: "Publication Year",
-          value: from && to ? `${from}-${to}` : from ? `>= ${from}` : `<= ${to}`,
+          value: publicationYearValue,
           removable: true,
         });
       }
@@ -119,11 +129,19 @@ export const SearchFacets = ({
     // Citation filters
     if (filters.citationCount) {
       const { from, to } = filters.citationCount;
-      if (from || to) {
+      let citationCountValue: string | undefined;
+      if (from !== undefined && to !== undefined) {
+        citationCountValue = `${String(from)}-${String(to)}`;
+      } else if (from !== undefined) {
+        citationCountValue = `>= ${String(from)}`;
+      } else if (to !== undefined) {
+        citationCountValue = `<= ${String(to)}`;
+      }
+      if (citationCountValue !== undefined) {
         activeFilters.push({
           field: "citationCount",
           label: "Citations",
-          value: from && to ? `${from}-${to}` : from ? `>= ${from}` : `<= ${to}`,
+          value: citationCountValue,
           removable: true,
         });
       }
@@ -176,7 +194,7 @@ export const SearchFacets = ({
     }
 
     // Boolean filters
-    if (filters.openAccess) {
+    if (filters.openAccess === true) {
       activeFilters.push({
         field: "openAccess",
         label: "Access",
@@ -189,7 +207,7 @@ export const SearchFacets = ({
   };
 
   const activeFilters = getActiveFilters();
-  const displayFilters = showAllFacets ? activeFilters : activeFilters.slice(0, 8);
+  const displayFilters = showAllFacets ? activeFilters : activeFilters.slice(0, MAX_VISIBLE_FACETS);
 
   if (activeFilters.length === 0) {
     return null;
@@ -222,7 +240,7 @@ export const SearchFacets = ({
           <Group gap="xs" wrap="wrap">
             {displayFilters.map((filter, index) => (
               <Badge
-                key={`${filter.field}-${index}`}
+                key={`${filter.field}-${String(index)}`}
                 size="md"
                 variant="light"
                 color="blue"
@@ -251,30 +269,36 @@ export const SearchFacets = ({
                     <IconX
                       size={10}
                       style={{ cursor: "pointer", flexShrink: 0 }}
-                      onClick={() => onRemoveFilter(filter.field)}
+                      onClick={() => {
+                        onRemoveFilter(filter.field);
+                      }}
                     />
                   )}
                 </Group>
               </Badge>
             ))}
 
-            {activeFilters.length > 8 && !showAllFacets && (
+            {activeFilters.length > MAX_VISIBLE_FACETS && !showAllFacets && (
               <Button
                 variant="subtle"
                 size="xs"
                 leftSection={<IconChevronDown size={12} />}
-                onClick={() => setShowAllFacets(true)}
+                onClick={() => {
+                  setShowAllFacets(true);
+                }}
               >
-                Show {activeFilters.length - 8} more
+                Show {activeFilters.length - MAX_VISIBLE_FACETS} more
               </Button>
             )}
 
-            {showAllFacets && activeFilters.length > 8 && (
+            {showAllFacets && activeFilters.length > MAX_VISIBLE_FACETS && (
               <Button
                 variant="subtle"
                 size="xs"
                 leftSection={<IconChevronUp size={12} />}
-                onClick={() => setShowAllFacets(false)}
+                onClick={() => {
+                  setShowAllFacets(false);
+                }}
               >
                 Show less
               </Button>

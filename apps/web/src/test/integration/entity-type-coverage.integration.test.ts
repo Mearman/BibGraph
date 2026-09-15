@@ -16,10 +16,11 @@ import { describe, expect,it } from 'vitest';
 
 import { ENTITY_TYPE_CONFIGS } from '@/components/entity-detail/EntityTypeConfig';
 
+const EXPECTED_ENTITY_TYPE_COUNT = 12;
+
 describe('Entity Type Coverage', () => {
   /**
-   * All 12 OpenAlex entity types that should be supported
-   * (licenses excluded - not a first-class OpenAlex entity)
+   * All 12 OpenAlex entity types that should be supported (licenses excluded - not a first-class OpenAlex entity)
    */
   const EXPECTED_ENTITY_TYPES: EntityType[] = [
     'works',
@@ -42,7 +43,7 @@ describe('Entity Type Coverage', () => {
       
 
       // Verify we have exactly 12 types
-      expect(EXPECTED_ENTITY_TYPES).toHaveLength(12);
+      expect(EXPECTED_ENTITY_TYPES).toHaveLength(EXPECTED_ENTITY_TYPE_COUNT);
 
       // Verify each type is a valid EntityType
       for (const type of EXPECTED_ENTITY_TYPES) {
@@ -79,9 +80,9 @@ describe('Entity Type Coverage', () => {
       expect(cachedOpenAlex.client.keywords).toBeDefined();
 
       // Note: domains, fields, subfields are handled by topics API
-      expect(cachedOpenAlex.client.topics.getDomains).toBeDefined();
-      expect(cachedOpenAlex.client.topics.getFields).toBeDefined();
-      expect(cachedOpenAlex.client.topics.getSubfields).toBeDefined();
+      expect(typeof cachedOpenAlex.client.topics.getDomains).toBe('function');
+      expect(typeof cachedOpenAlex.client.topics.getFields).toBe('function');
+      expect(typeof cachedOpenAlex.client.topics.getSubfields).toBe('function');
     });
 
     it('should have client objects for standard entity types', () => {
@@ -151,10 +152,10 @@ describe('Entity Type Coverage', () => {
 
     it('should not have configs for invalid entity types', () => {
       // Verify licenses (excluded) is not in configs
-      expect((ENTITY_TYPE_CONFIGS as any)['licenses']).toBeUndefined();
+      expect('licenses' in ENTITY_TYPE_CONFIGS).toBe(false);
 
       // Verify other invalid keys are not present
-      expect((ENTITY_TYPE_CONFIGS as any)['invalid']).toBeUndefined();
+      expect('invalid' in ENTITY_TYPE_CONFIGS).toBe(false);
     });
   });
 
@@ -165,8 +166,8 @@ describe('Entity Type Coverage', () => {
       const configCount = Object.keys(ENTITY_TYPE_CONFIGS).length;
 
       // Should have 12 types and 12 configs
-      expect(typeCount).toBe(12);
-      expect(configCount).toBe(12);
+      expect(typeCount).toBe(EXPECTED_ENTITY_TYPE_COUNT);
+      expect(configCount).toBe(EXPECTED_ENTITY_TYPE_COUNT);
 
       // Every type should have a config
       for (const type of EXPECTED_ENTITY_TYPES) {
@@ -186,10 +187,10 @@ describe('Entity Type Coverage', () => {
       expect(EXPECTED_ENTITY_TYPES).not.toContain('licenses');
 
       // Verify no license client methods
-      expect((cachedOpenAlex.client as any).licenses).toBeUndefined();
+      expect('licenses' in cachedOpenAlex.client).toBe(false);
 
       // Verify no license config
-      expect((ENTITY_TYPE_CONFIGS as any).licenses).toBeUndefined();
+      expect('licenses' in ENTITY_TYPE_CONFIGS).toBe(false);
     });
   });
 });

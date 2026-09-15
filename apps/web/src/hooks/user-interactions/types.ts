@@ -77,12 +77,12 @@ export interface UseUserInteractionsReturn {
   unbookmarkSearch: () => Promise<void>;
   unbookmarkList: () => Promise<void>;
   updateBookmark: (
-    updates: Partial<Pick<CatalogueEntity, "notes">>,
+    updates: Readonly<Partial<Pick<CatalogueEntity, "notes">>>,
   ) => Promise<void>;
   searchBookmarks: (query: string) => Promise<CatalogueEntity[]>;
 
   // Bulk operations
-  bulkRemoveBookmarks: (bookmarkRecordIds: string[]) => Promise<BulkRemoveResult>;
+  bulkRemoveBookmarks: (bookmarkRecordIds: readonly string[]) => Promise<BulkRemoveResult>;
 
   // History management
   clearHistory: () => Promise<void>;

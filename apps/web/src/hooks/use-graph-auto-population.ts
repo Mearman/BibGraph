@@ -5,12 +5,9 @@
  * 1. Resolves display names for stub nodes (using batch queries)
  * 2. Discovers relationships between existing nodes
  *
- * Uses pluggable background task execution to avoid blocking the UI.
- * Strategies: idle (requestIdleCallback), scheduler (postTask), worker, sync
+ * Uses pluggable background task execution to avoid blocking the UI. Strategies: idle (requestIdleCallback), scheduler (postTask), worker, sync
  *
- * This is separate from explicit node expansion which adds NEW nodes.
- * Auto-population only works with nodes already in the graph.
- * @module hooks/use-graph-auto-population
+ * This is separate from explicit node expansion which adds NEW nodes. Auto-population only works with nodes already in the graph.
  */
 
 import type { EntityType, GraphEdge, GraphNode, RelationshipQueryConfig } from '@bibgraph/types';
@@ -45,13 +42,6 @@ const LOG_PREFIX = 'graph-auto-population';
  * - Discovers relationships between existing nodes
  *
  * Uses background task execution to avoid blocking UI
- * @param root0
- * @param root0.nodes
- * @param root0.edges
- * @param root0.onLabelsResolved
- * @param root0.onEdgesDiscovered
- * @param root0.enabled
- * @param root0.strategy
  */
 export const useGraphAutoPopulation = ({
   nodes,
@@ -83,7 +73,7 @@ export const useGraphAutoPopulation = ({
    * Resolve display names for nodes with ID-only labels
    */
   const resolveLabels = useCallback(
-    async (nodesToResolve: GraphNode[], signal?: AbortSignal): Promise<Map<string, string>> => {
+    async (nodesToResolve: readonly GraphNode[], signal?: AbortSignal): Promise<Map<string, string>> => {
       const labelMap = new Map<string, string>();
 
       const needsResolution = nodesToResolve.filter(
@@ -96,7 +86,7 @@ export const useGraphAutoPopulation = ({
 
       logger.debug(
         LOG_PREFIX,
-        `Resolving labels for ${needsResolution.length} nodes using ${executor.currentStrategy} strategy`
+        `Resolving labels for ${String(needsResolution.length)} nodes using ${executor.currentStrategy} strategy`
       );
 
       // Group by entity type
@@ -126,7 +116,7 @@ export const useGraphAutoPopulation = ({
         for (const batchResults of result.data) {
           for (const entity of batchResults) {
             const displayName = entity.display_name ?? entity.title;
-            if (displayName && entity.id) {
+            if (displayName !== undefined && displayName !== '' && entity.id) {
               const shortId = normalizeId(entity.id);
               labelMap.set(shortId, displayName);
               processedNodesReference.current.add(shortId);
@@ -135,7 +125,7 @@ export const useGraphAutoPopulation = ({
         }
       }
 
-      logger.debug(LOG_PREFIX, `Resolved ${labelMap.size} labels`);
+      logger.debug(LOG_PREFIX, `Resolved ${String(labelMap.size)} labels`);
       return labelMap;
     },
     [executor]
@@ -144,10 +134,66 @@ export const useGraphAutoPopulation = ({
   /**
    * Discover relationships between all nodes using the relationship registry
    */
+  /**
+   * Process a single relationship query based on its source type
+   */
+  const processQuery = async (
+    typeNodes: readonly GraphNode[],
+    query: RelationshipQueryConfig,
+    entityType: EntityType,
+    allNodeIds: Set<string>,
+    existingEdgeKeys: Set<string>,
+    direction: RelationshipDirection,
+    signal?: AbortSignal
+  ): Promise<GraphEdge[]> => {
+    switch (query.source) {
+      case 'api':
+        return discoverApiRelationships(
+          typeNodes,
+          query,
+          allNodeIds,
+          existingEdgeKeys,
+          processedEdgePairsReference.current,
+          direction,
+          executor,
+          signal
+        );
+      case 'embedded':
+        return discoverEmbeddedRelationships(
+          typeNodes,
+          query,
+          entityType,
+          allNodeIds,
+          existingEdgeKeys,
+          processedEdgePairsReference.current,
+          direction,
+          executor,
+          signal
+        );
+      case 'embedded-with-resolution':
+        return discoverEmbeddedWithResolutionRelationships(
+          typeNodes,
+          query,
+          entityType,
+          allNodeIds,
+          existingEdgeKeys,
+          processedEdgePairsReference.current,
+          direction,
+          executor,
+          signal
+        );
+      default:
+        return [];
+    }
+  };
+
+  /**
+   * Discover relationships between all nodes using the relationship registry
+   */
   const discoverRelationships = useCallback(
     async (
-      allNodes: GraphNode[],
-      existingEdges: GraphEdge[],
+      allNodes: readonly GraphNode[],
+      existingEdges: readonly GraphEdge[],
       signal?: AbortSignal
     ): Promise<GraphEdge[]> => {
       const newEdges: GraphEdge[] = [];
@@ -174,7 +220,7 @@ export const useGraphAutoPopulation = ({
 
       logger.debug(
         LOG_PREFIX,
-        `Discovering relationships between ${allNodes.length} nodes across ${nodesByType.size} entity types`
+        `Discovering relationships between ${String(allNodes.length)} nodes across ${String(nodesByType.size)} entity types`
       );
 
       // Process each entity type
@@ -188,10 +234,10 @@ export const useGraphAutoPopulation = ({
           for (const query of queryList) {
             logger.debug(
               LOG_PREFIX,
-              `Processing ${typeNodes.length} ${entityType} nodes for ${direction} ${query.type}`
+              `Processing ${String(typeNodes.length)} ${entityType} nodes for ${direction} ${query.type}`
             );
 
-            const edges = await processQuery(
+            const discoveredEdgesForQuery = await processQuery(
               typeNodes,
               query,
               entityType,
@@ -200,76 +246,16 @@ export const useGraphAutoPopulation = ({
               direction,
               signal
             );
-            newEdges.push(...edges);
+            newEdges.push(...discoveredEdgesForQuery);
           }
         }
       }
 
-      logger.debug(LOG_PREFIX, `Discovered ${newEdges.length} total edges across all entity types`);
+      logger.debug(LOG_PREFIX, `Discovered ${String(newEdges.length)} total edges across all entity types`);
       return newEdges;
     },
     [executor]
   );
-
-  /**
-   * Process a single relationship query based on its source type
-   * @param typeNodes
-   * @param query
-   * @param entityType
-   * @param allNodeIds
-   * @param existingEdgeKeys
-   * @param direction
-   * @param signal
-   */
-  const processQuery = async (
-    typeNodes: GraphNode[],
-    query: RelationshipQueryConfig,
-    entityType: EntityType,
-    allNodeIds: Set<string>,
-    existingEdgeKeys: Set<string>,
-    direction: RelationshipDirection,
-    signal?: AbortSignal
-  ): Promise<GraphEdge[]> => {
-    switch (query.source) {
-      case 'api':
-        return discoverApiRelationships(
-          typeNodes,
-          query as RelationshipQueryConfig & { source: 'api' },
-          allNodeIds,
-          existingEdgeKeys,
-          processedEdgePairsReference.current,
-          direction,
-          executor,
-          signal
-        );
-      case 'embedded':
-        return discoverEmbeddedRelationships(
-          typeNodes,
-          query as RelationshipQueryConfig & { source: 'embedded' },
-          entityType,
-          allNodeIds,
-          existingEdgeKeys,
-          processedEdgePairsReference.current,
-          direction,
-          executor,
-          signal
-        );
-      case 'embedded-with-resolution':
-        return discoverEmbeddedWithResolutionRelationships(
-          typeNodes,
-          query as RelationshipQueryConfig & { source: 'embedded-with-resolution' },
-          entityType,
-          allNodeIds,
-          existingEdgeKeys,
-          processedEdgePairsReference.current,
-          direction,
-          executor,
-          signal
-        );
-      default:
-        return [];
-    }
-  };
 
   /**
    * Main population function
@@ -290,19 +276,22 @@ export const useGraphAutoPopulation = ({
     try {
       // Filter out nodes from persistent graph source to prevent feedback loop
       const primaryNodes = nodes.filter((node) => {
-        const sourceId = node.entityData?.sourceId as string | undefined;
+        const sourceId = typeof node.entityData?.sourceId === 'string' ? node.entityData.sourceId : undefined;
         return sourceId !== 'graph:persistent';
       });
 
       logger.debug(
         LOG_PREFIX,
-        `Processing ${primaryNodes.length} primary nodes (filtered ${nodes.length - primaryNodes.length} persistent graph nodes)`
+        `Processing ${String(primaryNodes.length)} primary nodes (filtered ${String(nodes.length - primaryNodes.length)} persistent graph nodes)`
       );
+
+      // Read the abort state via a call rather than a direct property access each time, since TypeScript otherwise narrows repeated `signal.aborted` reads to a stale `false` across the `await` points below even though the real getter can change between them.
+      const isAborted = (): boolean => signal.aborted;
 
       // 1. Resolve labels for stub nodes
       const labelUpdates = await resolveLabels(primaryNodes, signal);
 
-      if (signal.aborted) return;
+      if (isAborted()) return;
 
       if (labelUpdates.size > 0 && onLabelsResolved) {
         onLabelsResolved(labelUpdates);
@@ -312,7 +301,7 @@ export const useGraphAutoPopulation = ({
       // 2. Discover relationships between existing nodes
       const discoveredEdges = await discoverRelationships(primaryNodes, edges, signal);
 
-      if (signal.aborted) return;
+      if (isAborted()) return;
 
       if (discoveredEdges.length > 0 && onEdgesDiscovered) {
         onEdgesDiscovered(discoveredEdges);
@@ -332,7 +321,7 @@ export const useGraphAutoPopulation = ({
 
   // Debounced effect to trigger population when nodes change
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return undefined;
 
     if (debounceTimerReference.current) {
       clearTimeout(debounceTimerReference.current);

@@ -30,7 +30,7 @@ export type MergeStrategy = 'union' | 'intersection' | 'combine';
 interface ListMergeProperties {
   lists: CatalogueList[];
   onMerge: (
-    sourceListIds: string[],
+    sourceListIds: readonly string[],
     mergeStrategy: MergeStrategy,
     newListName: string,
     deduplicate: boolean
@@ -118,7 +118,7 @@ export const ListMerge = ({ lists, onMerge, onClose }: ListMergeProperties) => {
       </Group>
 
       {/* Error Alert */}
-      {error && (
+      {error !== null && error !== "" && (
         <Box c="red.9" bg="red.0" p="md" style={{ borderRadius: '4px' }}>
           <Text size="sm">{error}</Text>
         </Box>
@@ -137,7 +137,7 @@ export const ListMerge = ({ lists, onMerge, onClose }: ListMergeProperties) => {
                 padding="xs"
                 radius="sm"
                 withBorder
-                onClick={() => handleToggleList(list.id)}
+                onClick={() => { handleToggleList(list.id); }}
                 style={{
                   cursor: 'pointer',
                   borderColor: selectedListIds.includes(list.id)
@@ -149,7 +149,7 @@ export const ListMerge = ({ lists, onMerge, onClose }: ListMergeProperties) => {
                   <Group gap="xs">
                     <Checkbox
                       checked={selectedListIds.includes(list.id)}
-                      onChange={() => {}}
+                      onChange={() => { /* No-op: the actual toggle happens in onClick below (needed to stopPropagation from the surrounding Card's own onClick); React still requires a controlled input to have an onChange handler. */ }}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleToggleList(list.id);
@@ -159,7 +159,7 @@ export const ListMerge = ({ lists, onMerge, onClose }: ListMergeProperties) => {
                       <Text size="sm" fw={500}>
                         {list.title}
                       </Text>
-                      {list.description && (
+                      {list.description !== undefined && list.description !== "" && (
                         <Text size="xs" c="dimmed">
                           {list.description}
                         </Text>
@@ -181,7 +181,7 @@ export const ListMerge = ({ lists, onMerge, onClose }: ListMergeProperties) => {
         <Text fw={500} mb="xs">Merge Strategy</Text>
         <Radio.Group
           value={mergeStrategy}
-          onChange={(value) => setMergeStrategy(value as MergeStrategy)}
+          onChange={(value) => { setMergeStrategy(value); }}
         >
           <Stack gap="sm">
             {MERGE_STRATEGIES.map((strategy) => (
@@ -201,7 +201,7 @@ export const ListMerge = ({ lists, onMerge, onClose }: ListMergeProperties) => {
         label="Remove duplicate entities"
         description="When enabled, entities appearing multiple times will be deduplicated"
         checked={deduplicate}
-        onChange={(e) => setDeduplicate(e.currentTarget.checked)}
+        onChange={(e) => { setDeduplicate(e.currentTarget.checked); }}
         disabled={mergeStrategy === 'intersection'} // Intersection already deduplicates
       />
 
@@ -210,7 +210,7 @@ export const ListMerge = ({ lists, onMerge, onClose }: ListMergeProperties) => {
         label="New List Name"
         placeholder="Merged List"
         value={newListName}
-        onChange={(e) => setNewListName(e.target.value)}
+        onChange={(e) => { setNewListName(e.target.value); }}
         required
       />
 
@@ -233,7 +233,7 @@ export const ListMerge = ({ lists, onMerge, onClose }: ListMergeProperties) => {
           Cancel
         </Button>
         <Button
-          onClick={handleSubmit}
+          onClick={() => { void handleSubmit(); }}
           disabled={!isFormValid || isSubmitting}
           loading={isSubmitting}
           leftSection={!isSubmitting && <IconCheck size={ICON_SIZE.MD} />}

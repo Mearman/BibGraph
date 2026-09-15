@@ -1,8 +1,5 @@
 /**
- * RelationshipSection component
- * Displays a grouped section of relationships by type (e.g., "Citations", "Authors", "Affiliations")
- * Shows relationship type label, count badge, and list of relationship items
- * @module RelationshipSection
+ * RelationshipSection component Displays a grouped section of relationships by type (e.g., "Citations", "Authors", "Affiliations") Shows relationship type label, count badge, and list of relationship items
  * @see specs/016-entity-relationship-viz/spec.md
  */
 
@@ -40,18 +37,13 @@ export interface RelationshipSectionProps {
 /**
  * Displays a section of grouped relationships
  * Shows type label, count, and paginated list of relationship items
- * @param root0
- * @param root0.section
- * @param root0.onPageChange
- * @param root0.onPageSizeChange
- * @param root0.isLoading
  */
 export const RelationshipSection = ({
   section,
   onPageChange,
   onPageSizeChange,
   isLoading,
-}) => {
+}: Readonly<RelationshipSectionProps>) => {
   const testId = `relationship-section-${section.type}-${section.direction}`;
 
   return (
@@ -67,7 +59,7 @@ export const RelationshipSection = ({
             <Text fw={600} size="sm">
               {section.label}
             </Text>
-            {section.icon && <Text size="sm">{section.icon}</Text>}
+            {section.icon !== undefined && section.icon !== '' && <Text size="sm">{section.icon}</Text>}
           </Group>
           <Badge
             variant="light"
@@ -79,7 +71,7 @@ export const RelationshipSection = ({
         </Group>
 
         {/* Partial data warning */}
-        {section.isPartialData && (
+        {section.isPartialData === true && (
           <Alert
             icon={<IconAlertCircle size={16} />}
             title="Incomplete Data"

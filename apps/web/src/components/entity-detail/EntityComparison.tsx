@@ -6,8 +6,6 @@
  * - Compare metadata side-by-side
  * - Highlight differences
  * - Share comparison via URL
- *
- * @module components/entity-detail
  */
 
 import type { EntityType } from '@bibgraph/types';
@@ -39,21 +37,21 @@ interface EntityComparisonProperties {
 
 /**
  * Format value for display
- * @param value
  */
 const formatValue = (value: unknown): string => {
   if (value === null || value === undefined) return '—';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'number') return value.toLocaleString();
   if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return `${value.length} items`;
-  if (typeof value === 'object') return '[Object]';
-  return String(value);
+  if (Array.isArray(value)) return `${String(value.length)} items`;
+  if (typeof value === 'bigint' || typeof value === 'symbol' || typeof value === 'function') {
+    return value.toString();
+  }
+  return '[Object]';
 };
 
 /**
  * Get comparable fields for entity type
- * @param entityType
  */
 const getComparableFields = (entityType: EntityType): { key: string; label: string }[] => {
   const commonFields = [
@@ -65,7 +63,7 @@ const getComparableFields = (entityType: EntityType): { key: string; label: stri
     { key: 'updated_date', label: 'Updated Date' },
   ];
 
-  const typeSpecificFields: Record<string, { key: string; label: string }[]> = {
+  const typeSpecificFields: Record<EntityType, { key: string; label: string }[]> = {
     works: [
       { key: 'publication_year', label: 'Publication Year' },
       { key: 'type', label: 'Type' },
@@ -101,13 +99,11 @@ const getComparableFields = (entityType: EntityType): { key: string; label: stri
     subfields: [],
   };
 
-  return [...commonFields, ...(typeSpecificFields[entityType] || [])];
+  return [...commonFields, ...typeSpecificFields[entityType]];
 };
 
 /**
  * Check if values are different
- * @param value1
- * @param value2
  */
 const isDifferent = (value1: unknown, value2: unknown): boolean => {
   if (value1 === value2) return false;
@@ -118,12 +114,6 @@ const isDifferent = (value1: unknown, value2: unknown): boolean => {
 
 /**
  * EntityComparison Component
- * @param root0
- * @param root0.entity1
- * @param root0.entity2
- * @param root0.entityType
- * @param root0.entity1Id
- * @param root0.entity2Id
  */
 export const EntityComparison: React.FC<EntityComparisonProperties> = ({
   entity1,

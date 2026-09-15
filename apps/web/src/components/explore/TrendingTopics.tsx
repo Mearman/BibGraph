@@ -11,6 +11,7 @@ import { useNavigate } from '@tanstack/react-router';
 
 import { ICON_SIZE } from '@/config/style-constants';
 import { useActivity } from '@/contexts/ActivityContext';
+import type { Activity } from '@/types/activity';
 
 import classes from './TrendingTopics.module.css';
 
@@ -19,20 +20,22 @@ interface TrendingTopic {
   count: number;
 }
 
-const extractSearchTopics = (activities: typeof useActivity.prototype.activities): TrendingTopic[] => {
+const MAX_TRENDING_TOPICS = 10;
+
+const extractSearchTopics = (activities: readonly Activity[]): TrendingTopic[] => {
   const searchCounts = new Map<string, number>();
 
   activities
-    .filter((activity) => activity.category === 'search' && activity.query)
+    .filter((activity) => activity.category === 'search' && activity.query !== undefined && activity.query !== '')
     .forEach((activity) => {
       const query = activity.query ?? '';
-      searchCounts.set(query, (searchCounts.get(query) || 0) + 1);
+      searchCounts.set(query, (searchCounts.get(query) ?? 0) + 1);
     });
 
   return [...searchCounts]
     .map(([topic, count]) => ({ topic, count }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+    .slice(0, MAX_TRENDING_TOPICS);
 };
 
 export const TrendingTopics: React.FC = () => {
@@ -42,7 +45,7 @@ export const TrendingTopics: React.FC = () => {
   const trendingTopics = extractSearchTopics(activities);
 
   const handleTopicClick = (topic: string) => {
-    navigate({
+    void navigate({
       to: '/search',
       search: { q: topic, filter: undefined, search: undefined },
     });
@@ -66,7 +69,7 @@ export const TrendingTopics: React.FC = () => {
           {trendingTopics.map((item) => (
             <UnstyledButton
               key={item.topic}
-              onClick={() => handleTopicClick(item.topic)}
+              onClick={() => { handleTopicClick(item.topic); }}
               className={classes.topicButton}
             >
               <Group gap={4}>

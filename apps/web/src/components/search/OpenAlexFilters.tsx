@@ -31,6 +31,13 @@ const OPEN_ACCESS_OPTIONS = [
   { value: "false", label: "Non-Open Access Only" },
 ] as const;
 
+const DATE_PICKER_WIDTH_COMPACT = 120;
+const DATE_PICKER_WIDTH_EXPANDED = 140;
+const CITATION_INPUT_WIDTH_COMPACT = 110;
+const CITATION_INPUT_WIDTH_EXPANDED = 130;
+const ACCESS_SELECT_WIDTH_COMPACT = 160;
+const ACCESS_SELECT_WIDTH_EXPANDED = 180;
+
 export const OpenAlexFilters = ({
   filters,
   onFiltersChange,
@@ -40,13 +47,13 @@ export const OpenAlexFilters = ({
   // Publication date range handlers
   const handleFromDateChange = (value: string | null) => {
     onFiltersChange({
-      fromPublicationDate: value ? new Date(value) : null,
+      fromPublicationDate: value !== null && value !== "" ? new Date(value) : null,
     });
   };
 
   const handleToDateChange = (value: string | null) => {
     onFiltersChange({
-      toPublicationDate: value ? new Date(value) : null,
+      toPublicationDate: value !== null && value !== "" ? new Date(value) : null,
     });
   };
 
@@ -84,10 +91,10 @@ export const OpenAlexFilters = ({
               value={filters.fromPublicationDate}
               onChange={handleFromDateChange}
               leftSection={<IconCalendar size={16} />}
-              maxDate={filters.toPublicationDate || undefined}
+              maxDate={filters.toPublicationDate ?? undefined}
               disabled={disabled}
               clearable
-              w={compact ? 120 : 140}
+              w={compact ? DATE_PICKER_WIDTH_COMPACT : DATE_PICKER_WIDTH_EXPANDED}
               size={compact ? "sm" : "md"}
               aria-label="Publication start date"
             />
@@ -101,10 +108,10 @@ export const OpenAlexFilters = ({
               value={filters.toPublicationDate}
               onChange={handleToDateChange}
               leftSection={<IconCalendar size={16} />}
-              minDate={filters.fromPublicationDate || undefined}
+              minDate={filters.fromPublicationDate ?? undefined}
               disabled={disabled}
               clearable
-              w={compact ? 120 : 140}
+              w={compact ? DATE_PICKER_WIDTH_COMPACT : DATE_PICKER_WIDTH_EXPANDED}
               size={compact ? "sm" : "md"}
               aria-label="Publication end date"
             />
@@ -133,7 +140,7 @@ export const OpenAlexFilters = ({
               disabled={disabled}
               allowNegative={false}
               allowDecimal={false}
-              w={compact ? 110 : 130}
+              w={compact ? CITATION_INPUT_WIDTH_COMPACT : CITATION_INPUT_WIDTH_EXPANDED}
               size={compact ? "sm" : "md"}
               aria-label="Minimum citation count"
             />
@@ -155,7 +162,7 @@ export const OpenAlexFilters = ({
               disabled={disabled}
               allowNegative={false}
               allowDecimal={false}
-              w={compact ? 110 : 130}
+              w={compact ? CITATION_INPUT_WIDTH_COMPACT : CITATION_INPUT_WIDTH_EXPANDED}
               size={compact ? "sm" : "md"}
               aria-label="Maximum citation count"
             />
@@ -177,7 +184,7 @@ export const OpenAlexFilters = ({
             leftSection={<IconShield size={16} />}
             disabled={disabled}
             clearable
-            w={compact ? 160 : 180}
+            w={compact ? ACCESS_SELECT_WIDTH_COMPACT : ACCESS_SELECT_WIDTH_EXPANDED}
             size={compact ? "sm" : "md"}
             aria-label="Open access status filter"
           />

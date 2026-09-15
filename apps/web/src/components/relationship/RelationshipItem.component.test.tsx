@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 /**
  * Component tests for RelationshipItem component
- * @vitest-environment jsdom
  */
 
 import { RelationType } from '@bibgraph/types';

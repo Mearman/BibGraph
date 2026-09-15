@@ -33,8 +33,8 @@ export const FieldSelector = <T extends readonly string[]>({
   description = "Choose which fields to include in the response",
 }: FieldSelectorProps<T>) => {
   const combobox = useCombobox({
-    onDropdownClose: () => combobox.resetSelectedOption(),
-    onDropdownOpen: () => combobox.updateSelectedOptionIndex("active"),
+    onDropdownClose: () => { combobox.resetSelectedOption(); },
+    onDropdownOpen: () => { combobox.updateSelectedOptionIndex("active"); },
   });
 
   const [search, setSearch] = useState("");
@@ -67,7 +67,7 @@ export const FieldSelector = <T extends readonly string[]>({
     <Pill
       key={field}
       withRemoveButton
-      onRemove={() => handleValueRemove(field)}
+      onRemove={() => { handleValueRemove(field); }}
       styles={{
         root: {
           fontFamily: "monospace",
@@ -121,15 +121,15 @@ export const FieldSelector = <T extends readonly string[]>({
         >
           <Combobox.DropdownTarget>
             <PillsInput
-              onClick={() => combobox.openDropdown()}
+              onClick={() => { combobox.openDropdown(); }}
               rightSection={<Combobox.Chevron />}
             >
               <Pill.Group>
                 {values}
                 <Combobox.EventsTarget>
                   <PillsInput.Field
-                    onFocus={() => combobox.openDropdown()}
-                    onBlur={() => combobox.closeDropdown()}
+                    onFocus={() => { combobox.openDropdown(); }}
+                    onBlur={() => { combobox.closeDropdown(); }}
                     value={search}
                     placeholder={
                       selectedFields.length === 0 ? "Select fields..." : ""
@@ -144,9 +144,8 @@ export const FieldSelector = <T extends readonly string[]>({
                       }
 
                       event.preventDefault();
-                      const lastField = selectedFields[selectedFields.length - 1];
-                      if (lastField !== undefined) {
-                        handleValueRemove(lastField);
+                      if (selectedFields.length > 0) {
+                        handleValueRemove(selectedFields[selectedFields.length - 1]);
                       }
                     }}
                   />

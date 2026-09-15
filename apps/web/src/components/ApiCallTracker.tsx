@@ -13,10 +13,6 @@ export interface ApiCallTrackerProps {
 /**
  * Component that logs API calls when rendered
  * Use this to track when API calls are made
- * @param root0
- * @param root0.entityType
- * @param root0.entityId
- * @param root0.queryParams
  */
 export const ApiCallTracker = ({
   entityType,

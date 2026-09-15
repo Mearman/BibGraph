@@ -52,7 +52,7 @@ export const MissingPaperSection: React.FC<MissingPaperSectionProperties> = ({
   onDatasetSelect,
   onDetectionComplete,
 }) => {
-  const selectedDataset = selectedDatasetId
+  const selectedDataset = selectedDatasetId !== null && selectedDatasetId !== ""
     ? datasets.find((d) => d.id === selectedDatasetId)
     : undefined;
 
@@ -137,7 +137,7 @@ export const MissingPaperSection: React.FC<MissingPaperSectionProperties> = ({
           />
         )}
 
-        {!selectedDatasetId && <EmptySelectionState />}
+        {(selectedDatasetId === null || selectedDatasetId === "") && <EmptySelectionState />}
       </div>
     </div>
   );

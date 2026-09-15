@@ -11,7 +11,7 @@ import { Box, LoadingOverlay, useComputedColorScheme } from '@mantine/core';
 import React, { useCallback, useEffect, useMemo,useRef } from 'react';
 import ForceGraph2D, { type ForceGraphMethods, type LinkObject,type NodeObject } from 'react-force-graph-2d';
 
-import { ENTITY_TYPE_COLORS as HASH_BASED_ENTITY_COLORS } from '../../styles/hash-colors';
+import { ENTITY_TYPE_COLORS } from '../../styles/hash-colors';
 import {
   CONTAINER,
   LABEL,
@@ -22,9 +22,6 @@ import {
   TIMING,
 } from './constants';
 import { getEdgeStyle } from './edge-styles';
-
-// Entity type colors using hash-based generation for deterministic, consistent coloring
-const ENTITY_TYPE_COLORS: Record<EntityType, string> = HASH_BASED_ENTITY_COLORS;
 
 // Default prop values extracted as constants to prevent infinite render loops
 const DEFAULT_HIGHLIGHTED_NODE_IDS = new Set<string>();
@@ -93,11 +90,11 @@ export interface ForceGraphVisualizationProps {
    */
   highlightedPath?: string[];
   /**
-  Community assignments: nodeId -> communityId
+  Community assignments: nodeId maps to communityId
    */
   communityAssignments?: Map<string, number>;
   /**
-  Community colors: communityId -> color
+  Community colors: communityId maps to color
    */
   communityColors?: Map<number, string>;
   /**
@@ -137,24 +134,62 @@ export interface ForceGraphVisualizationProps {
    */
   enableSimulation?: boolean;
   /**
-  Seed for deterministic initial positions (defaults to 42 for reproducibility)
-   */
-  seed?: number;
-  /**
   Callback when graph methods become available (for external control like zoomToFit)
    */
-  onGraphReady?: (methods: ForceGraphMethods) => void;
+  onGraphReady?: (methods: Readonly<ForceGraphMethods>) => void;
 }
 
+/**
+ * Type guards distinguishing our own ForceGraphNode/ForceGraphLink instances from the generic NodeObject/LinkObject types react-force-graph's own canvas-callback signatures declare.
+ */
+const isForceGraphNode = (node: NodeObject): node is ForceGraphNode => 'originalNode' in node;
+const isForceGraphLink = (link: LinkObject): link is ForceGraphLink => 'originalEdge' in link;
+const isPositionedForceGraphNode = (endpoint: unknown): endpoint is ForceGraphNode =>
+  typeof endpoint === 'object' && endpoint !== null && 'originalNode' in endpoint;
 
 /**
- * Simple seeded random number generator for deterministic layouts
- * @param seed
+ * Default node styling based on entity type and highlighting
  */
-const seededRandom = (seed: number): () => number => () => {
-    seed = (seed * 1_103_515_245 + 12_345) & 0x7F_FF_FF_FF;
-    return seed / 0x7F_FF_FF_FF;
+const getDefaultNodeStyle = (node: ForceGraphNode, isHighlighted: boolean, communityId?: number, communityColors?: Map<number, string>): NodeStyle => {
+  const communityColor = communityId !== undefined ? communityColors?.get(communityId) : undefined;
+  const color = communityColor ?? ENTITY_TYPE_COLORS[node.entityType];
+
+  return {
+    color,
+    size: isHighlighted ? NODE.HIGHLIGHTED_SIZE : NODE.DEFAULT_SIZE,
+    opacity: NODE.FULL_OPACITY,
+    borderColor: isHighlighted ? 'var(--mantine-color-body)' : undefined,
+    borderWidth: isHighlighted ? NODE.HIGHLIGHTED_BORDER_WIDTH : 0,
   };
+};
+
+/**
+ * Default link styling based on edge type, direction, and highlighting Uses edge-styles.ts for consistent relationship type colors
+ */
+const getDefaultLinkStyle = (link: ForceGraphLink, isHighlighted: boolean, isPathHighlightMode: boolean): LinkStyle => {
+  const edge = link.originalEdge;
+  const edgeStyle = getEdgeStyle(edge);
+  const isDirected = edge.direction !== undefined;
+
+  // Path highlight mode overrides edge type colors
+  if (isHighlighted && isPathHighlightMode) {
+    return {
+      color: 'var(--mantine-primary-color-filled)', // Primary color for path highlighting
+      width: LINK.HIGHLIGHTED_WIDTH,
+      opacity: LINK.HIGHLIGHTED_OPACITY,
+      dashed: false,
+      directed: isDirected,
+    };
+  }
+
+  return {
+    color: edgeStyle.stroke ?? 'var(--mantine-color-dimmed)',
+    width: edgeStyle.strokeWidth ?? LINK.DEFAULT_WIDTH,
+    opacity: edgeStyle.strokeOpacity ?? LINK.DEFAULT_OPACITY,
+    dashed: edgeStyle.strokeDasharray !== undefined,
+    directed: isDirected,
+  };
+};
 
 export const ForceGraphVisualization = ({
   nodes,
@@ -176,32 +211,31 @@ export const ForceGraphVisualization = ({
   onNodeHover,
   onBackgroundClick,
   enableSimulation = true,
-  seed,
   onGraphReady,
 }: ForceGraphVisualizationProps) => {
-  const containerReference = useRef<HTMLDivElement>(null);
-  const graphReference = useRef<ForceGraphMethods | undefined>(undefined);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const graphRef = useRef<ForceGraphMethods | undefined>(undefined);
   const colorScheme = useComputedColorScheme('light');
 
   // Notify parent when graph methods become available
   useEffect(() => {
     // Use a short delay to ensure the ref is populated after render
     const checkReference = () => {
-      if (graphReference.current && onGraphReady) {
-        onGraphReady(graphReference.current);
+      if (graphRef.current && onGraphReady) {
+        onGraphReady(graphRef.current);
       }
     };
     // Check immediately and after a short delay (for initial mount)
     checkReference();
     const timeoutId = setTimeout(checkReference, TIMING.GRAPH_REF_CHECK_DELAY_MS);
-    return () => clearTimeout(timeoutId);
+    return () => { clearTimeout(timeoutId); };
   }, [onGraphReady]);
 
   // Track container width for responsive sizing
   const [containerWidth, setContainerWidth] = React.useState(width ?? CONTAINER.DEFAULT_WIDTH);
 
   useEffect(() => {
-    if (!containerReference.current || width) return;
+    if (!containerRef.current || width !== undefined) return undefined;
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -209,8 +243,8 @@ export const ForceGraphVisualization = ({
       }
     });
 
-    resizeObserver.observe(containerReference.current);
-    return () => resizeObserver.disconnect();
+    resizeObserver.observe(containerRef.current);
+    return () => { resizeObserver.disconnect(); };
   }, [width]);
 
   // Create highlighted path edge set for quick lookup
@@ -232,9 +266,6 @@ export const ForceGraphVisualization = ({
 
   // Transform nodes for force graph
   const graphData = useMemo(() => {
-    // Always use deterministic seeding for reproducible layouts
-    const random = seededRandom(seed ?? SIMULATION.DEFAULT_SEED);
-
     // Deduplicate nodes by ID (safety net - upstream should already deduplicate)
     const seenNodeIds = new Set<string>();
     const deduplicatedNodes = nodes.filter(n => {
@@ -262,9 +293,8 @@ export const ForceGraphVisualization = ({
       entityType: node.entityType,
       label: node.label,
       entityId: node.entityId,
-      // Use existing positions or generate random ones
-      x: node.x ?? (random() - 0.5) * SIMULATION.INITIAL_POSITION_SPREAD,
-      y: node.y ?? (random() - 0.5) * SIMULATION.INITIAL_POSITION_SPREAD,
+      x: node.x,
+      y: node.y,
       originalNode: node,
     }));
 
@@ -277,7 +307,7 @@ export const ForceGraphVisualization = ({
     }));
 
     return { nodes: forceNodes, links: forceLinks };
-  }, [nodes, edges, filterNodeIds, seed]);
+  }, [nodes, edges, filterNodeIds]);
 
   // Determine if a node is highlighted
   const isNodeHighlighted = useCallback((nodeId: string): boolean => {
@@ -290,8 +320,8 @@ export const ForceGraphVisualization = ({
   // Determine if an edge is highlighted
   const isEdgeHighlighted = useCallback((edge: GraphEdge): boolean => {
     // Extract source and target IDs (always strings in our implementation)
-    const sourceId = typeof edge.source === 'string' ? edge.source : (edge.source as unknown as string);
-    const targetId = typeof edge.target === 'string' ? edge.target : (edge.target as unknown as string);
+    const sourceId = edge.source;
+    const targetId = edge.target;
 
     if (highlightedPath.length > 0) {
       return highlightedPathEdges.has(`${sourceId}-${targetId}`);
@@ -305,18 +335,18 @@ export const ForceGraphVisualization = ({
 
   // Node canvas rendering
   const nodeCanvasObject = useCallback((node: NodeObject, context: CanvasRenderingContext2D, globalScale: number) => {
-    const forceNode = node as ForceGraphNode;
-    const isHighlighted = isNodeHighlighted(forceNode.id);
-    const isExpanding = expandingNodeIds.has(forceNode.id);
-    const communityId = communityAssignments?.get(forceNode.id);
+    if (!isForceGraphNode(node)) return;
+    const isHighlighted = isNodeHighlighted(node.id);
+    const isExpanding = expandingNodeIds.has(node.id);
+    const communityId = communityAssignments?.get(node.id);
 
     // Get style from custom function or defaults
     const style = getNodeStyle
-      ? getNodeStyle(forceNode.originalNode, isHighlighted, communityId)
-      : getDefaultNodeStyle(forceNode, isHighlighted, communityId, communityColors);
+      ? getNodeStyle(node.originalNode, isHighlighted, communityId)
+      : getDefaultNodeStyle(node, isHighlighted, communityId, communityColors);
 
-    const x = forceNode.x ?? 0;
-    const y = forceNode.y ?? 0;
+    const x = node.x ?? 0;
+    const y = node.y ?? 0;
     const size = style.size ?? NODE.DEFAULT_SIZE;
 
     // Apply opacity for non-highlighted nodes in highlight mode
@@ -325,11 +355,11 @@ export const ForceGraphVisualization = ({
     // Draw node circle
     context.beginPath();
     context.arc(x, y, size, 0, 2 * Math.PI);
-    context.fillStyle = style.color ?? ENTITY_TYPE_COLORS[forceNode.entityType] ?? 'var(--mantine-color-dimmed)';
+    context.fillStyle = style.color ?? ENTITY_TYPE_COLORS[node.entityType];
     context.fill();
 
     // Draw border if specified
-    if (style.borderWidth && style.borderColor) {
+    if (style.borderWidth !== undefined && style.borderWidth > 0 && style.borderColor !== undefined) {
       context.strokeStyle = style.borderColor;
       context.lineWidth = style.borderWidth;
       context.stroke();
@@ -365,9 +395,9 @@ export const ForceGraphVisualization = ({
 
     // Draw label when zoomed in
     if (globalScale > LABEL.ZOOM_THRESHOLD) {
-      const label = forceNode.label || forceNode.id;
+      const label = node.label || node.id;
       const fontSize = Math.max(LABEL.BASE_FONT_SIZE / globalScale, LABEL.MIN_FONT_SIZE);
-      context.font = `${fontSize}px Sans-Serif`;
+      context.font = `${String(fontSize)}px Sans-Serif`;
       context.textAlign = 'center';
       context.textBaseline = 'top';
       context.fillStyle = isHighlighted ? 'var(--mantine-color-text)' : 'var(--mantine-color-dimmed)';
@@ -379,24 +409,26 @@ export const ForceGraphVisualization = ({
 
   // Link canvas rendering
   const linkCanvasObject = useCallback((link: LinkObject, context: CanvasRenderingContext2D, globalScale: number) => {
-    const forceLink = link as ForceGraphLink;
-    const isHighlighted = isEdgeHighlighted(forceLink.originalEdge);
+    if (!isForceGraphLink(link)) return;
+    const isHighlighted = isEdgeHighlighted(link.originalEdge);
 
     const style = getLinkStyle
-      ? getLinkStyle(forceLink.originalEdge, isHighlighted)
-      : getDefaultLinkStyle(forceLink, isHighlighted, highlightedPath.length > 0);
+      ? getLinkStyle(link.originalEdge, isHighlighted)
+      : getDefaultLinkStyle(link, isHighlighted, highlightedPath.length > 0);
 
-    const source = forceLink.source as ForceGraphNode;
-    const target = forceLink.target as ForceGraphNode;
+    // By the time this canvas callback fires, react-force-graph has already resolved source/target from raw node-id strings into the actual positioned node objects.
+    if (!isPositionedForceGraphNode(link.source) || !isPositionedForceGraphNode(link.target)) return;
+    const source = link.source;
+    const target = link.target;
 
-    if (!source.x || !source.y || !target.x || !target.y) return;
+    if (source.x === undefined || source.y === undefined || target.x === undefined || target.y === undefined) return;
 
     context.globalAlpha = isHighlighted ? (style.opacity ?? LINK.DEFAULT_OPACITY) : LINK.DIMMED_OPACITY;
     context.strokeStyle = style.color ?? 'var(--mantine-color-dimmed)';
     context.fillStyle = style.color ?? 'var(--mantine-color-dimmed)';
     context.lineWidth = (style.width ?? LINK.DEFAULT_WIDTH) / globalScale;
 
-    if (style.dashed) {
+    if (style.dashed === true) {
       context.setLineDash([LINK.DASH_PATTERN / globalScale, LINK.DASH_PATTERN / globalScale]);
     } else {
       context.setLineDash([]);
@@ -409,7 +441,7 @@ export const ForceGraphVisualization = ({
     context.stroke();
 
     // Draw arrowhead for directed edges
-    if (style.directed) {
+    if (style.directed === true) {
       const targetNodeSize = NODE.DEFAULT_SIZE;
       const arrowLength = LINK.ARROW_LENGTH / globalScale;
 
@@ -445,22 +477,19 @@ export const ForceGraphVisualization = ({
 
   // Handle node click
   const handleNodeClick = useCallback((node: NodeObject) => {
-    const forceNode = node as ForceGraphNode;
-    onNodeClick?.(forceNode.originalNode);
+    if (isForceGraphNode(node)) onNodeClick?.(node.originalNode);
   }, [onNodeClick]);
 
   // Handle node right-click (context menu)
   const handleNodeRightClick = useCallback((node: NodeObject, event: MouseEvent) => {
     event.preventDefault();
-    const forceNode = node as ForceGraphNode;
-    onNodeRightClick?.(forceNode.originalNode, event);
+    if (isForceGraphNode(node)) onNodeRightClick?.(node.originalNode, event);
   }, [onNodeRightClick]);
 
   // Handle node hover
   const handleNodeHover = useCallback((node: NodeObject | null) => {
-    if (node) {
-      const forceNode = node as ForceGraphNode;
-      onNodeHover?.(forceNode.originalNode);
+    if (node !== null && isForceGraphNode(node)) {
+      onNodeHover?.(node.originalNode);
     } else {
       onNodeHover?.(null);
     }
@@ -473,23 +502,24 @@ export const ForceGraphVisualization = ({
 
   // Pause simulation when not enabled
   useEffect(() => {
-    if (graphReference.current) {
+    if (graphRef.current) {
       if (enableSimulation) {
-        graphReference.current.resumeAnimation();
+        graphRef.current.resumeAnimation();
       } else {
-        graphReference.current.pauseAnimation();
+        graphRef.current.pauseAnimation();
       }
     }
   }, [enableSimulation]);
 
   // Fit graph to view on data change
   useEffect(() => {
-    if (graphReference.current && graphData.nodes.length > 0) {
-      // Small delay to let simulation settle
-      setTimeout(() => {
-        graphReference.current?.zoomToFit(TIMING.ZOOM_TO_FIT_DURATION_MS, TIMING.ZOOM_TO_FIT_PADDING);
-      }, TIMING.AUTO_FIT_DELAY_MS);
-    }
+    if (!graphRef.current || graphData.nodes.length === 0) return undefined;
+
+    // Small delay to let simulation settle
+    const timeoutId = setTimeout(() => {
+      graphRef.current?.zoomToFit(TIMING.ZOOM_TO_FIT_DURATION_MS, TIMING.ZOOM_TO_FIT_PADDING);
+    }, TIMING.AUTO_FIT_DELAY_MS);
+    return () => { clearTimeout(timeoutId); };
   }, [graphData.nodes.length]);
 
   if (!visible) {
@@ -498,7 +528,7 @@ export const ForceGraphVisualization = ({
 
   return (
     <Box
-      ref={containerReference}
+      ref={containerRef}
       pos="relative"
       style={{
         width: width ?? '100%',
@@ -511,7 +541,7 @@ export const ForceGraphVisualization = ({
     >
       <LoadingOverlay visible={loading} />
       <ForceGraph2D
-        ref={graphReference}
+        ref={graphRef}
         width={width ?? containerWidth}
         height={height}
         graphData={graphData}
@@ -530,60 +560,4 @@ export const ForceGraphVisualization = ({
       />
     </Box>
   );
-};
-
-/**
- * Default node styling based on entity type and highlighting
- * @param node
- * @param isHighlighted
- * @param communityId
- * @param communityColors
- */
-const getDefaultNodeStyle = (node: ForceGraphNode, isHighlighted: boolean, communityId?: number, communityColors?: Map<number, string>): NodeStyle => {
-  let color = ENTITY_TYPE_COLORS[node.entityType] ?? 'var(--mantine-color-dimmed)';
-
-  // Use community color if available
-  if (communityId !== undefined && communityColors?.has(communityId)) {
-    color = communityColors.get(communityId) ?? color;
-  }
-
-  return {
-    color,
-    size: isHighlighted ? NODE.HIGHLIGHTED_SIZE : NODE.DEFAULT_SIZE,
-    opacity: NODE.FULL_OPACITY,
-    borderColor: isHighlighted ? 'var(--mantine-color-body)' : undefined,
-    borderWidth: isHighlighted ? NODE.HIGHLIGHTED_BORDER_WIDTH : 0,
-  };
-};
-
-/**
- * Default link styling based on edge type, direction, and highlighting
- * Uses edge-styles.ts for consistent relationship type colors
- * @param link
- * @param isHighlighted
- * @param isPathHighlightMode
- */
-const getDefaultLinkStyle = (link: ForceGraphLink, isHighlighted: boolean, isPathHighlightMode: boolean): LinkStyle => {
-  const edge = link.originalEdge;
-  const edgeStyle = getEdgeStyle(edge);
-  const isDirected = edge.direction !== undefined;
-
-  // Path highlight mode overrides edge type colors
-  if (isHighlighted && isPathHighlightMode) {
-    return {
-      color: 'var(--mantine-primary-color-filled)', // Primary color for path highlighting
-      width: LINK.HIGHLIGHTED_WIDTH,
-      opacity: LINK.HIGHLIGHTED_OPACITY,
-      dashed: false,
-      directed: isDirected,
-    };
-  }
-
-  return {
-    color: edgeStyle.stroke ?? 'var(--mantine-color-dimmed)',
-    width: edgeStyle.strokeWidth ?? LINK.DEFAULT_WIDTH,
-    opacity: edgeStyle.strokeOpacity ?? LINK.DEFAULT_OPACITY,
-    dashed: edgeStyle.strokeDasharray !== undefined,
-    directed: isDirected,
-  };
 };

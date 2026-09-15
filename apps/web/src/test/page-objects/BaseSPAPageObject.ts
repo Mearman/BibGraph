@@ -50,14 +50,13 @@ export class BaseSPAPageObject extends BasePageObject {
 		searchResults: "[data-testid='search-results']",
 	};
 
-	constructor(page: Page, options: SPAPageObjectOptions = {}) {
+	constructor(page: Page, options: Readonly<SPAPageObjectOptions> = {}) {
 		super(page, options);
 		this.shouldWaitForAppReady = options.waitForAppReady ?? true;
 	}
 
 	/**
 	 * Navigate to a path and wait for SPA to be ready
-	 * @param path
 	 */
 	override async goto(path: string): Promise<void> {
 		await super.goto(path);
@@ -82,7 +81,7 @@ export class BaseSPAPageObject extends BasePageObject {
 		// Wait for React hydration to complete
 		await this.page.waitForFunction(() => {
 			const root = document.querySelector("#root");
-			return root && root.hasChildNodes();
+			return root?.hasChildNodes();
 		});
 
 		// Wait for any initial loading to complete
@@ -91,10 +90,9 @@ export class BaseSPAPageObject extends BasePageObject {
 
 	/**
 	 * Wait for loading spinners/skeletons to disappear
-	 * @param timeout
 	 */
 	async waitForLoadingComplete(timeout?: number): Promise<void> {
-		const loadingTimeout = timeout || this.defaultTimeout;
+		const loadingTimeout = timeout ?? this.defaultTimeout;
 
 		try {
 			// Wait for loading spinner to disappear (if present)
@@ -115,7 +113,6 @@ export class BaseSPAPageObject extends BasePageObject {
 
 	/**
 	 * Navigate using SPA router (client-side navigation)
-	 * @param path
 	 */
 	async navigateTo(path: string): Promise<void> {
 		// Use client-side navigation if possible
@@ -154,7 +151,6 @@ export class BaseSPAPageObject extends BasePageObject {
 
 	/**
 	 * Search using the header search input
-	 * @param query
 	 */
 	async search(query: string): Promise<void> {
 		await this.fill(this.selectors.searchInput, query);
@@ -201,7 +197,6 @@ export class BaseSPAPageObject extends BasePageObject {
 
 	/**
 	 * Click a navigation link by text
-	 * @param text
 	 */
 	async clickNavLink(text: string): Promise<void> {
 		await this.page.getByRole("link", { name: text }).click();

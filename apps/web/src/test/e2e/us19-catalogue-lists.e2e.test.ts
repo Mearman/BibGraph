@@ -29,13 +29,10 @@ import { StorageTestHelper } from '@/test/helpers/StorageTestHelper';
  * 5. Click the submit button ("Create List")
  * 6. Wait for modal to close and list to appear
  * 7. If the list was not auto-selected, click the list card to select it
- * @param page
- * @param listName
- * @param description
  */
 const createNamedList = async (page: Page, listName: string, description?: string): Promise<void> => {
 	// Step 1: Open the "Create New List" dropdown menu
-	await page.click('button:has-text("Create New List")');
+	await page.locator('button:has-text("Create New List")').click();
 
 	// Step 2: Click "Create Custom List" menu item to open the CreateListModal
 	const createCustomItem = page.locator('[role="menuitem"]:has-text("Create Custom List")');
@@ -51,7 +48,7 @@ const createNamedList = async (page: Page, listName: string, description?: strin
 	await titleInput.fill(listName);
 
 	// Step 5: Optionally fill description (uses id="list-description")
-	if (description) {
+	if (description !== undefined) {
 		const descriptionInput = page.locator('#list-description');
 		await descriptionInput.fill(description);
 	}
@@ -81,8 +78,10 @@ const createNamedList = async (page: Page, listName: string, description?: strin
 	}
 };
 
+const TEST_SUITE_TIMEOUT_MS = 120_000;
+
 test.describe('@workflow US-19 Catalogue Lists', () => {
-	test.setTimeout(120_000);
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS);
 
 	test.beforeEach(async ({ page }) => {
 		// Dismiss onboarding tour before any navigation
@@ -279,7 +278,7 @@ test.describe('@workflow US-19 Catalogue Lists', () => {
 				try {
 					const databases = await window.indexedDB.databases();
 					// System lists exist in IndexedDB but are protected by being hidden
-					return databases !== undefined;
+					return databases.length > 0;
 				} catch {
 					return true;
 				}

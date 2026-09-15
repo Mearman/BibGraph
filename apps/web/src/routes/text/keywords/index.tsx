@@ -14,7 +14,7 @@ import {
 } from "@mantine/core";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
@@ -27,8 +27,8 @@ const textKeywordsSearchSchema = z.object({
 
 
 const TextKeywordsRoute = () => {
-  const urlSearch = Route.useSearch();
-  const initialTitle = useMemo(() => urlSearch.title || "", [urlSearch.title]);
+  const urlSearch = useSearch({ from: "/text/keywords/" });
+  const initialTitle = useMemo(() => urlSearch.title ?? "", [urlSearch.title]);
   const [title, setTitle] = useState(initialTitle);
 
   useEffect(() => {
@@ -58,15 +58,15 @@ const TextKeywordsRoute = () => {
 
       logger.debug("text", "Extracting keywords from title", { title });
 
-      const keywords = await cachedOpenAlex.client.textAnalysis.getKeywords({
+      const extractedkeywords = await cachedOpenAlex.client.textAnalysis.getKeywords({
         title,
       });
 
       logger.debug("text", "Keywords extracted", {
-        count: keywords.length,
+        count: extractedkeywords.length,
       });
 
-      return keywords;
+      return extractedkeywords;
     },
     enabled: title.trim().length > 0,
     staleTime: 60_000,
@@ -98,7 +98,7 @@ const TextKeywordsRoute = () => {
           label="Title or Text"
           placeholder="Enter a research title or abstract to extract keywords..."
           value={title}
-          onChange={(event) => handleTitleChange(event.currentTarget.value)}
+          onChange={(event) => { handleTitleChange(event.currentTarget.value); }}
           minRows={3}
           autosize
         />

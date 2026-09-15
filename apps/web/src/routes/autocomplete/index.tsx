@@ -12,7 +12,7 @@ const autocompleteSearchSchema = z.object({
   types: z.string().optional().catch(undefined),
 });
 
-const AutocompleteGeneralRoute = lazy(() => import("./index.lazy"));
+const AutocompleteGeneralRoute = lazy(async () => import("./index.lazy"));
 
 export const Route = createFileRoute("/autocomplete/")({
   component: () => (

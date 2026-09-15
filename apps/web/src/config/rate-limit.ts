@@ -78,11 +78,9 @@ export const RETRY_CONFIG = {
 
 /**
  * Calculate retry delay with exponential backoff and jitter
- * @param root0
- * @param root0.attemptIndex
- * @param root0.config
- * @param root0.retryAfterMs
  */
+const FALLBACK_RETRY_BASE_DELAY_MS = 1000;
+
 export const calculateRetryDelay = ({
   attemptIndex,
   config,
@@ -96,7 +94,7 @@ export const calculateRetryDelay = ({
   retryAfterMs?: number;
 }): number => {
   // If server provides Retry-After header, respect it
-  if (retryAfterMs) {
+  if (retryAfterMs !== undefined) {
     return retryAfterMs;
   }
 
@@ -108,7 +106,7 @@ export const calculateRetryDelay = ({
     !("maxDelay" in config)
   ) {
     // Fallback to default delays
-    return 1000 * 2 ** attemptIndex;
+    return FALLBACK_RETRY_BASE_DELAY_MS * 2 ** attemptIndex;
   }
 
   // Exponential backoff with jitter

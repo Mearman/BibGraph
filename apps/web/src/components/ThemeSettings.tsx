@@ -20,6 +20,18 @@ import { BORDER_STYLE_GRAY_3, CARD_BORDER_STYLE, ICON_SIZE } from "@/config/styl
 import { useTheme } from "@/contexts/theme-context";
 import type { BorderRadius,ColorScheme, ComponentLibrary } from "@/styles/theme-contracts";
 
+const COMPONENT_LIBRARY_VALUES: ReadonlySet<string> = new Set(["mantine", "shadcn", "radix"]);
+const isComponentLibrary = (value: string): value is ComponentLibrary => COMPONENT_LIBRARY_VALUES.has(value);
+
+const COLOR_SCHEME_VALUES: ReadonlySet<string> = new Set(["blue", "green", "orange", "purple", "red", "neutral"]);
+const isColorScheme = (value: string): value is ColorScheme => COLOR_SCHEME_VALUES.has(value);
+
+const COLOR_MODE_VALUES: ReadonlySet<string> = new Set(["light", "dark", "auto"]);
+const isColorMode = (value: string): value is "light" | "dark" | "auto" => COLOR_MODE_VALUES.has(value);
+
+const BORDER_RADIUS_VALUES: ReadonlySet<string> = new Set(["xs", "sm", "md", "lg", "xl"]);
+const isBorderRadius = (value: string): value is BorderRadius => BORDER_RADIUS_VALUES.has(value);
+
 interface ThemeSettingsProperties {
   onClose?: () => void;
 }
@@ -93,26 +105,26 @@ export const ThemeSettings = ({ onClose }: ThemeSettingsProperties) => {
   ] as const;
 
   const handleComponentLibraryChange = (value: string | null) => {
-    if (value && ["mantine", "shadcn", "radix"].includes(value)) {
-      setComponentLibrary(value as ComponentLibrary);
+    if (value !== null && isComponentLibrary(value)) {
+      setComponentLibrary(value);
     }
   };
 
   const handleColorSchemeChange = (value: string | null) => {
-    if (value && ["blue", "green", "orange", "purple", "red", "neutral"].includes(value)) {
-      setColorScheme(value as ColorScheme);
+    if (value !== null && isColorScheme(value)) {
+      setColorScheme(value);
     }
   };
 
   const handleColorModeChange = (value: string) => {
-    if (["light", "dark", "auto"].includes(value)) {
-      setColorMode(value as "light" | "dark" | "auto");
+    if (isColorMode(value)) {
+      setColorMode(value);
     }
   };
 
   const handleBorderRadiusChange = (value: string | null) => {
-    if (value && ["xs", "sm", "md", "lg", "xl"].includes(value)) {
-      setBorderRadius(value as BorderRadius);
+    if (value !== null && isBorderRadius(value)) {
+      setBorderRadius(value);
     }
   };
 

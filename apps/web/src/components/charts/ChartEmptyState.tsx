@@ -22,10 +22,6 @@ interface ChartEmptyStateProperties {
 
 /**
  * Empty state component for charts when no data is available
- * @param root0
- * @param root0.height
- * @param root0.message
- * @param root0.ariaLabel
  */
 export const ChartEmptyState = ({
   height,

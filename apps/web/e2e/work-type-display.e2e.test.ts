@@ -17,6 +17,12 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect,test } from '@playwright/test';
 
+const MAX_REASONABLE_BADGE_Y_PX = 2000;
+const MIN_BADGE_WIDTH_PX = 40;
+const MIN_BADGE_HEIGHT_PX = 15;
+const MIN_PAGE_CONTENT_LENGTH = 100;
+const MAX_TOP_OF_PAGE_Y_PX = 1000;
+
 /**
  * Test work IDs for different types
  * Note: These may need to be updated based on actual XPAC work availability
@@ -46,7 +52,7 @@ test.describe('Work Type Display', () => {
     await page.locator('[data-testid="entity-detail-layout"]').waitFor({
       timeout: 10_000,
       state: 'visible',
-    }).catch(async () => {
+    }).catch(() => {
       console.log('⚠️ Work detail page not loaded properly');
       throw new Error('Work detail page failed to load');
     });
@@ -59,12 +65,12 @@ test.describe('Work Type Display', () => {
 
     if (isBadgeExists) {
       // Verify badge has text content
-      const badgeText = workTypeBadge;
-      await expect(badgeText).not.toBeEmpty();
-      const badgeTextContent = await badgeText.textContent();
+      
+      await expect(workTypeBadge).not.toBeEmpty();
+      const badgeTextContent = await workTypeBadge.textContent();
       expect(badgeTextContent?.length ?? 0).toBeGreaterThan(0);
 
-      console.log(`✅ Work type badge found: "${badgeTextContent}"`);
+      console.log(`✅ Work type badge found: "${String(badgeTextContent)}"`);
     } else {
       console.log('ℹ️ No work type badge rendered (work may not have type metadata)');
     }
@@ -81,7 +87,7 @@ test.describe('Work Type Display', () => {
       const workId = TEST_WORKS[workType];
 
       // Skip null IDs or placeholder IDs
-      if (!workId || workId.startsWith('W_')) {
+      if (workId === null || workId.startsWith('W_')) {
         console.log(`⚠️ Skipping ${workType} test - no real work ID available`);
         continue;
       }
@@ -100,7 +106,7 @@ test.describe('Work Type Display', () => {
         const badgeText = await xpacBadge.textContent();
         expect(badgeText?.toLowerCase()).toContain(workType);
 
-        console.log(`✅ XPAC badge for ${workType}: "${badgeText}"`);
+        console.log(`✅ XPAC badge for ${workType}: "${String(badgeText)}"`);
 
         // Test passed for this type, can return
         return;
@@ -249,13 +255,13 @@ test.describe('Work Type Display', () => {
 
       // Badge should be within visible viewport
       expect(boundingBox!.y).toBeGreaterThanOrEqual(0);
-      expect(boundingBox!.y).toBeLessThan(2000);
+      expect(boundingBox!.y).toBeLessThan(MAX_REASONABLE_BADGE_Y_PX);
 
       // Badge should have reasonable dimensions
-      expect(boundingBox!.width).toBeGreaterThan(40); // Badges typically > 40px wide
-      expect(boundingBox!.height).toBeGreaterThan(15); // Badges typically > 15px tall
+      expect(boundingBox!.width).toBeGreaterThan(MIN_BADGE_WIDTH_PX); // Badges typically > 40px wide
+      expect(boundingBox!.height).toBeGreaterThan(MIN_BADGE_HEIGHT_PX); // Badges typically > 15px tall
 
-      console.log(`✅ Work type badge positioned at (${boundingBox!.x}, ${boundingBox!.y}), size: ${boundingBox!.width}x${boundingBox!.height}`);
+      console.log(`✅ Work type badge positioned at (${String(boundingBox!.x)}, ${String(boundingBox!.y)}), size: ${String(boundingBox!.width)}x${String(boundingBox!.height)}`);
     } else {
       console.log('ℹ️ No work type badge to position - work may not have type metadata');
     }
@@ -279,10 +285,10 @@ test.describe('Work Type Display', () => {
       expect(boundingBox!.height).toBeGreaterThan(0);
 
       // Verify badge has text content
-      const badgeText = workTypeBadge;
-      await expect(badgeText).not.toBeEmpty();
+      
+      await expect(workTypeBadge).not.toBeEmpty();
 
-      console.log(`✅ Work type badge has proper Mantine styling: "${badgeText}"`);
+      console.log(`✅ Work type badge has proper Mantine styling: "${String(workTypeBadge)}"`);
     } else {
       console.log('ℹ️ Skipping styling test - no work type badge rendered');
     }
@@ -343,12 +349,12 @@ test.describe('Work Type Display', () => {
 
       // Work detail page should have publication information
       await expect(bodyText).not.toBeEmpty();
-      const textLength = await bodyText.evaluate((element) => element.textContent?.length ?? 0);
-      expect(textLength).toBeGreaterThan(100);
+      const textLength = await bodyText.evaluate((element) => element.textContent.length);
+      expect(textLength).toBeGreaterThan(MIN_PAGE_CONTENT_LENGTH);
 
       // Verify work type badge is part of cohesive publication details
       const badgeText = await workTypeBadge.textContent();
-      console.log(`✅ Work type badge "${badgeText}" displayed alongside publication metadata`);
+      console.log(`✅ Work type badge "${String(badgeText)}" displayed alongside publication metadata`);
     } else {
       console.log('ℹ️ No work type badge to verify - work may not have type metadata');
     }
@@ -431,7 +437,7 @@ test.describe('Work Type Badge Integration', () => {
       expect(badgeBox).toBeTruthy();
 
       // Badge should be near top of page (publication details)
-      expect(badgeBox!.y).toBeLessThan(1000);
+      expect(badgeBox!.y).toBeLessThan(MAX_TOP_OF_PAGE_Y_PX);
 
       console.log('✅ Work type badge displayed as primary publication metadata');
     } else {

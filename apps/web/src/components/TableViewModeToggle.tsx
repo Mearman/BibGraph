@@ -12,10 +12,10 @@ export interface TableViewModeToggleProps {
   size?: "xs" | "sm" | "md" | "lg" | "xl";
 }
 
-const VIEW_MODE_DATA: Array<{
+const VIEW_MODE_DATA: {
   value: TableViewMode;
   label: React.ReactNode;
-}> = [
+}[] = [
   {
     value: "table" as const,
     label: (
@@ -52,7 +52,7 @@ export const TableViewModeToggle = ({
 }: TableViewModeToggleProps) => (
   <SegmentedControl
     value={value}
-    onChange={(value_) => onChange(value_ as TableViewMode)}
+    onChange={(value_) => { onChange(value_); }}
     data={VIEW_MODE_DATA}
     size={size}
     fullWidth={false}

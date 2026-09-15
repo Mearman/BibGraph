@@ -8,7 +8,7 @@ import { useEffect } from "react";
 
 // Temporarily remove logger import to avoid potential issues
 
-const parseSearchParameters = (parameters: URLSearchParams): Record<string, unknown> => {
+const parseSearchParameters = (parameters: Readonly<URLSearchParams>): Record<string, unknown> => {
   const object: Record<string, unknown> = {};
   const numericKeys = new Set(["per_page", "page", "sample"]);
   parameters.forEach((value, key) => {
@@ -22,7 +22,7 @@ const parseSearchParameters = (parameters: URLSearchParams): Record<string, unkn
   return object;
 };
 
-const buildPathWithSearch = (path: string, parameters: URLSearchParams): string => {
+const buildPathWithSearch = (path: string, parameters: Readonly<URLSearchParams>): string => {
   if (parameters.toString()) {
     return `${path}?${parameters.toString()}`;
   }
@@ -38,12 +38,12 @@ const OpenAlexUrlComponent = () => {
   logger.debug("routing", "OpenAlexUrlComponent rendered with splat:", splat);
 
   useEffect(() => {
-    logger.debug("routing", `useEffect triggered, splat: ${splat}`);
-    if (!splat) {
+    logger.debug("routing", `useEffect triggered, splat: ${String(splat)}`);
+    if (splat === undefined || splat === '') {
       logger.debug("routing", "No splat, returning early");
       return;
     }
-    const decodedSplat = decodeURIComponent(splat as string);
+    const decodedSplat = decodeURIComponent(splat);
     logger.debug("routing", `Decoded splat: ${decodedSplat}`);
     try {
       // Validate and parse the splat as a full URL
@@ -83,7 +83,7 @@ const OpenAlexUrlComponent = () => {
 
       logger.debug(
         "routing",
-        `Path parts (preserving protocol slashes): ${JSON.stringify(pathParts)}, Length: ${pathParts.length}`,
+        `Path parts (preserving protocol slashes): ${JSON.stringify(pathParts)}, Length: ${String(pathParts.length)}`,
       );
 
       if (pathParts.length >= 2) {
@@ -104,7 +104,7 @@ const OpenAlexUrlComponent = () => {
         const orcidPattern = /^orcid:(\d{4}-\d{4}-\d{4}-\d{3}[0-9X])$/i;
         const doiPattern = /^https:\/{0,2}doi\.org\/(.+)$/i;
 
-        const rorMatch = id.match(rorPattern);
+        const rorMatch = rorPattern.exec(id);
         if (rorMatch && entityType === "institutions") {
           logger.debug(
             "routing",
@@ -118,14 +118,14 @@ const OpenAlexUrlComponent = () => {
           const targetPath = Object.keys(searchObject).length > 0
             ? buildPathWithSearch(rorPath, searchParameters)
             : rorPath;
-          navigate({
+          void navigate({
             to: targetPath,
             replace: true
           });
           return;
         }
 
-        const issnMatch = id.match(issnPattern);
+        const issnMatch = issnPattern.exec(id);
         if (issnMatch && entityType === "sources") {
           logger.debug(
             "routing",
@@ -139,14 +139,14 @@ const OpenAlexUrlComponent = () => {
           const targetPath = Object.keys(searchObject).length > 0
             ? buildPathWithSearch(issnPath, searchParameters)
             : issnPath;
-          navigate({
+          void navigate({
             to: targetPath,
             replace: true
           });
           return;
         }
 
-        const orcidMatch = id.match(orcidPattern);
+        const orcidMatch = orcidPattern.exec(id);
         if (orcidMatch && entityType === "authors") {
           logger.debug(
             "routing",
@@ -160,14 +160,14 @@ const OpenAlexUrlComponent = () => {
           const targetPath = Object.keys(searchObject).length > 0
             ? buildPathWithSearch(orcidPath, searchParameters)
             : orcidPath;
-          navigate({
+          void navigate({
             to: targetPath,
             replace: true
           });
           return;
         }
 
-        const doiMatch = id.match(doiPattern);
+        const doiMatch = doiPattern.exec(id);
         if (doiMatch && entityType === "works") {
           logger.debug(
             "routing",
@@ -183,7 +183,7 @@ const OpenAlexUrlComponent = () => {
           const targetPath = Object.keys(searchObject).length > 0
             ? buildPathWithSearch(doiPath, searchParameters)
             : doiPath;
-          navigate({
+          void navigate({
             to: targetPath,
             replace: true
           });
@@ -197,7 +197,7 @@ const OpenAlexUrlComponent = () => {
           // First encode normally, then encode any %2F (forward slash) again
           const encodedId = encodeURIComponent(id).replaceAll('%2F', '%252F');
           const targetPath = buildPathWithSearch(`/${detection.entityType}/${encodedId}`, searchParameters);
-          navigate({
+          void navigate({
             to: targetPath,
             replace: true,
           });
@@ -220,7 +220,7 @@ const OpenAlexUrlComponent = () => {
             `Navigating to (length 1 ID): ${targetPath} with search: ${JSON.stringify(Object.fromEntries(searchParameters))}`,
           );
           logger.debug("routing", `About to navigate for length 1 ID`);
-          navigate({
+          void navigate({
             to: targetPath,
             replace: true,
           });
@@ -233,7 +233,7 @@ const OpenAlexUrlComponent = () => {
       // Handle autocomplete
       logger.debug(
         "routing",
-        `Checking autocomplete, path starts with /autocomplete/: ${path.startsWith("/autocomplete/")}`,
+        `Checking autocomplete, path starts with /autocomplete/: ${String(path.startsWith("/autocomplete/"))}`,
       );
       if (path.startsWith("/autocomplete/")) {
         const subPath = path.slice("/autocomplete/".length);
@@ -243,7 +243,7 @@ const OpenAlexUrlComponent = () => {
           `Autocomplete match, navigating to: ${targetPath} with search: ${JSON.stringify(Object.fromEntries(searchParameters))}`,
         );
         logger.debug("routing", `About to navigate for autocomplete`);
-        navigate({
+        void navigate({
           to: targetPath,
           replace: true,
         });
@@ -267,7 +267,7 @@ const OpenAlexUrlComponent = () => {
       const entityType = entityMap[pathParts[0]];
       if (entityType && pathParts.length === 1) {
         const targetPath = buildPathWithSearch(`/${entityType}`, searchParameters);
-        navigate({
+        void navigate({
           to: targetPath,
           replace: true,
         });
@@ -279,13 +279,13 @@ const OpenAlexUrlComponent = () => {
       const fallbackPath = `/search?q=${encodeURIComponent(decodedSplat)}`;
       logger.debug("routing", `Fallback navigating to: ${fallbackPath}`);
       logger.debug("routing", `About to navigate for fallback search`);
-      navigate({
+      void navigate({
         to: fallbackPath,
         replace: true,
       });
       logger.debug("routing", `Navigation called for fallback search`);
     } catch (error) {
-      logger.debug("routing", `Error in parsing: ${error}`);
+      logger.debug("routing", `Error in parsing: ${String(error)}`);
       logger.error(
         "routing",
         `Failed to parse OpenAlex URL for splat ${decodedSplat}: ${error instanceof Error ? error.message : String(error)}`,
@@ -293,7 +293,7 @@ const OpenAlexUrlComponent = () => {
     }
   }, [splat, navigate]);
 
-  if (!splat) {
+  if (splat === undefined || splat === '') {
     return (
       <div>
         <h1>OpenAlex URL Handler</h1>

@@ -40,23 +40,27 @@ import { useBookmarks } from "@/hooks/useBookmarks";
 
 import type { BookmarksSearch, BookmarkViewMode } from "./bookmarks";
 
+const EXPORT_FORMATS: readonly ExportFormat[] = ["json", "csv", "markdown", "html"];
+
+const isExportFormat = (value: string | null): value is ExportFormat =>
+	value !== null && EXPORT_FORMATS.some((format) => format === value);
+
 /**
  * Convert CatalogueEntity to Bookmark type
- * @param entity
  */
 const convertToBookmark = (entity: CatalogueEntity): Bookmark => {
 	// Extract metadata from notes field (legacy format)
-	const notesLines = (entity.notes || "").split("\n");
+	const notesLines = (entity.notes ?? "").split("\n");
 	const urlLine = notesLines.find((line) => line.startsWith("URL: "));
 	const titleLine = notesLines.find((line) => line.startsWith("Title: "));
 	const tagsLine = notesLines.find((line) => line.startsWith("Tags: "));
 
-	const url = urlLine?.replace("URL: ", "") || "";
-	const title = titleLine?.replace("Title: ", "") || entity.entityId;
-	const tags = tagsLine?.replace("Tags: ", "").split(",").map(t => t.trim()).filter(Boolean) || [];
+	const url = urlLine?.replace("URL: ", "") ?? "";
+	const title = titleLine?.replace("Title: ", "") ?? entity.entityId;
+	const tags = tagsLine?.replace("Tags: ", "").split(",").map(t => t.trim()).filter(Boolean) ?? [];
 
 	return {
-		id: entity.id || entity.entityId,
+		id: entity.id ?? entity.entityId,
 		listId: SPECIAL_LIST_IDS.BOOKMARKS,
 		entityType: entity.entityType,
 		entityId: entity.entityId,
@@ -99,18 +103,18 @@ const BookmarksIndexPage = () => {
 	const { bookmarks } = useEnrichedBookmarks(rawBookmarks);
 
 	// Initialize filter state from URL parameters
-	const [searchQuery, setSearchQuery] = useState(search.search || "");
+	const [searchQuery, setSearchQuery] = useState(search.search ?? "");
 	const [entityTypeFilter, setEntityTypeFilter] = useState<EntityType | null>(
-		(search.entityType as EntityType) || null
+		search.entityType ?? null
 	);
-	const [tagFilters, setTagFilters] = useState<string[]>(search.tags || []);
-	const [matchAllTags, setMatchAllTags] = useState(search.matchAll || false);
+	const [tagFilters, setTagFilters] = useState<string[]>(search.tags ?? []);
+	const [matchAllTags, setMatchAllTags] = useState(search.matchAll ?? false);
 
 	// View options state from URL
-	const [viewMode, setViewMode] = useState<BookmarkViewMode>(search.viewMode || "list");
+	const [viewMode, setViewMode] = useState<BookmarkViewMode>(search.viewMode ?? "list");
 	const [groupByType, setGroupByType] = useState(search.groupByType ?? true);
-	const [sortBy, setSortBy] = useState<"date" | "title" | "type">(search.sortBy || "date");
-	const [sortOrder, setSortOrder] = useState<"asc" | "desc">(search.sortOrder || "desc");
+	const [sortBy, setSortBy] = useState<"date" | "title" | "type">(search.sortBy ?? "date");
+	const [sortOrder, setSortOrder] = useState<"asc" | "desc">(search.sortOrder ?? "desc");
 
 	// Debounce search query to avoid too many URL updates
 	const [debouncedSearchQuery] = useDebouncedValue(searchQuery, RATE_LIMIT_CONFIG.search.debounceMs);
@@ -138,7 +142,7 @@ const BookmarksIndexPage = () => {
 		if (!groupByType) newSearch.groupByType = groupByType;
 		if (viewMode !== "list") newSearch.viewMode = viewMode;
 
-		navigate({
+		void navigate({
 			to: "/bookmarks",
 			search: newSearch,
 			replace: true,
@@ -160,7 +164,7 @@ const BookmarksIndexPage = () => {
 	const availableTags = useMemo(() => {
 		const tagsSet = new Set<string>();
 		for (const bookmark of bookmarks) {
-			bookmark.metadata.tags?.forEach((tag) => tagsSet.add(tag));
+			bookmark.metadata.tags?.forEach((tag) => { tagsSet.add(tag); });
 		}
 		return [...tagsSet].sort();
 	}, [bookmarks]);
@@ -202,26 +206,26 @@ const BookmarksIndexPage = () => {
 
 	// Handle tag updates
 	const handleUpdateTags = useCallback(
-		async (bookmarkId: string, tags: string[]) => {
+		async (bookmarkId: string, tags: readonly string[]) => {
 			try {
 				logger.debug("bookmarks", "Updating bookmark tags", { bookmarkId, tags });
 
 				// Find the bookmark to get its current data
 				const bookmark = catalogueBookmarks.find((b) => b.id === bookmarkId);
-				if (!bookmark) {
+				if (bookmark === undefined) {
 					logger.error("bookmarks", "Bookmark not found for tag update", { bookmarkId });
 					return;
 				}
 
 				// Parse existing notes to preserve URL and Title
-				const notesLines = (bookmark.notes || "").split("\n");
+				const notesLines = (bookmark.notes ?? "").split("\n");
 				const urlLine = notesLines.find((line) => line.startsWith("URL: "));
 				const titleLine = notesLines.find((line) => line.startsWith("Title: "));
 
 				// Build new notes with updated tags
 				const newNotesLines: string[] = [];
-				if (urlLine) newNotesLines.push(urlLine);
-				if (titleLine) newNotesLines.push(titleLine);
+				if (urlLine !== undefined) newNotesLines.push(urlLine);
+				if (titleLine !== undefined) newNotesLines.push(titleLine);
 				if (tags.length > 0) newNotesLines.push(`Tags: ${tags.join(", ")}`);
 
 				// Add any other notes that aren't URL, Title, or Tags
@@ -292,7 +296,7 @@ const BookmarksIndexPage = () => {
 							<SegmentedControl
 								size="sm"
 								value={viewMode}
-								onChange={(value) => setViewMode(value as BookmarkViewMode)}
+								onChange={(value) => { setViewMode(value); }}
 								data={[
 									{
 										value: "list",
@@ -329,7 +333,7 @@ const BookmarksIndexPage = () => {
 								<Button
 									variant={groupByType ? "filled" : "light"}
 									size="sm"
-									onClick={() => setGroupByType(!groupByType)}
+									onClick={() => { setGroupByType(!groupByType); }}
 								>
 									{groupByType ? "Grouped" : "Flat"}
 								</Button>
@@ -344,15 +348,15 @@ const BookmarksIndexPage = () => {
 
 								<Menu.Dropdown>
 									<Menu.Label>Sort by</Menu.Label>
-									<Menu.Item onClick={() => setSortBy("date")}>Date Added</Menu.Item>
-									<Menu.Item onClick={() => setSortBy("title")}>Title</Menu.Item>
-									<Menu.Item onClick={() => setSortBy("type")}>Entity Type</Menu.Item>
+									<Menu.Item onClick={() => { setSortBy("date"); }}>Date Added</Menu.Item>
+									<Menu.Item onClick={() => { setSortBy("title"); }}>Title</Menu.Item>
+									<Menu.Item onClick={() => { setSortBy("type"); }}>Entity Type</Menu.Item>
 
 									<Menu.Divider />
 
 									<Menu.Label>Sort order</Menu.Label>
 									<Menu.Item
-										onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+										onClick={() => { setSortOrder(sortOrder === "asc" ? "desc" : "asc"); }}
 										leftSection={
 											sortOrder === "asc" ? (
 												<IconSortAscending size={ICON_SIZE.MD} />
@@ -371,7 +375,7 @@ const BookmarksIndexPage = () => {
 								size="sm"
 								color="green"
 								leftSection={<IconFileExport size={ICON_SIZE.MD} />}
-								onClick={() => setExportModalOpen(true)}
+								onClick={() => { setExportModalOpen(true); }}
 								disabled={filteredBookmarks.length === 0}
 							>
 								Export
@@ -387,7 +391,7 @@ const BookmarksIndexPage = () => {
 					entityTypeFilter={entityTypeFilter}
 					onEntityTypeChange={setEntityTypeFilter}
 					tagFilters={tagFilters}
-					onTagFiltersChange={setTagFilters}
+					onTagFiltersChange={(tags) => { setTagFilters([...tags]); }}
 					availableTags={availableTags}
 					resultCount={filteredBookmarks.length}
 					totalCount={bookmarks.length}
@@ -409,7 +413,7 @@ const BookmarksIndexPage = () => {
 						groupByType={groupByType}
 						sortBy={sortBy}
 						sortOrder={sortOrder}
-						onDeleteBookmark={handleDelete}
+						onDeleteBookmark={(id) => { void handleDelete(id); }}
 						onNavigate={handleNavigate}
 						onUpdateTags={handleUpdateTags}
 						loading={loading}
@@ -444,7 +448,7 @@ const BookmarksIndexPage = () => {
 			{/* Export Modal */}
 			<Modal
 				opened={exportModalOpen}
-				onClose={() => setExportModalOpen(false)}
+				onClose={() => { setExportModalOpen(false); }}
 				title="Export Bookmarks"
 				size="md"
 			>
@@ -456,7 +460,7 @@ const BookmarksIndexPage = () => {
 					<Select
 						label="Export Format"
 						value={exportFormat}
-						onChange={(value) => setExportFormat(value as ExportFormat)}
+						onChange={(value) => { if (isExportFormat(value)) { setExportFormat(value); } }}
 						data={[
 							{ value: "json", label: "JSON" },
 							{ value: "csv", label: "CSV" },
@@ -472,41 +476,37 @@ const BookmarksIndexPage = () => {
 						<Checkbox
 							label="Notes"
 							checked={exportOptions.includeNotes}
-							onChange={(event) =>
-								setExportOptions((previous) => ({ ...previous, includeNotes: event.currentTarget.checked }))
+							onChange={(event) => { setExportOptions((previous) => ({ ...previous, includeNotes: event.currentTarget.checked })); }
 							}
 						/>
 						<Checkbox
 							label="Tags"
 							checked={exportOptions.includeTags}
-							onChange={(event) =>
-								setExportOptions((previous) => ({ ...previous, includeTags: event.currentTarget.checked }))
+							onChange={(event) => { setExportOptions((previous) => ({ ...previous, includeTags: event.currentTarget.checked })); }
 							}
 						/>
 						<Checkbox
 							label="Timestamps"
 							checked={exportOptions.includeTimestamps}
-							onChange={(event) =>
-								setExportOptions((previous) => ({
+							onChange={(event) => { setExportOptions((previous) => ({
 									...previous,
 									includeTimestamps: event.currentTarget.checked,
-								}))
+								})); }
 							}
 						/>
 						<Checkbox
 							label="Custom Field Selections"
 							checked={exportOptions.includeFieldSelections}
-							onChange={(event) =>
-								setExportOptions((previous) => ({
+							onChange={(event) => { setExportOptions((previous) => ({
 									...previous,
 									includeFieldSelections: event.currentTarget.checked,
-								}))
+								})); }
 							}
 						/>
 					</Stack>
 
 					<Group justify="flex-end" mt="md">
-						<Button variant="subtle" onClick={() => setExportModalOpen(false)}>
+						<Button variant="subtle" onClick={() => { setExportModalOpen(false); }}>
 							Cancel
 						</Button>
 						<Button color="green" leftSection={<IconFileExport size={ICON_SIZE.MD} />} onClick={handleExport}>

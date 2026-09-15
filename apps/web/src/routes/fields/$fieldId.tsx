@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const FieldRoute = lazy(() =>
+const FieldRoute = lazy(async () =>
   import("./$fieldId.lazy").then((m) => ({ default: m.default })),
 );
 

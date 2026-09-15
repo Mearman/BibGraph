@@ -31,7 +31,7 @@ export const AnimatedLayoutContext = React.createContext<{
   resumeLayout: () => void;
   reheatLayout: (alpha?: number) => void;
   updateParameters: (
-    newParameters: Partial<{
+    newParameters: Readonly<Partial<{
       linkDistance: number;
       linkStrength: number;
       chargeStrength: number;
@@ -40,7 +40,7 @@ export const AnimatedLayoutContext = React.createContext<{
       collisionStrength: number;
       velocityDecay: number;
       alphaDecay: number;
-    }>,
+    }>>,
   ) => void;
 
   // Computed properties

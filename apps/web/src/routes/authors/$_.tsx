@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const AuthorRoute = lazy(() =>
+const AuthorRoute = lazy(async () =>
   import("./$_.lazy").then((m) => ({ default: m.default })),
 );
 

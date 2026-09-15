@@ -1,11 +1,12 @@
-import type {   EntityType } from "@bibgraph/types"
+import type { EntityType } from "@bibgraph/types"
+import { isEntityType } from "@bibgraph/types"
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy } from "react";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
 
-const BookmarksIndexPage = lazy(() => import("./bookmarks.lazy"));
+const BookmarksIndexPage = lazy(async () => import("./bookmarks.lazy"));
 
 export type BookmarkViewMode = "list" | "table" | "card";
 
@@ -29,7 +30,7 @@ export const Route = createFileRoute("/bookmarks")({
   validateSearch: (search: Record<string, unknown>): BookmarksSearch => {
     return {
       search: typeof search.search === "string" ? search.search : undefined,
-      entityType: typeof search.entityType === "string" ? search.entityType as EntityType : undefined,
+      entityType: isEntityType(search.entityType) ? search.entityType : undefined,
       tags: Array.isArray(search.tags)
         ? search.tags.filter((t): t is string => typeof t === "string")
         : (typeof search.tags === "string"

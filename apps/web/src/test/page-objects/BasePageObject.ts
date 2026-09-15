@@ -24,20 +24,21 @@ export interface BasePageObjectOptions {
 	timeout?: number;
 }
 
+const DEFAULT_TIMEOUT_MS = 30_000;
+
 export class BasePageObject {
 	protected readonly page: Page;
 	protected readonly baseUrl: string;
 	protected readonly defaultTimeout: number;
 
-	constructor(page: Page, options: BasePageObjectOptions = {}) {
+	constructor(page: Page, options: Readonly<BasePageObjectOptions> = {}) {
 		this.page = page;
-		this.baseUrl = options.baseUrl || "";
-		this.defaultTimeout = options.timeout || 30_000;
+		this.baseUrl = options.baseUrl ?? "";
+		this.defaultTimeout = options.timeout ?? DEFAULT_TIMEOUT_MS;
 	}
 
 	/**
 	 * Navigate to a path relative to baseUrl
-	 * @param path
 	 */
 	async goto(path: string): Promise<void> {
 		const url = this.baseUrl ? `${this.baseUrl}${path}` : path;
@@ -85,7 +86,6 @@ export class BasePageObject {
 
 	/**
 	 * Check if element is visible
-	 * @param selector
 	 */
 	async isVisible(selector: string): Promise<boolean> {
 		return this.page.locator(selector).isVisible();
@@ -93,8 +93,6 @@ export class BasePageObject {
 
 	/**
 	 * Wait for element to be visible
-	 * @param selector
-	 * @param timeout
 	 */
 	async waitForVisible(
 		selector: string,
@@ -103,26 +101,23 @@ export class BasePageObject {
 		const locator = this.page.locator(selector);
 		await locator.waitFor({
 			state: "visible",
-			timeout: timeout || this.defaultTimeout,
+			timeout: timeout ?? this.defaultTimeout,
 		});
 		return locator;
 	}
 
 	/**
 	 * Wait for element to be hidden
-	 * @param selector
-	 * @param timeout
 	 */
 	async waitForHidden(selector: string, timeout?: number): Promise<void> {
 		await this.page.locator(selector).waitFor({
 			state: "hidden",
-			timeout: timeout || this.defaultTimeout,
+			timeout: timeout ?? this.defaultTimeout,
 		});
 	}
 
 	/**
 	 * Click an element
-	 * @param selector
 	 */
 	async click(selector: string): Promise<void> {
 		await this.page.locator(selector).click();
@@ -130,8 +125,6 @@ export class BasePageObject {
 
 	/**
 	 * Fill an input field
-	 * @param selector
-	 * @param value
 	 */
 	async fill(selector: string, value: string): Promise<void> {
 		await this.page.locator(selector).fill(value);
@@ -139,7 +132,6 @@ export class BasePageObject {
 
 	/**
 	 * Get text content of an element
-	 * @param selector
 	 */
 	async getText(selector: string): Promise<string | null> {
 		return this.page.locator(selector).textContent();
@@ -147,7 +139,6 @@ export class BasePageObject {
 
 	/**
 	 * Get all text contents matching selector
-	 * @param selector
 	 */
 	async getAllTexts(selector: string): Promise<string[]> {
 		return this.page.locator(selector).allTextContents();
@@ -155,7 +146,6 @@ export class BasePageObject {
 
 	/**
 	 * Count elements matching selector
-	 * @param selector
 	 */
 	async count(selector: string): Promise<number> {
 		return this.page.locator(selector).count();
@@ -163,7 +153,6 @@ export class BasePageObject {
 
 	/**
 	 * Take a screenshot
-	 * @param name
 	 */
 	async screenshot(name: string): Promise<void> {
 		await this.page.screenshot({ path: `screenshots/${name}.png` });
@@ -171,8 +160,6 @@ export class BasePageObject {
 
 	/**
 	 * Wait for a specific text to appear on the page
-	 * @param text
-	 * @param timeout
 	 */
 	async waitForText(
 		text: string,
@@ -180,13 +167,12 @@ export class BasePageObject {
 	): Promise<void> {
 		await this.page.getByText(text).waitFor({
 			state: "visible",
-			timeout: timeout || this.defaultTimeout,
+			timeout: timeout ?? this.defaultTimeout,
 		});
 	}
 
 	/**
 	 * Assert page has title containing text
-	 * @param text
 	 */
 	async expectTitleContains(text: string): Promise<void> {
 		await expect(this.page).toHaveTitle(new RegExp(text));
@@ -194,7 +180,6 @@ export class BasePageObject {
 
 	/**
 	 * Assert URL contains path
-	 * @param path
 	 */
 	async expectUrlContains(path: string): Promise<void> {
 		await expect(this.page).toHaveURL(new RegExp(path));
@@ -202,7 +187,6 @@ export class BasePageObject {
 
 	/**
 	 * Assert element is visible
-	 * @param selector
 	 */
 	async expectVisible(selector: string): Promise<void> {
 		await expect(this.page.locator(selector)).toBeVisible();
@@ -210,8 +194,6 @@ export class BasePageObject {
 
 	/**
 	 * Assert element contains text
-	 * @param selector
-	 * @param text
 	 */
 	async expectText(selector: string, text: string): Promise<void> {
 		await expect(this.page.locator(selector)).toContainText(text);

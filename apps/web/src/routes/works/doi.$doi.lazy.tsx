@@ -15,7 +15,7 @@ const DOIWorkRoute = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const resolveDOI = async () => {
+    const resolveDOI = () => {
       try {
         // Decode the DOI parameter (may have been URL encoded)
         const decodedDOI = decodeURIComponent(doi);
@@ -52,7 +52,7 @@ const DOIWorkRoute = () => {
       }
     };
 
-    void resolveDOI();
+    resolveDOI();
   }, [doi, navigate]);
 
   return (

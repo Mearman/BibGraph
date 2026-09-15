@@ -9,6 +9,24 @@ import { useCallback,useMemo } from "react";
 
 import { getAcademicEntityColors } from "@/styles/css-variable-resolver";
 
+const SHADE_LIGHTEST = 0;
+const SHADE_LIGHT = 1;
+const SHADE_LIGHT_MEDIUM = 2;
+const SHADE_MEDIUM_LIGHT = 3;
+const SHADE_MEDIUM = 4;
+const SHADE_MEDIUM_DARK = 5;
+const SHADE_PRIMARY = 6;
+const SHADE_DARK = 7;
+const SHADE_DARKER = 8;
+const SHADE_DARKEST = 9;
+const SHADE_DEEPEST = 10;
+
+/**
+ * Reads a shade from a Mantine theme color palette, tolerating a palette that isn't registered in the current theme (Mantine's own types claim every palette name is always present, but a custom shadcn-style palette that hasn't been added to the theme config is genuinely absent at runtime) by falling back to the given default
+ */
+const readShade = (colors: Readonly<Record<string, readonly string[] | undefined>>, colorName: string, shade: number, fallback: string): string =>
+  colors[colorName]?.[shade] ?? fallback;
+
 export const useThemeColors = () => {
   const theme = useMantineTheme();
   const { colorScheme } = useMantineColorScheme();
@@ -34,7 +52,7 @@ export const useThemeColors = () => {
 
   // Base color utilities - memoized to prevent React 19 infinite loops
   const getColor = useCallback(
-    (color: string, shade: number = 6) => {
+    (color: string, shade = SHADE_PRIMARY) => {
       if (color in theme.colors) {
         return theme.colors[color][shade] || color;
       }
@@ -48,45 +66,45 @@ export const useThemeColors = () => {
     () => ({
       // Text colors using shadcn semantic colors
       text: {
-        primary: isDark ? theme.colors.stone?.[0] ?? "#fafaf9" : theme.colors.stone?.[9] ?? "#0c0a09",
-        secondary: isDark ? theme.colors.zinc?.[4] ?? "#a1a1aa" : theme.colors.zinc?.[5] ?? "#71717a",
-        tertiary: isDark ? theme.colors.zinc?.[5] ?? "#71717a" : theme.colors.zinc?.[4] ?? "#a1a1aa",
-        inverse: isDark ? theme.colors.stone?.[9] ?? "#0c0a09" : theme.colors.stone?.[0] ?? "#fafaf9",
+        primary: isDark ? readShade(theme.colors, "stone", SHADE_LIGHTEST, "#fafaf9") : readShade(theme.colors, "stone", SHADE_DARKEST, "#0c0a09"),
+        secondary: isDark ? readShade(theme.colors, "zinc", SHADE_MEDIUM, "#a1a1aa") : readShade(theme.colors, "zinc", SHADE_MEDIUM_DARK, "#71717a"),
+        tertiary: isDark ? readShade(theme.colors, "zinc", SHADE_MEDIUM_DARK, "#71717a") : readShade(theme.colors, "zinc", SHADE_MEDIUM, "#a1a1aa"),
+        inverse: isDark ? readShade(theme.colors, "stone", SHADE_DARKEST, "#0c0a09") : readShade(theme.colors, "stone", SHADE_LIGHTEST, "#fafaf9"),
       },
 
       // Background colors using shadcn semantic colors
       background: {
-        primary: isDark ? theme.colors.slate?.[10] ?? "#020617" : theme.colors.slate?.[0] ?? "#f8fafc",
-        secondary: isDark ? theme.colors.slate?.[9] ?? "#0f172a" : theme.colors.slate?.[1] ?? "#f1f5f9",
-        tertiary: isDark ? theme.colors.slate?.[8] ?? "#1e293b" : theme.colors.slate?.[2] ?? "#e2e8f0",
+        primary: isDark ? readShade(theme.colors, "slate", SHADE_DEEPEST, "#020617") : readShade(theme.colors, "slate", SHADE_LIGHTEST, "#f8fafc"),
+        secondary: isDark ? readShade(theme.colors, "slate", SHADE_DARKEST, "#0f172a") : readShade(theme.colors, "slate", SHADE_LIGHT, "#f1f5f9"),
+        tertiary: isDark ? readShade(theme.colors, "slate", SHADE_DARKER, "#1e293b") : readShade(theme.colors, "slate", SHADE_LIGHT_MEDIUM, "#e2e8f0"),
         overlay: isDark ? "rgba(2, 6, 23, 0.8)" : "rgba(248, 250, 252, 0.95)",
         blur: isDark ? "rgba(15, 23, 42, 0.95)" : "rgba(241, 245, 249, 0.95)",
       },
 
       // Border colors using shadcn semantic colors
       border: {
-        primary: isDark ? theme.colors.zinc?.[8] ?? "#27272a" : theme.colors.zinc?.[2] ?? "#e4e4e7",
-        secondary: isDark ? theme.colors.zinc?.[7] ?? "#3f3f46" : theme.colors.zinc?.[3] ?? "#d4d4d8",
+        primary: isDark ? readShade(theme.colors, "zinc", SHADE_DARKER, "#27272a") : readShade(theme.colors, "zinc", SHADE_LIGHT_MEDIUM, "#e4e4e7"),
+        secondary: isDark ? readShade(theme.colors, "zinc", SHADE_DARK, "#3f3f46") : readShade(theme.colors, "zinc", SHADE_MEDIUM_LIGHT, "#d4d4d8"),
       },
 
       // Semantic colors using shadcn primary/secondary system
-      primary: theme.colors.stone?.[6] ?? "#57534e",
-      secondary: theme.colors.zinc?.[6] ?? "#52525b",
-      success: theme.colors.emerald?.[6] ?? "#059669",
-      warning: theme.colors.orange?.[6] ?? "#ea580c",
-      error: theme.colors.red?.[6] ?? "#dc2626",
-      info: theme.colors.sky?.[6] ?? "#0284c7",
+      primary: readShade(theme.colors, "stone", SHADE_PRIMARY, "#57534e"),
+      secondary: readShade(theme.colors, "zinc", SHADE_PRIMARY, "#52525b"),
+      success: readShade(theme.colors, "emerald", SHADE_PRIMARY, "#059669"),
+      warning: readShade(theme.colors, "orange", SHADE_PRIMARY, "#ea580c"),
+      error: readShade(theme.colors, "red", SHADE_PRIMARY, "#dc2626"),
+      info: readShade(theme.colors, "sky", SHADE_PRIMARY, "#0284c7"),
 
       // Academic entity colors using shadcn palette mapping
       entity: {
-        work: getColor(shadcnEntityColors.work, 6),
-        author: getColor(shadcnEntityColors.author, 6),
-        source: getColor(shadcnEntityColors.source, 6),
-        institution: getColor(shadcnEntityColors.institution, 6),
-        concept: getColor(shadcnEntityColors.concept, 6),
-        topic: getColor(shadcnEntityColors.topic, 6),
-        publisher: getColor(shadcnEntityColors.publisher, 6),
-        funder: getColor(shadcnEntityColors.funder, 6),
+        work: getColor(shadcnEntityColors.work, SHADE_PRIMARY),
+        author: getColor(shadcnEntityColors.author, SHADE_PRIMARY),
+        source: getColor(shadcnEntityColors.source, SHADE_PRIMARY),
+        institution: getColor(shadcnEntityColors.institution, SHADE_PRIMARY),
+        concept: getColor(shadcnEntityColors.concept, SHADE_PRIMARY),
+        topic: getColor(shadcnEntityColors.topic, SHADE_PRIMARY),
+        publisher: getColor(shadcnEntityColors.publisher, SHADE_PRIMARY),
+        funder: getColor(shadcnEntityColors.funder, SHADE_PRIMARY),
       },
 
       // Entity to shadcn color name mapping for shade access
@@ -126,20 +144,18 @@ export const useThemeColors = () => {
   const getEntityColor = useCallback(
     (entityType: string | null | undefined): string => {
       // Handle undefined or null entity type
-      if (!entityType) {
+      if (entityType === null || entityType === undefined || entityType === "") {
         return colors.primary;
       }
 
-      // If entityType is already a detected entity type (like "works", "authors", etc.),
-      // convert to singular for color mapping
+      // If entityType is already a detected entity type (like "works", "authors", etc.), convert to singular for color mapping
       const normalizedType = entityType.toLowerCase();
       if (isValidEntityColorKey(normalizedType)) {
         // Convert plural to singular for color lookup
-        const singularType = normalizedType.replace(
-          /s$/,
-          "",
-        ) as keyof typeof colors.entity;
-        return colors.entity[singularType];
+        const singularType = normalizedType.replace(/s$/, "");
+        if (isValidEntityColorKey(singularType)) {
+          return colors.entity[singularType];
+        }
       }
 
       // If it's not a direct match, try to detect it as an OpenAlex ID
@@ -149,7 +165,7 @@ export const useThemeColors = () => {
           // Convert plural taxonomy key to singular color key
           const singularType = detectedType.replace(/s$/, "");
           if (isValidEntityColorKey(singularType)) {
-            return colors.entity[singularType as keyof typeof colors.entity];
+            return colors.entity[singularType];
           }
         }
       } catch {
@@ -162,9 +178,9 @@ export const useThemeColors = () => {
   );
 
   const getEntityColorShade = useCallback(
-    (entityType: string | null | undefined, shade: number = 6): string => {
+    (entityType: string | null | undefined, shade = SHADE_PRIMARY): string => {
       // Handle undefined or null entity type
-      if (!entityType) {
+      if (entityType === null || entityType === undefined || entityType === "") {
         return getColor("blue", shade);
       }
 
@@ -172,12 +188,11 @@ export const useThemeColors = () => {
       const normalizedType = entityType.toLowerCase();
       if (isValidEntityColorKey(normalizedType)) {
         // Convert plural to singular for color lookup
-        const singularType = normalizedType.replace(
-          /s$/,
-          "",
-        ) as keyof typeof colors.entityColorNames;
-        const colorName = colors.entityColorNames[singularType];
-        return getColor(colorName, shade);
+        const singularType = normalizedType.replace(/s$/, "");
+        if (isValidEntityColorKey(singularType)) {
+          const colorName = colors.entityColorNames[singularType];
+          return getColor(colorName, shade);
+        }
       }
 
       // Fall back to detection if it's an OpenAlex ID

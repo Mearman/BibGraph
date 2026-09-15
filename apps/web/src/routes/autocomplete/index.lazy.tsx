@@ -33,18 +33,21 @@ import { useThemeColors } from "@/hooks/use-theme-colors";
 import { decodeHtmlEntities } from "@/utils/decode-html-entities";
 import { transformAutocompleteResultToGridItem } from "@/utils/entity-mappers";
 
+const AUTOCOMPLETE_ENTITY_TYPE_SET = new Set<string>(AUTOCOMPLETE_ENTITY_TYPES);
+
+const isAutocompleteEntityType = (value: string): value is EntityType =>
+  AUTOCOMPLETE_ENTITY_TYPE_SET.has(value);
+
 /**
- * Parse comma-separated entity types from URL
- * Returns null if no types param, empty array if "none", or parsed types
- * @param typesParam
+ * Parse comma-separated entity types from URL Returns null if no types param, empty array if "none", or parsed types
  */
 const parseEntityTypes = (typesParam: string | undefined): EntityType[] | null => {
-  if (!typesParam) return null; // No param = use default (all types)
+  if (typesParam === undefined || typesParam === "") return null; // No param = use default (all types)
   if (typesParam === "none") return []; // Explicitly cleared
   return typesParam
     .split(",")
-    .map((t) => t.trim() as EntityType)
-    .filter((t) => AUTOCOMPLETE_ENTITY_TYPES.includes(t));
+    .map((t) => t.trim())
+    .filter(isAutocompleteEntityType);
 };
 
 const AutocompleteGeneralRoute = () => {
@@ -55,12 +58,14 @@ const AutocompleteGeneralRoute = () => {
 
   // Navigation handler for entity cards in list/grid views
   const handleNavigate = useCallback((path: string) => {
-    navigate({ to: path });
+    void navigate({ to: path });
   }, [navigate]);
 
   // Derive query from URL search params
   const query = useMemo(() => {
-    return urlSearch.q || urlSearch.search || "";
+    if (urlSearch.q !== undefined && urlSearch.q !== "") return urlSearch.q;
+    if (urlSearch.search !== undefined && urlSearch.search !== "") return urlSearch.search;
+    return "";
   }, [urlSearch.q, urlSearch.search]);
 
   // Derive selected entity types from URL
@@ -74,7 +79,7 @@ const AutocompleteGeneralRoute = () => {
 
   // Handle entity type filter changes
   const handleEntityTypeChange = useCallback(
-    (types: EntityType[]) => {
+    (types: readonly EntityType[]) => {
       // Build URL params, avoiding URLSearchParams encoding for types (commas get encoded)
       const parameterParts: string[] = [];
       if (query) {
@@ -93,7 +98,7 @@ const AutocompleteGeneralRoute = () => {
       }
       // If all selected, omit types param entirely (default state)
 
-      if (urlSearch.filter) {
+      if (urlSearch.filter !== undefined && urlSearch.filter !== "") {
         parameterParts.push(`filter=${encodeURIComponent(urlSearch.filter)}`);
       }
 
@@ -128,7 +133,7 @@ const AutocompleteGeneralRoute = () => {
         const routePath = routeMap[result.entity_type] || result.entity_type;
         return (
           <Anchor href={`#/${routePath}/${cleanId}`} fw={500}>
-            {decodeHtmlEntities(info.getValue() as string)}
+            {decodeHtmlEntities(info.row.original.display_name)}
           </Anchor>
         );
       },
@@ -138,7 +143,7 @@ const AutocompleteGeneralRoute = () => {
       accessorKey: "entity_type",
       header: "Type",
       cell: (info) => {
-        const entityType = info.getValue() as string;
+        const entityType = info.row.original.entity_type;
         return (
           <Badge size="sm" variant="light" color={getEntityColor(entityType)}>
             {entityType}
@@ -151,8 +156,8 @@ const AutocompleteGeneralRoute = () => {
       accessorKey: "hint",
       header: "Description",
       cell: (info) => {
-        const hint = info.getValue() as string | undefined;
-        return hint ? (
+        const hint = info.row.original.hint;
+        return hint !== undefined && hint !== "" ? (
           <Text size="sm" c="dimmed" lineClamp={TEXT.DEFAULT_LINE_CLAMP}>
             {hint}
           </Text>
@@ -164,8 +169,8 @@ const AutocompleteGeneralRoute = () => {
       accessorKey: "works_count",
       header: "Works",
       cell: (info) => {
-        const count = info.getValue() as number | undefined;
-        return count !== undefined && count !== null
+        const count = info.row.original.works_count;
+        return count !== undefined
           ? count.toLocaleString()
           : "-";
       },
@@ -175,8 +180,8 @@ const AutocompleteGeneralRoute = () => {
       accessorKey: "cited_by_count",
       header: "Citations",
       cell: (info) => {
-        const count = info.getValue() as number | undefined;
-        return count !== undefined && count !== null
+        const count = info.row.original.cited_by_count;
+        return count !== undefined
           ? count.toLocaleString()
           : "-";
       },
@@ -271,7 +276,7 @@ const AutocompleteGeneralRoute = () => {
       parameterParts.push(`types=${selectedTypes.join(",")}`);
     }
 
-    if (urlSearch.filter) {
+    if (urlSearch.filter !== undefined && urlSearch.filter !== "") {
       parameterParts.push(`filter=${encodeURIComponent(urlSearch.filter)}`);
     }
 
@@ -298,7 +303,7 @@ const AutocompleteGeneralRoute = () => {
         <TextInput
           placeholder="Search for anything in OpenAlex..."
           value={query}
-          onChange={(event) => handleSearch(event.currentTarget.value)}
+          onChange={(event) => { handleSearch(event.currentTarget.value); }}
           leftSection={<IconSearch size={ICON_SIZE.MD} />}
           size="md"
         />
@@ -310,7 +315,7 @@ const AutocompleteGeneralRoute = () => {
           inline
         />
 
-        {urlSearch.filter && (
+        {urlSearch.filter !== undefined && urlSearch.filter !== "" && (
           <Alert icon={<IconInfoCircle />} title="Active Filters" color="blue">
             <Text size="sm">Filter: {urlSearch.filter}</Text>
           </Alert>
@@ -337,7 +342,7 @@ const AutocompleteGeneralRoute = () => {
               </Text>
               <Text size="sm" c="dimmed" ta="center">
                 Start typing to get real-time autocomplete suggestions from
-                {isAllTypesSelected ? " all OpenAlex entities" : ` ${selectedTypes.length} selected entity types`}
+                {isAllTypesSelected ? " all OpenAlex entities" : ` ${String(selectedTypes.length)} selected entity types`}
               </Text>
             </Stack>
           </Card>
@@ -358,9 +363,7 @@ const AutocompleteGeneralRoute = () => {
               <Text size="sm">
                 {(() => {
                   if (error instanceof Error) {
-                    const match = error.message.match(
-                      /autocomplete failed: (.+)/,
-                    );
+                    const match = /autocomplete failed: (.+)/.exec(error.message);
                     if (match) {
                       return match[1];
                     }

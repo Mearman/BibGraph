@@ -6,7 +6,6 @@
  * - Visual diff highlighting (added/removed/common nodes and edges)
  * - Swap graphs functionality
  * - Diff statistics display
- * @module routes/graph-comparison
  */
 
 import type { GraphEdge, GraphNode } from '@bibgraph/types';
@@ -28,7 +27,7 @@ import {
   IconGraph,
   IconLoader,
 } from '@tabler/icons-react';
-import { createLazyFileRoute , Link } from '@tanstack/react-router';
+import { createLazyFileRoute , Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { GraphComparison } from '@/components/graph/comparison';
@@ -40,12 +39,17 @@ interface GraphComparisonSearchParameters {
   right?: string;
 }
 
+const getSearchParamString = (value: unknown): string | undefined =>
+  typeof value === 'string' ? value : undefined;
+
 /**
  * Graph Comparison Page Component
  */
 const GraphComparisonPage = () => {
-  const navigate = Route.useNavigate();
-  const searchParameters = Route.useSearch() as GraphComparisonSearchParameters;
+  const navigate = useNavigate();
+  const { left: rawLeftParam, right: rawRightParam } = useSearch({ strict: false });
+  const leftSearchParam = getSearchParamString(rawLeftParam);
+  const rightSearchParam = getSearchParamString(rawRightParam);
 
   const {
     manualSnapshots,
@@ -54,8 +58,20 @@ const GraphComparisonPage = () => {
     loadSnapshot,
   } = useGraphSnapshots();
 
-  const [leftSnapshotId, setLeftSnapshotId] = useState<string | null>(searchParameters.left ?? null);
-  const [rightSnapshotId, setRightSnapshotId] = useState<string | null>(searchParameters.right ?? null);
+  const [leftSnapshotId, setLeftSnapshotId] = useState<string | null>(leftSearchParam ?? null);
+  const [rightSnapshotId, setRightSnapshotId] = useState<string | null>(rightSearchParam ?? null);
+  const [previousLeftSearchParam, setPreviousLeftSearchParam] = useState(leftSearchParam);
+  const [previousRightSearchParam, setPreviousRightSearchParam] = useState(rightSearchParam);
+
+  // Adjust the selected snapshot IDs when the URL search params change, following React's documented "adjusting state when a prop changes" pattern (a setState call during render, not inside an effect, so it does not trigger the extra-render eslint warning).
+  if (leftSearchParam !== previousLeftSearchParam || rightSearchParam !== previousRightSearchParam) {
+    setPreviousLeftSearchParam(leftSearchParam);
+    setPreviousRightSearchParam(rightSearchParam);
+    if (leftSearchParam !== undefined && rightSearchParam !== undefined) {
+      setLeftSnapshotId(leftSearchParam);
+      setRightSnapshotId(rightSearchParam);
+    }
+  }
 
   const [leftSnapshot, setLeftSnapshot] = useState<{
     nodes: GraphNode[];
@@ -71,28 +87,14 @@ const GraphComparisonPage = () => {
 
   const [error, setError] = useState<string | null>(null);
 
-  // Load snapshots from URL params
-  useEffect(() => {
-    const loadSnapshotsFromURL = async () => {
-      if (!(searchParameters.left && searchParameters.right)) {
-      	return;
-      }
-
-      setLeftSnapshotId(searchParameters.left);
-      setRightSnapshotId(searchParameters.right);
-    };
-
-    void loadSnapshotsFromURL();
-  }, [searchParameters.left, searchParameters.right]);
-
   // Load left snapshot
   useEffect(() => {
-    if (!leftSnapshotId) {
-      setLeftSnapshot(null);
-      return;
-    }
-
     const loadLeft = async () => {
+      if (leftSnapshotId === null || leftSnapshotId === '') {
+        setLeftSnapshot(null);
+        return;
+      }
+
       setError(null);
 
       try {
@@ -121,12 +123,12 @@ const GraphComparisonPage = () => {
 
   // Load right snapshot
   useEffect(() => {
-    if (!rightSnapshotId) {
-      setRightSnapshot(null);
-      return;
-    }
-
     const loadRight = async () => {
+      if (rightSnapshotId === null || rightSnapshotId === '') {
+        setRightSnapshot(null);
+        return;
+      }
+
       setError(null);
 
       try {
@@ -160,7 +162,7 @@ const GraphComparisonPage = () => {
 
   // Handle close
   const handleClose = useCallback(() => {
-    navigate({ to: '/graph' });
+    void navigate({ to: '/graph' });
   }, [navigate]);
 
   // Loading state
@@ -207,7 +209,7 @@ const GraphComparisonPage = () => {
             </Button>
           </Group>
 
-          {error && (
+          {error !== null && (
             <Alert icon={<IconAlertTriangle size={ICON_SIZE.MD} />} title="Error" color="red">
               <Text>{error}</Text>
             </Alert>
@@ -220,7 +222,7 @@ const GraphComparisonPage = () => {
               {/* Left snapshot selection */}
               <Box>
                 <Text size="sm" fw={500} mb="xs">
-                  Left Graph {!leftSnapshotId && '(required)'}
+                  Left Graph {(leftSnapshotId === null || leftSnapshotId === '') && '(required)'}
                 </Text>
                 <Stack gap="xs">
                   {allSnapshots.map((snapshot) => (
@@ -229,7 +231,7 @@ const GraphComparisonPage = () => {
                       withBorder
                       p="sm"
                       style={{ cursor: 'pointer' }}
-                      onClick={() => setLeftSnapshotId(snapshot.id)}
+                      onClick={() => { setLeftSnapshotId(snapshot.id); }}
                       styles={{
                         root: {
                           borderColor: leftSnapshotId === snapshot.id ? 'var(--mantine-color-blue-5)' : undefined,
@@ -260,7 +262,7 @@ const GraphComparisonPage = () => {
               {/* Right snapshot selection */}
               <Box>
                 <Text size="sm" fw={500} mb="xs">
-                  Right Graph {!rightSnapshotId && '(required)'}
+                  Right Graph {(rightSnapshotId === null || rightSnapshotId === '') && '(required)'}
                 </Text>
                 <Stack gap="xs">
                   {allSnapshots.map((snapshot) => (
@@ -269,7 +271,7 @@ const GraphComparisonPage = () => {
                       withBorder
                       p="sm"
                       style={{ cursor: 'pointer' }}
-                      onClick={() => setRightSnapshotId(snapshot.id)}
+                      onClick={() => { setRightSnapshotId(snapshot.id); }}
                       styles={{
                         root: {
                           borderColor: rightSnapshotId === snapshot.id ? 'var(--mantine-color-blue-5)' : undefined,
@@ -299,15 +301,16 @@ const GraphComparisonPage = () => {
 
               {/* Compare button */}
               <Button
-                disabled={!leftSnapshotId || !rightSnapshotId || leftSnapshotId === rightSnapshotId}
+                disabled={leftSnapshotId === null || leftSnapshotId === '' || rightSnapshotId === null || rightSnapshotId === '' || leftSnapshotId === rightSnapshotId}
                 onClick={() => {
                   // Update URL with selected snapshot IDs
-                  navigate({
+                  const search: GraphComparisonSearchParameters = {
+                    left: leftSnapshotId ?? undefined,
+                    right: rightSnapshotId ?? undefined,
+                  };
+                  void navigate({
                     to: '/graph-comparison',
-                    search: {
-                      left: leftSnapshotId ?? undefined,
-                      right: rightSnapshotId ?? undefined,
-                    } as GraphComparisonSearchParameters,
+                    search,
                   });
                 }}
                 fullWidth

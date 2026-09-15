@@ -30,7 +30,7 @@ import {
 } from '../constants';
 import type { DisplayMode, LinkStyle, NodeStyle } from '../types';
 import { PerformanceOverlay } from './PerformanceOverlay';
-import type { WebGLStatus } from './types';
+import type { ForceGraph3DInstanceHandle, WebGLStatus } from './types';
 import {
   useForceGraph3DData,
   useHighlightedPathEdges,
@@ -79,11 +79,11 @@ export interface ForceGraph3DVisualizationProps {
    */
   highlightedPath?: string[];
   /**
-  Community assignments: nodeId -> communityId
+  Community assignments, keyed by node ID and valued by community ID
    */
   communityAssignments?: Map<string, number>;
   /**
-  Community colors: communityId -> color
+  Community colors, keyed by community ID and valued by color
    */
   communityColors?: Map<number, string>;
   /**
@@ -153,8 +153,7 @@ export interface ForceGraph3DVisualizationProps {
   /**
   Callback when graph methods become available (for external control like zoomToFit)
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onGraphReady?: (methods: any) => void;
+  onGraphReady?: (methods: Readonly<ForceGraph3DInstanceHandle>) => void;
   /**
   Enable cursor-centered zoom (zoom toward cursor position instead of orbit center)
    */
@@ -191,9 +190,8 @@ export const ForceGraph3DVisualization = ({
   onGraphReady,
   enableCursorCenteredZoom = true,
 }: ForceGraph3DVisualizationProps) => {
-  const containerReference = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const graphReference = useRef<any>(undefined);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const graphRef = useRef<ForceGraph3DInstanceHandle | undefined>(undefined);
   const colorScheme = useComputedColorScheme('light');
 
   // === WebGL Detection ===
@@ -211,13 +209,13 @@ export const ForceGraph3DVisualization = ({
   // === Graph Ready Callback ===
   useEffect(() => {
     const checkReference = () => {
-      if (graphReference.current && onGraphReady) {
-        onGraphReady(graphReference.current);
+      if (graphRef.current && onGraphReady) {
+        onGraphReady(graphRef.current);
       }
     };
     checkReference();
     const timeoutId = setTimeout(checkReference, TIMING.GRAPH_REF_CHECK_DELAY_MS);
-    return () => clearTimeout(timeoutId);
+    return () => { clearTimeout(timeoutId); };
   }, [onGraphReady]);
 
   // === Performance Hooks ===
@@ -234,7 +232,7 @@ export const ForceGraph3DVisualization = ({
     updateVisibleCounts,
   } = useGraph3DPerformance({
     enabled: showPerformanceOverlay || enableAdaptiveLOD,
-    onPerformanceDrop: onPerformanceDrop ? (stats) => onPerformanceDrop(stats.fps) : undefined,
+    onPerformanceDrop: onPerformanceDrop ? (stats) => { onPerformanceDrop(stats.fps); } : undefined,
     fpsThreshold: PERFORMANCE_3D.FPS_THRESHOLD,
   });
 
@@ -249,22 +247,23 @@ export const ForceGraph3DVisualization = ({
 
   // === Cursor-Centered Zoom ===
   useEffect(() => {
-    if (!enableCursorCenteredZoom) return;
+    if (!enableCursorCenteredZoom) return () => { /* nothing to clean up */ };
 
     const enableZoomToCursor = () => {
-      const controls = graphReference.current?.controls?.();
-      if (controls && 'zoomToCursor' in controls) {
+      const controls = graphRef.current?.controls();
+      if (controls !== undefined) {
         controls.zoomToCursor = true;
       }
     };
 
     enableZoomToCursor();
     const timeoutId = setTimeout(enableZoomToCursor, TIMING.GRAPH_REF_CHECK_DELAY_MS);
+    const graph = graphRef.current;
 
     return () => {
       clearTimeout(timeoutId);
-      const controls = graphReference.current?.controls?.();
-      if (controls && 'zoomToCursor' in controls) {
+      const controls = graph?.controls();
+      if (controls !== undefined) {
         controls.zoomToCursor = false;
       }
     };
@@ -274,7 +273,7 @@ export const ForceGraph3DVisualization = ({
   const [containerWidth, setContainerWidth] = useState(width ?? CONTAINER.DEFAULT_WIDTH);
 
   useEffect(() => {
-    if (!containerReference.current || width) return;
+    if (!containerRef.current || width !== undefined) return () => { /* nothing to clean up */ };
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -282,8 +281,8 @@ export const ForceGraph3DVisualization = ({
       }
     });
 
-    resizeObserver.observe(containerReference.current);
-    return () => resizeObserver.disconnect();
+    resizeObserver.observe(containerRef.current);
+    return () => { resizeObserver.disconnect(); };
   }, [width]);
 
   // === Graph Data Transformation ===
@@ -353,64 +352,62 @@ export const ForceGraph3DVisualization = ({
     onNodeRightClick,
     onNodeHover,
     onBackgroundClick,
-    graphRef: graphReference,
+    graphRef: graphRef,
   });
 
   // === Simulation Control ===
   useEffect(() => {
-    if (graphReference.current) {
+    if (graphRef.current) {
       if (enableSimulation) {
-        graphReference.current.resumeAnimation();
+        graphRef.current.resumeAnimation();
       } else {
-        graphReference.current.pauseAnimation();
+        graphRef.current.pauseAnimation();
       }
     }
   }, [enableSimulation]);
 
   // === Camera & View Management ===
   useEffect(() => {
-    if (graphReference.current && graphData.nodes.length > 0) {
-      setTimeout(() => {
-        if (enableCameraPersistence && savedCameraState) {
-          graphReference.current?.cameraPosition(savedCameraState.position, savedCameraState.lookAt, 0);
-        } else {
-          graphReference.current?.zoomToFit(TIMING.ZOOM_TO_FIT_DURATION_MS, TIMING.ZOOM_TO_FIT_PADDING);
-        }
-      }, TIMING.AUTO_FIT_DELAY_MS);
-    }
+    if (!graphRef.current || graphData.nodes.length === 0) return () => { /* nothing to clean up */ };
+
+    const timeoutId = setTimeout(() => {
+      if (enableCameraPersistence) {
+        graphRef.current?.cameraPosition(savedCameraState.position, savedCameraState.lookAt, 0);
+      } else {
+        graphRef.current?.zoomToFit(TIMING.ZOOM_TO_FIT_DURATION_MS, TIMING.ZOOM_TO_FIT_PADDING);
+      }
+    }, TIMING.AUTO_FIT_DELAY_MS);
+
+    return () => { clearTimeout(timeoutId); };
   }, [graphData.nodes.length, enableCameraPersistence, savedCameraState]);
 
   // === Render Loop (Camera Tracking, LOD, Animation) ===
   useEffect(() => {
-    if (!graphReference.current) return;
+    if (!graphRef.current) return () => { /* nothing to clean up */ };
 
-    const graph = graphReference.current;
+    const graph = graphRef.current;
     let animationFrameId: number;
 
     const onFrame = () => {
-      if (!graph.camera) return;
-
       const camera = graph.camera();
-      if (camera) {
-        const pos = camera.position;
-        cameraPositionRef.current = { x: pos.x, y: pos.y, z: pos.z };
+      const pos = camera.position;
+      cameraPositionRef.current = { x: pos.x, y: pos.y, z: pos.z };
 
-        if (enableCameraPersistence) {
-          const controls = graph.controls?.();
-          const lookAt = controls?.target
-            ? { x: controls.target.x, y: controls.target.y, z: controls.target.z }
-            : { x: 0, y: 0, z: 0 };
+      if (enableCameraPersistence) {
+        const controls = graph.controls();
+        const lookAt = controls.target
+          ? { x: controls.target.x, y: controls.target.y, z: controls.target.z }
+          : { x: 0, y: 0, z: 0 };
 
-          updateCameraState({
-            position: { x: pos.x, y: pos.y, z: pos.z },
-            lookAt,
-            zoom: pos.z,
-          });
-        }
+        updateCameraState({
+          position: { x: pos.x, y: pos.y, z: pos.z },
+          lookAt,
+          zoom: pos.z,
+        });
+      }
 
-        if (lodManager) {
-          lodManager.recordFrameTime();
-        }
+      if (lodManager) {
+        lodManager.recordFrameTime();
       }
 
       if (showPerformanceOverlay || enableAdaptiveLOD) {
@@ -419,7 +416,7 @@ export const ForceGraph3DVisualization = ({
         updateVisibleCounts(graphData.nodes.length, graphData.links.length);
       }
 
-      animateSpinningRings(graph.scene?.());
+      animateSpinningRings(graph.scene());
     };
 
     const animate = () => {
@@ -461,7 +458,7 @@ export const ForceGraph3DVisualization = ({
 
   if (!webglStatus.available) {
     return (
-      <Box ref={containerReference} pos="relative" style={containerStyle}>
+      <Box ref={containerRef} pos="relative" style={containerStyle}>
         <WebGLFallback reason={webglStatus.reason ?? 'WebGL not available'} />
       </Box>
     );
@@ -469,7 +466,7 @@ export const ForceGraph3DVisualization = ({
 
   return (
     <Box
-      ref={containerReference}
+      ref={containerRef}
       pos="relative"
       tabIndex={0}
       role="application"
@@ -479,7 +476,7 @@ export const ForceGraph3DVisualization = ({
     >
       <LoadingOverlay visible={loading} />
       <ForceGraph3D
-        ref={graphReference}
+        ref={graphRef}
         width={width ?? containerWidth}
         height={height}
         graphData={graphData}

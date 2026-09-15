@@ -56,9 +56,6 @@ const IMPROVEMENT_COLOR_MAP: Record<
  * - Semantic color coding based on improvement type
  * - Horizontal layout with consistent spacing
  * - Returns null for cleaner rendering when no improvements exist
- * @param root0
- * @param root0.work
- * @param root0."data-testid"
  * @example
  * ```tsx
  * // In a work detail page
@@ -94,7 +91,7 @@ export const MetadataImprovementBadges = ({
 		<Group gap="xs" data-testid={dataTestId}>
 			{improvements.map((improvement, index) => (
 				<Badge
-					key={`${improvement.type}-${index}`}
+					key={`${improvement.type}-${String(index)}`}
 					color={IMPROVEMENT_COLOR_MAP[improvement.type]}
 					size="sm"
 					variant="light"

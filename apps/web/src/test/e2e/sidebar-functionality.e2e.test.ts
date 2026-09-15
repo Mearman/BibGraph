@@ -4,10 +4,13 @@
 
 import { expect,test } from "@playwright/test";
 
-const BASE_URL = process.env.CI ? "http://localhost:4173" : "http://localhost:5173";
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = IS_CI ? "http://localhost:4173" : "http://localhost:5173";
+
+const TEST_SUITE_TIMEOUT_MS = 30_000;
 
 test.describe("Sidebar Functionality E2E Tests", () => {
-  test.setTimeout(30_000); // Reduced timeout for faster execution
+  test.setTimeout(TEST_SUITE_TIMEOUT_MS); // Reduced timeout for faster execution
 
   test.beforeEach(async ({ page }) => {
     // Navigate to the home page with shorter timeout
@@ -33,7 +36,7 @@ test.describe("Sidebar Functionality E2E Tests", () => {
     const bookmarksSidebar = page.getByRole('heading', { name: /bookmarks/i });
     const isBookmarksVisible = await bookmarksSidebar.isVisible().catch(() => false);
 
-    console.log(`Bookmarks sidebar initially visible: ${isBookmarksVisible}`);
+    console.log(`Bookmarks sidebar initially visible: ${String(isBookmarksVisible)}`);
 
     if (!isBookmarksVisible) {
       // Open left sidebar if it's not already open
@@ -62,18 +65,18 @@ test.describe("Sidebar Functionality E2E Tests", () => {
     // Check for empty state message (should be visible if no bookmarks)
     const emptyState = page.getByText('No bookmarks yet');
     const isEmptyStateVisible = await emptyState.isVisible().catch(() => false);
-    console.log(`Empty state visible: ${isEmptyStateVisible}`);
+    console.log(`Empty state visible: ${String(isEmptyStateVisible)}`);
 
     // Check for search functionality - look for any search input (global or sidebar) since both indicate sidebar is open
     // We'll accept any search input since the sidebar being open is what matters
     const anySearchInput = page.getByPlaceholder(/search/i).first();
     const isSearchInputVisible = await anySearchInput.isVisible().catch(() => false);
-    console.log(`Search input visible: ${isSearchInputVisible}`);
+    console.log(`Search input visible: ${String(isSearchInputVisible)}`);
 
     // Check for bookmarks panel text
     const panelText = page.getByRole('heading', { name: /bookmarks/i });
     const isPanelTextVisible = await panelText.isVisible().catch(() => false);
-    console.log(`Panel text visible: ${isPanelTextVisible}`);
+    console.log(`Panel text visible: ${String(isPanelTextVisible)}`);
 
     if (!isSearchInputVisible && !isPanelTextVisible) {
       // Take screenshot for debugging
@@ -108,7 +111,7 @@ test.describe("Sidebar Functionality E2E Tests", () => {
 
     // History sidebar should be open even if search input isn't immediately visible
     const isHistorySidebarVisible = await page.getByRole('heading', { name: /history/i }).isVisible();
-    console.log(`History sidebar visible: ${isHistorySidebarVisible}, Search input visible: ${isSearchInputVisible}`);
+    console.log(`History sidebar visible: ${String(isHistorySidebarVisible)}, Search input visible: ${String(isSearchInputVisible)}`);
 
     // Either search input or history sidebar should be visible
     await expect(searchInput.or(page.getByRole('heading', { name: /history/i }))).toBeVisible();

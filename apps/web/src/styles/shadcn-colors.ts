@@ -83,7 +83,12 @@ export const shadcnPalettes = {
 
 export type ShadcnPalette = keyof typeof shadcnPalettes
 export { type ShadcnPalette as ColorScheme }
-export type ShadcnShade = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
+
+// Numeric index range derived from the actual palette tuple length, rather than restating each shade index as a literal.
+type BuildIndexRange<Length extends number, Accumulated extends unknown[] = []> = Accumulated['length'] extends Length
+  ? Accumulated[number]
+  : BuildIndexRange<Length, [...Accumulated, Accumulated['length']]>
+export type ShadcnShade = BuildIndexRange<(typeof shadcnPalettes)['zinc']['length']>
 
 export const shadcnPaletteNames: ShadcnPalette[] = [
   'zinc', 'slate', 'stone', 'red', 'orange', 'amber', 'yellow', 'lime',

@@ -39,17 +39,50 @@ interface TagInfo {
 }
 
 /**
+Full range of hues on the HSL colour wheel, used to spread hash-generated tag colours evenly around it.
+ */
+const HUE_DEGREES = 360;
+
+/**
+Tag usage count above which a tag badge is rendered at "large" size in the tag cloud.
+ */
+const LARGE_TAG_COUNT_THRESHOLD = 5;
+
+/**
+The smallest font size (in rem) a tag cloud badge can render at, for a tag used only once.
+ */
+const MIN_TAG_FONT_SIZE_REM = 0.75;
+
+/**
+How much larger (in rem) the most-used tag's badge can grow relative to {@link MIN_TAG_FONT_SIZE_REM}.
+ */
+const TAG_FONT_SIZE_RANGE_REM = 0.5;
+
+/**
+ * Sum the Unicode code points of a string's characters, as a cheap, deterministic hash. A plain `for...of` loop (rather than spreading or `Array.from`-ing the string into an array first) keeps this Unicode-code-point-aware without tripping the project's spread-on-string and prefer-spread lint rules against each other.
+ * @param value - The string to hash
+ * @returns The summed code point value
+ */
+const hashTag = (value: string): number => {
+  let hash = 0;
+  for (const char of value) {
+    hash += char.codePointAt(0) ?? 0;
+  }
+  return hash;
+};
+
+/**
  * Extract all unique tags from lists and count their usage
  * @param lists - The catalogue lists to extract tags from
  * @returns Array of tag info with counts and colors
  */
-const extractTagInfo = (lists: CatalogueList[]): TagInfo[] => {
+const extractTagInfo = (lists: readonly CatalogueList[]): TagInfo[] => {
   const tagMap = new Map<string, number>();
 
   for (const list of lists) {
     if (list.tags) {
       for (const tag of list.tags) {
-        tagMap.set(tag, (tagMap.get(tag) || 0) + 1);
+        tagMap.set(tag, (tagMap.get(tag) ?? 0) + 1);
       }
     }
   }
@@ -57,9 +90,8 @@ const extractTagInfo = (lists: CatalogueList[]): TagInfo[] => {
   const tags: TagInfo[] = [];
   for (const [tag, count] of tagMap) {
     // Generate a consistent color based on tag name
-    const hash = [...tag].reduce((accumulator, char) => accumulator + char.charCodeAt(0), 0);
-    const hue = hash % 360;
-    const color = `hsl(${hue}, 70%, 50%)`;
+    const hue = hashTag(tag) % HUE_DEGREES;
+    const color = `hsl(${String(hue)}, 70%, 50%)`;
 
     tags.push({ tag, count, color });
   }
@@ -73,7 +105,7 @@ const extractTagInfo = (lists: CatalogueList[]): TagInfo[] => {
  * @returns Mantine color name for the tag
  */
 const getTagColor = (tag: string): string => {
-  const hash = [...tag].reduce((accumulator, char) => accumulator + char.charCodeAt(0), 0);
+  const hash = hashTag(tag);
   const colors = ['blue', 'grape', 'pink', 'red', 'orange', 'yellow', 'green', 'cyan', 'indigo'];
   return colors[hash % colors.length];
 };
@@ -98,7 +130,7 @@ export const TagCloud = ({ lists, selectedTags, onToggleTag, onClearTags }: TagC
     <Card padding="md" radius="sm" withBorder>
       <Stack gap="sm">
         {/* Header */}
-        <Group justify="space-between" onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
+        <Group justify="space-between" onClick={() => { setExpanded(!expanded); }} style={{ cursor: 'pointer' }}>
           <Group gap="xs">
             <IconTag size={ICON_SIZE.MD} />
             <Text fw={500}>Tags</Text>
@@ -119,7 +151,7 @@ export const TagCloud = ({ lists, selectedTags, onToggleTag, onClearTags }: TagC
             <TextInput
               placeholder="Search tags..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => { setSearchQuery(e.target.value); }}
               size="xs"
             />
 
@@ -134,7 +166,7 @@ export const TagCloud = ({ lists, selectedTags, onToggleTag, onClearTags }: TagC
                     variant="filled"
                     leftSection={<IconX size={10} />}
                     style={{ cursor: 'pointer' }}
-                    onClick={() => onToggleTag(tag)}
+                    onClick={() => { onToggleTag(tag); }}
                   >
                     {tag}
                   </Badge>
@@ -152,22 +184,22 @@ export const TagCloud = ({ lists, selectedTags, onToggleTag, onClearTags }: TagC
             {/* Tag Cloud */}
             {filteredTags.length > 0 ? (
               <Group gap="xs" wrap="wrap">
-                {filteredTags.map((tagInfo) => (
+                {filteredTags.map((info) => (
                   <Tooltip
-                    key={tagInfo.tag}
-                    label={`${tagInfo.count} list${tagInfo.count === 1 ? '' : 's'}`}
+                    key={info.tag}
+                    label={`${String(info.count)} list${info.count === 1 ? '' : 's'}`}
                   >
                     <Badge
-                      size={tagInfo.count > 5 ? 'lg' : tagInfo.count > 2 ? 'md' : 'sm'}
-                      color={selectedTags.has(tagInfo.tag) ? getTagColor(tagInfo.tag) : 'gray'}
-                      variant={selectedTags.has(tagInfo.tag) ? 'filled' : 'light'}
+                      size={info.count > LARGE_TAG_COUNT_THRESHOLD ? 'lg' : info.count > 2 ? 'md' : 'sm'}
+                      color={selectedTags.has(info.tag) ? getTagColor(info.tag) : 'gray'}
+                      variant={selectedTags.has(info.tag) ? 'filled' : 'light'}
                       style={{
                         cursor: 'pointer',
-                        fontSize: `${0.75 + (tagInfo.count / maxCount) * 0.5}rem`,
+                        fontSize: `${String(MIN_TAG_FONT_SIZE_REM + (info.count / maxCount) * TAG_FONT_SIZE_RANGE_REM)}rem`,
                       }}
-                      onClick={() => onToggleTag(tagInfo.tag)}
+                      onClick={() => { onToggleTag(info.tag); }}
                     >
-                      {tagInfo.tag}
+                      {info.tag}
                     </Badge>
                   </Tooltip>
                 ))}

@@ -1,9 +1,7 @@
 /**
  * Catalogue List Graph Data Source
  *
- * Wraps a catalogue list (bookmarks, history, or custom list) as a graph data source.
- * Fetches entity data from OpenAlex API and extracts relationships.
- * @module lib/graph-sources/catalogue-list-source
+ * Wraps a catalogue list (bookmarks, history, or custom list) as a graph data source. Fetches entity data from OpenAlex API and extracts relationships.
  */
 
 import {
@@ -20,7 +18,6 @@ import type {
   CatalogueList,
   CatalogueStorageProvider,
   GraphDataSource,
-  GraphSourceCategory,
   GraphSourceEntity,
 } from '@bibgraph/utils';
 import {
@@ -32,26 +29,29 @@ import {
 
 /**
  * Fetch entity data from OpenAlex API based on entity type
- * @param entityType
- * @param entityId
  */
 const fetchEntityData = async (entityType: EntityType, entityId: string): Promise<Record<string, unknown> | null> => {
   try {
     switch (entityType) {
       case 'works':
-        return await getWorkById(entityId) as unknown as Record<string, unknown>;
+        return await getWorkById(entityId);
       case 'authors':
-        return await getAuthorById(entityId) as unknown as Record<string, unknown>;
+        return await getAuthorById(entityId);
       case 'institutions':
-        return await getInstitutionById(entityId) as unknown as Record<string, unknown>;
+        return await getInstitutionById(entityId);
       case 'sources':
-        return await getSourceById(entityId) as unknown as Record<string, unknown>;
+        return await getSourceById(entityId);
       case 'topics':
-        return await getTopicById(entityId) as unknown as Record<string, unknown>;
+        return await getTopicById(entityId);
       case 'funders':
-        return await getFunderById(entityId) as unknown as Record<string, unknown>;
+        return await getFunderById(entityId);
       case 'publishers':
-        return await getPublisherById(entityId) as unknown as Record<string, unknown>;
+        return await getPublisherById(entityId);
+      case 'concepts':
+      case 'keywords':
+      case 'domains':
+      case 'fields':
+      case 'subfields':
       default:
         logger.debug('catalogue-list-source', `Unsupported entity type: ${entityType}`);
         return null;
@@ -64,17 +64,14 @@ const fetchEntityData = async (entityType: EntityType, entityId: string): Promis
 
 /**
  * Create a graph data source from a catalogue list
- * @param storage
- * @param listId
- * @param listInfo
  */
-export const createCatalogueListSource = (storage: CatalogueStorageProvider, listId: string, listInfo: CatalogueList): GraphDataSource => {
+export const createCatalogueListSource = (storage: Readonly<CatalogueStorageProvider>, listId: string, listInfo: CatalogueList): GraphDataSource => {
   const sourceId = `catalogue:${listId}`;
 
   return {
     id: sourceId,
     label: listInfo.title,
-    category: 'catalogue' as GraphSourceCategory,
+    category: 'catalogue',
     description: listInfo.description,
 
     getEntities: async (): Promise<GraphSourceEntity[]> => {
@@ -131,12 +128,11 @@ export const createCatalogueListSource = (storage: CatalogueStorageProvider, lis
 
 /**
  * Create a graph data source specifically for bookmarks
- * @param storage
  */
-export const createBookmarksSource = (storage: CatalogueStorageProvider): GraphDataSource => ({
+export const createBookmarksSource = (storage: Readonly<CatalogueStorageProvider>): GraphDataSource => ({
     id: 'catalogue:bookmarks',
     label: 'Bookmarks',
-    category: 'catalogue' as GraphSourceCategory,
+    category: 'catalogue',
     description: 'Your bookmarked entities',
 
     getEntities: async (): Promise<GraphSourceEntity[]> => {
@@ -178,17 +174,19 @@ export const createBookmarksSource = (storage: CatalogueStorageProvider): GraphD
       return bookmarks.length;
     },
 
-    isAvailable: async (): Promise<boolean> => true,
+    isAvailable: async (): Promise<boolean> => {
+      await Promise.resolve();
+      return true;
+    },
   });
 
 /**
  * Create a graph data source specifically for history
- * @param storage
  */
-export const createHistorySource = (storage: CatalogueStorageProvider): GraphDataSource => ({
+export const createHistorySource = (storage: Readonly<CatalogueStorageProvider>): GraphDataSource => ({
     id: 'catalogue:history',
     label: 'History',
-    category: 'catalogue' as GraphSourceCategory,
+    category: 'catalogue',
     description: 'Recently viewed entities',
 
     getEntities: async (): Promise<GraphSourceEntity[]> => {
@@ -230,18 +228,20 @@ export const createHistorySource = (storage: CatalogueStorageProvider): GraphDat
       return history.length;
     },
 
-    isAvailable: async (): Promise<boolean> => true,
+    isAvailable: async (): Promise<boolean> => {
+      await Promise.resolve();
+      return true;
+    },
   });
 
 /**
  * Create a graph data source specifically for graph list (persistent working set)
  * T032: Graph list as a graph data source
- * @param storage
  */
-export const createGraphListSource = (storage: CatalogueStorageProvider): GraphDataSource => ({
+export const createGraphListSource = (storage: Readonly<CatalogueStorageProvider>): GraphDataSource => ({
     id: 'catalogue:graph-list',
     label: 'Graph List',
-    category: 'catalogue' as GraphSourceCategory,
+    category: 'catalogue',
     description: 'Persistent graph working set with provenance tracking',
 
     getEntities: async (): Promise<GraphSourceEntity[]> => {
@@ -286,14 +286,15 @@ export const createGraphListSource = (storage: CatalogueStorageProvider): GraphD
       });
 
       const fetched = await Promise.all(fetchPromises);
-      for (const result of fetched) {
-        if (result) results.push(result);
-      }
+      results.push(...fetched);
 
       return results;
     },
 
     getEntityCount: async (): Promise<number> => await storage.getGraphListSize(),
 
-    isAvailable: async (): Promise<boolean> => true,
+    isAvailable: async (): Promise<boolean> => {
+      await Promise.resolve();
+      return true;
+    },
   });

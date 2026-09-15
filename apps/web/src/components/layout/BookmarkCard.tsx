@@ -3,16 +3,11 @@
  * Handles display name resolution and actions
  */
 
-import type { EntityType } from "@bibgraph/types";
-import { hostnameMatches } from '@bibgraph/utils';
 import { logger } from "@bibgraph/utils/logger";
 import {
   type CatalogueEntity,
 } from "@bibgraph/utils/storage/catalogue-db";
-import {
-  parseExistingAppUrl,
-  reconstructEntityUrl,
-} from "@bibgraph/utils/url-reconstruction";
+import { reconstructEntityUrl } from "@bibgraph/utils/url-reconstruction";
 import {
   ActionIcon,
   Badge,
@@ -51,17 +46,17 @@ export const BookmarkCard = ({ bookmark, onClose, onDeleted }: BookmarkCardPrope
   // Fetch display name from API if not a special ID and no title in notes
   const { displayName, isLoading } = useEntityDisplayName({
     entityId: bookmark.entityId,
-    entityType: bookmark.entityType as EntityType,
-    enabled: !isSpecialId && !titleFromNotes,
+    entityType: bookmark.entityType,
+    enabled: !isSpecialId && titleFromNotes === undefined,
   });
 
   // Determine the title to display
   let title: string;
-  if (titleFromNotes) {
+  if (titleFromNotes !== undefined) {
     title = titleFromNotes;
   } else if (isSpecialId) {
     title = bookmark.entityId.startsWith("search-") ? `Search: ${bookmark.entityId.replace("search-", "").split("-", 1)[0]}` : `List: ${bookmark.entityId.replace("list-", "")}`;
-  } else if (displayName) {
+  } else if (displayName !== null && displayName !== "") {
     title = displayName;
   } else if (isLoading) {
     title = "Loading...";
@@ -69,51 +64,18 @@ export const BookmarkCard = ({ bookmark, onClose, onDeleted }: BookmarkCardPrope
     title = `${bookmark.entityType}: ${bookmark.entityId}`;
   }
 
-  // Compute link URL using entity-based reconstruction with backward compatibility
-  const getLinkUrl = (): string => {
-    // For new bookmarks: use entity-based URL reconstruction
-    if (bookmark.entityType && bookmark.entityId) {
-      return reconstructEntityUrl(
-        bookmark.entityType,
-        bookmark.entityId,
-        { basePath: "" } // bibgraph.com is primary domain
-      );
-    }
-
-    // Backward compatibility: try to extract URL from notes for existing bookmarks
-    const urlMatch = bookmark.notes?.match(/URL: ([^\n]+)/);
-    if (urlMatch) {
-      const url = urlMatch[1];
-
-      // Try to parse existing app URLs and convert to entity-based navigation
-      const parsedUrl = parseExistingAppUrl(url);
-      if (parsedUrl && parsedUrl.entityType && parsedUrl.entityId) {
-        return reconstructEntityUrl(
-          parsedUrl.entityType,
-          parsedUrl.entityId,
-          { basePath: "" } // bibgraph.com is primary domain
-        );
-      }
-
-      // Convert OpenAlex API URLs to internal paths
-      if (hostnameMatches(url, "api.openalex.org")) {
-        return url.replace("https://api.openalex.org", "");
-      }
-
-      // Return internal paths as-is (no base path needed for bibgraph.com)
-      if (url.startsWith("/")) {
-        return url;
-      }
-    }
-
-    // Fallback to default entity path
-    return `/${(bookmark.entityType || 'works')}/${(bookmark.entityId || 'unknown')}`;
-  };
+  // Compute link URL using entity-based reconstruction. `entityType` and `entityId` are always present on `CatalogueEntity`, so no fallback is needed.
+  const getLinkUrl = (): string =>
+    reconstructEntityUrl(
+      bookmark.entityType,
+      bookmark.entityId,
+      { basePath: "" } // bibgraph.com is primary domain
+    );
 
   const linkUrl = getLinkUrl();
 
   const handleClick = () => {
-    if (onClose) {
+    if (onClose !== undefined) {
       onClose();
     }
   };
@@ -129,22 +91,23 @@ export const BookmarkCard = ({ bookmark, onClose, onDeleted }: BookmarkCardPrope
       ),
       labels: { confirm: "Delete", cancel: "Cancel" },
       confirmProps: { color: "red" },
-      onConfirm: async () => {
-        try {
-          if (bookmark.id) {
-            await storageProvider.removeBookmark(bookmark.id);
-            onDeleted?.();
+      onConfirm: () => {
+        void (async () => {
+          try {
+            if (bookmark.id !== undefined) {
+              await storageProvider.removeBookmark(bookmark.id);
+              onDeleted?.();
+            }
+          } catch (error) {
+            logger.error("bookmarks", "Failed to delete bookmark:", error);
           }
-        } catch (error) {
-          logger.error("bookmarks", "Failed to delete bookmark:", error);
-        }
+        })();
       },
     });
   };
 
-  // Filter out technical metadata from notes for display
-  // This includes URL:, Title:, Tags: prefixes and provenance lines like "AUTHOR from OpenAlex Tags:"
-  const notesDisplay = bookmark.notes
+  // Filter out technical metadata from notes for display This includes URL:, Title:, Tags: prefixes and provenance lines like "AUTHOR from OpenAlex Tags:"
+  const filteredNotes = bookmark.notes
     ?.split('\n')
     .filter(line => {
       const trimmed = line.trim();
@@ -160,7 +123,8 @@ export const BookmarkCard = ({ bookmark, onClose, onDeleted }: BookmarkCardPrope
     })
     .map(line => line.trim())
     .filter(Boolean)
-    .join('\n') || undefined;
+    .join('\n');
+  const notesDisplay = filteredNotes !== undefined && filteredNotes !== "" ? filteredNotes : undefined;
 
   return (
     <Card
@@ -182,7 +146,7 @@ export const BookmarkCard = ({ bookmark, onClose, onDeleted }: BookmarkCardPrope
           >
             {title}
           </Text>
-          {notesDisplay && (
+          {notesDisplay !== undefined && (
             <Text size="xs" c="dimmed" lineClamp={2}>
               {notesDisplay}
             </Text>
@@ -194,7 +158,7 @@ export const BookmarkCard = ({ bookmark, onClose, onDeleted }: BookmarkCardPrope
             {new Date(bookmark.addedAt).toLocaleDateString()}
           </Text>
         </Stack>
-        {bookmark.id && (
+        {bookmark.id !== undefined && (
           <Tooltip label="Delete bookmark">
             <ActionIcon
               size="sm"

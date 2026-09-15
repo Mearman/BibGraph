@@ -6,7 +6,7 @@ interface EntityFilterProperties {
   value: string | string[];
   operator: FilterOperator;
   config: FilterFieldConfig;
-  onValueChange: (value: string | string[]) => void;
+  onValueChange: (value: string | readonly string[]) => void;
   onOperatorChange: (operator: FilterOperator) => void;
   disabled?: boolean;
   compact?: boolean;
@@ -23,7 +23,7 @@ export const EntityFilter = ({
   compact = false,
   fieldId,
 }: EntityFilterProperties) => {
-  const selectOptions = (config.options || []).map((option) => ({
+  const selectOptions = (config.options ?? []).map((option) => ({
     value: String(option.value),
     label: option.label,
   }));
@@ -50,8 +50,8 @@ export const EntityFilter = ({
                 id={properties.fieldId}
                 data={selectOptions}
                 value={Array.isArray(properties.value) ? properties.value : []}
-                onChange={(value_) => properties.onChange(value_)}
-                placeholder={config.placeholder || "Select entities"}
+                onChange={(value_) => { properties.onChange(value_); }}
+                placeholder={config.placeholder ?? "Select entities"}
                 disabled={properties.disabled}
                 size={properties.compact ? "xs" : "sm"}
                 flex={1}
@@ -62,8 +62,8 @@ export const EntityFilter = ({
                 id={properties.fieldId}
                 data={selectOptions}
                 value={typeof properties.value === "string" ? properties.value : ""}
-                onChange={(value_) => properties.onChange(value_ || "")}
-                placeholder={config.placeholder || "Select entity"}
+                onChange={(value_) => { properties.onChange(value_ ?? ""); }}
+                placeholder={config.placeholder ?? "Select entity"}
                 disabled={properties.disabled}
                 size={properties.compact ? "xs" : "sm"}
                 flex={1}
@@ -74,8 +74,8 @@ export const EntityFilter = ({
             <TextInput
               id={properties.fieldId}
               value={typeof properties.value === "string" ? properties.value : ""}
-              onChange={(event) => properties.onChange(event.currentTarget.value)}
-              placeholder={config.placeholder || "Enter entity ID or name"}
+              onChange={(event) => { properties.onChange(event.currentTarget.value); }}
+              placeholder={config.placeholder ?? "Enter entity ID or name"}
               disabled={properties.disabled}
               size={properties.compact ? "xs" : "sm"}
               flex={1}

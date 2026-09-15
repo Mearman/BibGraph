@@ -9,11 +9,12 @@
  */
 
 import type { GraphNode } from '@bibgraph/types';
-import { GraphLODManager } from '@bibgraph/utils';
+import type { GraphLODManager } from '@bibgraph/utils';
 import { useCallback, useRef } from 'react';
 import * as THREE from 'three';
 import SpriteText from 'three-spritetext';
 
+import { ENTITY_TYPE_COLORS } from '../../../styles/hash-colors';
 import {
   ANIMATION_3D,
   COLORS_3D,
@@ -23,7 +24,7 @@ import {
   NODE,
 } from '../constants';
 import type { NodeStyle } from '../types';
-import { ENTITY_TYPE_COLORS, getDefaultNodeStyle } from './style-helpers';
+import { getDefaultNodeStyle } from './style-helpers';
 import type { ForceGraphNode, LODRenderSettings, Vector3D } from './types';
 
 export interface UseNodeThreeObjectOptions {
@@ -36,11 +37,11 @@ export interface UseNodeThreeObjectOptions {
    */
   expandingNodeIds: Set<string>;
   /**
-  Community assignments: nodeId -> communityId
+  Community assignments, keyed by node ID and valued by community ID
    */
   communityAssignments?: Map<string, number>;
   /**
-  Community colors: communityId -> color
+  Community colors, keyed by community ID and valued by color
    */
   communityColors?: Map<number, string>;
   /**
@@ -80,18 +81,13 @@ const DEFAULT_LOD_SETTINGS: LODRenderSettings = {
 
 /**
  * Create the main sphere mesh for a node
- * @param baseSize
- * @param color
- * @param opacity
- * @param isHighlighted
- * @param lodSettings
  */
 const createNodeSphere = (
   baseSize: number,
   color: string,
   opacity: number,
   isHighlighted: boolean,
-  lodSettings: LODRenderSettings
+  lodSettings: Readonly<LODRenderSettings>
 ): THREE.Mesh => {
   const geometry = new THREE.SphereGeometry(
     baseSize,
@@ -126,8 +122,6 @@ const createNodeSphere = (
 
 /**
  * Create highlight ring for a node
- * @param baseSize
- * @param segments
  */
 const createHighlightRing = (
   baseSize: number,
@@ -151,7 +145,6 @@ const createHighlightRing = (
 
 /**
  * Create spinning loading indicator for expanding nodes
- * @param baseSize
  */
 const createSpinningRing = (baseSize: number): THREE.Group => {
   const group = new THREE.Group();
@@ -197,9 +190,6 @@ const createSpinningRing = (baseSize: number): THREE.Group => {
 
 /**
  * Create label sprite for a node
- * @param label
- * @param baseSize
- * @param isHighlighted
  */
 const createLabelSprite = (
   label: string,
@@ -227,13 +217,6 @@ const createLabelSprite = (
  * - Highlighted/dimmed visual states
  * - Expanding node animations
  * - Label sprites
- * @param root0
- * @param root0.isNodeHighlighted
- * @param root0.expandingNodeIds
- * @param root0.communityAssignments
- * @param root0.communityColors
- * @param root0.getNodeStyle
- * @param root0.lodManager
  */
 export const useNodeThreeObject = ({
   isNodeHighlighted,
@@ -257,8 +240,7 @@ export const useNodeThreeObject = ({
         ? customGetNodeStyle(node.originalNode, isHighlighted, communityId)
         : getDefaultNodeStyle(node, isHighlighted, communityId, communityColors);
 
-      const color =
-        style.color ?? ENTITY_TYPE_COLORS[node.entityType] ?? COLORS_3D.DEFAULT_FALLBACK;
+      const color = style.color ?? ENTITY_TYPE_COLORS[node.entityType];
       const baseSize = style.size ?? NODE.DEFAULT_SIZE;
       const opacity = isHighlighted
         ? (style.opacity ?? NODE.FULL_OPACITY)
@@ -314,21 +296,34 @@ export const useNodeThreeObject = ({
   return { nodeThreeObject, cameraPositionRef: cameraPositionReference };
 };
 
+const DEFAULT_SPIN_SPEED_MULTIPLIER = 1;
+
+/**
+ * Read the spinning-ring marker this module writes onto an `Object3D`'s `userData`.
+ *
+ * Three.js types `userData` as `{ [key: string]: any }`, so this narrows it to the two fields this module actually reads without propagating `any` to the caller.
+ */
+const getSpinningRingUserData = (userData: Record<string, unknown>): { isSpinningRing: boolean; spinSpeedMultiplier: number } => {
+  const isSpinningRing = userData.isSpinningRing === true;
+  const spinSpeedValue = userData.spinSpeed;
+  const spinSpeedMultiplier = typeof spinSpeedValue === 'number' ? spinSpeedValue : DEFAULT_SPIN_SPEED_MULTIPLIER;
+  return { isSpinningRing, spinSpeedMultiplier };
+};
+
 /**
  * Animate spinning rings in a Three.js scene
  *
  * Call this in your render loop to animate loading indicators.
- * @param scene
  */
 export const animateSpinningRings = (scene: THREE.Scene | undefined): void => {
   if (!scene) return;
 
   scene.traverse((object: THREE.Object3D) => {
-    if (!object.userData.isSpinningRing) {
+    const { isSpinningRing, spinSpeedMultiplier } = getSpinningRingUserData(object.userData);
+    if (!isSpinningRing) {
     	return;
     }
 
-    const spinSpeed = (object.userData.spinSpeed as number | undefined) ?? 1;
-    object.rotation.z += ANIMATION_3D.SPIN_SPEED * spinSpeed;
+    object.rotation.z += ANIMATION_3D.SPIN_SPEED * spinSpeedMultiplier;
   });
 };

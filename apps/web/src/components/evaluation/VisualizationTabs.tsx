@@ -64,8 +64,8 @@ const TabButton: React.FC<TabButtonProperties> = ({ tab, isActive, onClick }) =>
           : "none",
         transition: "all 0.2s",
       }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => { setIsHovered(true); }}
+      onMouseLeave={() => { setIsHovered(false); }}
     >
       {tab.label}
     </button>
@@ -122,7 +122,7 @@ export const VisualizationTabs: React.FC<VisualizationTabsProperties> = ({
             key={tab.key}
             tab={tab}
             isActive={activeTab === tab.key}
-            onClick={() => onTabChange(tab.key)}
+            onClick={() => { onTabChange(tab.key); }}
           />
         ))}
       </div>

@@ -17,10 +17,6 @@ interface SearchResultsSkeletonProperties {
 
 /**
  * Skeleton for search results loading state
- * @param root0
- * @param root0.viewType
- * @param root0.items
- * @param root0.title
  */
 export const SearchResultsSkeleton = ({
   viewType = 'list',

@@ -18,7 +18,7 @@ const OpenAlexRoute = () => {
   useEffect(() => {
     const resolveOpenAlexUrl = () => {
       try {
-        if (!_splat) {
+        if (_splat === undefined || _splat === "") {
           throw new Error("No URL path provided");
         }
 
@@ -59,7 +59,7 @@ const OpenAlexRoute = () => {
         );
         void navigate({
           to: "/search",
-          search: { q: _splat as string, filter: undefined, search: undefined },
+          search: { q: _splat ?? "", filter: undefined, search: undefined },
           replace: true,
         });
       }

@@ -24,6 +24,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { announceToScreenReader, createFocusTrap } from "@/utils/accessibility";
 
+// Converts a 0-1 score ratio to a percentage for display.
+const PERCENTAGE_MULTIPLIER = 100;
+// Decimal places shown for the raw (non-percentage) performance-range figure.
+const PERFORMANCE_RANGE_DECIMAL_PLACES = 3;
+// Decimal places shown when announcing a single data point's raw value to screen readers.
+const POINT_VALUE_DECIMAL_PLACES = 3;
+// Vertical space reserved for the title/toolbar above the chart placeholder area.
+const PLACEHOLDER_CHART_HEIGHT_OFFSET = 100;
+
 interface AccessibleChartProperties {
   comparisonResults: ComparisonResults[];
   title: string;
@@ -50,7 +59,6 @@ interface ChartData {
 
 /**
  * Generates comprehensive data table representation for screen readers
- * @param data
  */
 const _generateDataTable = (data: ChartData): string => {
   let table = "Data Table:\n\n";
@@ -58,13 +66,13 @@ const _generateDataTable = (data: ChartData): string => {
   table += "-----\t-----\t-----------\n";
 
   for (const point of data.points) {
-    table += `${point.label}\t${point.value}\t${point.description || ''}\n`;
+    table += `${point.label}\t${String(point.value)}\t${point.description ?? ''}\n`;
   }
 
   table += `\nSummary: ${data.summary}\n`;
   table += "\nKey Insights:\n";
   for (const [index, insight] of data.insights.entries()) {
-    table += `${index + 1}. ${insight}\n`;
+    table += `${String(index + 1)}. ${insight}\n`;
   }
 
   return table;
@@ -72,8 +80,6 @@ const _generateDataTable = (data: ChartData): string => {
 
 /**
  * Generates audio description for charts
- * @param data
- * @param chartType
  */
 const generateAudioDescription = (data: ChartData, chartType: string): string => {
   let description = `${chartType} chart titled "${data.summary}". `;
@@ -83,7 +89,7 @@ const generateAudioDescription = (data: ChartData, chartType: string): string =>
     return description;
   }
 
-  description += `The chart displays ${data.points.length} data points. `;
+  description += `The chart displays ${String(data.points.length)} data points. `;
 
   // Range information
   const values = data.points.map(p => p.value);
@@ -94,40 +100,36 @@ const generateAudioDescription = (data: ChartData, chartType: string): string =>
   description += `Values range from ${min.toFixed(1)} to ${max.toFixed(1)}, with an average of ${avg.toFixed(1)}. `;
 
   // Highlight key points
-  const highestPoint = data.points.reduce((max, point) =>
-    point.value > max.value ? point : max, data.points[0]
+  const highestPoint = data.points.reduce((currentHighest, point) =>
+    point.value > currentHighest.value ? point : currentHighest, data.points[0]
   );
-  const lowestPoint = data.points.reduce((min, point) =>
-    point.value < min.value ? point : min, data.points[0]
+  const lowestPoint = data.points.reduce((currentLowest, point) =>
+    point.value < currentLowest.value ? point : currentLowest, data.points[0]
   );
 
-  description += `The highest value is ${highestPoint.value} for ${highestPoint.label}. `;
-  description += `The lowest value is ${lowestPoint.value} for ${lowestPoint.label}. `;
+  description += `The highest value is ${String(highestPoint.value)} for ${highestPoint.label}. `;
+  description += `The lowest value is ${String(lowestPoint.value)} for ${lowestPoint.label}. `;
 
   return description;
 };
 
 /**
  * Accessible Data Table View
- * @param root0
- * @param root0.data
- * @param root0.onClose
  */
 const DataTableView = ({ data, onClose }: { data: ChartData; onClose: () => void }) => {
-  const tableReference = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!tableReference.current) {
-    	return;
+    if (!tableRef.current) {
+    	return undefined;
     }
 
-    const cleanup = createFocusTrap(tableReference.current);
-    return cleanup;
+    return createFocusTrap(tableRef.current);
   }, []);
 
   return (
     <Box
-      ref={tableReference}
+      ref={tableRef}
       style={{
         backgroundColor: 'var(--mantine-color-body)',
         border: '1px solid var(--mantine-color-gray-3)',
@@ -220,7 +222,7 @@ const DataTableView = ({ data, onClose }: { data: ChartData; onClose: () => void
                 {point.value.toFixed(2)}
               </td>
               <td style={{ padding: '8px', color: 'var(--mantine-color-dimmed)' }}>
-                {point.description || '-'}
+                {point.description ?? '-'}
               </td>
             </tr>
           ))}
@@ -250,10 +252,8 @@ const DataTableView = ({ data, onClose }: { data: ChartData; onClose: () => void
 
 /**
  * Keyboard Navigation Instructions
- * @param root0
- * @param root0.chartType
  */
-const KeyboardInstructions = ({ chartType }: { chartType: string }) => {
+const KeyboardInstructions = ({ chartType }: { chartType: 'bar' | 'scatter' | 'heatmap' }) => {
   const instructions = {
     bar: [
       'Tab: Navigate between bars',
@@ -311,14 +311,6 @@ const KeyboardInstructions = ({ chartType }: { chartType: string }) => {
 
 /**
  * Main Accessible Chart Component
- * @param root0
- * @param root0.comparisonResults
- * @param root0.title
- * @param root0.description
- * @param root0.chartType
- * @param root0.height
- * @param root0.provideDataTable
- * @param root0.provideAudioDescription
  */
 export const AccessibleChart = ({
   comparisonResults,
@@ -332,28 +324,28 @@ export const AccessibleChart = ({
   const [showDataTable, setShowDataTable] = useState(false);
   const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
   const [isKeyboardMode, setIsKeyboardMode] = useState(false);
-  const chartReference = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
 
   // Process data for accessibility
   const chartData: ChartData = useMemo(() => {
     const points: DataPoint[] = comparisonResults.map((result, index) => ({
-      id: `point-${index}`,
+      id: `point-${String(index)}`,
       label: result.dataset.name,
       value: result.f1Score, // Use F1 score as primary metric
       category: 'dataset',
-      description: `Precision: ${(result.precision * 100).toFixed(1)}%, Recall: ${(result.recall * 100).toFixed(1)}%, F1-Score: ${(result.f1Score * 100).toFixed(1)}%`,
+      description: `Precision: ${(result.precision * PERCENTAGE_MULTIPLIER).toFixed(1)}%, Recall: ${(result.recall * PERCENTAGE_MULTIPLIER).toFixed(1)}%, F1-Score: ${(result.f1Score * PERCENTAGE_MULTIPLIER).toFixed(1)}%`,
     }));
 
     const values = points.map(p => p.value);
     const insights = [
       `Highest performing dataset: ${points.reduce((max, p) => p.value > max.value ? p : max, points[0]).label}`,
-      `Average F1-score: ${(values.reduce((a, b) => a + b, 0) / values.length * 100).toFixed(1)}%`,
-      `Performance range: ${(Math.max(...values) - Math.min(...values)).toFixed(3)}`,
+      `Average F1-score: ${(values.reduce((a, b) => a + b, 0) / values.length * PERCENTAGE_MULTIPLIER).toFixed(1)}%`,
+      `Performance range: ${(Math.max(...values) - Math.min(...values)).toFixed(PERFORMANCE_RANGE_DECIMAL_PLACES)}`,
     ];
 
     return {
       points,
-      summary: `${comparisonResults.length} datasets compared on F1-score performance`,
+      summary: `${String(comparisonResults.length)} datasets compared on F1-score performance`,
       insights,
     };
   }, [comparisonResults]);
@@ -403,7 +395,7 @@ export const AccessibleChart = ({
 
         setSelectedPoint(newIndex);
         const point = chartData.points[newIndex];
-        announceToScreenReader(`${point.label}: ${point.value.toFixed(3)}. ${point.description}`);
+        announceToScreenReader(`${point.label}: ${point.value.toFixed(POINT_VALUE_DECIMAL_PLACES)}. ${point.description ?? ""}`);
         break;
       }
 
@@ -412,7 +404,7 @@ export const AccessibleChart = ({
         event.preventDefault();
         if (selectedPoint !== null) {
           const point = chartData.points[selectedPoint];
-          announceToScreenReader(`Selected: ${point.label}. ${point.description}`);
+          announceToScreenReader(`Selected: ${point.label}. ${point.description ?? ""}`);
         }
         break;
       }
@@ -425,7 +417,7 @@ export const AccessibleChart = ({
   
   return (
     <Box
-      ref={chartReference}
+      ref={chartRef}
       onKeyDown={handleKeyDown}
       style={{
         position: 'relative',
@@ -440,7 +432,7 @@ export const AccessibleChart = ({
         <Group justify="space-between" align="flex-start">
           <Box style={{ flex: 1 }}>
             <Title order={3} mb="xs">{title}</Title>
-            {description && (
+            {description !== undefined && description !== "" && (
               <Text size="sm" c="dimmed">{description}</Text>
             )}
           </Box>
@@ -464,7 +456,7 @@ export const AccessibleChart = ({
 
             <Tooltip label="Hear chart summary (H)">
               <ActionIcon
-                onClick={() => announceToScreenReader(comprehensiveDescription)}
+                onClick={() => { announceToScreenReader(comprehensiveDescription); }}
                 aria-label="Hear chart summary"
                 variant="subtle"
               >
@@ -478,7 +470,7 @@ export const AccessibleChart = ({
       {/* Visual chart placeholder (would be replaced with actual chart component) */}
       <Box
         style={{
-          height: height - 100,
+          height: height - PLACEHOLDER_CHART_HEIGHT_OFFSET,
           border: '2px dashed var(--mantine-color-gray-4)',
           borderRadius: '8px',
           display: 'flex',
@@ -515,10 +507,10 @@ export const AccessibleChart = ({
             alignItems: 'center',
             justifyContent: 'center',
           }}
-          onClick={() => setShowDataTable(false)}
+          onClick={() => { setShowDataTable(false); }}
         >
-          <Box onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '100%' }}>
-            <DataTableView data={chartData} onClose={() => setShowDataTable(false)} />
+          <Box onClick={(e) => { e.stopPropagation(); }} style={{ maxWidth: '600px', width: '100%' }}>
+            <DataTableView data={chartData} onClose={() => { setShowDataTable(false); }} />
           </Box>
         </Box>
       )}
@@ -546,11 +538,6 @@ export const AccessibleChart = ({
 
 /**
  * Chart with Alt Text Generator
- * @param root0
- * @param root0.children
- * @param root0.title
- * @param root0.data
- * @param root0.generateAltText
  */
 export const ChartWithAltText = ({
   children,
@@ -566,12 +553,12 @@ export const ChartWithAltText = ({
   const altText = useMemo(() => {
     if (!generateAltText || data.length === 0) return '';
 
-    const values = data.map((d: unknown) => (typeof d === 'object' && d !== null && 'value' in d) ? Number((d as { value: unknown }).value) || 0 : 0);
+    const values = data.map((d: unknown) => (typeof d === 'object' && d !== null && 'value' in d) ? Number((d).value) || 0 : 0);
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
     const max = Math.max(...values);
     const min = Math.min(...values);
 
-    return `Chart showing ${data.length} items. Average value: ${avg.toFixed(1)}. Range: ${min.toFixed(1)} to ${max.toFixed(1)}. ${title}`;
+    return `Chart showing ${String(data.length)} items. Average value: ${avg.toFixed(1)}. Range: ${min.toFixed(1)} to ${max.toFixed(1)}. ${title}`;
   }, [data, generateAltText, title]);
 
   return (

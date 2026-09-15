@@ -4,9 +4,11 @@
 import { expect,test } from '@playwright/test';
 
 const BASE_URL = 'https://mearman.github.io/BibGraph';
+const SUITE_TIMEOUT_MS = 30_000;
+const MIN_CONTENT_LENGTH = 50;
 
 test.describe('Deployed Site - Critical URLs', () => {
-  test.setTimeout(30_000);
+  test.setTimeout(SUITE_TIMEOUT_MS);
 
   test('concepts list page should NOT show "Unsupported entity type"', async ({ page }) => {
     await page.goto(`${BASE_URL}/#/concepts`, { waitUntil: 'domcontentloaded', timeout: 20_000 });
@@ -19,7 +21,7 @@ test.describe('Deployed Site - Critical URLs', () => {
     expect(hasError).toBe(false);
     
     // Should have substantial content
-    expect(mainText!.length).toBeGreaterThan(50);
+    expect(mainText!.length).toBeGreaterThan(MIN_CONTENT_LENGTH);
     
     console.log('✅ Concepts list page: No "Unsupported entity type" error');
   });

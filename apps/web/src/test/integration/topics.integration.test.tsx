@@ -1,7 +1,9 @@
-import { cachedOpenAlex } from "@bibgraph/client";
+import type * as BibgraphClient from "@bibgraph/client";
+import type { Topic } from "@bibgraph/types";
 import { InMemoryStorageProvider } from "@bibgraph/utils";
 import { MantineProvider } from "@mantine/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type * as TanstackReactRouter from "@tanstack/react-router";
 import { useParams, useSearch } from "@tanstack/react-router";
 import { cleanup,fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -11,15 +13,19 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { StorageProviderWrapper } from "@/contexts/storage-provider-context";
 import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
 
+const { getTopicMock } = vi.hoisted(() => ({
+  getTopicMock: vi.fn(),
+}));
+
 // Mock cachedOpenAlex client
 vi.mock("@bibgraph/client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@bibgraph/client")>();
+  const actual = await importOriginal<typeof BibgraphClient>();
   return {
     ...actual,
     cachedOpenAlex: {
       client: {
         topics: {
-          getTopic: vi.fn(),
+          getTopic: getTopicMock,
         },
       },
     },
@@ -28,7 +34,7 @@ vi.mock("@bibgraph/client", async (importOriginal) => {
 
 // Mock router hooks and Link component
 vi.mock("@tanstack/react-router", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+  const actual = await importOriginal<typeof TanstackReactRouter>();
   return {
     ...actual,
     useParams: vi.fn(),
@@ -47,7 +53,7 @@ const mockTopicData = {
   works_count: 5000,
   cited_by_count: 10_000,
   description: "A sample topic description",
-};
+} as Topic;
 
 describe("TopicRoute Integration Tests", () => {
   let queryClient: QueryClient;
@@ -71,9 +77,7 @@ describe("TopicRoute Integration Tests", () => {
     vi.mocked(useSearch).mockReturnValue({});
 
     // Mock successful API response by default
-    vi.mocked(cachedOpenAlex.client.topics.getTopic).mockResolvedValue(
-      mockTopicData as any,
-    );
+    getTopicMock.mockResolvedValue(mockTopicData);
   });
 
   const TestWrapper = ({ children }: { children: ReactNode }) => (
@@ -96,11 +100,14 @@ describe("TopicRoute Integration Tests", () => {
     vi.clearAllMocks();
   });
 
-  it("renders loading state initially", async () => {
+  it("renders loading state initially", () => {
     // Make the API call slow to test loading state
-    vi.mocked(cachedOpenAlex.client.topics.getTopic).mockImplementation(
-      () => new Promise(() => {}), // Never resolves
-    );
+    getTopicMock.mockImplementation(async () => {
+      await new Promise(() => {
+        // Never resolves - keeps the component in its loading state for this test.
+      });
+      return mockTopicData;
+    });
 
     render(
       <TestWrapper>
@@ -114,9 +121,7 @@ describe("TopicRoute Integration Tests", () => {
 
   it("renders error state when API fails", async () => {
     const mockError = new Error("API Error");
-    vi.mocked(cachedOpenAlex.client.topics.getTopic).mockRejectedValue(
-      mockError,
-    );
+    getTopicMock.mockRejectedValue(mockError);
 
     render(
       <TestWrapper>
@@ -209,10 +214,6 @@ describe("TopicRoute Integration Tests", () => {
   });
 
   it("does not refetch data on view toggle", async () => {
-    const getTopicMock = vi.mocked(
-      cachedOpenAlex.client.topics.getTopic,
-    );
-
     render(
       <TestWrapper>
         <TopicRoute />

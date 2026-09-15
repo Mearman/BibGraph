@@ -7,7 +7,8 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { Page,test as base } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { test as base } from "@playwright/test";
 
 interface CacheFixtures {
   cachedPage: Page;
@@ -19,6 +20,9 @@ interface CacheFixtures {
 }
 
 const HAR_CACHE_DIR = path.join(__dirname, "../../test-results/har-cache");
+const CACHE_KEY_LENGTH = 8;
+const BYTES_PER_KB = 1024;
+const HIT_RATE_PERCENT_MULTIPLIER = 100;
 
 /**
  * Generate a stable cache key for a test
@@ -28,12 +32,11 @@ const HAR_CACHE_DIR = path.join(__dirname, "../../test-results/har-cache");
  * - No sensitive data: Only test metadata (test titles) are hashed
  * - No security requirements: Cache keys are used for file naming, not authentication
  * - Determinism required: MD5 provides stable, short identifiers across test runs
- *
  * @param testTitle - The test title to generate a cache key from
  * @returns An 8-character hexadecimal cache key
  */
- 
-const getCacheKey = (testTitle: string): string => crypto.createHash("md5").update(testTitle).digest("hex").slice(0, 8);
+
+const getCacheKey = (testTitle: string): string => crypto.createHash("md5").update(testTitle).digest("hex").slice(0, CACHE_KEY_LENGTH);
 
 /**
  * Extended test with caching capabilities
@@ -41,11 +44,6 @@ const getCacheKey = (testTitle: string): string => crypto.createHash("md5").upda
 export const test = base.extend<CacheFixtures>({
   /**
    * Enhanced page with HAR caching
-   * @param root0
-   * @param root0.page
-   * @param root0.context
-   * @param use
-   * @param testInfo
    */
   cachedPage: async ({ page, context }, use, testInfo) => {
     const cacheKey = getCacheKey(testInfo.title);
@@ -85,7 +83,7 @@ export const test = base.extend<CacheFixtures>({
     // Log HAR file size
     if (fs.existsSync(harPath)) {
       const stats = fs.statSync(harPath);
-      const sizeMB = (stats.size / 1024 / 1024).toFixed(2);
+      const sizeMB = (stats.size / BYTES_PER_KB / BYTES_PER_KB).toFixed(2);
       console.log(
         `📊 HAR file ${isHarExists ? "updated" : "created"}: ${harPath} (${sizeMB} MB)`
       );
@@ -94,10 +92,6 @@ export const test = base.extend<CacheFixtures>({
 
   /**
    * Cache statistics for monitoring
-   * @param root0
-   * @param root0.page
-   * @param use
-   * @param testInfo
    */
   cacheStats: async ({ page }, use, testInfo) => {
     const stats = {
@@ -122,9 +116,9 @@ export const test = base.extend<CacheFixtures>({
 
     // Log cache statistics after test
     console.log(`📈 Cache stats for "${testInfo.title}":`);
-    console.log(`   Hits: ${stats.hits}, Misses: ${stats.misses}`);
+    console.log(`   Hits: ${String(stats.hits)}, Misses: ${String(stats.misses)}`);
     if (stats.hits + stats.misses > 0) {
-      const hitRate = ((stats.hits / (stats.hits + stats.misses)) * 100).toFixed(1);
+      const hitRate = ((stats.hits / (stats.hits + stats.misses)) * HIT_RATE_PERCENT_MULTIPLIER).toFixed(1);
       console.log(`   Hit rate: ${hitRate}%`);
     }
   },

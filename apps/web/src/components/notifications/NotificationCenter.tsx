@@ -37,11 +37,13 @@ interface NotificationBellProperties {
   unreadCount: number;
 }
 
+const MAX_DISPLAYED_UNREAD_COUNT = 9;
+
 const NotificationBell = memo(({ onClick, unreadCount }: NotificationBellProperties) => {
   const theme = useMantineTheme();
 
   return (
-    <UnstyledButton onClick={onClick} aria-label={`Open notifications (${unreadCount} unread)`}>
+    <UnstyledButton onClick={onClick} aria-label={`Open notifications (${String(unreadCount)} unread)`}>
       <Box pos="relative">
         <ActionIcon
           variant="subtle"
@@ -71,7 +73,7 @@ const NotificationBell = memo(({ onClick, unreadCount }: NotificationBellPropert
               border: `2px solid ${theme.colors.gray[0]}`,
             }}
           >
-            {unreadCount > 9 ? '9+' : unreadCount}
+            {unreadCount > MAX_DISPLAYED_UNREAD_COUNT ? `${String(MAX_DISPLAYED_UNREAD_COUNT)}+` : unreadCount}
           </Box>
         )}
       </Box>
@@ -94,18 +96,23 @@ interface NotificationItemProperties {
   onDismiss: (id: string) => void;
 }
 
+const MS_PER_MINUTE = 60_000;
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const DAYS_PER_WEEK = 7;
+
 const NotificationItem = memo(({ notification, onMarkAsRead, onDismiss }: NotificationItemProperties) => {
-  const formatTime = (date: Date): string => {
+  const formatTime = (date: Readonly<Date>): string => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
+    const diffMins = Math.floor(diffMs / MS_PER_MINUTE);
 
     if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffMins < MINUTES_PER_HOUR) return `${String(diffMins)}m ago`;
+    const diffHours = Math.floor(diffMins / MINUTES_PER_HOUR);
+    if (diffHours < HOURS_PER_DAY) return `${String(diffHours)}h ago`;
+    const diffDays = Math.floor(diffHours / HOURS_PER_DAY);
+    if (diffDays < DAYS_PER_WEEK) return `${String(diffDays)}d ago`;
     return date.toLocaleDateString();
   };
 
@@ -126,7 +133,7 @@ const NotificationItem = memo(({ notification, onMarkAsRead, onDismiss }: Notifi
         textAlign: 'left',
         backgroundColor: notification.read ? 'transparent' : 'var(--mantine-color-blue-0)',
       }}
-      onClick={() => onMarkAsRead(notification.id)}
+      onClick={() => { onMarkAsRead(notification.id); }}
     >
       <Group gap="sm" wrap="nowrap">
         <Box

@@ -1,4 +1,4 @@
-import type { EntityType } from "@bibgraph/types";
+import { isEntityType } from "@bibgraph/types";
 import { useLiveRegion, useReducedMotion } from "@bibgraph/ui";
 import { logger } from "@bibgraph/utils";
 import { Alert, Badge,Code, Container, Flex, Group, Loader, Paper, Progress, Skeleton, Stack, Text, Title } from "@mantine/core";
@@ -23,6 +23,9 @@ interface LoadingStep {
   label: string;
   estimatedTime: number; // percentage of total time
 }
+
+const PERCENT_SCALE = 100;
+const MS_PER_SECOND = 1000;
 
 // Define loading steps for entity detail pages
 const getLoadingSteps = (entityType: string): LoadingStep[] => {
@@ -53,7 +56,7 @@ const getLoadingSteps = (entityType: string): LoadingStep[] => {
 export const LoadingState = ({
   entityType,
   entityId,
-  config,
+  config: _config,
   operation = "load",
   showProgress = true,
   estimatedDuration = 3000 // Default 3 seconds
@@ -62,13 +65,13 @@ export const LoadingState = ({
   const [currentStep, setCurrentStep] = useState(0);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [lastAnnouncedStep, setLastAnnouncedStep] = useState(-1);
-  const loaderColor = getMantineColor(config.colorKey as EntityType);
+  const loaderColor = isEntityType(entityType) ? getMantineColor(entityType) : 'blue';
   const steps = getLoadingSteps(entityType);
 
   // Accessibility hooks
   const { announce, LiveRegionComponent } = useLiveRegion();
   const isPrefersReducedMotion = useReducedMotion();
-  const loadingElementReference = useRef<HTMLDivElement>(null);
+  const loadingElementRef = useRef<HTMLDivElement>(null);
 
   // Simulate progress with accessibility announcements
   useEffect(() => {
@@ -76,8 +79,10 @@ export const LoadingState = ({
       setTimeElapsed(previous => previous + LOADING_CONSTANTS.PROGRESS_UPDATE_INTERVAL_MS);
 
       // Calculate progress based on elapsed time and steps
-      const totalTime = estimatedDuration;
-      const progressPercentage = Math.min((timeElapsed / totalTime) * 100, LOADING_CONSTANTS.MAX_PROGRESS_PERCENT);
+      const progressPercentage = Math.min(
+        (timeElapsed / estimatedDuration) * PERCENT_SCALE,
+        LOADING_CONSTANTS.MAX_PROGRESS_PERCENT
+      );
 
       setProgress(progressPercentage);
 
@@ -85,7 +90,7 @@ export const LoadingState = ({
       let cumulativeTime = 0;
       let newStep = 0;
       for (let index = 0; index < steps.length; index++) {
-        cumulativeTime += (steps[index].estimatedTime / 100) * totalTime;
+        cumulativeTime += (steps[index].estimatedTime / PERCENT_SCALE) * estimatedDuration;
         if (timeElapsed < cumulativeTime) {
           newStep = index;
           break;
@@ -98,14 +103,14 @@ export const LoadingState = ({
       if (newStep !== lastAnnouncedStep && newStep < steps.length) {
         const step = steps[newStep];
         announce(
-          `Loading ${entityType}: ${step.label}. ${Math.round(progressPercentage)}% complete.`,
+          `Loading ${entityType}: ${step.label}. ${String(Math.round(progressPercentage))}% complete.`,
           'polite'
         );
         setLastAnnouncedStep(newStep);
       }
     }, LOADING_CONSTANTS.PROGRESS_UPDATE_INTERVAL_MS);
 
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); };
   }, [timeElapsed, estimatedDuration, steps, entityType, lastAnnouncedStep, announce]);
 
   // Debug logging
@@ -136,7 +141,7 @@ export const LoadingState = ({
         size="md"
         p="xl"
         data-testid="loading-state"
-        ref={loadingElementReference}
+        ref={loadingElementRef}
         role="status"
         aria-live="polite"
         aria-label={`Loading ${entityType}`}
@@ -244,10 +249,10 @@ export const LoadingState = ({
             {/* Time Information */}
             <Group justify="center" gap="md">
               <Text size="xs" c="dimmed">
-                Time elapsed: {(timeElapsed / 1000).toFixed(1)}s
+                Time elapsed: {(timeElapsed / MS_PER_SECOND).toFixed(1)}s
               </Text>
               <Text size="xs" c="dimmed">
-                Estimated: {(estimatedDuration / 1000).toFixed(1)}s
+                Estimated: {(estimatedDuration / MS_PER_SECOND).toFixed(1)}s
               </Text>
             </Group>
           </Stack>

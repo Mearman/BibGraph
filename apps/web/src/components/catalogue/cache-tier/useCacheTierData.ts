@@ -1,11 +1,10 @@
 /**
  * Custom hooks for Cache Tier data management
- * @module components/catalogue/cache-tier/useCacheTierData
  */
 
 import { cachedOpenAlex } from "@bibgraph/client";
 import type { CachedEntityEntry } from "@bibgraph/client/internal/static-data-provider";
-import type { EntityType } from "@bibgraph/types";
+import { isEntityType } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -18,10 +17,13 @@ import type { CacheTierStats, CacheTierSummary, StaticCacheTierConfig } from "./
 export const useEntityNavigation = () => {
   const navigate = useNavigate();
 
-  return useCallback((entity: CachedEntityEntry) => {
-    const entityType = entity.entityType as EntityType;
-    const path = `/${entityType}/${entity.entityId}`;
-    navigate({ to: path });
+  return useCallback((entity: Readonly<CachedEntityEntry>) => {
+    if (!isEntityType(entity.entityType)) {
+      logger.error("cache-tier-ui", "Unknown entity type, cannot navigate", { entityType: entity.entityType });
+      return;
+    }
+    const path = `/${entity.entityType}/${entity.entityId}`;
+    void navigate({ to: path });
   }, [navigate]);
 };
 
@@ -78,7 +80,7 @@ export const useCacheTierData = (): UseCacheTierDataReturn => {
     try {
       const stats = await cachedOpenAlex.getStaticCacheStats();
       setTierStats({
-        gitHubPages: stats.tierStats?.github_pages ?? null,
+        gitHubPages: stats.tierStats.github_pages,
       });
     } catch (error) {
       logger.error("cache-tier-ui", "Failed to load tier stats", { error });
@@ -96,13 +98,14 @@ export const useCacheTierData = (): UseCacheTierDataReturn => {
 
   useEffect(() => {
     void Promise.all([loadCacheSummary(), loadTierStats(), loadStaticCacheEntities()])
-      .catch((error) => {
+      .catch((error: unknown) => {
         logger.error("cache-tier-ui", "Failed to load cache data", { error });
       })
-      .finally(() => setHasInitialLoadCompleted(true));
+      .finally(() => { setHasInitialLoadCompleted(true); });
   }, [loadCacheSummary, loadTierStats, loadStaticCacheEntities]);
 
   const handleRefreshMemory = useCallback(async () => {
+    await Promise.resolve();
     setIsRefreshingMemory(true);
     try {
       const memoryEntities = cachedOpenAlex.enumerateMemoryCacheEntities();

@@ -10,7 +10,7 @@
  * - Storage operations are called with correct parameters
  */
 
-import type { GraphListNode,GraphNode } from '@bibgraph/types';
+import type { GraphNode } from '@bibgraph/types';
 import { InMemoryStorageProvider } from '@bibgraph/utils';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
@@ -20,6 +20,15 @@ import { NotificationProvider } from '@/contexts/NotificationContext';
 import { StorageProviderWrapper } from '@/contexts/storage-provider-context';
 
 import { useGraphList } from './use-graph-list';
+
+/**
+ * Clones a storage provider instance, preserving its prototype methods, so a single method can be overridden on the clone without mutating the shared `storage` instance used across tests.
+ */
+const cloneStorage = (source: InMemoryStorageProvider): InMemoryStorageProvider =>
+	Object.create(
+		Object.getPrototypeOf(source) as object,
+		Object.getOwnPropertyDescriptors(source),
+	) as InMemoryStorageProvider;
 
 describe('Graph List Management Hook (T042-T044)', () => {
 	let storage: InMemoryStorageProvider;
@@ -71,13 +80,10 @@ describe('Graph List Management Hook (T042-T044)', () => {
 			});
 
 			// Create a proper proxy that preserves prototype methods
-			const slowStorage = Object.create(
-				Object.getPrototypeOf(storage),
-				Object.getOwnPropertyDescriptors(storage)
-			) as InMemoryStorageProvider;
+			const slowStorage = cloneStorage(storage);
 
 			// Override only the addToGraphList method
-			slowStorage.addToGraphList = vi.fn().mockImplementation(async (...arguments_: unknown[]) => {
+			slowStorage.addToGraphList = vi.fn().mockImplementation(async (...arguments_: readonly unknown[]) => {
 				// Wait for our promise before completing
 				await addPromise;
 				// Then call the real implementation
@@ -120,7 +126,7 @@ describe('Graph List Management Hook (T042-T044)', () => {
 
 			// Verify node is present in state (optimistic update)
 			expect(result.current.nodes).toHaveLength(1);
-			const listNode = result.current.nodes[0] as GraphListNode;
+			const listNode = result.current.nodes[0];
 			expect(listNode.entityId).toBe('W1');
 			expect(listNode.provenance).toBe('user');
 
@@ -130,16 +136,13 @@ describe('Graph List Management Hook (T042-T044)', () => {
 
 			// Verify final state (should be same as optimistic state)
 			expect(result.current.nodes).toHaveLength(1);
-			const finalNode = result.current.nodes[0] as GraphListNode;
+			const finalNode = result.current.nodes[0];
 			expect(finalNode.provenance).toBe('user');
 		});
 
 		it('should handle errors gracefully and rollback optimistic updates', async () => {
 			// Create a storage provider that will fail
-			const failingStorage = Object.create(
-				Object.getPrototypeOf(storage),
-				Object.getOwnPropertyDescriptors(storage)
-			) as InMemoryStorageProvider;
+			const failingStorage = cloneStorage(storage);
 
 			// Override only the addToGraphList method to fail
 			failingStorage.addToGraphList = vi.fn().mockRejectedValue(new Error('Storage error'));
@@ -233,12 +236,12 @@ describe('Graph List Management Hook (T042-T044)', () => {
 
 			// Add all nodes
 			await Promise.all(
-				nodes.map((node) => result.current.addNode(node, 'collection-load'))
+				nodes.map(async (node) => result.current.addNode(node, 'collection-load'))
 			);
 
 			// Verify all nodes added
 			const graphList = await storage.getGraphList();
-			expect(graphList).toHaveLength(3);
+			expect(graphList).toHaveLength(nodes.length);
 			expect(graphList.every((n) => n.provenance === 'collection-load')).toBe(true);
 		});
 	});
@@ -305,7 +308,7 @@ describe('Graph List Management Hook (T042-T044)', () => {
 			];
 
 			await Promise.all(
-				discoveredNodes.map((node) => result.current.addNode(node, 'expansion'))
+				discoveredNodes.map(async (node) => result.current.addNode(node, 'expansion'))
 			);
 
 			// Should have 2 nodes total (W1 with updated provenance, A1 new)

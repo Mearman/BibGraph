@@ -12,7 +12,8 @@ import { waitForAppReady } from '@/test/helpers/app-ready';
 import { StorageTestHelper } from '@/test/helpers/StorageTestHelper';
 import { BaseEntityPageObject } from '@/test/page-objects/BaseEntityPageObject';
 
-const BASE_URL = process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173';
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = IS_CI ? 'http://localhost:4173' : 'http://localhost:5173';
 
 const TEST_ENTITIES = {
 	author: { type: 'authors' as const, id: 'A5017898742' },
@@ -21,8 +22,10 @@ const TEST_ENTITIES = {
 	source: { type: 'sources' as const, id: 'S137773608' },
 };
 
+const TEST_SUITE_TIMEOUT_MS = 120_000;
+
 test.describe('@workflow US-17 Bookmarking', () => {
-	test.setTimeout(120_000);
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS);
 
 	test.beforeEach(async ({ page }) => {
 		await page.goto(BASE_URL, {

@@ -43,6 +43,20 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import React, { useEffect,useState } from "react";
 
+// Number of most-recent activity entries shown in the Recent Activity list.
+const RECENT_ACTIVITY_DISPLAY_COUNT = 5;
+
+// Units for converting the mock recent-activity timestamps below into offsets from now.
+const MS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE;
+const MS_PER_HOUR = MS_PER_MINUTE * MINUTES_PER_HOUR;
+const MS_PER_DAY = MS_PER_HOUR * HOURS_PER_DAY;
+const RECENT_SEARCH_MINUTES_AGO = 30;
+const RECENT_BOOKMARK_HOURS_AGO = 2;
+
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
 import { useCatalogue } from "@/hooks/useCatalogue";
 
@@ -70,7 +84,7 @@ const QuickSearch = ({ onSearch }: QuickSearchProperties) => {
       <Group gap="sm">
         <Select
           value={entityType}
-          onChange={(value) => setEntityType(value || "works")}
+          onChange={(value) => { setEntityType(value !== null && value !== "" ? value : "works"); }}
           data={[
             { value: "works", label: "Works" },
             { value: "authors", label: "Authors" },
@@ -83,8 +97,8 @@ const QuickSearch = ({ onSearch }: QuickSearchProperties) => {
         <TextInput
           placeholder="Search academic literature..."
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+          onChange={(e) => { setQuery(e.target.value); }}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
           style={{ flex: 1 }}
         />
         <ActionIcon size="lg" onClick={handleSearch} color="blue" aria-label="Search">
@@ -96,12 +110,12 @@ const QuickSearch = ({ onSearch }: QuickSearchProperties) => {
 };
 
 interface RecentActivityProperties {
-  activities: Array<{
+  activities: {
     id: string;
     type: string;
     description: string;
     timestamp: Date;
-  }>;
+  }[];
 }
 
 const RecentActivity = ({ activities }: RecentActivityProperties) => {
@@ -124,7 +138,7 @@ const RecentActivity = ({ activities }: RecentActivityProperties) => {
     <Card padding="md" style={{ border: BORDER_STYLE_GRAY_3 }} h="100%">
       <Title order={4} mb="md">Recent Activity</Title>
       <List spacing="sm" size="sm">
-        {activities.slice(0, 5).map((activity) => (
+        {activities.slice(0, RECENT_ACTIVITY_DISPLAY_COUNT).map((activity) => (
           <List.Item
             key={activity.id}
             icon={
@@ -210,7 +224,7 @@ const QuickActions = ({ onAction }: QuickActionsProperties) => {
             key={action.id}
             variant="light"
             color={action.color}
-            onClick={() => onAction(action.id)}
+            onClick={() => { onAction(action.id); }}
             h="auto"
             p="md"
           >
@@ -292,11 +306,11 @@ const ResearchStats = ({ stats }: ResearchStatsProperties) => {
 };
 
 interface PopularTopicsProperties {
-  topics: Array<{
+  topics: {
     name: string;
     count: number;
     trend: "up" | "down" | "stable";
-  }>;
+  }[];
 }
 
 const PopularTopics = ({ topics }: PopularTopicsProperties) => {
@@ -340,24 +354,24 @@ export const ResearchDashboard = () => {
   const navigate = useNavigate();
   const { lists } = useCatalogue();
 
-  const [recentActivity] = useState([
+  const [recentActivity] = useState(() => [
     {
       id: "1",
       type: "search",
       description: "Searched for 'machine learning in healthcare'",
-      timestamp: new Date(Date.now() - 1000 * 60 * 30),
+      timestamp: new Date(Date.now() - MS_PER_MINUTE * RECENT_SEARCH_MINUTES_AGO),
     },
     {
       id: "2",
       type: "bookmark",
       description: "Added 3 papers to 'AI in Medicine' bibliography",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
+      timestamp: new Date(Date.now() - MS_PER_HOUR * RECENT_BOOKMARK_HOURS_AGO),
     },
     {
       id: "3",
       type: "export",
       description: "Exported 'Climate Change Research' list as BibTeX",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
+      timestamp: new Date(Date.now() - MS_PER_DAY),
     },
   ]);
 
@@ -368,11 +382,11 @@ export const ResearchDashboard = () => {
     sharedItems: 5,
   });
 
-  const [popularTopics] = useState<Array<{
+  const [popularTopics] = useState<{
     name: string;
     count: number;
     trend: "up" | "down" | "stable";
-  }>>([
+  }[]>([
     { name: "Machine Learning", count: 15_420, trend: "up" },
     { name: "Climate Change", count: 12_350, trend: "up" },
     { name: "COVID-19 Research", count: 9876, trend: "down" },
@@ -381,7 +395,7 @@ export const ResearchDashboard = () => {
   ]);
 
   const handleQuickSearch = (query: string, entityType: string) => {
-    navigate({
+    void navigate({
       to: "/search",
       search: { q: query, filter: entityType, search: undefined },
     });
@@ -392,7 +406,7 @@ export const ResearchDashboard = () => {
 
     switch (action) {
       case "advanced-search":
-        navigate({ to: "/search", search: { q: "", filter: undefined, search: undefined } });
+        void navigate({ to: "/search", search: { q: "", filter: undefined, search: undefined } });
         break;
       case "create-list":
         // This would open a modal for creating a new list
@@ -500,7 +514,7 @@ export const ResearchDashboard = () => {
                     variant="subtle"
                     fullWidth
                     leftSection={<IconDatabase size={ICON_SIZE.SM} />}
-                    onClick={() => navigate({ to: "/catalogue" })}
+                    onClick={() => { void navigate({ to: "/catalogue" }); }}
                   >
                     My Bibliographies ({lists.length})
                   </Button>
@@ -508,7 +522,7 @@ export const ResearchDashboard = () => {
                     variant="subtle"
                     fullWidth
                     leftSection={<IconBook size={ICON_SIZE.SM} />}
-                    onClick={() => navigate({ to: "/history" })}
+                    onClick={() => { void navigate({ to: "/history" }); }}
                   >
                     Recent Searches
                   </Button>
@@ -516,7 +530,7 @@ export const ResearchDashboard = () => {
                     variant="subtle"
                     fullWidth
                     leftSection={<IconUsers size={ICON_SIZE.SM} />}
-                    onClick={() => navigate({ to: "/authors" })}
+                    onClick={() => { void navigate({ to: "/authors", params: {} }); }}
                   >
                     Top Authors
                   </Button>
@@ -524,7 +538,7 @@ export const ResearchDashboard = () => {
                     variant="subtle"
                     fullWidth
                     leftSection={<IconBuilding size={ICON_SIZE.SM} />}
-                    onClick={() => navigate({ to: "/institutions" })}
+                    onClick={() => { void navigate({ to: "/institutions", params: {} }); }}
                   >
                     Leading Institutions
                   </Button>

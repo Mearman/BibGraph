@@ -14,9 +14,13 @@ import { IconPlus, IconSearch,IconTrash } from "@tabler/icons-react";
 import React, { useCallback,useState } from "react";
 
 import { BORDER_STYLE_GRAY_3 } from '@/config/style-constants';
+
+const RANDOM_ID_RADIX = 36;
+const RANDOM_ID_SLICE_END = 11;
+
 // Simple ID generator for query terms
 const generateId = () =>
-  `query-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  `query-${String(Date.now())}-${Math.random().toString(RANDOM_ID_RADIX).slice(2, RANDOM_ID_SLICE_END)}`;
 
 // TypeScript interfaces for query structure
 export interface QueryTerm {
@@ -104,7 +108,7 @@ export const AdvancedQueryBuilder: React.FC<AdvancedQueryBuilderProps> = ({
 
   // Update term text
   const updateTermText = useCallback(
-    ({ termId, text }) => {
+    ({ termId, text }: { termId: string; text: string }) => {
       const newTerms = query.terms.map((term) =>
         term.id === termId ? { ...term, text } : term,
       );
@@ -116,7 +120,7 @@ export const AdvancedQueryBuilder: React.FC<AdvancedQueryBuilderProps> = ({
 
   // Update term operator
   const updateTermOperator = useCallback(
-    ({ termId, operator }) => {
+    ({ termId, operator }: { termId: string; operator: QueryTerm["operator"] }) => {
       const newTerms = query.terms.map((term) =>
         term.id === termId ? { ...term, operator } : term,
       );
@@ -162,7 +166,7 @@ export const AdvancedQueryBuilder: React.FC<AdvancedQueryBuilderProps> = ({
               {index > 0 && (
                 <Select
                   data={OPERATOR_OPTIONS}
-                  value={term.operator || "AND"}
+                  value={term.operator ?? "AND"}
                   onChange={(value) => {
                     if (value === "AND" || value === "OR") {
                       updateTermOperator({ termId: term.id, operator: value });
@@ -170,23 +174,23 @@ export const AdvancedQueryBuilder: React.FC<AdvancedQueryBuilderProps> = ({
                   }}
                   w={80}
                   size="sm"
-                  aria-label={`Operator for term ${index + 1}`}
+                  aria-label={`Operator for term ${String(index + 1)}`}
                 />
               )}
 
               {/* Search term input */}
               <TextInput
                 value={term.text}
-                onChange={(event) =>
+                onChange={(event) => {
                   updateTermText({
                     termId: term.id,
                     text: event.currentTarget.value,
-                  })
-                }
+                  });
+                }}
                 placeholder={placeholder}
                 flex={1}
                 size="sm"
-                aria-label={`Search term ${index + 1}`}
+                aria-label={`Search term ${String(index + 1)}`}
               />
 
               {/* Remove button (only show if more than one term) */}
@@ -194,9 +198,11 @@ export const AdvancedQueryBuilder: React.FC<AdvancedQueryBuilderProps> = ({
                 <ActionIcon
                   variant="subtle"
                   color="red"
-                  onClick={() => removeTerm(term.id)}
+                  onClick={() => {
+                    removeTerm(term.id);
+                  }}
                   size="sm"
-                  aria-label={`Remove term ${index + 1}`}
+                  aria-label={`Remove term ${String(index + 1)}`}
                 >
                   <IconTrash size={16} />
                 </ActionIcon>
@@ -236,7 +242,7 @@ export const AdvancedQueryBuilder: React.FC<AdvancedQueryBuilderProps> = ({
               {query.terms
                 .filter((term) => term.text.trim().length > 0)
                 .map((term, index) => {
-                  const prefix = index > 0 ? ` ${term.operator || "AND"} ` : "";
+                  const prefix = index > 0 ? ` ${term.operator ?? "AND"} ` : "";
                   return `${prefix}"${term.text.trim()}"`;
                 })
                 .join("")}

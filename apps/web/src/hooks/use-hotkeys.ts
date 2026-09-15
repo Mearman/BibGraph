@@ -15,7 +15,7 @@ interface UseHotkeysOptions {
   scope?: string;
 }
 
-export const useGlobalHotkeys = (options: UseHotkeysOptions = {}) => {
+export const useGlobalHotkeys = (options: Readonly<UseHotkeysOptions> = {}) => {
   const { enabled = true } = options;
 
   // Define all hotkey configurations
@@ -25,9 +25,11 @@ export const useGlobalHotkeys = (options: UseHotkeysOptions = {}) => {
       key: 'ctrl+k',
       description: 'Focus search',
       action: () => {
-        const searchInput = document.querySelector('input[aria-label*="search" i]') as HTMLInputElement;
-        searchInput?.focus();
-        searchInput?.select();
+        const searchInput = document.querySelector('input[aria-label*="search" i]');
+        if (searchInput instanceof HTMLInputElement) {
+          searchInput.focus();
+          searchInput.select();
+        }
       },
       category: 'global',
       preventDefault: true,
@@ -57,9 +59,11 @@ export const useGlobalHotkeys = (options: UseHotkeysOptions = {}) => {
 
         // Clear search if focused
         const activeElement = document.activeElement;
-        if (activeElement?.tagName === 'INPUT' && activeElement.getAttribute('aria-label')?.includes('search')) {
-          const clearButton = document.querySelector('[aria-label*="clear" i]') as HTMLElement;
-          clearButton?.click();
+        if (activeElement?.tagName === 'INPUT' && activeElement.getAttribute('aria-label')?.includes('search') === true) {
+          const clearButton = document.querySelector('[aria-label*="clear" i]');
+          if (clearButton instanceof HTMLElement) {
+            clearButton.click();
+          }
         }
       },
       category: 'global',
@@ -100,8 +104,10 @@ export const useGlobalHotkeys = (options: UseHotkeysOptions = {}) => {
       key: 'ctrl+f',
       description: 'Toggle filters',
       action: () => {
-        const filterButton = document.querySelector('[aria-label*="filter" i]') as HTMLElement;
-        filterButton?.click();
+        const filterButton = document.querySelector('[aria-label*="filter" i]');
+        if (filterButton instanceof HTMLElement) {
+          filterButton.click();
+        }
       },
       category: 'search',
       preventDefault: true,
@@ -110,8 +116,10 @@ export const useGlobalHotkeys = (options: UseHotkeysOptions = {}) => {
       key: 'ctrl+enter',
       description: 'Execute search',
       action: () => {
-        const searchButton = document.querySelector('[aria-label*="search" i][type="submit"]') as HTMLElement;
-        searchButton?.click();
+        const searchButton = document.querySelector('[aria-label*="search" i][type="submit"]');
+        if (searchButton instanceof HTMLElement) {
+          searchButton.click();
+        }
       },
       category: 'search',
       preventDefault: true,
@@ -123,11 +131,13 @@ export const useGlobalHotkeys = (options: UseHotkeysOptions = {}) => {
       description: 'Next result',
       action: () => {
         const results = document.querySelectorAll('[role="listitem"]');
-        const currentIndex = [...results].indexOf(
-          document.activeElement?.parentElement as Element
-        );
+        const activeParent = document.activeElement?.parentElement;
+        const currentIndex = activeParent ? [...results].indexOf(activeParent) : -1;
         const nextIndex = (currentIndex + 1) % results.length;
-        (results[nextIndex] as HTMLElement)?.focus();
+        const nextElement = results[nextIndex];
+        if (nextElement instanceof HTMLElement) {
+          nextElement.focus();
+        }
       },
       category: 'content',
       preventDefault: true,
@@ -137,11 +147,13 @@ export const useGlobalHotkeys = (options: UseHotkeysOptions = {}) => {
       description: 'Previous result',
       action: () => {
         const results = document.querySelectorAll('[role="listitem"]');
-        const currentIndex = [...results].indexOf(
-          document.activeElement?.parentElement as Element
-        );
+        const activeParent = document.activeElement?.parentElement;
+        const currentIndex = activeParent ? [...results].indexOf(activeParent) : -1;
         const previousIndex = currentIndex <= 0 ? results.length - 1 : currentIndex - 1;
-        (results[previousIndex] as HTMLElement)?.focus();
+        const previousElement = results[previousIndex];
+        if (previousElement instanceof HTMLElement) {
+          previousElement.focus();
+        }
       },
       category: 'content',
       preventDefault: true,
@@ -152,9 +164,11 @@ export const useGlobalHotkeys = (options: UseHotkeysOptions = {}) => {
       key: 'alt+a',
       description: 'Skip to main content',
       action: () => {
-        const mainContent = document.querySelector('main') || document.querySelector('[role="main"]');
+        const mainContent = document.querySelector('main') ?? document.querySelector('[role="main"]');
         mainContent?.scrollIntoView({ behavior: 'smooth' });
-        (mainContent as HTMLElement)?.focus();
+        if (mainContent instanceof HTMLElement) {
+          mainContent.focus();
+        }
       },
       category: 'accessibility',
       preventDefault: true,
@@ -202,26 +216,26 @@ export const useGlobalHotkeys = (options: UseHotkeysOptions = {}) => {
   }, []);
 
   // Helper function to handle hotkey events
-  const createHotkeyHandler = useCallback((hotkey: HotkeyConfig) => {
+  const createHotkeyHandler = useCallback((hotkey: Readonly<HotkeyConfig>) => {
     return (event: KeyboardEvent) => {
       // Check if the key combination matches
       const isMatch = checkKeyMatch(event, hotkey.key);
 
       if (isMatch) {
-        if (hotkey.preventDefault) {
+        if (hotkey.preventDefault === true) {
           event.preventDefault();
         }
         event.stopPropagation();
 
         // Execute the action
-        hotkey.action();
+        void hotkey.action();
       }
     };
   }, [checkKeyMatch]);
 
   // Helper function to register a single hotkey
-  const registerHotkey = useCallback((hotkey: HotkeyConfig) => {
-    if (hotkey.enabled === false) return;
+  const registerHotkey = useCallback((hotkey: Readonly<HotkeyConfig>) => {
+    if (hotkey.enabled === false) return undefined;
 
     const handler = createHotkeyHandler(hotkey);
     document.addEventListener('keydown', handler);
@@ -233,7 +247,7 @@ export const useGlobalHotkeys = (options: UseHotkeysOptions = {}) => {
 
   // Register all hotkeys
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return undefined;
 
     const cleanupFunctions = hotkeys.map(hotkey => registerHotkey(hotkey));
 
@@ -261,8 +275,10 @@ export const useGlobalHotkeys = (options: UseHotkeysOptions = {}) => {
 export const useSearchHotkeys = (onSearch?: () => void, onClear?: () => void) => {
   useHotkeys('ctrl+k', (e) => {
     e.preventDefault();
-    const searchInput = document.querySelector('input[aria-label*="search" i]') as HTMLInputElement;
-    searchInput?.focus();
+    const searchInput = document.querySelector('input[aria-label*="search" i]');
+    if (searchInput instanceof HTMLInputElement) {
+      searchInput.focus();
+    }
   }, { enableOnFormTags: true });
 
   useHotkeys('ctrl+enter', (e) => {
@@ -280,20 +296,24 @@ export const useNavigationHotkeys = () => {
   useHotkeys('j', (e) => {
     e.preventDefault();
     const results = document.querySelectorAll('[role="listitem"]');
-    const currentIndex = document.activeElement?.parentElement
-      ? [...results].indexOf(document.activeElement.parentElement as Element)
-      : -1;
+    const activeParent = document.activeElement?.parentElement;
+    const currentIndex = activeParent ? [...results].indexOf(activeParent) : -1;
     const nextIndex = (currentIndex + 1) % results.length;
-    (results[nextIndex] as HTMLElement)?.focus();
+    const nextElement = results[nextIndex];
+    if (nextElement instanceof HTMLElement) {
+      nextElement.focus();
+    }
   });
 
   useHotkeys('k', (e) => {
     e.preventDefault();
     const results = document.querySelectorAll('[role="listitem"]');
-    const currentIndex = document.activeElement?.parentElement
-      ? [...results].indexOf(document.activeElement.parentElement as Element)
-      : -1;
+    const activeParent = document.activeElement?.parentElement;
+    const currentIndex = activeParent ? [...results].indexOf(activeParent) : -1;
     const previousIndex = currentIndex <= 0 ? results.length - 1 : currentIndex - 1;
-    (results[previousIndex] as HTMLElement)?.focus();
+    const previousElement = results[previousIndex];
+    if (previousElement instanceof HTMLElement) {
+      previousElement.focus();
+    }
   });
 };

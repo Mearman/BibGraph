@@ -1,7 +1,5 @@
 /**
- * RelationshipPagination component
- * Provides pagination controls with page navigation and page size selector
- * @module RelationshipPagination
+ * RelationshipPagination component Provides pagination controls with page navigation and page size selector
  * @see specs/016-entity-relationship-viz/spec.md
  */
 
@@ -52,15 +50,18 @@ const PAGE_SIZE_OPTIONS = [
 ];
 
 /**
+Decimal radix for parsing the page size selector's string value
+ */
+const PAGE_SIZE_PARSE_RADIX = 10;
+
+/**
+Below this item count, pagination controls add no value over a plain count
+ */
+const SINGLE_PAGE_ITEM_THRESHOLD = 10;
+
+/**
  * Pagination controls for relationship lists
  * Includes page navigation and page size selector
- * @param root0
- * @param root0.pagination
- * @param root0.totalCount
- * @param root0.loadedCount
- * @param root0.onPageChange
- * @param root0.onPageSizeChange
- * @param root0.disabled
  */
 export const RelationshipPagination = ({
   pagination,
@@ -69,7 +70,7 @@ export const RelationshipPagination = ({
   onPageChange,
   onPageSizeChange,
   disabled = false,
-}) => {
+}: Readonly<RelationshipPaginationProps>) => {
   // Convert 0-indexed currentPage to 1-indexed for display
   const displayPage = pagination.currentPage + 1;
 
@@ -83,13 +84,13 @@ export const RelationshipPagination = ({
   };
 
   const handlePageSizeChange = (value: string | null) => {
-    if (value) {
-      onPageSizeChange?.(Number.parseInt(value, 10));
+    if (value !== null) {
+      onPageSizeChange?.(Number.parseInt(value, PAGE_SIZE_PARSE_RADIX));
     }
   };
 
   // Don't show pagination if only one page and no page size options needed
-  if (totalCount <= 10) {
+  if (totalCount <= SINGLE_PAGE_ITEM_THRESHOLD) {
     return (
       <Text size="sm" c="dimmed">
         Showing {loadedCount} of {totalCount}

@@ -1,7 +1,6 @@
 /**
  * GraphEmptyState component
  * Provides engaging empty state visuals with clear guidance for the graph explorer
- * @module GraphEmptyState
  */
 
 import {
@@ -26,6 +25,7 @@ import {
   IconSettings,
 } from '@tabler/icons-react';
 import { Link } from '@tanstack/react-router';
+import type { ReactNode } from 'react';
 
 import { ICON_SIZE } from '@/config/style-constants';
 
@@ -44,10 +44,8 @@ export interface GraphEmptyStateProps {
 
 /**
  * Large decorative icon with a subtle background
- * @param root0
- * @param root0.children
  */
-const DecorativeIcon = ({ children }: { children: import("react").ReactNode }) => (
+const DecorativeIcon = ({ children }: { children: ReactNode }) => (
   <Box
     style={{
       width: 120,
@@ -74,8 +72,6 @@ const DecorativeIcon = ({ children }: { children: import("react").ReactNode }) =
 
 /**
  * Empty state when no data sources are enabled
- * @param root0
- * @param root0.availableSourceCount
  */
 const NoSourcesEnabledState = ({ availableSourceCount = 0 }: { availableSourceCount?: number }) => (
   <Stack align="center" gap="xl" py="xl">
@@ -108,7 +104,7 @@ const NoSourcesEnabledState = ({ availableSourceCount = 0 }: { availableSourceCo
           >
             <Text>
               <strong>Toggle sources</strong> in the left panel
-              {availableSourceCount > 0 && ` (${availableSourceCount} available)`}
+              {availableSourceCount > 0 && ` (${String(availableSourceCount)} available)`}
             </Text>
           </List.Item>
           <List.Item
@@ -216,18 +212,17 @@ const NoEntitiesState = () => (
 
 /**
  * GraphEmptyState displays contextual guidance when the graph has no data to show
- * @param root0
- * @param root0.variant
- * @param root0.availableSourceCount
  */
 export const GraphEmptyState = ({
   variant,
   availableSourceCount,
-}) => {
+}: GraphEmptyStateProps) => {
   switch (variant) {
     case 'no-sources':
       return <NoSourcesEnabledState availableSourceCount={availableSourceCount} />;
     case 'no-entities':
       return <NoEntitiesState />;
+    default:
+      return variant satisfies never;
   }
 };

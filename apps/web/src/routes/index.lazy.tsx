@@ -35,7 +35,7 @@ const HomePage = () => {
     if (!searchQuery.trim()) return;
 
     // Navigate to search page with search query
-    navigate({
+    void navigate({
       to: "/search",
       search: { q: searchQuery.trim(), filter: undefined, search: undefined },
     });
@@ -43,7 +43,7 @@ const HomePage = () => {
 
   const handleExampleSearch = (query: string) => {
     // Navigate to search page with example query
-    navigate({
+    void navigate({
       to: "/search",
       search: { q: query, filter: undefined, search: undefined },
     });
@@ -129,7 +129,7 @@ const HomePage = () => {
           <Stack gap="xs">
             <Group gap="sm" wrap="wrap">
               <UnstyledButton
-                onClick={() => handleExampleSearch("machine learning")}
+                onClick={() => { handleExampleSearch("machine learning"); }}
                 aria-label="Search for machine learning papers"
                 style={{
                   fontSize: "var(--mantine-font-size-sm)",
@@ -144,7 +144,7 @@ const HomePage = () => {
                 •
               </Text>
               <UnstyledButton
-                onClick={() => handleExampleSearch("climate change")}
+                onClick={() => { handleExampleSearch("climate change"); }}
                 aria-label="Search for climate change papers"
                 style={{
                   fontSize: "var(--mantine-font-size-sm)",
@@ -159,7 +159,7 @@ const HomePage = () => {
                 •
               </Text>
               <UnstyledButton
-                onClick={() => handleExampleSearch("0000-0003-1613-5981")}
+                onClick={() => { handleExampleSearch("0000-0003-1613-5981"); }}
                 aria-label="Search for author by ORCID example"
                 style={{
                   fontSize: "var(--mantine-font-size-sm)",
