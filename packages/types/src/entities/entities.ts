@@ -8,19 +8,21 @@ import type {
 	OpenAlexId,
 	PartialExceptId,
 } from "./base"
-import {
+import type {
 	authorSchema,
 	conceptSchema,
 	domainSchema,
 	fieldSchema,
-	funderSchema,
 	institutionSchema,
-	keywordSchema,
 	publisherSchema,
-	sourceSchema,
 	subfieldSchema,
-	topicSchema,
 	workSchema,
+} from "./schemas"
+import {
+	funderSchema,
+	keywordSchema,
+	sourceSchema,
+	topicSchema,
 } from "./schemas"
 
 /**
@@ -44,21 +46,21 @@ interface EntityWithWorksFieldMap extends BaseEntityFieldMap {
 }
 
 /**
- * Generic base entity type that picks only the specified fields.
- * @template Keys - Union type of allowed field names for this entity
+ * Generic base entity type that picks only the specified fields. `Keys` is a union type of allowed field names for this entity.
  * @example
+ * ```
  * type AuthorKeys = 'id' | 'display_name' | 'orcid';
  * interface Author extends BaseEntity<AuthorKeys> {
- *   orcid?: ORCID;
+ * orcid?: ORCID;
  * }
+ * ```
  */
 export type BaseEntity<Keys extends string = string> = {
 	[K in Keys & keyof BaseEntityFieldMap]: BaseEntityFieldMap[K]
 }
 
 /**
- * Generic entity-with-works type that picks only the specified fields.
- * @template Keys - Union type of allowed field names for this entity
+ * Generic entity-with-works type that picks only the specified fields. `Keys` is a union type of allowed field names for this entity.
  */
 export type EntityWithWorks<Keys extends string = string> = {
 	[K in Keys & keyof EntityWithWorksFieldMap]: EntityWithWorksFieldMap[K]
@@ -267,38 +269,27 @@ export interface EntityTypeMap {
 // Field arrays for use with select parameter
 
 /**
- * Helper to create a validated array of keys for an entity type.
- * This ensures all elements in the array are valid keys of T.
+ * Fields that can be selected for BaseEntity. These are the core fields present on all OpenAlex entities.
  */
-export const keysOf =
-	<T>() =>
-	<const K extends readonly (keyof T)[]>(keys: K) =>
-		keys
-
-/**
- * Fields that can be selected for BaseEntity.
- * These are the core fields present on all OpenAlex entities.
- */
-export const BASE_ENTITY_FIELDS = keysOf<BaseEntity>()([
+export const BASE_ENTITY_FIELDS = [
 	"id",
 	"display_name",
 	"cited_by_count",
 	"counts_by_year",
 	"updated_date",
 	"created_date",
-])
+] as const satisfies readonly (keyof BaseEntity)[]
 
 export type BaseEntityField = (typeof BASE_ENTITY_FIELDS)[number]
 
 /**
- * Fields that can be selected for EntityWithWorks.
- * These are the fields present on entities that have associated works collections.
+ * Fields that can be selected for EntityWithWorks. These are the fields present on entities that have associated works collections.
  */
-export const ENTITY_WITH_WORKS_FIELDS = keysOf<EntityWithWorks>()([
+export const ENTITY_WITH_WORKS_FIELDS = [
 	...BASE_ENTITY_FIELDS,
 	"works_count",
 	"works_api_url",
-])
+] as const satisfies readonly (keyof EntityWithWorks)[]
 
 export type EntityWithWorksField = (typeof ENTITY_WITH_WORKS_FIELDS)[number]
 
@@ -306,7 +297,7 @@ export type EntityWithWorksField = (typeof ENTITY_WITH_WORKS_FIELDS)[number]
  * Fields that can be selected for Author entities.
  * Use with the select parameter to request specific fields.
  */
-export const AUTHOR_FIELDS = keysOf<Author>()([
+export const AUTHOR_FIELDS = [
 	"id",
 	"display_name",
 	"cited_by_count",
@@ -321,14 +312,14 @@ export const AUTHOR_FIELDS = keysOf<Author>()([
 	"summary_stats",
 	"x_concepts",
 	"topics",
-])
+] as const satisfies readonly (keyof Author)[]
 
 export type AuthorField = (typeof AUTHOR_FIELDS)[number]
 
 /**
  * Fields that can be selected for Work entities.
  */
-export const WORK_FIELDS = keysOf<Work>()([
+export const WORK_FIELDS = [
 	...BASE_ENTITY_FIELDS,
 	"doi",
 	"title",
@@ -372,7 +363,7 @@ export const WORK_FIELDS = keysOf<Work>()([
 	"language",
 	"topics",
 	"keywords",
-])
+] as const satisfies readonly (keyof Work)[]
 
 export type WorkField = (typeof WORK_FIELDS)[number]
 
@@ -386,7 +377,7 @@ export type SourceField = (typeof SOURCE_FIELDS)[number]
 /**
  * Fields that can be selected for Institution entities.
  */
-export const INSTITUTION_FIELDS = keysOf<InstitutionEntity>()([
+export const INSTITUTION_FIELDS = [
 	"id",
 	"display_name",
 	"cited_by_count",
@@ -408,7 +399,7 @@ export const INSTITUTION_FIELDS = keysOf<InstitutionEntity>()([
 	"x_concepts",
 	"topics",
 	"lineage",
-])
+] as const satisfies readonly (keyof InstitutionEntity)[]
 
 export type InstitutionField = (typeof INSTITUTION_FIELDS)[number]
 
@@ -416,7 +407,7 @@ export type InstitutionField = (typeof INSTITUTION_FIELDS)[number]
  * Fields that can be selected for Concept entities.
  * Note: Concepts are being phased out in favor of Topics.
  */
-export const CONCEPT_FIELDS = keysOf<Concept>()([
+export const CONCEPT_FIELDS = [
 	"id",
 	"display_name",
 	"cited_by_count",
@@ -435,7 +426,7 @@ export const CONCEPT_FIELDS = keysOf<Concept>()([
 	"ancestors",
 	"related_concepts",
 	"summary_stats",
-])
+] as const satisfies readonly (keyof Concept)[]
 
 export type ConceptField = (typeof CONCEPT_FIELDS)[number]
 
@@ -449,7 +440,7 @@ export type TopicField = (typeof TOPIC_FIELDS)[number]
 /**
  * Fields that can be selected for Publisher entities.
  */
-export const PUBLISHER_FIELDS = keysOf<Publisher>()([
+export const PUBLISHER_FIELDS = [
 	"id",
 	"display_name",
 	"cited_by_count",
@@ -466,7 +457,7 @@ export const PUBLISHER_FIELDS = keysOf<Publisher>()([
 	"sources_count",
 	"ids",
 	"sources_api_url",
-])
+] as const satisfies readonly (keyof Publisher)[]
 
 export type PublisherField = (typeof PUBLISHER_FIELDS)[number]
 

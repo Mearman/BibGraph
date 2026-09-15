@@ -41,10 +41,8 @@ export interface GrantGraphEdge {
 
 /**
  * Helper function to create grant relationship edges
- * @param workId
- * @param grant
  */
-export const createGrantGraphEdge = (workId: string, grant: GrantRelationship): GrantGraphEdge => {
+export const createGrantGraphEdge = (workId: string, grant: Readonly<GrantRelationship>): GrantGraphEdge => {
 	const funderId = grant.funder
 	return {
 		id: `${workId}-funded_by-${funderId.replace('https://openalex.org/', '')}`,
@@ -54,13 +52,12 @@ export const createGrantGraphEdge = (workId: string, grant: GrantRelationship): 
 		direction: 'outbound',
 		label: 'funded by',
 		funderDisplayName: grant.funder_display_name,
-		awardId: grant.award_id || undefined
+		awardId: grant.award_id ?? undefined
 	}
 };
 
 /**
  * Type guard for grant relationship data
- * @param data
  */
 export const isGrantRelationship = (data: unknown): data is GrantRelationship => typeof data === 'object' && data !== null &&
 		'funder' in data &&

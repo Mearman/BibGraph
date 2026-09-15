@@ -51,12 +51,10 @@ export interface ConceptGraphEdge {
 
 /**
  * Helper function to create concept relationship edges
- * @param workId
- * @param concept
  */
 export const createConceptGraphEdge = (
 	workId: string,
-	concept: ConceptRelationship
+	concept: Readonly<ConceptRelationship>
 ): ConceptGraphEdge => {
 	const conceptId = concept.id
 	return {
@@ -75,7 +73,6 @@ export const createConceptGraphEdge = (
 
 /**
  * Type guard for concept relationship data
- * @param data
  */
 export const isConceptRelationship = (data: unknown): data is ConceptRelationship => typeof data === 'object' && data !== null &&
 		'id' in data &&

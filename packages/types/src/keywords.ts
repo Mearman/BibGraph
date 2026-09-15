@@ -41,12 +41,10 @@ export interface KeywordGraphEdge {
 
 /**
  * Helper function to create keyword relationship edges
- * @param workId
- * @param keyword
  */
 export const createKeywordGraphEdge = (
 	workId: string,
-	keyword: KeywordRelationship
+	keyword: Readonly<KeywordRelationship>
 ): KeywordGraphEdge => {
 	const keywordId = keyword.id
 	return {
@@ -63,7 +61,6 @@ export const createKeywordGraphEdge = (
 
 /**
  * Type guard for keyword relationship data
- * @param data
  */
 export const isKeywordRelationship = (data: unknown): data is KeywordRelationship => typeof data === 'object' && data !== null &&
 		'id' in data &&

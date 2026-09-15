@@ -70,9 +70,6 @@ export interface EnhancedTopicGraphEdge {
 
 /**
  * Helper function to create enhanced topic relationship edges
- * @param entityId
- * @param entityType
- * @param topic
  */
 export const createEnhancedTopicGraphEdge = (entityId: string, entityType: 'author' | 'source' | 'institution', topic: EnhancedTopicRelationship): EnhancedTopicGraphEdge => {
 	const topicId = topic.id
@@ -96,7 +93,6 @@ export const createEnhancedTopicGraphEdge = (entityId: string, entityType: 'auth
 
 /**
  * Type guard for enhanced topic relationship data
- * @param data
  */
 export const isEnhancedTopicRelationship = (data: unknown): data is EnhancedTopicRelationship => typeof data === 'object' && data !== null &&
 		'id' in data &&

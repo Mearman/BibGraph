@@ -17,13 +17,12 @@ import type { EdgePropertyFilter, GraphEdgeRecord, GraphNodeRecord } from './gra
  * Edge properties that can be used as numeric weights.
  * These are the indexed properties on GraphEdgeRecord that are numeric.
  */
-export type WeightableEdgeProperty = 'score' | 'weight';
+export type WeightableEdgeProperty = 'score';
 
 /**
  * Generic weight function signature.
  * Allows weight calculation based on edge and optionally source/target nodes.
- * @template N - Node type
- * @template E - Edge type
+ * Type parameters: N is the node type, E is the edge type.
  * @example
  * ```typescript
  * // Simple edge property weight
@@ -38,8 +37,7 @@ export type WeightFunction<N, E> = (edge: E, sourceNode: N, targetNode: N) => nu
 
 /**
  * Configuration for how edge weights are calculated.
- * @template N - Node type (default: GraphNodeRecord)
- * @template E - Edge type (default: GraphEdgeRecord)
+ * Type parameters: N is the node type (default GraphNodeRecord), E is the edge type (default GraphEdgeRecord).
  * @example
  * ```typescript
  * // Use score property as weight
@@ -72,14 +70,12 @@ export interface WeightConfig<
 
   /**
    * Invert the weight (1/weight) for finding "strongest" instead of "shortest" paths.
-   * When true, high property values result in low traversal cost.
-   * @default false
+   * When true, high property values result in low traversal cost. Defaults to false.
    */
   invert?: boolean;
 
   /**
-   * Default weight to use when property is undefined on an edge.
-   * @default 1
+   * Default weight to use when property is undefined on an edge. Defaults to 1.
    */
   defaultWeight?: number;
 }
@@ -98,8 +94,7 @@ export type TraversalDirection = 'outbound' | 'inbound' | 'both';
  *
  * Combines filtering, weight configuration, and traversal parameters
  * for flexible graph exploration.
- * @template N - Node type (default: GraphNodeRecord)
- * @template E - Edge type (default: GraphEdgeRecord)
+ * Type parameters: N is the node type (default GraphNodeRecord), E is the edge type (default GraphEdgeRecord).
  * @example
  * ```typescript
  * // Find shortest weighted path through authors only
@@ -126,7 +121,7 @@ export interface TraversalOptions<
    * - 'outbound': Follow edges from source to target
    * - 'inbound': Follow edges from target to source
    * - 'both': Follow edges in both directions (undirected)
-   * @default 'both'
+   * Defaults to 'both'.
    */
   direction?: TraversalDirection;
 
@@ -152,8 +147,7 @@ export interface TraversalOptions<
 
   /**
    * Whether to treat the graph as directed or undirected.
-   * This affects how edges are followed during traversal.
-   * @default true
+   * This affects how edges are followed during traversal. Defaults to true.
    */
   directed?: boolean;
 }

@@ -5,6 +5,7 @@
 import { z } from "zod"
 
 import { BaseAutocompleteOptionsSchema } from "./common"
+import { ConceptsFiltersSchema } from "./filters"
 import { conceptSchema } from "./schemas"
 import { createSchemaTypeGuard } from "./utils"
 
@@ -12,6 +13,8 @@ import { createSchemaTypeGuard } from "./utils"
  * Type guard for Concept entities
  */
 export const isConcept = createSchemaTypeGuard(conceptSchema)
+
+const MAX_CONCEPTS_PER_PAGE = 200
 
 // ============================================================================
 // CONCEPT SCHEMAS
@@ -68,7 +71,7 @@ export const ConceptsQueryParamsSchema = z.object({
 	search: z.string().optional(),
 	sort: ConceptSortOptionSchema.optional(),
 	page: z.number().min(1).optional(),
-	per_page: z.number().min(1).max(200).optional(),
+	per_page: z.number().min(1).max(MAX_CONCEPTS_PER_PAGE).optional(),
 	cursor: z.string().optional(),
 	select: z.array(ConceptSelectFieldSchema).optional(),
 	sample: z.number().min(0).optional(),
@@ -82,10 +85,10 @@ export type ConceptsQueryParams = z.infer<typeof ConceptsQueryParamsSchema>
  * Concept search options
  */
 export const ConceptSearchOptionsSchema = z.object({
-	filters: z.any().optional(), // ConceptsFilters
+	filters: z.lazy(() => ConceptsFiltersSchema).optional(),
 	sort: ConceptSortOptionSchema.optional(),
 	page: z.number().min(1).optional(),
-	per_page: z.number().min(1).max(200).optional(),
+	per_page: z.number().min(1).max(MAX_CONCEPTS_PER_PAGE).optional(),
 	select: z.array(ConceptSelectFieldSchema).optional(),
 })
 

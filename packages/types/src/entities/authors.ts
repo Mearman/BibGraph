@@ -9,6 +9,10 @@ import { AuthorsFiltersSchema } from "./filters"
 import { authorSchema } from "./schemas"
 import { createSchemaTypeGuard } from "./utils"
 
+const MIN_PUBLICATION_YEAR = 1000
+const MAX_PUBLICATION_YEAR = 2100
+const MAX_AUTHOR_GROUPING_PER_PAGE = 200
+
 /**
  * Type guard for Author entities
  */
@@ -47,8 +51,8 @@ export type AuthorWorksFilters = z.infer<typeof AuthorWorksFiltersSchema>
  */
 export const AuthorCollaboratorsFiltersSchema = z.object({
 	min_works: z.number().min(0).optional(),
-	from_publication_year: z.number().min(1000).max(2100).optional(),
-	to_publication_year: z.number().min(1000).max(2100).optional(),
+	from_publication_year: z.number().min(MIN_PUBLICATION_YEAR).max(MAX_PUBLICATION_YEAR).optional(),
+	to_publication_year: z.number().min(MIN_PUBLICATION_YEAR).max(MAX_PUBLICATION_YEAR).optional(),
 })
 
 export type AuthorCollaboratorsFilters = z.infer<typeof AuthorCollaboratorsFiltersSchema>
@@ -68,9 +72,9 @@ export type GroupByResult = z.infer<typeof GroupByResultSchema>
  * Author grouping options
  */
 export const AuthorGroupingOptionsSchema = z.object({
-	filters: z.any().optional(), // AuthorsFilters
+	filters: z.lazy(() => AuthorsFiltersSchema).optional(),
 	sort: z.string().optional(),
-	per_page: z.number().min(1).max(200).optional(),
+	per_page: z.number().min(1).max(MAX_AUTHOR_GROUPING_PER_PAGE).optional(),
 	page: z.number().min(1).optional(),
 })
 

@@ -86,9 +86,13 @@ export interface PruneGraphListResult {
   removedNodeIds: string[];
 }
 
+const HOURS_PER_PRUNE_AGE = 24;
+const MINUTES_PER_HOUR = 60;
+const SECONDS_PER_MINUTE = 60;
+const MILLISECONDS_PER_SECOND = 1000;
+
 /**
- * Graph list configuration constants
- * Extracted to prevent magic numbers (Constitution Principle XVII)
+ * Graph list configuration constants Extracted to prevent magic numbers (Constitution Principle XVII)
  */
 export const GRAPH_LIST_CONFIG = {
   /**
@@ -104,7 +108,7 @@ export const GRAPH_LIST_CONFIG = {
   /**
   Age threshold for pruning auto-populated nodes (milliseconds)
    */
-  PRUNE_AGE_MS: 24 * 60 * 60 * 1000, // 24 hours
+  PRUNE_AGE_MS: HOURS_PER_PRUNE_AGE * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND, // 24 hours
 
   /**
   Special list ID for graph list in storage
