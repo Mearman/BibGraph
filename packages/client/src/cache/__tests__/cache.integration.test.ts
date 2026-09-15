@@ -176,6 +176,44 @@ interface StaticDataProviderMock {
 
 const mockedStaticDataProvider = staticDataProvider as unknown as StaticDataProviderMock;
 
+
+/**
+ * Minimal entities that satisfy the runtime type guards on the static-cache hit path: each carries the full base-entity fields (OpenAlex URL id, display name, citation counts, per-year counts, ISO dates) the guards validate.
+ */
+const validWork = (id: string) => ({
+  id: `https://openalex.org/${id}`,
+  display_name: "Cached Work",
+  cited_by_count: 10,
+  counts_by_year: [],
+  updated_date: "2023-01-01",
+  created_date: "2023-01-01",
+});
+
+const validAuthor = (id: string) => ({
+  id: `https://openalex.org/${id}`,
+  display_name: "Cached Author",
+  works_count: 5,
+  cited_by_count: 50,
+  orcid: undefined,
+  counts_by_year: [],
+  updated_date: "2023-01-01",
+  created_date: "2023-01-01",
+  summary_stats: { "2yr_mean_citedness": 1, h_index: 2, i10_index: 3 },
+});
+
+const validSource = (id: string) => ({
+  id: `https://openalex.org/${id}`,
+  display_name: "Cached Source",
+  works_count: 5,
+  cited_by_count: 50,
+  works_api_url: "https://api.openalex.org/works",
+  is_oa: false,
+  is_in_doaj: false,
+  counts_by_year: [],
+  updated_date: "2023-01-01",
+  created_date: "2023-01-01",
+});
+
 describe("Cache Integration - CachedOpenAlexClient", () => {
   let cachedClient: CachedOpenAlexClient;
 
@@ -276,23 +314,18 @@ describe("Cache Integration - CachedOpenAlexClient", () => {
     });
 
     it("should fallback to API when static cache misses", async () => {
-      // Mock static cache miss
+      // Mock static cache miss: the base client mock always throws, so the
+      // API fallback surfaces its failure rather than flattening it to null
       mockedStaticDataProvider.getStaticData.mockResolvedValue({
         found: false,
         data: undefined,
       });
 
-      // Note: The base client mock always throws errors, so API fallback will fail
-      // This test verifies that getEntity is called, which attempts API fallback
-      const result = await cachedClient.client.getEntity("W123");
-
+      await expect(cachedClient.client.getEntity("W123")).rejects.toThrow("API call failed");
       expect(mockedStaticDataProvider.getStaticData).toHaveBeenCalledWith(
         "works",
         "W123",
       );
-
-      // Since API fallback fails (base client mock throws), result should be null
-      expect(result).toBeNull();
     });
 
     it("should track request statistics", () => {
@@ -332,7 +365,7 @@ describe("Cache Integration - CachedOpenAlexClient", () => {
     it("should detect works entity type", async () => {
       mockedStaticDataProvider.getStaticData.mockResolvedValue({
         found: true,
-        data: { id: "W123", title: "Work" },
+        data: validWork("W123"),
       });
 
       await cachedClient.client.getEntity("W123");
@@ -345,7 +378,7 @@ describe("Cache Integration - CachedOpenAlexClient", () => {
     it("should detect authors entity type", async () => {
       mockedStaticDataProvider.getStaticData.mockResolvedValue({
         found: true,
-        data: { id: "A123", name: "Author" },
+        data: validAuthor("A123"),
       });
 
       await cachedClient.client.getEntity("A123");
@@ -358,7 +391,7 @@ describe("Cache Integration - CachedOpenAlexClient", () => {
     it("should detect sources entity type", async () => {
       mockedStaticDataProvider.getStaticData.mockResolvedValue({
         found: true,
-        data: { id: "S123", name: "Source" },
+        data: validSource("S123"),
       });
 
       await cachedClient.client.getEntity("S123");
@@ -371,15 +404,14 @@ describe("Cache Integration - CachedOpenAlexClient", () => {
 
   describe("Error Handling and Resilience", () => {
     it("should handle static cache errors gracefully", async () => {
-      // Mock static cache error
+      // Cache lookups reject on both the primary and the post-API fallback
+      // attempt; the provider degrades each to a miss, so the API failure is
+      // what surfaces
       mockedStaticDataProvider.getStaticData.mockRejectedValue(
         new Error("Cache error"),
       );
 
-      const result = await cachedClient.client.getEntity("W123");
-
-      expect(result).toBeNull();
-      // API should not be called when static cache fails gracefully
+      await expect(cachedClient.client.getEntity("W123")).rejects.toThrow("API call failed");
       expect(mockedStaticDataProvider.getStaticData).toHaveBeenCalledWith(
         "works",
         "W123",
@@ -388,14 +420,9 @@ describe("Cache Integration - CachedOpenAlexClient", () => {
 
     it("should handle API errors and attempt static cache fallback", async () => {
       const testData = {
-        id: "https://openalex.org/W123",
+        ...validWork("W123"),
         title: "Cached Work",
-        display_name: "Cached Work",
         publication_year: 2023,
-        cited_by_count: 10,
-        counts_by_year: [],
-        updated_date: "2023-01-01",
-        created_date: "2023-01-01",
       };
 
       // Mock static cache miss first
@@ -422,20 +449,15 @@ describe("Cache Integration - CachedOpenAlexClient", () => {
       expect(mockedStaticDataProvider.getStaticData).toHaveBeenCalledTimes(2);
     });
 
-    it("should return null when both cache and API fail", async () => {
-      // Mock static cache miss
+    it("should reject when both cache and API fail", async () => {
+      // Mock static cache miss: the primary and fallback lookups both miss,
+      // and the mocked API client always throws
       mockedStaticDataProvider.getStaticData.mockResolvedValue({
         found: false,
         data: undefined,
       });
 
-      // Mock API error - skip test as it requires complex mocking
-      // const getByIdSpy2 = spyOn(cachedClient as any, "getById")
-      //   .mockRejectedValue(new Error("API error"));
-
-      const result = await cachedClient.client.getEntity("W123");
-
-      expect(result).toBeNull();
+      await expect(cachedClient.client.getEntity("W123")).rejects.toThrow("API call failed");
     });
   });
 

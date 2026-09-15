@@ -646,16 +646,16 @@ describe("OpenAlexBaseClient", () => {
   describe("Edge Cases and Error Conditions", () => {
     it("should reject responses with no content-type header", async () => {
       mockFetch.mockReset();
-      const responseWithoutContentType = Response.json(
-        { results: [], meta: { count: 0 } },
-        { status: 200 },
-      );
-      const responseWithoutContentType2 = Response.json(
-        { results: [], meta: { count: 0 } },
-        { status: 200 },
-      );
-      mockFetch.mockResolvedValueOnce(responseWithoutContentType);
-      mockFetch.mockResolvedValueOnce(responseWithoutContentType2);
+      // Response.json() always stamps an application/json content-type, so a
+      // plain string body (which defaults to text/plain) is what actually
+      // reaches the content-type guard without one
+      // Body written as a literal string, deliberately not Response.json():
+      // Response.json() stamps an application/json content-type, and this
+      // test needs a response whose content-type is the text/plain default
+      const notJsonResponse = (): Response =>
+        new Response('{"results":[],"meta":{"count":0}}', { status: 200 });
+      mockFetch.mockResolvedValueOnce(notJsonResponse());
+      mockFetch.mockResolvedValueOnce(notJsonResponse());
 
       await expect(client.get("works", {}, passthroughSchema())).rejects.toThrow(OpenAlexApiError);
       await expect(client.get("works", {}, passthroughSchema())).rejects.toThrow(
