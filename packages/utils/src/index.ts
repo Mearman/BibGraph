@@ -37,35 +37,28 @@ export * from "./webgl-detection";
 
 // Graph utilities
 export * from "./graph-3d-adapter";
-export * from "./graph-sources/relationship-extractor";
-export * from "./graph-sources/types";
+export * from "./graph-sources";
 
 // Spatial graph utilities
-export * from "./spatial/graph-lod-manager";
+export * from "./spatial";
 
 // Service utilities
 export * from "./services";
 
 // Storage utilities
-export * from "./storage/dexie-storage-provider";
-export * from "./storage/catalogue-db";
-export * from "./storage/catalogue-storage-provider";
-export * from "./storage/in-memory-storage-provider";
-export * from "./storage/indexeddb-storage";
-export * from "./storage/storage-provider-types";
+export * from "./storage";
 
 // UI utilities
-export * from "./ui/filter-base";
+export * from "./ui";
 
 // Cache utilities
 export * from "./cache";
 
 // Static data cache utilities
-export * from "./static-data/cache";
+export * from "./static-data";
 
 // Hooks
-export * from "./hooks/use-entity-route";
+export * from "./hooks";
 
 // Background tasks
-export * from "./background-tasks/types";
-export * from "./background-tasks/task-executor";
+export * from "./background-tasks";

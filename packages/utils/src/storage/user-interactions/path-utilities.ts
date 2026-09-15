@@ -51,9 +51,13 @@ export const createApiUrlRequest = (internalPath: string, params: Record<string,
 	if (Object.keys(params).length > 0) {
 		const searchParameters = new URLSearchParams()
 		for (const [key, value] of Object.entries(params)) {
-			if (value !== undefined && value !== null) {
-				searchParameters.append(key, String(value))
+			if (value === undefined || value === null) {
+				continue
 			}
+			const stringValue = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+				? String(value)
+				: JSON.stringify(value)
+			searchParameters.append(key, stringValue)
 		}
 		const queryString = searchParameters.toString()
 		if (queryString && !apiUrl.includes('?')) {

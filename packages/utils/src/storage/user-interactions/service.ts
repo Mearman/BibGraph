@@ -46,12 +46,15 @@ const DEFAULT_PAGE_VISIT_LIMIT = 50
 const DEFAULT_ENDPOINT_VISIT_LIMIT = 20
 const DEFAULT_POPULAR_REQUESTS_LIMIT = 10
 
+// Number of characters of a cache key used as a lightweight request hash
+const REQUEST_HASH_PREFIX_LENGTH = 16
+
 /**
  * Service for managing user page visits and bookmarks
  */
 export class UserInteractionsService {
-	private db: UserInteractionsDB
-	private logger?: GenericLogger
+	private readonly db: UserInteractionsDB
+	private readonly logger?: GenericLogger
 
 	constructor(logger?: GenericLogger) {
 		this.db = getDB()
@@ -64,14 +67,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Record a page visit with normalized OpenAlex request
-	 * @param params
-	 * @param params.request
-	 * @param params.metadata
-	 * @param params.metadata.sessionId
-	 * @param params.metadata.referrer
-	 * @param params.metadata.duration
-	 * @param params.metadata.cached
-	 * @param params.metadata.bytesSaved
 	 */
 	async recordPageVisit(params: {
 		request: StoredNormalizedRequest
@@ -88,7 +83,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Get recent page visits across all pages
-	 * @param limit
 	 */
 	async getRecentPageVisits(limit = DEFAULT_PAGE_VISIT_LIMIT): Promise<PageVisitRecord[]> {
 		return getRecentPageVisitsOp(this.db, limit, this.logger)
@@ -128,14 +122,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Record page visit (legacy format for compatibility)
-	 * @param params
-	 * @param params.cacheKey
-	 * @param params.metadata
-	 * @param params.metadata.sessionId
-	 * @param params.metadata.referrer
-	 * @param params.metadata.duration
-	 * @param params.metadata.cached
-	 * @param params.metadata.bytesSaved
 	 */
 	async recordPageVisitLegacy(params: {
 		cacheKey: string
@@ -151,7 +137,7 @@ export class UserInteractionsService {
 		const request = createApiUrlRequest(
 			params.cacheKey,
 			{},
-			params.cacheKey.slice(0, 16)
+			params.cacheKey.slice(0, REQUEST_HASH_PREFIX_LENGTH)
 		)
 
 		return this.recordPageVisit({ request, metadata: params.metadata })
@@ -159,8 +145,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Get page visits by endpoint pattern
-	 * @param endpointPattern
-	 * @param limit
 	 */
 	async getPageVisitsByEndpoint(
 		endpointPattern: string,
@@ -171,7 +155,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Get popular requests from page visits
-	 * @param limit
 	 */
 	async getPopularRequests(
 		limit = DEFAULT_POPULAR_REQUESTS_LIMIT
@@ -185,7 +168,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Check if a request is bookmarked
-	 * @param cacheKey
 	 */
 	async isRequestBookmarked(cacheKey: string): Promise<boolean> {
 		return isRequestBookmarkedOp(this.db, cacheKey, this.logger)
@@ -193,7 +175,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Check if a request is bookmarked by hash
-	 * @param hash
 	 */
 	async isRequestBookmarkedByHash(hash: string): Promise<boolean> {
 		return isRequestBookmarkedByHashOp(this.db, hash, this.logger)
@@ -201,7 +182,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Get bookmark by cache key
-	 * @param cacheKey
 	 */
 	async getBookmark(cacheKey: string): Promise<BookmarkRecord | null> {
 		return getBookmarkOp(this.db, cacheKey, this.logger)
@@ -209,7 +189,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Get bookmark by hash
-	 * @param hash
 	 */
 	async getBookmarkByHash(hash: string): Promise<BookmarkRecord | null> {
 		return getBookmarkByHashOp(this.db, hash, this.logger)
@@ -217,11 +196,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Add a bookmark for a normalized request
-	 * @param params
-	 * @param params.request
-	 * @param params.title
-	 * @param params.notes
-	 * @param params.tags
 	 */
 	async addBookmark(params: {
 		request: StoredNormalizedRequest
@@ -241,7 +215,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Remove a bookmark
-	 * @param bookmarkId
 	 */
 	async removeBookmark(bookmarkId: number): Promise<void> {
 		return removeBookmarkOp(this.db, bookmarkId, this.logger)
@@ -249,9 +222,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Update a bookmark
-	 * @param params
-	 * @param params.bookmarkId
-	 * @param params.updates
 	 */
 	async updateBookmark(params: {
 		bookmarkId: number
@@ -262,7 +232,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Search bookmarks by title, notes, or tags
-	 * @param query
 	 */
 	async searchBookmarks(query: string): Promise<BookmarkRecord[]> {
 		return searchBookmarksOp(this.db, query, this.logger)
@@ -274,23 +243,17 @@ export class UserInteractionsService {
 
 	/**
 	 * Check if an entity is bookmarked
-	 * @param params
-	 * @param params.entityId
-	 * @param params.entityType
 	 */
-	async isEntityBookmarked(params: {
+	async isEntityBookmarked(params: Readonly<{
 		entityId: string
 		entityType: string
-	}): Promise<boolean> {
+	}>): Promise<boolean> {
 		const cacheKey = `/${params.entityType}/${params.entityId}`
 		return this.isRequestBookmarked(cacheKey)
 	}
 
 	/**
 	 * Check if a search is bookmarked
-	 * @param params
-	 * @param params.searchQuery
-	 * @param params.filters
 	 */
 	async isSearchBookmarked(params: {
 		searchQuery: string
@@ -302,7 +265,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Check if a list is bookmarked
-	 * @param url
 	 */
 	async isListBookmarked(url: string): Promise<boolean> {
 		return this.isRequestBookmarked(url)
@@ -310,23 +272,17 @@ export class UserInteractionsService {
 
 	/**
 	 * Get entity bookmark
-	 * @param params
-	 * @param params.entityId
-	 * @param params.entityType
 	 */
-	async getEntityBookmark(params: {
+	async getEntityBookmark(params: Readonly<{
 		entityId: string
 		entityType: string
-	}): Promise<BookmarkRecord | null> {
+	}>): Promise<BookmarkRecord | null> {
 		const cacheKey = `/${params.entityType}/${params.entityId}`
 		return this.getBookmark(cacheKey)
 	}
 
 	/**
 	 * Get search bookmark
-	 * @param params
-	 * @param params.searchQuery
-	 * @param params.filters
 	 */
 	async getSearchBookmark(params: {
 		searchQuery: string
@@ -338,7 +294,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Get list bookmark
-	 * @param url
 	 */
 	async getListBookmark(url: string): Promise<BookmarkRecord | null> {
 		return this.getBookmark(url)
@@ -346,29 +301,25 @@ export class UserInteractionsService {
 
 	/**
 	 * Add list bookmark
-	 * @param url
-	 * @param title
-	 * @param notes
-	 * @param tags
 	 */
 	async addListBookmark(
 		url: string,
 		title: string,
 		notes?: string,
-		tags?: string[]
+		tags?: readonly string[]
 	): Promise<number> {
 		const { createApiUrlRequest } = await import("./path-utilities.js")
 		const request = createApiUrlRequest(
 			url,
 			{},
-			url.slice(0, 16)
+			url.slice(0, REQUEST_HASH_PREFIX_LENGTH)
 		)
 
 		return this.addBookmark({
 			request,
 			title,
 			notes,
-			tags,
+			tags: tags === undefined ? undefined : [...tags],
 		})
 	}
 
@@ -378,19 +329,13 @@ export class UserInteractionsService {
 
 	/**
 	 * Remove multiple bookmarks in bulk
-	 * @param bookmarkIds
 	 */
-	async removeBookmarks(bookmarkIds: number[]): Promise<{ success: number; failed: number }> {
+	async removeBookmarks(bookmarkIds: readonly number[]): Promise<{ success: number; failed: number }> {
 		return removeBookmarksOp(this.db, bookmarkIds, this.logger)
 	}
 
 	/**
 	 * Update tags for multiple bookmarks in bulk
-	 * @param params
-	 * @param params.bookmarkIds
-	 * @param params.addTags
-	 * @param params.removeTags
-	 * @param params.replaceTags
 	 */
 	async updateBookmarkTags(params: {
 		bookmarkIds: number[]
@@ -403,10 +348,6 @@ export class UserInteractionsService {
 
 	/**
 	 * Update notes for multiple bookmarks in bulk
-	 * @param params
-	 * @param params.bookmarkIds
-	 * @param params.notes
-	 * @param params.action
 	 */
 	async updateBookmarkNotes(params: {
 		bookmarkIds: number[]

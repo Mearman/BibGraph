@@ -78,40 +78,36 @@ export interface BuildContext {
 	protocol?: string
 }
 
-/**
- * Runtime environment detection utilities
- */
-export class EnvironmentDetector {
-	private static _cachedContext: BuildContext | undefined
+let cachedBuildContext: BuildContext | undefined
 
-	/**
-	 * Detect the current environment mode from NODE_ENV and other indicators
-	 */
-	static detectMode(): EnvironmentMode {
-		// Check NODE_ENV first (most reliable)
-		const nodeEnvironmentMode = this.getModeFromNodeEnv()
-		if (nodeEnvironmentMode) return nodeEnvironmentMode
+const getModeFromNodeEnv = (): EnvironmentMode | null => {
+	if (process.env.NODE_ENV !== undefined && process.env.NODE_ENV !== "") {
+		const nodeEnvironment = process.env.NODE_ENV.toLowerCase()
+		switch (nodeEnvironment) {
+			case "production":
+				return EnvironmentMode.PRODUCTION
+			case "test":
+				return EnvironmentMode.TEST
+			case "development":
+				return EnvironmentMode.DEVELOPMENT
+		}
+	}
+	return null
+}
 
-		// Check Vite environment variables
-		const viteMode = this.getModeFromViteEnv()
-		if (viteMode) return viteMode
-
-		// Check global __DEV__ flag (from Vite define)
-		const developmentFlagMode = this.getModeFromDevFlag()
-		if (developmentFlagMode) return developmentFlagMode
-
-		// Browser-based detection
-		const browserMode = this.getModeFromBrowser()
-		if (browserMode) return browserMode
-
-		// Default to development if uncertain
-		return EnvironmentMode.DEVELOPMENT
+const getModeFromViteEnv = (): EnvironmentMode | null => {
+	if (!("env" in import.meta)) {
+		return null
 	}
 
-	private static getModeFromNodeEnv(): EnvironmentMode | null {
-		if (globalThis.process?.env?.NODE_ENV) {
-			const nodeEnvironment = globalThis.process?.env?.NODE_ENV.toLowerCase()
-			switch (nodeEnvironment) {
+	try {
+		const environment = import.meta.env
+
+		// Check MODE first
+		const mode = environment.MODE
+		if (typeof mode === "string") {
+			const modeLower = mode.toLowerCase()
+			switch (modeLower) {
 				case "production":
 					return EnvironmentMode.PRODUCTION
 				case "test":
@@ -120,128 +116,141 @@ export class EnvironmentDetector {
 					return EnvironmentMode.DEVELOPMENT
 			}
 		}
+
+		// Check boolean flags
+		if (environment.DEV) return EnvironmentMode.DEVELOPMENT
+		if (environment.PROD) return EnvironmentMode.PRODUCTION
+
+		return null
+	} catch {
+		// Ignore errors if import.meta.env is not available
 		return null
 	}
+}
 
-	private static getModeFromViteEnv(): EnvironmentMode | null {
-		if (import.meta === undefined || !("env" in import.meta)) {
-			return null
-		}
-
+const getModeFromDevFlag = (): EnvironmentMode | null => {
+	if (
+		typeof globalThis !== "undefined" &&
+		Object.prototype.hasOwnProperty.call(globalThis, "__DEV__")
+	) {
 		try {
-			const environment = import.meta.env
-			if (!environment) return null
-
-			// Check MODE first
-			const mode = environment.MODE
-			if (typeof mode === "string") {
-				const modeLower = mode.toLowerCase()
-				switch (modeLower) {
-					case "production":
-						return EnvironmentMode.PRODUCTION
-					case "test":
-						return EnvironmentMode.TEST
-					case "development":
-						return EnvironmentMode.DEVELOPMENT
-				}
+			if (typeof __DEV__ === "boolean") {
+				return __DEV__ ? EnvironmentMode.DEVELOPMENT : EnvironmentMode.PRODUCTION
 			}
-
-			// Check boolean flags
-			if (environment.DEV) return EnvironmentMode.DEVELOPMENT
-			if (environment.PROD) return EnvironmentMode.PRODUCTION
-
-			return null
 		} catch {
-			// Ignore errors if import.meta.env is not available
-			return null
+			// Ignore errors if __DEV__ is not accessible
 		}
 	}
+	return null
+}
 
-	private static isViteEnv(meta: unknown): boolean {
-		if (typeof meta !== "object" || meta === null) return false
-		return "env" in meta
-	}
+const getModeFromBrowser = (): EnvironmentMode | null => {
+	if (typeof window !== "undefined") {
+		const hostname = window.location.hostname
 
-	private static getViteMode(environment: unknown): string | undefined {
-		if (typeof environment !== "object" || environment === null || !("MODE" in environment)) return undefined
-		const mode = (environment as Record<string, unknown>).MODE
-		return typeof mode === "string" ? mode.toLowerCase() : undefined
-	}
-
-	private static getModeFromDevFlag(): EnvironmentMode | null {
-		if (
-			typeof globalThis !== "undefined" &&
-			Object.prototype.hasOwnProperty.call(globalThis, "__DEV__")
-		) {
-			try {
-				const developmentFlag = __DEV__
-				if (typeof developmentFlag === "boolean") {
-					return developmentFlag ? EnvironmentMode.DEVELOPMENT : EnvironmentMode.PRODUCTION
-				}
-			} catch {
-				// Ignore errors if __DEV__ is not accessible
-			}
+		// Local development indicators
+		if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".local")) {
+			return EnvironmentMode.DEVELOPMENT
 		}
-		return null
-	}
 
-	private static getModeFromBrowser(): EnvironmentMode | null {
-		if (typeof window !== "undefined") {
-			const hostname = window.location?.hostname
-
-			// Local development indicators
-			if (hostname === "localhost" || hostname === "127.0.0.1" || hostname?.endsWith(".local")) {
-				return EnvironmentMode.DEVELOPMENT
-			}
-
-			// Development port indicators
-			const port = window.location?.port
-			if (port && ["3000", "5173", "8080", "4173"].includes(port)) {
-				return EnvironmentMode.DEVELOPMENT
-			}
-
-			// GitHub Pages or custom domain = production
-			if (hostname === "bibgraph.joenash.uk" || hostname?.endsWith(".github.io")) {
-				return EnvironmentMode.PRODUCTION
-			}
+		// Development port indicators
+		const port = window.location.port
+		if (port !== "" && ["3000", "5173", "8080", "4173"].includes(port)) {
+			return EnvironmentMode.DEVELOPMENT
 		}
-		return null
+
+		// GitHub Pages or custom domain = production
+		if (hostname === "bibgraph.joenash.uk" || hostname.endsWith(".github.io")) {
+			return EnvironmentMode.PRODUCTION
+		}
 	}
+	return null
+}
+
+/**
+ * Extract build info from raw build data
+ */
+const extractBuildInfo = (buildInfo: Readonly<Record<string, unknown>>): {
+	buildTimestamp?: string
+	commitHash?: string
+} => {
+	const buildTimestamp = buildInfo.buildTimestamp
+	const commitHash = buildInfo.commitHash
+	const shortCommitHash = buildInfo.shortCommitHash
+
+	return {
+		buildTimestamp: typeof buildTimestamp === "string" ? buildTimestamp : undefined,
+		commitHash:
+			typeof commitHash === "string"
+				? commitHash
+				: (typeof shortCommitHash === "string"
+					? shortCommitHash
+					: undefined),
+	}
+}
+
+/**
+ * Runtime environment detection utilities
+ */
+export const EnvironmentDetector = {
+	/**
+	 * Detect the current environment mode from NODE_ENV and other indicators
+	 */
+	detectMode: (): EnvironmentMode => {
+		// Check NODE_ENV first (most reliable)
+		const nodeEnvironmentMode = getModeFromNodeEnv()
+		if (nodeEnvironmentMode !== null) return nodeEnvironmentMode
+
+		// Check Vite environment variables
+		const viteMode = getModeFromViteEnv()
+		if (viteMode !== null) return viteMode
+
+		// Check global __DEV__ flag (from Vite define)
+		const developmentFlagMode = getModeFromDevFlag()
+		if (developmentFlagMode !== null) return developmentFlagMode
+
+		// Browser-based detection
+		const browserMode = getModeFromBrowser()
+		if (browserMode !== null) return browserMode
+
+		// Default to development if uncertain
+		return EnvironmentMode.DEVELOPMENT
+	},
 
 	/**
 	 * Detect if running in browser context
 	 */
-	static isBrowser(): boolean {
+	isBrowser: (): boolean => {
 		return typeof window !== "undefined" && typeof document !== "undefined"
-	}
+	},
 
 	/**
 	 * Detect if running in Node.js context
 	 */
-	static isNode(): boolean {
-		return globalThis.process?.versions?.node !== undefined
-	}
+	isNode: (): boolean => {
+		return typeof process !== "undefined"
+	},
 
 	/**
 	 * Detect if running in Web Worker context
 	 */
-	static isWorker(): boolean {
+	isWorker: (): boolean => {
 		return (
 			typeof globalThis !== "undefined" &&
 			"importScripts" in globalThis &&
 			typeof window === "undefined"
 		)
-	}
+	},
 
 	/**
 	 * Detect if development server is running
 	 */
-	static isDevServer(): boolean {
-		if (!this.isBrowser()) return false
+	isDevServer: (): boolean => {
+		if (!EnvironmentDetector.isBrowser()) return false
 
-		const hostname = window.location?.hostname
-		const port = window.location?.port
-		const protocol = window.location?.protocol
+		const hostname = window.location.hostname
+		const port = window.location.port
+		const protocol = window.location.protocol
 
 		// Local development indicators
 		if (hostname === "localhost" || hostname === "127.0.0.1") {
@@ -249,7 +258,7 @@ export class EnvironmentDetector {
 		}
 
 		// Development ports
-		if (port && ["3000", "5173", "8080", "4173"].includes(port)) {
+		if (port !== "" && ["3000", "5173", "8080", "4173"].includes(port)) {
 			return true
 		}
 
@@ -259,45 +268,22 @@ export class EnvironmentDetector {
 		}
 
 		return false
-	}
+	},
 
 	/**
 	 * Detect if running on GitHub Pages
 	 */
-	static isGitHubPages(): boolean {
-		if (!this.isBrowser()) return false
+	isGitHubPages: (): boolean => {
+		if (!EnvironmentDetector.isBrowser()) return false
 
-		const hostname = window.location?.hostname
-		return (hostname === "bibgraph.joenash.uk") || hostname?.endsWith(".github.io")
-	}
-
-	/**
-	 * Extract build info from raw build data
-	 * @param buildInfo
-	 */
-	private static extractBuildInfo(buildInfo: Record<string, unknown>): {
-		buildTimestamp?: string
-		commitHash?: string
-	} {
-		const buildTimestamp = buildInfo.buildTimestamp
-		const commitHash = buildInfo.commitHash
-		const shortCommitHash = buildInfo.shortCommitHash
-
-		return {
-			buildTimestamp: typeof buildTimestamp === "string" ? buildTimestamp : undefined,
-			commitHash:
-				typeof commitHash === "string"
-					? commitHash
-					: (typeof shortCommitHash === "string"
-						? shortCommitHash
-						: undefined),
-		}
-	}
+		const hostname = window.location.hostname
+		return (hostname === "bibgraph.joenash.uk") || hostname.endsWith(".github.io")
+	},
 
 	/**
 	 * Get build information from injected metadata
 	 */
-	static getBuildInfo(): { buildTimestamp?: string; commitHash?: string } {
+	getBuildInfo: (): { buildTimestamp?: string; commitHash?: string } => {
 		try {
 			// Check for Vite-injected build info
 			if (
@@ -305,9 +291,8 @@ export class EnvironmentDetector {
 				Object.prototype.hasOwnProperty.call(globalThis, "__BUILD_INFO__")
 			) {
 				try {
-					const buildInfoRaw = __BUILD_INFO__
-					if (buildInfoRaw && typeof buildInfoRaw === "object" && buildInfoRaw !== null) {
-						return this.extractBuildInfo(buildInfoRaw)
+					if (__BUILD_INFO__ !== undefined && typeof __BUILD_INFO__ === "object") {
+						return extractBuildInfo(__BUILD_INFO__)
 					}
 				} catch {
 					// Ignore errors if __BUILD_INFO__ is not accessible
@@ -318,45 +303,45 @@ export class EnvironmentDetector {
 		}
 
 		return {}
-	}
+	},
 
 	/**
 	 * Get current hostname (browser only)
 	 */
-	static getHostname(): string | undefined {
-		if (this.isBrowser()) {
-			return window.location?.hostname
+	getHostname: (): string | undefined => {
+		if (EnvironmentDetector.isBrowser()) {
+			return window.location.hostname
 		}
 		return undefined
-	}
+	},
 
 	/**
 	 * Get current protocol (browser only)
 	 */
-	static getProtocol(): string | undefined {
-		if (this.isBrowser()) {
-			return window.location?.protocol
+	getProtocol: (): string | undefined => {
+		if (EnvironmentDetector.isBrowser()) {
+			return window.location.protocol
 		}
 		return undefined
-	}
+	},
 
 	/**
 	 * Get complete build context with caching
 	 */
-	static getBuildContext(): BuildContext {
-		if (this._cachedContext) {
-			return this._cachedContext
+	getBuildContext: (): BuildContext => {
+		if (cachedBuildContext !== undefined) {
+			return cachedBuildContext
 		}
 
-		const mode = this.detectMode()
-		const buildInfo = this.getBuildInfo()
-		const isBrowser = this.isBrowser()
-		const isNode = this.isNode()
-		const isWorker = this.isWorker()
-		const isDevelopmentServer = this.isDevServer()
-		const isGitHubPages = this.isGitHubPages()
+		const mode = EnvironmentDetector.detectMode()
+		const buildInfo = EnvironmentDetector.getBuildInfo()
+		const isBrowser = EnvironmentDetector.isBrowser()
+		const isNode = EnvironmentDetector.isNode()
+		const isWorker = EnvironmentDetector.isWorker()
+		const isDevelopmentServer = EnvironmentDetector.isDevServer()
+		const isGitHubPages = EnvironmentDetector.isGitHubPages()
 
-		this._cachedContext = {
+		cachedBuildContext = {
 			isDevelopment: mode === EnvironmentMode.DEVELOPMENT,
 			isProduction: mode === EnvironmentMode.PRODUCTION,
 			isTest: mode === EnvironmentMode.TEST,
@@ -368,25 +353,25 @@ export class EnvironmentDetector {
 			isWorker,
 			isDevServer: isDevelopmentServer,
 			isGitHubPages,
-			hostname: this.getHostname(),
-			protocol: this.getProtocol(),
+			hostname: EnvironmentDetector.getHostname(),
+			protocol: EnvironmentDetector.getProtocol(),
 		}
 
-		return this._cachedContext
-	}
+		return cachedBuildContext
+	},
 
 	/**
 	 * Clear cached context (useful for testing)
 	 */
-	static clearCache(): void {
-		this._cachedContext = undefined
-	}
+	clearCache: (): void => {
+		cachedBuildContext = undefined
+	},
 
 	/**
 	 * Get a human-readable environment description
 	 */
-	static getEnvironmentDescription(): string {
-		const context = this.getBuildContext()
+	getEnvironmentDescription: (): string => {
+		const context = EnvironmentDetector.getBuildContext()
 
 		if (context.isTest) {
 			return "Test Environment"
@@ -394,20 +379,20 @@ export class EnvironmentDetector {
 
 		if (context.isDevelopment) {
 			if (context.isDevServer) {
-				return `Development Server (${context.hostname}:${window.location?.port || "unknown"})`
+				return `Development Server (${context.hostname ?? "unknown"}:${window.location.port === "" ? "unknown" : window.location.port})`
 			}
 			return "Development Build"
 		}
 
 		if (context.isProduction) {
 			if (context.isGitHubPages) {
-				return `Production (GitHub Pages: ${context.hostname})`
+				return `Production (GitHub Pages: ${context.hostname ?? "unknown"})`
 			}
 			return "Production Build"
 		}
 
 		return "Unknown Environment"
-	}
+	},
 }
 
 /**

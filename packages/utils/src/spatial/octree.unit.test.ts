@@ -7,6 +7,14 @@ import { beforeEach,describe, expect, it } from 'vitest';
 
 import { createOctreeFromItems,Octree } from './octree';
 
+const INSERTED_ITEM_COUNT = 3;
+const RANGE_QUERY_TOTAL_ITEMS = 4;
+const SPHERE_QUERY_RADIUS = 15;
+const FIND_NEAREST_MAX_DISTANCE = 5;
+const LARGE_K_VALUE = 10;
+const K_NEAREST_TOTAL_ITEMS = 4;
+const K_NEAREST_MAX_DISTANCE = 25;
+
 describe('Octree', () => {
   const defaultBounds: BoundingBox3D = {
     min: { x: -100, y: -100, z: -100 },
@@ -38,7 +46,7 @@ describe('Octree', () => {
       octree.insert({ x: -50, y: -50, z: -50 }, 'bottom-left-back');
       octree.insert({ x: 50, y: 50, z: 50 }, 'top-right-front');
       octree.insert({ x: 0, y: 0, z: 0 }, 'center');
-      expect(octree.size).toBe(3);
+      expect(octree.size).toBe(INSERTED_ITEM_COUNT);
     });
 
     it('should reject items outside bounds', () => {
@@ -56,10 +64,10 @@ describe('Octree', () => {
       octree.insert({ x: 50, y: 50, z: 50 }, 'b');
       octree.insert({ x: 0, y: 0, z: 0 }, 'c');
 
-      expect(octree.size).toBe(3);
+      expect(octree.size).toBe(INSERTED_ITEM_COUNT);
       // All items should still be retrievable
       const allItems = octree.getAllItems();
-      expect(allItems.length).toBe(3);
+      expect(allItems.length).toBe(INSERTED_ITEM_COUNT);
     });
   });
 
@@ -121,7 +129,7 @@ describe('Octree', () => {
 
     it('should return all items when query contains entire tree', () => {
       const results = octree.queryRange(defaultBounds);
-      expect(results.length).toBe(4);
+      expect(results.length).toBe(RANGE_QUERY_TOTAL_ITEMS);
     });
   });
 
@@ -136,7 +144,7 @@ describe('Octree', () => {
     });
 
     it('should find items within a sphere', () => {
-      const results = octree.querySphere({ x: 0, y: 0, z: 0 }, 15);
+      const results = octree.querySphere({ x: 0, y: 0, z: 0 }, SPHERE_QUERY_RADIUS);
       expect(results.length).toBe(2);
 
       const dataValues = results.map(r => r.data);
@@ -173,7 +181,7 @@ describe('Octree', () => {
     });
 
     it('should respect maxDistance', () => {
-      const nearest = octree.findNearest({ x: 0, y: 0, z: 0 }, 5);
+      const nearest = octree.findNearest({ x: 0, y: 0, z: 0 }, FIND_NEAREST_MAX_DISTANCE);
       expect(nearest).toBeNull();
     });
 
@@ -203,12 +211,12 @@ describe('Octree', () => {
     });
 
     it('should return all items if k > size', () => {
-      const nearest = octree.findKNearest({ x: 0, y: 0, z: 0 }, 10);
-      expect(nearest.length).toBe(4);
+      const nearest = octree.findKNearest({ x: 0, y: 0, z: 0 }, LARGE_K_VALUE);
+      expect(nearest.length).toBe(K_NEAREST_TOTAL_ITEMS);
     });
 
     it('should respect maxDistance', () => {
-      const nearest = octree.findKNearest({ x: 0, y: 0, z: 0 }, 10, 25);
+      const nearest = octree.findKNearest({ x: 0, y: 0, z: 0 }, LARGE_K_VALUE, K_NEAREST_MAX_DISTANCE);
       expect(nearest.length).toBe(2);
     });
   });
@@ -221,7 +229,7 @@ describe('Octree', () => {
       octree.insert({ x: 0, y: 0, z: 0 }, 'c');
 
       const allItems = octree.getAllItems();
-      expect(allItems.length).toBe(3);
+      expect(allItems.length).toBe(INSERTED_ITEM_COUNT);
 
       const dataValues = allItems.map(item => item.data);
       expect(dataValues).toContain('a');
@@ -273,7 +281,7 @@ describe('createOctreeFromItems', () => {
     ];
 
     const octree = createOctreeFromItems(items);
-    expect(octree.size).toBe(3);
+    expect(octree.size).toBe(INSERTED_ITEM_COUNT);
 
     const allItems = octree.getAllItems();
     const dataValues = allItems.map(item => item.data);

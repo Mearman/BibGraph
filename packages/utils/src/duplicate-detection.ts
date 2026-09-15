@@ -2,7 +2,6 @@
  * Duplicate Detection Utilities
  *
  * Provides utilities for detecting duplicate entities within and across catalogue lists.
- * @package
  */
 
 import type { CatalogueEntity } from './storage/catalogue-db/index.js';
@@ -59,8 +58,8 @@ export interface DuplicateDetectionOptions {
  * @returns Array of duplicate groups found
  */
 export const detectDuplicatesInList = (
-  entities: CatalogueEntity[],
-  options: DuplicateDetectionOptions = {}
+  entities: readonly CatalogueEntity[],
+  options: Readonly<DuplicateDetectionOptions> = {}
 ): DuplicateGroup[] => {
   const { crossType = false, minOccurrences = 2 } = options;
 
@@ -116,12 +115,12 @@ export const detectDuplicatesInList = (
  */
 export const detectDuplicatesAcrossLists = (
   listEntities: Map<string, CatalogueEntity[]>,
-  options: DuplicateDetectionOptions = {}
+  options: Readonly<DuplicateDetectionOptions> = {}
 ): DuplicateGroup[] => {
   const { crossType = false, minOccurrences = 2 } = options;
 
   // Collect all entities with their list IDs
-  const entityMap = new Map<string, Array<{ entity: CatalogueEntity; listId: string }>>();
+  const entityMap = new Map<string, { entity: CatalogueEntity; listId: string }[]>();
 
   for (const [listId, entities] of listEntities) {
     for (const entity of entities) {
@@ -192,8 +191,10 @@ export interface DuplicateStats {
   duplicatePercentage: number;
 }
 
+const PERCENTAGE_MULTIPLIER = 100;
+
 export const calculateDuplicateStats = (
-  entities: CatalogueEntity[]
+  entities: readonly CatalogueEntity[]
 ): DuplicateStats => {
   const totalEntities = entities.length;
   const duplicates = detectDuplicatesInList(entities);
@@ -212,7 +213,7 @@ export const calculateDuplicateStats = (
     duplicateCount: duplicateEntities,
     removableCount,
     duplicatePercentage: totalEntities > 0
-      ? (removableCount / totalEntities) * 100
+      ? (removableCount / totalEntities) * PERCENTAGE_MULTIPLIER
       : 0,
   };
 };
@@ -223,7 +224,7 @@ export const calculateDuplicateStats = (
  * @returns Array of entity record IDs that can be safely removed
  */
 export const suggestDuplicateRemovals = (
-  entities: CatalogueEntity[]
+  entities: readonly CatalogueEntity[]
 ): string[] => {
   const duplicates = detectDuplicatesInList(entities);
   const toRemove: string[] = [];
@@ -232,7 +233,7 @@ export const suggestDuplicateRemovals = (
     // Keep the first one, mark the rest for removal
     for (let index = 1; index < group.entities.length; index++) {
       const entity = group.entities[index];
-      if (entity.id) {
+      if (entity.id !== undefined && entity.id !== "") {
         toRemove.push(entity.id);
       }
     }

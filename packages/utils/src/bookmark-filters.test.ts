@@ -18,7 +18,7 @@ const createMockBookmark = (
 	id: string,
 	entityType: EntityType,
 	title: string,
-	tags: string[] = [],
+	tags: readonly string[] = [],
 	notes = ""
 ): Bookmark => ({
 	id,
@@ -33,10 +33,12 @@ const createMockBookmark = (
 		title,
 		entityType,
 		entityId: `${entityType.charAt(0).toUpperCase()}${id}`,
-		tags,
+		tags: [...tags],
 		timestamp: new Date(),
 	},
 });
+
+const WHITESPACE_ONLY_QUERY_LENGTH = 3;
 
 describe("filterBySearch", () => {
 	it("should return all bookmarks when search query is empty", () => {
@@ -46,7 +48,7 @@ describe("filterBySearch", () => {
 		];
 
 		expect(filterBySearch(bookmarks, "")).toEqual(bookmarks);
-		expect(filterBySearch(bookmarks, ' '.repeat(3))).toEqual(bookmarks);
+		expect(filterBySearch(bookmarks, ' '.repeat(WHITESPACE_ONLY_QUERY_LENGTH))).toEqual(bookmarks);
 	});
 
 	it("should filter by title (case-insensitive)", () => {
@@ -178,7 +180,7 @@ describe("filterByEntityType", () => {
 		];
 
 		const bookmarks = entityTypes.map((type, index) =>
-			createMockBookmark(`${index}`, type, `${type} entity`)
+			createMockBookmark(String(index), type, `${type} entity`)
 		);
 
 		for (const type of entityTypes) {
@@ -208,7 +210,7 @@ describe("filterByTags", () => {
 
 		const result = filterByTags(bookmarks, ["ai"]);
 		expect(result).toHaveLength(2);
-		expect(result.every((b) => b.metadata.tags?.includes("ai"))).toBe(true);
+		expect(result.every((b) => b.metadata.tags?.includes("ai") === true)).toBe(true);
 	});
 
 	it("should filter by multiple tags with OR logic", () => {
@@ -337,7 +339,8 @@ describe("edge cases", () => {
 
 	it("should handle very long search queries", () => {
 		const bookmarks = [createMockBookmark("1", "authors", "John Doe")];
-		const longQuery = "a".repeat(1000);
+		const LONG_QUERY_LENGTH = 1000;
+		const longQuery = "a".repeat(LONG_QUERY_LENGTH);
 
 		expect(filterBySearch(bookmarks, longQuery)).toEqual([]);
 	});

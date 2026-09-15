@@ -12,8 +12,6 @@ import type { AddEntityParams as AddEntityParameters, BatchAddResult } from './s
 
 /**
  * Get the maximum position in a list
- * @param storage
- * @param listId
  */
 const getMaxPosition = (storage: InMemoryStorage, listId: string): number => {
 	let maxPosition = 0;
@@ -27,10 +25,6 @@ const getMaxPosition = (storage: InMemoryStorage, listId: string): number => {
 
 /**
  * Check if entity already exists in list
- * @param storage
- * @param listId
- * @param entityType
- * @param entityId
  */
 const entityExistsInList = (storage: InMemoryStorage, listId: string, entityType: EntityType, entityId: string): boolean => {
 	for (const entity of storage.entities.values()) {
@@ -47,9 +41,6 @@ const entityExistsInList = (storage: InMemoryStorage, listId: string, entityType
 
 /**
  * Validate list exists and entity type matches list type
- * @param storage
- * @param listId
- * @param entityType
  */
 const validateListForEntity = (storage: InMemoryStorage, listId: string, entityType: EntityType): CatalogueList => {
 	const list = getList(storage, listId);
@@ -66,10 +57,8 @@ const validateListForEntity = (storage: InMemoryStorage, listId: string, entityT
 
 /**
  * Add an entity to a list
- * @param storage
- * @param params
  */
-export const addEntityToList = (storage: InMemoryStorage, params: AddEntityParameters): string => {
+export const addEntityToList = (storage: InMemoryStorage, params: Readonly<AddEntityParameters>): string => {
 	validateListForEntity(storage, params.listId, params.entityType);
 
 	if (entityExistsInList(storage, params.listId, params.entityType, params.entityId)) {
@@ -99,8 +88,6 @@ export const addEntityToList = (storage: InMemoryStorage, params: AddEntityParam
 
 /**
  * Get all entities in a list sorted by position
- * @param storage
- * @param listId
  */
 export const getListEntities = (storage: InMemoryStorage, listId: string): CatalogueEntity[] => {
 	const listEntities: CatalogueEntity[] = [];
@@ -114,9 +101,6 @@ export const getListEntities = (storage: InMemoryStorage, listId: string): Catal
 
 /**
  * Remove an entity from a list
- * @param storage
- * @param listId
- * @param entityRecordId
  */
 export const removeEntityFromList = (storage: InMemoryStorage, listId: string, entityRecordId: string): void => {
 	const entity = storage.entities.get(entityRecordId);
@@ -132,9 +116,6 @@ export const removeEntityFromList = (storage: InMemoryStorage, listId: string, e
 
 /**
  * Update entity notes
- * @param storage
- * @param entityRecordId
- * @param notes
  */
 export const updateEntityNotes = (storage: InMemoryStorage, entityRecordId: string, notes: string): void => {
 	const entity = storage.entities.get(entityRecordId);
@@ -156,17 +137,11 @@ export const updateEntityNotes = (storage: InMemoryStorage, entityRecordId: stri
 /**
  * Update entity data (entityType, entityId, and optionally notes)
  * Used primarily for migration scenarios where entity identification changes
- * @param storage
- * @param entityRecordId
- * @param data
- * @param data.entityType
- * @param data.entityId
- * @param data.notes
  */
 export const updateEntityData = (
 	storage: InMemoryStorage,
 	entityRecordId: string,
-	data: { entityType: EntityType; entityId: string; notes?: string }
+	data: Readonly<{ entityType: EntityType; entityId: string; notes?: string }>
 ): void => {
 	const entity = storage.entities.get(entityRecordId);
 	if (!entity) {
@@ -188,11 +163,8 @@ export const updateEntityData = (
 
 /**
  * Reorder entities in a list
- * @param storage
- * @param listId
- * @param orderedEntityIds
  */
-export const reorderEntities = (storage: InMemoryStorage, listId: string, orderedEntityIds: string[]): void => {
+export const reorderEntities = (storage: InMemoryStorage, listId: string, orderedEntityIds: readonly string[]): void => {
 	const list = getList(storage, listId);
 	if (!list) {
 		throw new Error('List not found');
@@ -226,15 +198,12 @@ export const reorderEntities = (storage: InMemoryStorage, listId: string, ordere
 
 /**
  * Add multiple entities to a list
- * @param storage
- * @param listId
- * @param entities
  */
-export const addEntitiesToList = (storage: InMemoryStorage, listId: string, entities: Array<{
+export const addEntitiesToList = (storage: InMemoryStorage, listId: string, entities: readonly {
 		entityType: EntityType;
 		entityId: string;
 		notes?: string;
-	}>): BatchAddResult => {
+	}[]): BatchAddResult => {
 	let success = 0;
 	let failed = 0;
 

@@ -10,10 +10,10 @@ import type { CatalogueDB } from "./schema.js";
 
 /**
  * Add search query to history with FIFO eviction
- * @param db Database instance
- * @param query Search query text
- * @param maxHistory Maximum entries to keep (default: 50)
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param query - Search query text
+ * @param maxHistory - Maximum entries to keep (default: 50)
+ * @param logger - Optional logger
  */
 export const addSearchQuery = async (
   db: CatalogueDB,
@@ -39,7 +39,7 @@ export const addSearchQuery = async (
       const entriesToRemove = allEntries.slice(0, allEntries.length - maxHistory);
       const idsToRemove = entriesToRemove
         .map((e) => e.id)
-        .filter((id): id is string => id !== undefined);
+        .filter((entryId): entryId is string => entryId !== undefined);
       await db.searchHistory.bulkDelete(idsToRemove);
     }
 
@@ -52,8 +52,8 @@ export const addSearchQuery = async (
 
 /**
  * Get all search history entries ordered by timestamp (newest first)
- * @param db Database instance
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param logger - Optional logger
  * @returns Search history entries
  */
 export const getSearchHistory = async (
@@ -70,9 +70,9 @@ export const getSearchHistory = async (
 
 /**
  * Remove search query from history
- * @param db Database instance
- * @param id Entry ID to remove
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param id - Entry ID to remove
+ * @param logger - Optional logger
  */
 export const removeSearchQuery = async (
   db: CatalogueDB,
@@ -90,8 +90,8 @@ export const removeSearchQuery = async (
 
 /**
  * Clear all search history
- * @param db Database instance
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param logger - Optional logger
  */
 export const clearSearchHistory = async (
   db: CatalogueDB,

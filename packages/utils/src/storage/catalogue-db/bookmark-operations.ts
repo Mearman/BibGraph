@@ -12,31 +12,27 @@ import type { CatalogueDB } from "./schema.js";
 
 /**
  * Add a bookmark to the special bookmarks list
- * @param db Database instance
- * @param initializeSpecialLists Helper to initialize special lists
- * @param addEntityToList Helper to add entity to list
- * @param params Bookmark parameters
- * @param params.entityType
- * @param params.entityId
- * @param params.notes
- * @param logger Optional logger
- * @param _logger
+ * @param db - Database instance
+ * @param initializeSpecialLists - Helper to initialize special lists
+ * @param addEntityToList - Helper to add entity to list
+ * @param params - Bookmark parameters
+ * @param _logger - Optional logger
  * @returns The ID of the created bookmark entity record
  */
 export const addBookmark = async (
 	db: CatalogueDB,
 	initializeSpecialLists: () => Promise<void>,
-	addEntityToList: (parameters: {
+	addEntityToList: (parameters: Readonly<{
 		listId: string;
 		entityType: EntityType;
 		entityId: string;
 		notes?: string;
-	}) => Promise<string>,
-	params: {
+	}>) => Promise<string>,
+	params: Readonly<{
 		entityType: EntityType;
 		entityId: string;
 		notes?: string;
-	},
+	}>,
 	_logger?: GenericLogger
 ): Promise<string> => {
 	await initializeSpecialLists();
@@ -52,8 +48,8 @@ export const addBookmark = async (
 
 /**
  * Remove a bookmark from the special bookmarks list
- * @param removeEntityFromList Helper to remove entity from list
- * @param entityRecordId Entity record ID
+ * @param removeEntityFromList - Helper to remove entity from list
+ * @param entityRecordId - Entity record ID
  */
 export const removeBookmark = async (
 	removeEntityFromList: (listId: string, entityRecordId: string) => Promise<void>,
@@ -64,11 +60,10 @@ export const removeBookmark = async (
 
 /**
  * Get all bookmarks
- * @param db Database instance
- * @param initializeSpecialLists Helper to initialize special lists
- * @param getListEntities Helper to get list entities
- * @param logger Optional logger
- * @param _logger
+ * @param db - Database instance
+ * @param initializeSpecialLists - Helper to initialize special lists
+ * @param getListEntities - Helper to get list entities
+ * @param _logger - Optional logger
  * @returns Array of bookmark entities
  */
 export const getBookmarks = async (
@@ -83,10 +78,10 @@ export const getBookmarks = async (
 
 /**
  * Check if an entity is bookmarked
- * @param db Database instance
- * @param entityType Entity type
- * @param entityId Entity ID
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param entityType - Entity type
+ * @param entityId - Entity ID
+ * @param logger - Optional logger
  * @returns True if bookmarked, false otherwise
  */
 export const isBookmarked = async (

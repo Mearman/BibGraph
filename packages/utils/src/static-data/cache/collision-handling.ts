@@ -1,12 +1,9 @@
 /**
  * Collision Handling Utilities for Static Data Cache
  *
- * Provides functions for detecting, handling, and validating URL collisions
- * in the cache. Multiple URLs that differ only in sensitive parameters
- * (like api_key or mailto) can map to the same cache file.
+ * Provides functions for detecting, handling, and validating URL collisions in the cache. Multiple URLs that differ only in sensitive parameters (like api_key or mailto) can map to the same cache file.
  *
- * These utilities support both legacy single-URL entries and enhanced
- * multi-URL entries for collision tracking and resolution.
+ * These utilities support both legacy single-URL entries and enhanced multi-URL entries for collision tracking and resolution.
  */
 
 import type { CacheStorageType } from "../../cache-browser/types.js"
@@ -15,41 +12,6 @@ import { getCacheFilePath } from "./file-path.js"
 import { filenameToQuery } from "./query.js"
 import type { FileEntry } from "./types.js"
 import { decodeFilename, normalizeQueryForFilename, sanitizeUrlForCaching } from "./url.js"
-
-/**
- * Compare two URLs for equivalence in caching context
- * Two URLs are equivalent if they would normalize to the same cache filename
- * Ignores sensitive parameters (api_key, mailto) and parameter order
- * @param root0
- * @param root0.url1
- * @param root0.url2
- */
-export const areUrlsEquivalentForCaching = ({
-	url1,
-	url2,
-}: {
-	url1: string
-	url2: string
-}): boolean => {
-	if (!areValidUrlInputs({ url1, url2 })) {
-		return false
-	}
-
-	if (!areValidHttpUrls({ url1, url2 })) {
-		return false
-	}
-
-	try {
-		return compareUrlComponents({ url1, url2 })
-	} catch (error) {
-		logger.warn("cache", "Failed to compare URLs for equivalence", {
-			url1,
-			url2,
-			error,
-		})
-		return false
-	}
-}
 
 const areValidUrlInputs = ({ url1, url2 }: { url1: string; url2: string }): boolean => {
 	if (
@@ -100,14 +62,44 @@ const compareUrlComponents = ({ url1, url2 }: { url1: string; url2: string }): b
 }
 
 /**
+ * Compare two URLs for equivalence in caching context Two URLs are equivalent if they would normalize to the same cache filename Ignores sensitive parameters (api_key, mailto) and parameter order
+ */
+export const areUrlsEquivalentForCaching = ({
+	url1,
+	url2,
+}: {
+	url1: string
+	url2: string
+}): boolean => {
+	if (!areValidUrlInputs({ url1, url2 })) {
+		return false
+	}
+
+	if (!areValidHttpUrls({ url1, url2 })) {
+		return false
+	}
+
+	try {
+		return compareUrlComponents({ url1, url2 })
+	} catch (error) {
+		logger.warn("cache", "Failed to compare URLs for equivalence", {
+			url1,
+			url2,
+			error,
+		})
+		return false
+	}
+}
+
+/**
  * Check if a URL would collide with an existing FileEntry (map to the same cache path)
- * @param entry Existing file entry
- * @param url URL to check for collision
- * @param getCacheFilePathFn Function to get cache path (defaults to getCacheFilePath)
+ * @param entry - Existing file entry
+ * @param url - URL to check for collision
+ * @param getCacheFilePathFn - Function to get cache path (defaults to getCacheFilePath)
  * @returns true if the URL maps to the same cache path as the entry
  */
 export const hasCollision = async (entry: FileEntry, url: string, getCacheFilePathFn = getCacheFilePath): Promise<boolean> => {
-	if (!entry || !url) {
+	if (url === "") {
 		return false
 	}
 
@@ -119,7 +111,7 @@ export const hasCollision = async (entry: FileEntry, url: string, getCacheFilePa
 
 	logger.debug(
 		"cache",
-		`hasCollision: entryPath="${entryPath}", urlPath="${urlPath}", equal=${entryPath === urlPath}`
+		`hasCollision: entryPath="${String(entryPath)}", urlPath="${String(urlPath)}", equal=${String(entryPath === urlPath)}`
 	)
 
 	return entryPath !== null && entryPath === urlPath
@@ -127,18 +119,18 @@ export const hasCollision = async (entry: FileEntry, url: string, getCacheFilePa
 
 /**
  * Type guard to check if a FileEntry supports multiple URLs (has been enhanced)
- * @param entry
  */
 export const isMultiUrlFileEntry = (entry: unknown): entry is FileEntry & {
 	equivalentUrls: string[]
 	urlTimestamps: Record<string, string>
 	collisionInfo: CollisionInfo
 } => {
-	// Accept entries that declare the multi-url fields even if arrays are empty;
-	// validation will catch empty-equivalentUrls as invalid when appropriate.
+	// Accept entries that declare the multi-url fields even if arrays are empty; validation will catch empty-equivalentUrls as invalid when appropriate.
+	if (typeof entry !== "object" || entry === null) {
+		return false
+	}
+
 	if (
-		typeof entry !== "object" ||
-		entry === null ||
 		!("equivalentUrls" in entry) ||
 		!("urlTimestamps" in entry) ||
 		!("collisionInfo" in entry)
@@ -146,23 +138,42 @@ export const isMultiUrlFileEntry = (entry: unknown): entry is FileEntry & {
 		return false
 	}
 
-	const candidate = entry as Record<string, unknown>
-
 	return (
-		Array.isArray(candidate.equivalentUrls) &&
-		typeof candidate.urlTimestamps === "object" &&
-		candidate.urlTimestamps !== null &&
-		typeof candidate.collisionInfo === "object" &&
-		candidate.collisionInfo !== null
+		Array.isArray(entry.equivalentUrls) &&
+		typeof entry.urlTimestamps === "object" &&
+		entry.urlTimestamps !== null &&
+		typeof entry.collisionInfo === "object" &&
+		entry.collisionInfo !== null
 	)
 }
 
 /**
+ * Migrate a legacy single-URL FileEntry to the multi-URL format Initializes the new fields with appropriate defaults
+ */
+export const migrateToMultiUrl = (entry: FileEntry): FileEntry => {
+	if (isMultiUrlFileEntry(entry)) {
+		return entry // Already migrated
+	}
+
+	const migrated: FileEntry = {
+		...entry,
+		equivalentUrls: [entry.url],
+		urlTimestamps: {
+			[entry.url]: entry.lastRetrieved,
+		},
+		collisionInfo: {
+			mergedCount: 0,
+			firstCollision: undefined,
+			lastMerge: undefined,
+			totalUrls: 1,
+		},
+	}
+
+	return migrated
+}
+
+/**
  * Add new URL to equivalent URLs if not already present
- * @param root0
- * @param root0.entry
- * @param root0.newUrl
- * @param root0.currentTime
  */
 const addNewUrlToEntry = ({
 	entry,
@@ -193,7 +204,6 @@ const addNewUrlToEntry = ({
 
 /**
  * Sort equivalent URLs by recency (most recent first)
- * @param entry
  */
 const sortUrlsByRecency = (entry: FileEntry): void => {
 	try {
@@ -201,8 +211,8 @@ const sortUrlsByRecency = (entry: FileEntry): void => {
 			entry.equivalentUrls.sort((a, b) => {
 				const taRaw = entry.urlTimestamps?.[a]
 				const tbRaw = entry.urlTimestamps?.[b]
-				const ta = taRaw ? Date.parse(taRaw) : NaN
-				const tb = tbRaw ? Date.parse(tbRaw) : NaN
+				const ta = taRaw !== undefined ? Date.parse(taRaw) : NaN
+				const tb = tbRaw !== undefined ? Date.parse(tbRaw) : NaN
 
 				// If both invalid or equal, keep original order
 				if (Number.isNaN(ta) && Number.isNaN(tb)) return 0
@@ -222,7 +232,6 @@ const sortUrlsByRecency = (entry: FileEntry): void => {
 
 /**
  * Normalize URL for collision detection
- * @param url
  */
 const normalizeUrlForCollision = (url: string): string => {
 	try {
@@ -237,9 +246,8 @@ const normalizeUrlForCollision = (url: string): string => {
 
 /**
  * Group URLs by their normalized collision key
- * @param urls
  */
-const groupUrlsByCollisionKey = (urls: string[]): Map<string, string[]> => {
+const groupUrlsByCollisionKey = (urls: readonly string[]): Map<string, string[]> => {
 	const groups = new Map<string, string[]>()
 	for (const url of urls) {
 		const key = normalizeUrlForCollision(url)
@@ -252,9 +260,6 @@ const groupUrlsByCollisionKey = (urls: string[]): Map<string, string[]> => {
 
 /**
  * Select up to 2 non-primary URLs from a group, keeping recency order
- * @param root0
- * @param root0.urls
- * @param root0.primary
  */
 const selectNonPrimaryUrls = ({ urls, primary }: { urls: string[]; primary: string }): string[] => {
 	const selected: string[] = []
@@ -271,7 +276,6 @@ const selectNonPrimaryUrls = ({ urls, primary }: { urls: string[]; primary: stri
 
 /**
  * Deduplicate equivalent URLs, keeping at most two non-primary URLs
- * @param entry
  */
 const deduplicateUrls = (entry: FileEntry): void => {
 	try {
@@ -300,11 +304,10 @@ const deduplicateUrls = (entry: FileEntry): void => {
 }
 
 /**
- * Merge a new colliding URL into an existing FileEntry
- * Updates equivalentUrls, timestamps, and collision statistics
- * @param existingEntry
- * @param newUrl
- * @param currentTime Optional current timestamp; defaults to now
+ * Merge a new colliding URL into an existing FileEntry Updates equivalentUrls, timestamps, and collision statistics
+ * @param existingEntry - Existing FileEntry to merge the new URL into
+ * @param newUrl - The colliding URL to merge into the entry
+ * @param currentTime - Optional current timestamp; defaults to now
  */
 export const mergeCollision = (existingEntry: FileEntry, newUrl: string, currentTime: string = new Date().toISOString()): FileEntry => {
 	const entry = migrateToMultiUrl(existingEntry)
@@ -317,12 +320,7 @@ export const mergeCollision = (existingEntry: FileEntry, newUrl: string, current
 }
 
 /**
- * Reconstruct possible original URLs that could collide to the same cache filename
- * Generates canonical URL and variations with sensitive parameters
- * Assumes filename is a query filename from the queries/ directory
- * @param root0
- * @param root0.queryFilename
- * @param root0.entityType
+ * Reconstruct possible original URLs that could collide to the same cache filename Generates canonical URL and variations with sensitive parameters Assumes filename is a query filename from the queries/ directory
  */
 export const reconstructPossibleCollisions = ({
 	queryFilename,
@@ -347,10 +345,7 @@ export const reconstructPossibleCollisions = ({
 
 	// If cursor=*, add variation with actual cursor value (which normalizes to *)
 	if (queryString.includes("cursor=*")) {
-		// Simpler approach: remove the normalized cursor marker and append a concrete
-		// cursor token at the end. Preserve raw characters so tests can match exact
-		// literal strings (they expect unencoded ':' and '/'). This mirrors prior
-		// implementation.
+		// Simpler approach: remove the normalized cursor marker and append a concrete cursor token at the end. Preserve raw characters so tests can match exact literal strings (they expect unencoded ':' and '/'). This mirrors prior implementation.
 		let cursorLess = queryString.replaceAll(/[&?]cursor=\*/g, "")
 		if (cursorLess.startsWith("&")) cursorLess = cursorLess.slice(1)
 		if (cursorLess.endsWith("&")) cursorLess = cursorLess.slice(0, -1)
@@ -362,38 +357,7 @@ export const reconstructPossibleCollisions = ({
 }
 
 /**
- * Migrate a legacy single-URL FileEntry to the multi-URL format
- * Initializes the new fields with appropriate defaults
- * @param entry
- */
-export const migrateToMultiUrl = (entry: FileEntry): FileEntry => {
-	if (isMultiUrlFileEntry(entry)) {
-		return entry // Already migrated
-	}
-
-	const migrated: FileEntry = {
-		...entry,
-		equivalentUrls: [entry.url],
-		urlTimestamps: {
-			[entry.url]: entry.lastRetrieved,
-		},
-		collisionInfo: {
-			mergedCount: 0,
-			firstCollision: undefined,
-			lastMerge: undefined,
-			totalUrls: 1,
-		},
-	}
-
-	return migrated
-}
-
-/**
- * Validate a FileEntry for consistency and correctness
- * Checks equivalentUrls[0] === url and that all URLs map to the same cache path
- * Logs warnings for any issues found
- * @param entry
- * @param getCacheFilePathFn
+ * Validate a FileEntry for consistency and correctness Checks equivalentUrls[0] === url and that all URLs map to the same cache path Logs warnings for any issues found
  */
 export const validateFileEntry = async (entry: FileEntry, getCacheFilePathFn = getCacheFilePath): Promise<boolean> => {
 	if (!isMultiUrlFileEntry(entry)) {
@@ -415,11 +379,11 @@ export const validateFileEntry = async (entry: FileEntry, getCacheFilePathFn = g
 		url: entry.url,
 		staticDataRoot: "",
 	})
-	if (basePath) {
+	if (basePath !== null) {
 		for (const url of entry.equivalentUrls) {
 			const urlPath = await getCacheFilePathFn({ url, staticDataRoot: "" })
 			if (urlPath !== basePath) {
-				errors.push(`URL '${url}' maps to '${urlPath}' but expected '${basePath}'`)
+				errors.push(`URL '${url}' maps to '${String(urlPath)}' but expected '${basePath}'`)
 			}
 		}
 	} else {
@@ -436,7 +400,7 @@ export const validateFileEntry = async (entry: FileEntry, getCacheFilePathFn = g
 	// Validate collisionInfo consistency
 	if (entry.collisionInfo.totalUrls !== entry.equivalentUrls.length) {
 		errors.push(
-			`collisionInfo.totalUrls (${entry.collisionInfo.totalUrls}) does not match equivalentUrls.length (${entry.equivalentUrls.length})`
+			`collisionInfo.totalUrls (${String(entry.collisionInfo.totalUrls)}) does not match equivalentUrls.length (${String(entry.equivalentUrls.length)})`
 		)
 	}
 
@@ -452,9 +416,7 @@ export const validateFileEntry = async (entry: FileEntry, getCacheFilePathFn = g
 }
 
 /**
- * Information about URL collisions and merge history for a FileEntry.
- * Captures statistics for debugging cache behavior, migration analysis,
- * and understanding how multiple request variations map to the same data.
+ * Information about URL collisions and merge history for a FileEntry. Captures statistics for debugging cache behavior, migration analysis, and understanding how multiple request variations map to the same data.
  *
  * Collision scenarios include:
  * - Different api_key parameters (stripped for caching but vary per request)
@@ -462,8 +424,7 @@ export const validateFileEntry = async (entry: FileEntry, getCacheFilePathFn = g
  * - Cursor pagination normalization (cursor=* for all paginated results)
  * - Parameter reordering (normalized alphabetically for consistency)
  *
- * This metadata has minimal performance impact as it's only stored in indexes,
- * not in the actual data files.
+ * This metadata has minimal performance impact as it's only stored in indexes, not in the actual data files.
  */
 export interface CollisionInfo {
 	/**

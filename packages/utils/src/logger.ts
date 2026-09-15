@@ -27,10 +27,13 @@ interface LoggerConfig {
 	enableDebugLogs: boolean
 }
 
+const RANDOM_ID_RADIX = 36
+const RANDOM_ID_SLICE_START = 7
+
 // Generic Logger class
 export class GenericLogger {
 	private logs: LogEntry[] = []
-	private listeners: ((logs: LogEntry[]) => void)[] = []
+	private listeners: ((logs: readonly LogEntry[]) => void)[] = []
 	private config: LoggerConfig = {
 		maxLogs: 1000,
 		enableConsoleOutput: true,
@@ -44,7 +47,7 @@ export class GenericLogger {
 		}
 
 		const entry: LogEntry = {
-			id: Math.random().toString(36).slice(7),
+			id: Math.random().toString(RANDOM_ID_RADIX).slice(RANDOM_ID_SLICE_START),
 			timestamp: new Date(),
 			level,
 			category,
@@ -93,11 +96,13 @@ export class GenericLogger {
 			}
 			case "warn": {
 				console.warn(logMessage, logData)
-			
+
 			break;
 			}
-			default: {
+			case "error": {
 				console.error(logMessage, logData)
+
+			break;
 			}
 			}
 		}
@@ -119,7 +124,7 @@ export class GenericLogger {
 		this.log("error", category, message, data, component)
 	}
 
-	subscribe(listener: (logs: LogEntry[]) => void) {
+	subscribe(listener: (logs: readonly LogEntry[]) => void) {
 		this.listeners.push(listener)
 		return () => {
 			this.listeners = this.listeners.filter((l) => l !== listener)
@@ -137,7 +142,7 @@ export class GenericLogger {
 		}
 	}
 
-	updateConfig(newConfig: Partial<LoggerConfig>) {
+	updateConfig(newConfig: Readonly<Partial<LoggerConfig>>) {
 		this.config = { ...this.config, ...newConfig }
 	}
 
@@ -154,7 +159,7 @@ export class GenericLogger {
 		URL.revokeObjectURL(url)
 	}
 
-	configure(config: Partial<LoggerConfig>) {
+	configure(config: Readonly<Partial<LoggerConfig>>) {
 		this.config = { ...this.config, ...config }
 	}
 
@@ -179,11 +184,18 @@ const toError = (error: unknown): Error => {
 	return new Error("Unknown error occurred")
 }
 
+const HTTP_ERROR_STATUS_THRESHOLD = 400
+const HTTP_WARN_STATUS_THRESHOLD = 300
+
 // Convenience functions for common logging patterns
 export const createApiLogger = (logger: GenericLogger) => ({
 	logRequest: (url: string, method: string, status?: number, responseTime?: number) => {
-		const level = status && status >= 400 ? "error" : (status && status >= 300 ? "warn" : "debug")
-		logger.log(level, "api", `${method} ${url}${status ? ` - ${String(status)}` : ""}`, {
+		const level = status !== undefined && status >= HTTP_ERROR_STATUS_THRESHOLD
+			? "error"
+			: status !== undefined && status >= HTTP_WARN_STATUS_THRESHOLD
+				? "warn"
+				: "debug"
+		logger.log(level, "api", `${method} ${url}${status !== undefined ? ` - ${String(status)}` : ""}`, {
 			url,
 			method,
 			status,
@@ -203,7 +215,7 @@ export const createCacheLogger = (logger: GenericLogger) => ({
 
 export const createStorageLogger = (logger: GenericLogger) => ({
 	logOperation: (operation: "read" | "write" | "delete", key: string, size?: number) => {
-		logger.debug("storage", `Storage ${operation}: ${key}${size ? ` (${String(size)} bytes)` : ""}`, {
+		logger.debug("storage", `Storage ${operation}: ${key}${size !== undefined ? ` (${String(size)} bytes)` : ""}`, {
 			operation,
 			key,
 			size,
@@ -231,6 +243,92 @@ export const logError = (
 	)
 }
 
+/**
+ * Extracts a human-readable message from an unhandled promise rejection reason, which arrives typed `any` from the DOM lib and cannot be trusted without narrowing
+ */
+const getRejectionMessage = (reason: unknown): string => {
+	if (reason instanceof Error) return reason.message
+	if (typeof reason === "object" && reason !== null && "message" in reason && typeof reason.message === "string") {
+		return reason.message
+	}
+	return "Unhandled promise rejection"
+}
+
+/**
+ * Extracts a name from an unhandled promise rejection reason (see {@link getRejectionMessage})
+ */
+const getRejectionName = (reason: unknown): string => {
+	if (reason instanceof Error) return reason.name
+	if (typeof reason === "object" && reason !== null && "name" in reason && typeof reason.name === "string") {
+		return reason.name
+	}
+	return "PromiseRejection"
+}
+
+/**
+ * Send error data to PostHog for analytics Privacy-compliant error tracking without sensitive data
+ */
+interface PostHogErrorData {
+	error_type: string
+	error_category: string
+	component_name: string
+	error_message: string
+	error_name?: string
+	error_filename?: string
+	error_line?: number
+	error_column?: number
+	user_agent_group: string
+	timestamp: string
+}
+
+interface PostHogClient {
+	capture: (eventName: string, properties: unknown) => void
+}
+
+const isPostHogClient = (value: unknown): value is PostHogClient => {
+	if (typeof value !== 'object' || value === null) return false
+	if (!('capture' in value)) return false
+	return typeof value.capture === 'function'
+}
+
+/**
+ * Get user agent group for analytics (privacy-friendly grouping)
+ */
+const getUserAgentGroup = (): string => {
+	if (typeof navigator === 'undefined') return 'unknown';
+	const userAgent = navigator.userAgent.toLowerCase();
+	if (userAgent.includes('chrome')) return 'chrome';
+	if (userAgent.includes('firefox')) return 'firefox';
+	if (userAgent.includes('safari')) return 'safari';
+	if (userAgent.includes('edge')) return 'edge';
+	return 'other';
+};
+
+/**
+ * Reads the PostHog client off the global window, which has no statically-declared `posthog` property (it's injected at runtime by the PostHog snippet) -- narrows through `unknown` rather than asserting a shape onto it
+ */
+const getGlobalPostHogClient = (win: unknown): PostHogClient | undefined => {
+	if (typeof win !== 'object' || win === null || !('posthog' in win)) {
+		return undefined
+	}
+	const { posthog } = win
+	return isPostHogClient(posthog) ? posthog : undefined
+}
+
+const sendErrorToPostHog = (errorData: Readonly<PostHogErrorData>) => {
+	try {
+		if (typeof window === 'undefined') return
+
+		const posthog = getGlobalPostHogClient(window)
+		if (posthog) {
+			posthog.capture('error_occurred', errorData);
+		}
+	} catch (analyticsError) {
+		// Don't let analytics errors break the error handler
+		console.warn('Failed to send global error to PostHog:', analyticsError);
+	}
+};
+
 // Global error handler setup - generic for any browser environment
 export const setupGlobalErrorHandling = (logger: GenericLogger) => {
 	// Handle unhandled promise rejections
@@ -243,8 +341,8 @@ export const setupGlobalErrorHandling = (logger: GenericLogger) => {
 				error_type: 'promise_rejection',
 				error_category: 'javascript_error',
 				component_name: 'GlobalErrorHandler',
-				error_message: event.reason?.message || 'Unhandled promise rejection',
-				error_name: event.reason?.name || 'PromiseRejection',
+				error_message: getRejectionMessage(event.reason),
+				error_name: getRejectionName(event.reason),
 				user_agent_group: getUserAgentGroup(),
 				timestamp: new Date().toISOString(),
 			})
@@ -263,9 +361,7 @@ export const setupGlobalErrorHandling = (logger: GenericLogger) => {
 			typeof errorMessage === "string" &&
 			errorMessage.includes("ResizeObserver loop completed with undelivered notifications")
 		) {
-			// This is a benign browser warning that occurs when ResizeObserver
-			// callbacks take too long or trigger layout changes. It's not actionable
-			// and doesn't indicate a real error in the application.
+			// This is a benign browser warning that occurs when ResizeObserver callbacks take too long or trigger layout changes. It's not actionable and doesn't indicate a real error in the application.
 			return
 		}
 
@@ -292,55 +388,6 @@ export const setupGlobalErrorHandling = (logger: GenericLogger) => {
 
 	logger.debug("general", "Global error handling initialized", {}, "setupGlobalErrorHandling")
 }
-
-/**
- * Send error data to PostHog for analytics
- * Privacy-compliant error tracking without sensitive data
- */
-interface PostHogErrorData {
-	error_type: string
-	error_category: string
-	component_name: string
-	error_message: string
-	error_name?: string
-	error_filename?: string
-	error_line?: number
-	error_column?: number
-	user_agent_group: string
-	timestamp: string
-}
-
-const sendErrorToPostHog = (errorData: PostHogErrorData) => {
-	try {
-		if (typeof window !== 'undefined' && 'posthog' in window) {
-			interface WindowWithPostHog extends Window {
-				posthog?: {
-					capture(eventName: string, properties: unknown): void
-				}
-			}
-			const posthog = (window as WindowWithPostHog).posthog;
-			if (posthog) {
-				posthog.capture('error_occurred', errorData);
-			}
-		}
-	} catch (analyticsError) {
-		// Don't let analytics errors break the error handler
-		console.warn('Failed to send global error to PostHog:', analyticsError);
-	}
-};
-
-/**
- * Get user agent group for analytics (privacy-friendly grouping)
- */
-const getUserAgentGroup = (): string => {
-	if (typeof navigator === 'undefined') return 'unknown';
-	const userAgent = navigator.userAgent.toLowerCase();
-	if (userAgent.includes('chrome')) return 'chrome';
-	if (userAgent.includes('firefox')) return 'firefox';
-	if (userAgent.includes('safari')) return 'safari';
-	if (userAgent.includes('edge')) return 'edge';
-	return 'other';
-};
 
 // Export a singleton logger instance for simple usage
 export const logger = new GenericLogger()

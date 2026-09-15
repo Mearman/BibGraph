@@ -6,7 +6,6 @@
  *
  * Best for: Tasks that need priority control and modern browser support
  * @see https://developer.mozilla.org/en-US/docs/Web/API/Scheduler
- * @module utils/background-tasks/scheduler-strategy
  */
 
 import type {
@@ -23,28 +22,29 @@ Default chunk size for batch processing
 const DEFAULT_CHUNK_SIZE = 10;
 
 /**
- * Type declaration for the Scheduler API (not yet in TypeScript lib)
+ * Combine multiple abort signals into one
  */
-interface SchedulerPostTaskOptions {
-  priority?: 'user-blocking' | 'user-visible' | 'background';
-  signal?: AbortSignal;
-  delay?: number;
-}
+const anySignal = (signals: readonly AbortSignal[]): AbortSignal => {
+  const controller = new AbortController();
 
-interface Scheduler {
-  postTask<T>(callback: () => T | Promise<T>, options?: SchedulerPostTaskOptions): Promise<T>;
-  yield(): Promise<void>;
-}
-
-declare global {
-  interface Window {
-    scheduler: Scheduler;
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort();
+      return controller.signal;
+    }
+    signal.addEventListener('abort', () => { controller.abort(); }, { once: true });
   }
-}
+
+  return controller.signal;
+};
+
+/**
+ * Check whether an abort signal has fired. Wrapped in a function so re-checks inside a loop are not statically narrowed away as "always false" by an earlier check in the same scope.
+ */
+const isAborted = (signal: AbortSignal): boolean => signal.aborted;
 
 /**
  * Map TaskPriority to Scheduler API priority
- * @param priority
  */
 const mapPriority = (priority?: TaskPriority): SchedulerPostTaskOptions['priority'] => {
   switch (priority) {
@@ -54,6 +54,7 @@ const mapPriority = (priority?: TaskPriority): SchedulerPostTaskOptions['priorit
       return 'user-visible';
     case 'low':
     case 'background':
+    case undefined:
     default:
       return 'background';
   }
@@ -62,7 +63,7 @@ const mapPriority = (priority?: TaskPriority): SchedulerPostTaskOptions['priorit
 /**
  * Check if Scheduler API is available
  */
-const hasScheduler = (): boolean => typeof window !== 'undefined' && 'scheduler' in window && typeof window.scheduler?.postTask === 'function';
+const hasScheduler = (): boolean => typeof window !== 'undefined' && 'scheduler' in window && typeof window.scheduler.postTask === 'function';
 
 /**
  * Background task strategy using the Scheduler API
@@ -91,7 +92,7 @@ export class SchedulerStrategy implements BackgroundTaskStrategy {
   ): Promise<BackgroundTaskResult<T>> {
     const startTime = performance.now();
 
-    if (!this.isSupported() || !window.scheduler) {
+    if (!this.isSupported()) {
       return {
         success: false,
         error: new Error('Scheduler API not supported'),
@@ -100,7 +101,7 @@ export class SchedulerStrategy implements BackgroundTaskStrategy {
     }
 
     // Check for abort signal
-    if (options?.signal?.aborted) {
+    if (options?.signal?.aborted === true) {
       return {
         success: false,
         cancelled: true,
@@ -111,14 +112,25 @@ export class SchedulerStrategy implements BackgroundTaskStrategy {
     try {
       const scheduler = window.scheduler;
 
-      const result = await scheduler.postTask(task, {
-        priority: mapPriority(options?.priority),
-        signal: options?.signal,
-      });
+      // scheduler.postTask's native lib.dom typing returns Promise<any>, since it cannot know the callback's return type. Capture the real result in a boxed closure variable instead of trusting postTask's own return value, so no `any` ever crosses into our typed result.
+      let outcomeBox: { value: T } | undefined;
+      await scheduler.postTask(
+        async () => {
+          outcomeBox = { value: await task() };
+        },
+        {
+          priority: mapPriority(options?.priority),
+          signal: options?.signal,
+        }
+      );
+
+      if (outcomeBox === undefined) {
+        throw new Error('Scheduled task completed without producing a result');
+      }
 
       return {
         success: true,
-        data: result,
+        data: outcomeBox.value,
         executionTime: performance.now() - startTime,
       };
     } catch (error) {
@@ -140,7 +152,7 @@ export class SchedulerStrategy implements BackgroundTaskStrategy {
   }
 
   async processBatch<T, R>(
-    items: T[],
+    items: readonly T[],
     processor: (item: T) => R | Promise<R>,
     options?: BackgroundTaskOptions & { onProgress?: ProgressCallback }
   ): Promise<BackgroundTaskResult<R[]>> {
@@ -148,7 +160,7 @@ export class SchedulerStrategy implements BackgroundTaskStrategy {
     const results: R[] = [];
     const chunkSize = options?.chunkSize ?? DEFAULT_CHUNK_SIZE;
 
-    if (!this.isSupported() || !window.scheduler) {
+    if (!this.isSupported()) {
       return {
         success: false,
         error: new Error('Scheduler API not supported'),
@@ -176,7 +188,7 @@ export class SchedulerStrategy implements BackgroundTaskStrategy {
     try {
       for (let index = 0; index < items.length; index += chunkSize) {
         // Check for abort
-        if (signal.aborted) {
+        if (isAborted(signal)) {
           return {
             success: false,
             data: results,
@@ -188,13 +200,15 @@ export class SchedulerStrategy implements BackgroundTaskStrategy {
         // Process chunk via scheduler
         const chunk = items.slice(index, index + chunkSize);
 
-        const chunkResults = await scheduler.postTask(
+        // See the note in execute() above: postTask's native return type is Promise<any>, so the real result is captured via a boxed closure variable rather than trusted from postTask's own return value.
+        let chunkResultsBox: { value: R[] } | undefined;
+        await scheduler.postTask(
           async () => {
             const chunkRes: R[] = [];
             for (const item of chunk) {
               chunkRes.push(await processor(item));
             }
-            return chunkRes;
+            chunkResultsBox = { value: chunkRes };
           },
           {
             priority: mapPriority(options?.priority),
@@ -202,15 +216,17 @@ export class SchedulerStrategy implements BackgroundTaskStrategy {
           }
         );
 
-        results.push(...chunkResults);
+        if (chunkResultsBox === undefined) {
+          throw new Error('Scheduled chunk completed without producing a result');
+        }
+
+        results.push(...chunkResultsBox.value);
 
         // Report progress
         options?.onProgress?.(results.length, items.length);
 
-        // Yield between chunks if scheduler.yield is available
-        if (scheduler.yield) {
-          await scheduler.yield();
-        }
+        // Yield to the main thread between chunks
+        await scheduler.yield();
       }
 
       return {
@@ -244,21 +260,3 @@ export class SchedulerStrategy implements BackgroundTaskStrategy {
     this.abortController?.abort();
   }
 }
-
-/**
- * Combine multiple abort signals into one
- * @param signals
- */
-const anySignal = (signals: AbortSignal[]): AbortSignal => {
-  const controller = new AbortController();
-
-  for (const signal of signals) {
-    if (signal.aborted) {
-      controller.abort();
-      return controller.signal;
-    }
-    signal.addEventListener('abort', () => controller.abort(), { once: true });
-  }
-
-  return controller.signal;
-};

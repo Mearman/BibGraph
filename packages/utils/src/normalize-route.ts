@@ -25,7 +25,8 @@ const stringifyQueryString = (object: Record<string, unknown>): string => {
 		}
 
 		const encodedKey = encodeURIComponent(key)
-		const encodedValue = encodeURIComponent(String(value))
+		const stringValue = typeof value === "string" ? value : JSON.stringify(value)
+		const encodedValue = encodeURIComponent(stringValue)
 		pairs.push(`${encodedKey}=${encodedValue}`)
 	}
 	return pairs.join("&")
@@ -37,7 +38,7 @@ export const normalizeRoute = ({ path, search }: { path: string; search: string 
 	const parsed = parseQueryString(query)
 
 	for (const key of SENSITIVE_PARAMS) {
-		delete parsed[key]
+		Reflect.deleteProperty(parsed, key)
 	}
 
 	const sortedKeys = Object.keys(parsed).sort()

@@ -4,10 +4,21 @@
  * for fast, isolated E2E and unit testing
  */
 
+import { GRAPH_LIST_CONFIG } from '@bibgraph/types';
 import { afterEach,beforeEach, describe, expect, it } from 'vitest';
 
 import { SPECIAL_LIST_IDS } from './catalogue-db/index.js';
 import { InMemoryStorageProvider } from './in-memory-storage-provider.js';
+
+/**
+ * Waits for the given number of milliseconds, used to guarantee a measurable timestamp difference between two Date.now() reads.
+ */
+const delay = async (ms: number): Promise<void> => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+/**
+ * Minimum delay used to guarantee a measurable timestamp difference between two Date.now() reads.
+ */
+const TIMESTAMP_DELAY_MS = 10;
 
 describe('InMemoryStorageProvider Graph List Operations (T028)', () => {
 	let provider: InMemoryStorageProvider;
@@ -102,8 +113,8 @@ describe('InMemoryStorageProvider Graph List Operations (T028)', () => {
 
 			const nodes = await provider.getGraphList();
 
-			// Should only return nodes with valid IDs
-			expect(nodes.every((n) => n.id !== undefined)).toBe(true);
+			// Should only return nodes with valid, non-empty IDs
+			expect(nodes.every((n) => n.id.length > 0)).toBe(true);
 		});
 	});
 
@@ -128,25 +139,25 @@ describe('InMemoryStorageProvider Graph List Operations (T028)', () => {
 		it('should enforce size limit', async () => {
 			await provider.initializeSpecialLists();
 
-			// Add exactly 1000 nodes
-			for (let index = 0; index < 1000; index++) {
+			// Fill the graph list up to its configured maximum size
+			for (let index = 0; index < GRAPH_LIST_CONFIG.MAX_SIZE; index++) {
 				await provider.addToGraphList({
-					entityId: `W${index}`,
+					entityId: `W${String(index)}`,
 					entityType: 'works',
-					label: `Work ${index}`,
+					label: `Work ${String(index)}`,
 					provenance: 'user',
 				});
 			}
 
-			// 1001st should throw
+			// The node past the configured maximum should throw
 			await expect(
 				provider.addToGraphList({
-					entityId: 'W1000',
+					entityId: `W${String(GRAPH_LIST_CONFIG.MAX_SIZE)}`,
 					entityType: 'works',
 					label: 'Exceeds Limit',
 					provenance: 'user',
 				})
-			).rejects.toThrow('Graph list size limit reached (1000 nodes)');
+			).rejects.toThrow(`Graph list size limit reached (${String(GRAPH_LIST_CONFIG.MAX_SIZE)} nodes)`);
 		});
 
 		it('should update existing node when adding duplicate', async () => {
@@ -164,7 +175,7 @@ describe('InMemoryStorageProvider Graph List Operations (T028)', () => {
 			const initialId = initialNodes[0].id;
 
 			// Wait to ensure timestamp difference
-			await new Promise((resolve) => setTimeout(resolve, 10));
+			await delay(TIMESTAMP_DELAY_MS);
 
 			// Add same entity with different provenance
 			const updatedId = await provider.addToGraphList({
@@ -234,17 +245,18 @@ describe('InMemoryStorageProvider Graph List Operations (T028)', () => {
 			await provider.initializeSpecialLists();
 
 			// Add multiple nodes
-			for (let index = 0; index < 5; index++) {
+			const nodeCountToAdd = 5;
+			for (let index = 0; index < nodeCountToAdd; index++) {
 				await provider.addToGraphList({
-					entityId: `W${index}`,
+					entityId: `W${String(index)}`,
 					entityType: 'works',
-					label: `Work ${index}`,
+					label: `Work ${String(index)}`,
 					provenance: 'user',
 				});
 			}
 
 			let size = await provider.getGraphListSize();
-			expect(size).toBe(5);
+			expect(size).toBe(nodeCountToAdd);
 
 			await provider.clearGraphList();
 
@@ -291,18 +303,19 @@ describe('InMemoryStorageProvider Graph List Operations (T028)', () => {
 		it('should return accurate count', async () => {
 			await provider.initializeSpecialLists();
 
-			for (let index = 0; index < 10; index++) {
+			const nodeCountToAdd = 10;
+			for (let index = 0; index < nodeCountToAdd; index++) {
 				await provider.addToGraphList({
-					entityId: `W${index}`,
+					entityId: `W${String(index)}`,
 					entityType: 'works',
-					label: `Work ${index}`,
+					label: `Work ${String(index)}`,
 					provenance: 'user',
 				});
 			}
 
 			const size = await provider.getGraphListSize();
 
-			expect(size).toBe(10);
+			expect(size).toBe(nodeCountToAdd);
 		});
 	});
 
@@ -421,28 +434,30 @@ describe('InMemoryStorageProvider Graph List Operations (T028)', () => {
 		it('should stop at size limit', async () => {
 			await provider.initializeSpecialLists();
 
-			// Fill to 999
-			const batch1 = Array.from({ length: 999 }, (_, index) => ({
-				entityId: `W${index}`,
+			// Fill to one below the configured maximum
+			const initialBatchSize = GRAPH_LIST_CONFIG.MAX_SIZE - 1;
+			const batch1 = Array.from({ length: initialBatchSize }, (_, index) => ({
+				entityId: `W${String(index)}`,
 				entityType: 'works' as const,
-				label: `Work ${index}`,
+				label: `Work ${String(index)}`,
 				provenance: 'user' as const,
 			}));
 			await provider.batchAddToGraphList(batch1);
 
-			// Try to add 5 more (should only add 1)
-			const ids = await provider.batchAddToGraphList([
-				{ entityId: 'W999', entityType: 'works', label: 'Last', provenance: 'user' },
-				{ entityId: 'W1000', entityType: 'works', label: 'Nope', provenance: 'user' },
-				{ entityId: 'W1001', entityType: 'works', label: 'Nope', provenance: 'user' },
-				{ entityId: 'W1002', entityType: 'works', label: 'Nope', provenance: 'user' },
-				{ entityId: 'W1003', entityType: 'works', label: 'Nope', provenance: 'user' },
-			]);
+			// Try to add several more (should only add enough to reach the maximum)
+			const attemptedExtraCount = 5;
+			const secondBatch = Array.from({ length: attemptedExtraCount }, (_, offset) => ({
+				entityId: `W${String(initialBatchSize + offset)}`,
+				entityType: 'works' as const,
+				label: offset === 0 ? 'Last' : 'Nope',
+				provenance: 'user' as const,
+			}));
+			const ids = await provider.batchAddToGraphList(secondBatch);
 
-			expect(ids).toHaveLength(1);
+			expect(ids).toHaveLength(GRAPH_LIST_CONFIG.MAX_SIZE - initialBatchSize);
 
 			const size = await provider.getGraphListSize();
-			expect(size).toBe(1000);
+			expect(size).toBe(GRAPH_LIST_CONFIG.MAX_SIZE);
 		});
 
 		it('should handle updates for existing nodes', async () => {

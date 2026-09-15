@@ -5,7 +5,6 @@
  * Automatically yields to the main thread for high-priority work like rendering.
  *
  * Best for: Non-urgent background tasks that can be deferred
- * @module utils/background-tasks/idle-strategy
  */
 
 import type {
@@ -14,6 +13,7 @@ import type {
   BackgroundTaskStrategy,
   ProgressCallback,
 } from './types';
+import { isSignalAborted } from './types';
 
 /**
 Default time remaining threshold to continue processing (ms)
@@ -31,15 +31,19 @@ Fallback timeout for requestIdleCallback (ms)
 const IDLE_CALLBACK_TIMEOUT = 1000;
 
 /**
+Simulated idle time remaining (ms) when requestIdleCallback is unavailable
+ */
+const FALLBACK_IDLE_TIME_MS = 50;
+
+/**
  * Polyfill check for requestIdleCallback
  */
 const hasIdleCallback = (): boolean => typeof requestIdleCallback === 'function';
 
 /**
  * Promisified requestIdleCallback with timeout
- * @param timeout
  */
-const waitForIdle = (timeout?: number): Promise<IdleDeadline> => new Promise((resolve) => {
+const waitForIdle = async (timeout?: number): Promise<IdleDeadline> => await new Promise((resolve) => {
     if (hasIdleCallback()) {
       requestIdleCallback(resolve, { timeout: timeout ?? IDLE_CALLBACK_TIMEOUT });
     } else {
@@ -47,7 +51,7 @@ const waitForIdle = (timeout?: number): Promise<IdleDeadline> => new Promise((re
       setTimeout(() => {
         resolve({
           didTimeout: true,
-          timeRemaining: () => 50, // Simulate 50ms of idle time
+          timeRemaining: () => FALLBACK_IDLE_TIME_MS,
         });
       }, 0);
     }
@@ -68,7 +72,7 @@ const waitForIdle = (timeout?: number): Promise<IdleDeadline> => new Promise((re
 export class IdleCallbackStrategy implements BackgroundTaskStrategy {
   readonly name = 'idle' as const;
 
-  private pendingCallbacks: Set<number> = new Set();
+  private readonly pendingCallbacks = new Set<number>();
   private aborted = false;
 
   isSupported(): boolean {
@@ -83,7 +87,7 @@ export class IdleCallbackStrategy implements BackgroundTaskStrategy {
     const startTime = performance.now();
 
     // Check for abort signal
-    if (options?.signal?.aborted) {
+    if (options?.signal?.aborted === true) {
       return {
         success: false,
         cancelled: true,
@@ -95,8 +99,8 @@ export class IdleCallbackStrategy implements BackgroundTaskStrategy {
       // Wait for idle period
       await waitForIdle(options?.timeout);
 
-      // Check again after waiting
-      if (options?.signal?.aborted || this.aborted) {
+      // Check again after waiting -- via isSignalAborted so this is a fresh expression: TypeScript narrows the first check above and then (incorrectly, since AbortSignal.aborted is live external state that can flip during the preceding await) treats a second inline read of the same readonly property as still provably false.
+      if (isSignalAborted(options?.signal) || this.aborted) {
         return {
           success: false,
           cancelled: true,
@@ -122,7 +126,7 @@ export class IdleCallbackStrategy implements BackgroundTaskStrategy {
   }
 
   async processBatch<T, R>(
-    items: T[],
+    items: readonly T[],
     processor: (item: T) => R | Promise<R>,
     options?: BackgroundTaskOptions & { onProgress?: ProgressCallback }
   ): Promise<BackgroundTaskResult<R[]>> {
@@ -132,7 +136,7 @@ export class IdleCallbackStrategy implements BackgroundTaskStrategy {
     let processed = 0;
 
     // Check for abort signal
-    if (options?.signal?.aborted) {
+    if (options?.signal?.aborted === true) {
       return {
         success: false,
         cancelled: true,
@@ -145,8 +149,8 @@ export class IdleCallbackStrategy implements BackgroundTaskStrategy {
         // Wait for idle period
         const deadline = await waitForIdle(options?.timeout);
 
-        // Check for abort
-        if (options?.signal?.aborted || this.aborted) {
+        // Check for abort -- Boolean(...) rather than a literal `=== true` comparison, since an earlier check already narrows this same readonly property and TypeScript persists that narrowing across the preceding await even though AbortSignal.aborted is live external state that can flip meanwhile.
+        if (isSignalAborted(options?.signal) || this.aborted) {
           return {
             success: false,
             data: results,
@@ -170,7 +174,7 @@ export class IdleCallbackStrategy implements BackgroundTaskStrategy {
         // If we still have items but ran out of time, yield and continue
         if (processed < items.length && deadline.timeRemaining() <= MIN_TIME_REMAINING) {
           // Yield to browser via microtask
-          await new Promise((resolve) => setTimeout(resolve, 0));
+          await new Promise((resolve) => { setTimeout(resolve, 0); });
         }
       }
 

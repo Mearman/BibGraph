@@ -42,17 +42,15 @@ export interface Event {
 	timestamp?: number
 }
 
-export interface EventHandler {
-	(event: Event): void
-}
+export type EventHandler = (event: Event) => void
 
 // EventBus interface
 export interface EventBus {
-	on(eventType: string, handler: EventHandler): string
-	off(eventType: string, handler: EventHandler): void
-	emit(event: Event): void
-	close(): void
-	isBroadcasting(): boolean
+	on: (eventType: string, handler: EventHandler) => string
+	off: (eventType: string, handler: EventHandler) => void
+	emit: (event: Event) => void
+	close: () => void
+	isBroadcasting: () => boolean
 }
 
 // Task system types
@@ -88,12 +86,12 @@ export interface EventBusOptions {
 
 // Local EventBus - in-memory only
 class LocalEventBus implements EventBus {
-	private listeners = new Map<string, EventHandler[]>()
-	private listenerIds = new Map<EventHandler, string>()
+	private readonly listeners = new Map<string, EventHandler[]>()
+	private readonly listenerIds = new Map<EventHandler, string>()
 	private nextId = 0
 
 	on(eventType: string, handler: EventHandler): string {
-		const id = `listener-${this.nextId++}`
+		const id = `listener-${String(this.nextId++)}`
 		this.listenerIds.set(handler, id)
 
 		if (!this.listeners.has(eventType)) {
@@ -146,10 +144,19 @@ class LocalEventBus implements EventBus {
 	}
 }
 
+/**
+ * Type guard confirming a broadcast message's payload is a well-formed {@link Event}
+ */
+const isEvent = (value: unknown): value is Event => {
+	if (typeof value !== "object" || value === null) return false
+	if (!("type" in value)) return false
+	return typeof value.type === "string"
+}
+
 // Cross-tab EventBus using BroadcastChannel
 class CrossTabEventBus implements EventBus {
-	private localBus = new LocalEventBus()
-	private channel: BroadcastChannel
+	private readonly localBus = new LocalEventBus()
+	private readonly channel: BroadcastChannel
 
 	constructor(channelName: string) {
 		this.channel = new BroadcastChannel(channelName)
@@ -157,7 +164,7 @@ class CrossTabEventBus implements EventBus {
 	}
 
 	private handleBroadcastMessage(event: MessageEvent): void {
-		if (event.data && typeof event.data === "object" && event.data.type) {
+		if (isEvent(event.data)) {
 			this.localBus.emit(event.data)
 		}
 	}
@@ -202,11 +209,11 @@ export const localEventBus = createLocalEventBus()
 
 // Queue and coordination types
 export interface TaskQueue {
-	enqueue(task: TaskDescriptor): string
-	cancel(taskId: string): boolean
-	clear(): void
-	getTaskStatus(taskId: string): TaskStatus | null
-	getStats(): {
+	enqueue: (task: TaskDescriptor) => string
+	cancel: (taskId: string) => boolean
+	clear: () => void
+	getTaskStatus: (taskId: string) => TaskStatus | null
+	getStats: () => {
 		queueLength: number
 		activeTasks: number
 		processing: boolean
@@ -215,9 +222,9 @@ export interface TaskQueue {
 }
 
 export interface WorkerPool {
-	submitTask(taskId: string, payload: unknown, timeout?: number): Promise<unknown>
-	shutdown(): void
-	getStats(): {
+	submitTask: (taskId: string, payload: unknown, timeout?: number) => Promise<unknown>
+	shutdown: () => void
+	getStats: () => {
 		totalWorkers: number
 		idleWorkers: number
 		busyWorkers: number
@@ -235,18 +242,18 @@ export interface WorkerPoolOptions {
 }
 
 export interface QueuedResourceCoordinator {
-	submitTask(task: TaskDescriptor): string
-	cancelTask(taskId: string): boolean
-	clearQueue(): void
-	getTaskStatus(taskId: string): TaskStatus | null
-	release(): void
-	getStatus(): {
+	submitTask: (task: TaskDescriptor) => string
+	cancelTask: (taskId: string) => boolean
+	clearQueue: () => void
+	getTaskStatus: (taskId: string) => TaskStatus | null
+	release: () => void
+	getStatus: () => {
 		isLeader: boolean
 		leaderId?: string
 		followers: string[]
 		lastHeartbeat?: number
 	}
-	getQueueStats(): {
+	getQueueStats: () => {
 		pendingTasks: number
 		activeTasks: number
 		completedTasks: number
@@ -254,9 +261,9 @@ export interface QueuedResourceCoordinator {
 		isLeader: boolean
 		queueCapacity: number
 	}
-	onLeadershipChange(
+	onLeadershipChange: (
 		callback: (status: ReturnType<QueuedResourceCoordinator["getStatus"]>) => void
-	): () => void
+	) => () => void
 }
 
 export interface QueueCoordinatorOptions {

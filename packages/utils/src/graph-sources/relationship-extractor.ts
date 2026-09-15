@@ -1,9 +1,7 @@
 /**
  * Relationship Extraction Utilities
  *
- * Extracts relationships from OpenAlex entity data for graph visualization.
- * This logic is shared between catalogue sources and cache sources.
- * @module graph-sources/relationship-extractor
+ * Extracts relationships from OpenAlex entity data for graph visualization. This logic is shared between catalogue sources and cache sources.
  */
 
 import type { EntityType } from '@bibgraph/types';
@@ -11,15 +9,50 @@ import { RelationType as RT } from '@bibgraph/types';
 
 import type { GraphSourceRelationship } from './types';
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isString = (value: unknown): value is string => typeof value === 'string';
+
 /**
- * Normalize an OpenAlex ID by extracting the short ID from a URL if needed.
- * e.g., "https://openalex.org/A5048491430" -> "A5048491430"
- * @param id
+ * Read a string field from an untyped OpenAlex entity record, returning `undefined` when the field is missing or is not actually a string.
+ */
+const getString = (source: Readonly<Record<string, unknown>>, key: string): string | undefined => {
+  const value = source[key];
+  return isString(value) ? value : undefined;
+};
+
+/**
+ * Read a string-array field from an untyped OpenAlex entity record, dropping any entries that are not actually strings.
+ */
+const getStringArray = (source: Readonly<Record<string, unknown>>, key: string): readonly string[] => {
+  const value = source[key];
+  return Array.isArray(value) ? value.filter(isString) : [];
+};
+
+/**
+ * Read a nested object field from an untyped OpenAlex entity record, returning `undefined` when the field is missing or is not an object.
+ */
+const getRecord = (source: Readonly<Record<string, unknown>>, key: string): Record<string, unknown> | undefined => {
+  const value = source[key];
+  return isRecord(value) ? value : undefined;
+};
+
+/**
+ * Read an object-array field from an untyped OpenAlex entity record, dropping any entries that are not actually objects.
+ */
+const getRecordArray = (source: Readonly<Record<string, unknown>>, key: string): readonly Record<string, unknown>[] => {
+  const value = source[key];
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+};
+
+/**
+ * Normalize an OpenAlex ID by extracting the short ID from a URL if needed. e.g., "https://openalex.org/A5048491430" -\> "A5048491430"
  */
 export const normalizeOpenAlexId = (id: string): string => {
   if (!id) return id;
   // If it's a URL, extract just the ID part
-  const urlMatch = id.match(/openalex\.org\/([ACDFIKPQSTW]\d+)$/i);
+  const urlMatch = /openalex\.org\/([ACDFIKPQSTW]\d+)$/i.exec(id);
   if (urlMatch) {
     return urlMatch[1].toUpperCase();
   }
@@ -29,57 +62,88 @@ export const normalizeOpenAlexId = (id: string): string => {
 
 /**
  * Extract display label from entity data based on entity type
- * @param entityType
- * @param entityId
- * @param entityData
  */
 export const extractEntityLabel = (entityType: EntityType, entityId: string, entityData: Record<string, unknown>): string => {
   switch (entityType) {
-    case 'works':
-      return (entityData.title as string) ?? (entityData.display_name as string) ?? entityId;
+    case 'works': {
+      const title = getString(entityData, 'title');
+      if (title !== undefined && title !== '') return title;
+      const displayName = getString(entityData, 'display_name');
+      return displayName !== undefined && displayName !== '' ? displayName : entityId;
+    }
+    case 'authors':
+    case 'sources':
+    case 'institutions':
+    case 'topics':
+    case 'concepts':
+    case 'publishers':
+    case 'funders':
+    case 'keywords':
+    case 'domains':
+    case 'fields':
+    case 'subfields': {
+      const displayName = getString(entityData, 'display_name');
+      return displayName !== undefined && displayName !== '' ? displayName : entityId;
+    }
     default:
-      return (entityData.display_name as string) ?? entityId;
+      return entityType satisfies never;
   }
 };
 
 /**
+ * Extract TOPIC-style relationships (an entity's `topics` array of `{ id, display_name }` pairs) shared by works, authors, institutions and sources.
+ */
+const extractTopicEntries = (data: Readonly<Record<string, unknown>>, relationType: RT): GraphSourceRelationship[] => {
+  const relationships: GraphSourceRelationship[] = [];
+  for (const topic of getRecordArray(data, 'topics')) {
+    const topicId = getString(topic, 'id');
+    if (topicId !== undefined && topicId !== '') {
+      relationships.push({
+        targetId: normalizeOpenAlexId(topicId),
+        targetType: 'topics',
+        relationType,
+        targetLabel: getString(topic, 'display_name'),
+      });
+    }
+  }
+  return relationships;
+};
+
+/**
  * Extract relationships from a Work entity
- * @param data
  */
 export const extractWorkRelationships = (data: Record<string, unknown>): GraphSourceRelationship[] => {
   const relationships: GraphSourceRelationship[] = [];
 
   // Authorships -> Authors
-  const authorships = data.authorships as
-    | Array<{ author?: { id?: string; display_name?: string } }>
-    | undefined;
-  for (const auth of authorships ?? []) {
-    if (auth.author?.id) {
+  for (const authorship of getRecordArray(data, 'authorships')) {
+    const author = getRecord(authorship, 'author');
+    const authorId = author !== undefined ? getString(author, 'id') : undefined;
+    if (authorId !== undefined && authorId !== '') {
       relationships.push({
-        targetId: normalizeOpenAlexId(auth.author.id),
+        targetId: normalizeOpenAlexId(authorId),
         targetType: 'authors',
         relationType: RT.AUTHORSHIP,
-        targetLabel: auth.author.display_name,
+        targetLabel: author !== undefined ? getString(author, 'display_name') : undefined,
       });
     }
   }
 
   // Primary location -> Source
-  const primaryLocation = data.primary_location as
-    | { source?: { id?: string; display_name?: string } }
-    | undefined;
-  if (primaryLocation?.source?.id) {
+  const primaryLocation = getRecord(data, 'primary_location');
+  const primarySource = primaryLocation !== undefined ? getRecord(primaryLocation, 'source') : undefined;
+  const primarySourceId = primarySource !== undefined ? getString(primarySource, 'id') : undefined;
+  if (primarySourceId !== undefined && primarySourceId !== '') {
     relationships.push({
-      targetId: normalizeOpenAlexId(primaryLocation.source.id),
+      targetId: normalizeOpenAlexId(primarySourceId),
       targetType: 'sources',
       relationType: RT.PUBLICATION,
-      targetLabel: primaryLocation.source.display_name,
+      targetLabel: primarySource !== undefined ? getString(primarySource, 'display_name') : undefined,
     });
   }
 
   // Referenced works (only have IDs, no display_name available)
-  const referencedWorks = data.referenced_works as string[] | undefined;
-  for (const referenceId of referencedWorks ?? []) {
+  for (const referenceId of getStringArray(data, 'referenced_works')) {
     relationships.push({
       targetId: normalizeOpenAlexId(referenceId),
       targetType: 'works',
@@ -88,29 +152,17 @@ export const extractWorkRelationships = (data: Record<string, unknown>): GraphSo
   }
 
   // Topics
-  const topics = data.topics as Array<{ id?: string; display_name?: string }> | undefined;
-  for (const topic of topics ?? []) {
-    if (topic.id) {
-      relationships.push({
-        targetId: normalizeOpenAlexId(topic.id),
-        targetType: 'topics',
-        relationType: RT.TOPIC,
-        targetLabel: topic.display_name,
-      });
-    }
-  }
+  relationships.push(...extractTopicEntries(data, RT.TOPIC));
 
   // Grants -> Funders
-  const grants = data.grants as
-    | Array<{ funder?: string; funder_display_name?: string }>
-    | undefined;
-  for (const grant of grants ?? []) {
-    if (grant.funder) {
+  for (const grant of getRecordArray(data, 'grants')) {
+    const funderId = getString(grant, 'funder');
+    if (funderId !== undefined && funderId !== '') {
       relationships.push({
-        targetId: normalizeOpenAlexId(grant.funder),
+        targetId: normalizeOpenAlexId(funderId),
         targetType: 'funders',
         relationType: RT.FUNDED_BY,
-        targetLabel: grant.funder_display_name,
+        targetLabel: getString(grant, 'funder_display_name'),
       });
     }
   }
@@ -120,67 +172,44 @@ export const extractWorkRelationships = (data: Record<string, unknown>): GraphSo
 
 /**
  * Extract relationships from an Author entity
- * @param data
  */
 export const extractAuthorRelationships = (data: Record<string, unknown>): GraphSourceRelationship[] => {
   const relationships: GraphSourceRelationship[] = [];
 
   // Affiliations -> Institutions
-  const affiliations = data.affiliations as
-    | Array<{ institution?: { id?: string; display_name?: string } }>
-    | undefined;
-  for (const aff of affiliations ?? []) {
-    if (aff.institution?.id) {
+  for (const affiliation of getRecordArray(data, 'affiliations')) {
+    const institution = getRecord(affiliation, 'institution');
+    const institutionId = institution !== undefined ? getString(institution, 'id') : undefined;
+    if (institutionId !== undefined && institutionId !== '') {
       relationships.push({
-        targetId: normalizeOpenAlexId(aff.institution.id),
+        targetId: normalizeOpenAlexId(institutionId),
         targetType: 'institutions',
         relationType: RT.AFFILIATION,
-        targetLabel: aff.institution.display_name,
+        targetLabel: institution !== undefined ? getString(institution, 'display_name') : undefined,
       });
     }
   }
 
   // Topics
-  const topics = data.topics as Array<{ id?: string; display_name?: string }> | undefined;
-  for (const topic of topics ?? []) {
-    if (topic.id) {
-      relationships.push({
-        targetId: normalizeOpenAlexId(topic.id),
-        targetType: 'topics',
-        relationType: RT.AUTHOR_RESEARCHES,
-        targetLabel: topic.display_name,
-      });
-    }
-  }
+  relationships.push(...extractTopicEntries(data, RT.AUTHOR_RESEARCHES));
 
   return relationships;
 };
 
 /**
  * Extract relationships from an Institution entity
- * @param data
  */
 export const extractInstitutionRelationships = (data: Record<string, unknown>): GraphSourceRelationship[] => {
   const relationships: GraphSourceRelationship[] = [];
-  const institutionId = normalizeOpenAlexId((data.id as string) ?? '');
+  const rawId = getString(data, 'id');
+  const institutionId = normalizeOpenAlexId(rawId ?? '');
 
   // Topics
-  const topics = data.topics as Array<{ id?: string; display_name?: string }> | undefined;
-  for (const topic of topics ?? []) {
-    if (topic.id) {
-      relationships.push({
-        targetId: normalizeOpenAlexId(topic.id),
-        targetType: 'topics',
-        relationType: RT.TOPIC,
-        targetLabel: topic.display_name,
-      });
-    }
-  }
+  relationships.push(...extractTopicEntries(data, RT.TOPIC));
 
   // Lineage -> Parent institutions (only IDs available, no display_name)
-  const lineage = data.lineage as string[] | undefined;
-  for (const parentId of lineage ?? []) {
-    if (parentId !== institutionId && parentId !== data.id) {
+  for (const parentId of getStringArray(data, 'lineage')) {
+    if (parentId !== institutionId && parentId !== rawId) {
       relationships.push({
         targetId: normalizeOpenAlexId(parentId),
         targetType: 'institutions',
@@ -194,16 +223,14 @@ export const extractInstitutionRelationships = (data: Record<string, unknown>): 
 
 /**
  * Extract relationships from a Source entity
- * @param data
  */
 export const extractSourceRelationships = (data: Record<string, unknown>): GraphSourceRelationship[] => {
   const relationships: GraphSourceRelationship[] = [];
 
-  // Host organization -> Publisher
-  // OpenAlex provides host_organization (ID) and host_organization_name (display name)
-  const hostOrg = data.host_organization as string | undefined;
-  const hostOrgName = data.host_organization_name as string | undefined;
-  if (hostOrg) {
+  // Host organization -> Publisher OpenAlex provides host_organization (ID) and host_organization_name (display name)
+  const hostOrg = getString(data, 'host_organization');
+  const hostOrgName = getString(data, 'host_organization_name');
+  if (hostOrg !== undefined && hostOrg !== '') {
     relationships.push({
       targetId: normalizeOpenAlexId(hostOrg),
       targetType: 'publishers',
@@ -213,47 +240,38 @@ export const extractSourceRelationships = (data: Record<string, unknown>): Graph
   }
 
   // Topics
-  const topics = data.topics as Array<{ id?: string; display_name?: string }> | undefined;
-  for (const topic of topics ?? []) {
-    if (topic.id) {
-      relationships.push({
-        targetId: normalizeOpenAlexId(topic.id),
-        targetType: 'topics',
-        relationType: RT.TOPIC,
-        targetLabel: topic.display_name,
-      });
-    }
-  }
+  relationships.push(...extractTopicEntries(data, RT.TOPIC));
 
   return relationships;
 };
 
 /**
  * Extract relationships from a Topic entity
- * @param data
  */
 export const extractTopicRelationships = (data: Record<string, unknown>): GraphSourceRelationship[] => {
   const relationships: GraphSourceRelationship[] = [];
 
   // Field
-  const field = data.field as { id?: string; display_name?: string } | undefined;
-  if (field?.id) {
+  const field = getRecord(data, 'field');
+  const fieldId = field !== undefined ? getString(field, 'id') : undefined;
+  if (fieldId !== undefined && fieldId !== '') {
     relationships.push({
-      targetId: normalizeOpenAlexId(field.id),
+      targetId: normalizeOpenAlexId(fieldId),
       targetType: 'fields',
       relationType: RT.TOPIC_PART_OF_FIELD,
-      targetLabel: field.display_name,
+      targetLabel: field !== undefined ? getString(field, 'display_name') : undefined,
     });
   }
 
   // Domain
-  const domain = data.domain as { id?: string; display_name?: string } | undefined;
-  if (domain?.id) {
+  const domain = getRecord(data, 'domain');
+  const domainId = domain !== undefined ? getString(domain, 'id') : undefined;
+  if (domainId !== undefined && domainId !== '') {
     relationships.push({
-      targetId: normalizeOpenAlexId(domain.id),
+      targetId: normalizeOpenAlexId(domainId),
       targetType: 'domains',
       relationType: RT.FIELD_PART_OF_DOMAIN,
-      targetLabel: domain.display_name,
+      targetLabel: domain !== undefined ? getString(domain, 'display_name') : undefined,
     });
   }
 
@@ -262,8 +280,6 @@ export const extractTopicRelationships = (data: Record<string, unknown>): GraphS
 
 /**
  * Extract relationships from any entity based on its type
- * @param entityType
- * @param entityData
  */
 export const extractRelationships = (entityType: EntityType, entityData: Record<string, unknown>): GraphSourceRelationship[] => {
   switch (entityType) {
@@ -277,9 +293,16 @@ export const extractRelationships = (entityType: EntityType, entityData: Record<
       return extractSourceRelationships(entityData);
     case 'topics':
       return extractTopicRelationships(entityData);
-    default:
-      // Funders, publishers, concepts, keywords, domains, fields, subfields
-      // don't have relationships we extract
+    case 'concepts':
+    case 'publishers':
+    case 'funders':
+    case 'keywords':
+    case 'domains':
+    case 'fields':
+    case 'subfields':
+      // These entity types don't have relationships we extract.
       return [];
+    default:
+      return entityType satisfies never;
   }
 };

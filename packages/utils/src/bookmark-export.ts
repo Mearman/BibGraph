@@ -40,24 +40,45 @@ export interface ExportOptions {
 }
 
 /**
- * Export bookmarks to JSON format
- * @param bookmarks
- * @param options
+ * Helper: Escape CSV values
  */
-export const exportToJSON = (bookmarks: Bookmark[], options: ExportOptions): string => {
+const escapeCSV = (value: string): string => {
+	if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+		return `"${value.replaceAll('"', '""')}"`;
+	}
+	return value;
+};
+
+/**
+ * Helper: Escape HTML special characters
+ */
+const escapeHTML = (value: string): string =>
+	value
+		.replaceAll("&", "&amp;")
+		.replaceAll("<", "&lt;")
+		.replaceAll(">", "&gt;")
+		.replaceAll('"', "&quot;")
+		.replaceAll("'", "&#039;");
+
+/**
+ * Export bookmarks to JSON format
+ */
+export const exportToJSON = (bookmarks: readonly Bookmark[], options: Readonly<ExportOptions>): string => {
 	const data = bookmarks.map((bookmark) => ({
 		id: bookmark.id,
 		entityType: bookmark.entityType,
 		entityId: bookmark.entityId,
 		title: bookmark.metadata.title,
 		url: bookmark.metadata.url,
-		...(options.includeNotes && bookmark.notes && { notes: bookmark.notes }),
-		...(options.includeTags && bookmark.metadata.tags && { tags: bookmark.metadata.tags }),
-		...(options.includeTimestamps && {
-			addedAt: bookmark.addedAt?.toISOString(),
-			timestamp: bookmark.metadata.timestamp?.toISOString(),
+		...(options.includeNotes === true &&
+			bookmark.notes !== undefined &&
+			bookmark.notes !== "" && { notes: bookmark.notes }),
+		...(options.includeTags === true && bookmark.metadata.tags && { tags: bookmark.metadata.tags }),
+		...(options.includeTimestamps === true && {
+			addedAt: bookmark.addedAt.toISOString(),
+			timestamp: bookmark.metadata.timestamp.toISOString(),
 		}),
-		...(options.includeFieldSelections &&
+		...(options.includeFieldSelections === true &&
 			bookmark.metadata.selectFields && { selectFields: bookmark.metadata.selectFields }),
 	}));
 
@@ -66,20 +87,18 @@ export const exportToJSON = (bookmarks: Bookmark[], options: ExportOptions): str
 
 /**
  * Export bookmarks to CSV format
- * @param bookmarks
- * @param options
  */
-export const exportToCSV = (bookmarks: Bookmark[], options: ExportOptions): string => {
+export const exportToCSV = (bookmarks: readonly Bookmark[], options: Readonly<ExportOptions>): string => {
 	// CSV headers
 	const headers = [
 		"Title",
 		"URL",
 		"Entity Type",
 		"Entity ID",
-		...(options.includeNotes ? ["Notes"] : []),
-		...(options.includeTags ? ["Tags"] : []),
-		...(options.includeTimestamps ? ["Added At"] : []),
-		...(options.includeFieldSelections ? ["Custom Fields"] : []),
+		...(options.includeNotes === true ? ["Notes"] : []),
+		...(options.includeTags === true ? ["Tags"] : []),
+		...(options.includeTimestamps === true ? ["Added At"] : []),
+		...(options.includeFieldSelections === true ? ["Custom Fields"] : []),
 	];
 
 	// CSV rows
@@ -89,11 +108,11 @@ export const exportToCSV = (bookmarks: Bookmark[], options: ExportOptions): stri
 			escapeCSV(bookmark.metadata.url),
 			bookmark.entityType,
 			bookmark.entityId,
-			...(options.includeNotes ? [escapeCSV(bookmark.notes || "")] : []),
-			...(options.includeTags ? [escapeCSV((bookmark.metadata.tags || []).join("; "))] : []),
-			...(options.includeTimestamps ? [bookmark.addedAt?.toISOString() || ""] : []),
-			...(options.includeFieldSelections
-				? [escapeCSV((bookmark.metadata.selectFields || []).join(", "))]
+			...(options.includeNotes === true ? [escapeCSV(bookmark.notes ?? "")] : []),
+			...(options.includeTags === true ? [escapeCSV((bookmark.metadata.tags ?? []).join("; "))] : []),
+			...(options.includeTimestamps === true ? [bookmark.addedAt.toISOString()] : []),
+			...(options.includeFieldSelections === true
+				? [escapeCSV((bookmark.metadata.selectFields ?? []).join(", "))]
 				: []),
 		];
 		return row.join(",");
@@ -104,33 +123,30 @@ export const exportToCSV = (bookmarks: Bookmark[], options: ExportOptions): stri
 
 /**
  * Export bookmarks to Markdown format
- * @param bookmarks
- * @param options
  */
-export const exportToMarkdown = (bookmarks: Bookmark[], options: ExportOptions): string => {
+export const exportToMarkdown = (bookmarks: readonly Bookmark[], options: Readonly<ExportOptions>): string => {
 	const lines: string[] = [];
 
 	// Title
 	lines.push("# Bookmarks");
 	lines.push("");
 	lines.push(`Exported: ${new Date().toISOString()}`);
-	lines.push(`Total bookmarks: ${bookmarks.length}`);
+	lines.push(`Total bookmarks: ${String(bookmarks.length)}`);
 	lines.push("");
 
 	// Group by entity type
-	const groupedByType = bookmarks.reduce(
-		(accumulator, bookmark) => {
-			if (!accumulator[bookmark.entityType]) {
-				accumulator[bookmark.entityType] = [];
-			}
-			accumulator[bookmark.entityType].push(bookmark);
-			return accumulator;
-		},
-		{} as Record<string, Bookmark[]>
-	);
+	const groupedByType = bookmarks.reduce((accumulator, bookmark) => {
+		const existing = accumulator.get(bookmark.entityType);
+		if (existing === undefined) {
+			accumulator.set(bookmark.entityType, [bookmark]);
+		} else {
+			existing.push(bookmark);
+		}
+		return accumulator;
+	}, new Map<string, Bookmark[]>());
 
 	// Output each group
-	for (const [entityType, typeBookmarks] of Object.entries(groupedByType)) {
+	for (const [entityType, typeBookmarks] of groupedByType) {
 		lines.push(`## ${entityType.charAt(0).toUpperCase() + entityType.slice(1)}`);
 		lines.push("");
 
@@ -144,26 +160,26 @@ export const exportToMarkdown = (bookmarks: Bookmark[], options: ExportOptions):
 			lines.push("");
 
 			// Tags
-			if (options.includeTags && bookmark.metadata.tags && bookmark.metadata.tags.length > 0) {
+			if (options.includeTags === true && bookmark.metadata.tags && bookmark.metadata.tags.length > 0) {
 				lines.push(`**Tags**: ${bookmark.metadata.tags.map((tag) => `\`${tag}\``).join(", ")}`);
 				lines.push("");
 			}
 
 			// Notes
-			if (options.includeNotes && bookmark.notes) {
+			if (options.includeNotes === true && bookmark.notes !== undefined && bookmark.notes !== "") {
 				lines.push(`**Notes**: ${bookmark.notes}`);
 				lines.push("");
 			}
 
 			// Timestamp
-			if (options.includeTimestamps && bookmark.addedAt) {
+			if (options.includeTimestamps === true) {
 				lines.push(`**Added**: ${bookmark.addedAt.toLocaleString()}`);
 				lines.push("");
 			}
 
 			// Custom fields
 			if (
-				options.includeFieldSelections &&
+				options.includeFieldSelections === true &&
 				bookmark.metadata.selectFields &&
 				bookmark.metadata.selectFields.length > 0
 			) {
@@ -183,10 +199,8 @@ export const exportToMarkdown = (bookmarks: Bookmark[], options: ExportOptions):
 
 /**
  * Export bookmarks to HTML format
- * @param bookmarks
- * @param options
  */
-export const exportToHTML = (bookmarks: Bookmark[], options: ExportOptions): string => {
+export const exportToHTML = (bookmarks: readonly Bookmark[], options: Readonly<ExportOptions>): string => {
 	const lines: string[] = [];
 
 	// HTML header
@@ -213,22 +227,21 @@ export const exportToHTML = (bookmarks: Bookmark[], options: ExportOptions): str
 	// Title
 	lines.push("  <h1>Bookmarks</h1>");
 	lines.push(`  <p>Exported: ${new Date().toLocaleString()}</p>`);
-	lines.push(`  <p>Total bookmarks: ${bookmarks.length}</p>`);
+	lines.push(`  <p>Total bookmarks: ${String(bookmarks.length)}</p>`);
 
 	// Group by entity type
-	const groupedByType = bookmarks.reduce(
-		(accumulator, bookmark) => {
-			if (!accumulator[bookmark.entityType]) {
-				accumulator[bookmark.entityType] = [];
-			}
-			accumulator[bookmark.entityType].push(bookmark);
-			return accumulator;
-		},
-		{} as Record<string, Bookmark[]>
-	);
+	const groupedByType = bookmarks.reduce((accumulator, bookmark) => {
+		const existing = accumulator.get(bookmark.entityType);
+		if (existing === undefined) {
+			accumulator.set(bookmark.entityType, [bookmark]);
+		} else {
+			existing.push(bookmark);
+		}
+		return accumulator;
+	}, new Map<string, Bookmark[]>());
 
 	// Output each group
-	for (const [entityType, typeBookmarks] of Object.entries(groupedByType)) {
+	for (const [entityType, typeBookmarks] of groupedByType) {
 		lines.push(`  <h2>${entityType.charAt(0).toUpperCase() + entityType.slice(1)}</h2>`);
 
 		for (const bookmark of typeBookmarks) {
@@ -246,13 +259,13 @@ export const exportToHTML = (bookmarks: Bookmark[], options: ExportOptions): str
 			lines.push(`      Entity ID: <code>${escapeHTML(bookmark.entityId)}</code>`);
 
 			// Timestamp
-			if (options.includeTimestamps && bookmark.addedAt) {
+			if (options.includeTimestamps === true) {
 				lines.push(` | Added: ${bookmark.addedAt.toLocaleString()}`);
 			}
 			lines.push("    </div>");
 
 			// Tags
-			if (options.includeTags && bookmark.metadata.tags && bookmark.metadata.tags.length > 0) {
+			if (options.includeTags === true && bookmark.metadata.tags && bookmark.metadata.tags.length > 0) {
 				lines.push('    <div style="margin-top: 8px;">');
 				for (const tag of bookmark.metadata.tags) {
 					lines.push(`      <span class="tag">${escapeHTML(tag)}</span>`);
@@ -261,13 +274,13 @@ export const exportToHTML = (bookmarks: Bookmark[], options: ExportOptions): str
 			}
 
 			// Notes
-			if (options.includeNotes && bookmark.notes) {
+			if (options.includeNotes === true && bookmark.notes !== undefined && bookmark.notes !== "") {
 				lines.push(`    <div class="notes">${escapeHTML(bookmark.notes)}</div>`);
 			}
 
 			// Custom fields
 			if (
-				options.includeFieldSelections &&
+				options.includeFieldSelections === true &&
 				bookmark.metadata.selectFields &&
 				bookmark.metadata.selectFields.length > 0
 			) {
@@ -291,10 +304,8 @@ export const exportToHTML = (bookmarks: Bookmark[], options: ExportOptions): str
 
 /**
  * Main export function that routes to the appropriate format
- * @param bookmarks
- * @param options
  */
-export const exportBookmarks = (bookmarks: Bookmark[], options: ExportOptions): string => {
+export const exportBookmarks = (bookmarks: readonly Bookmark[], options: Readonly<ExportOptions>): string => {
 	switch (options.format) {
 		case "json":
 			return exportToJSON(bookmarks, options);
@@ -305,15 +316,12 @@ export const exportBookmarks = (bookmarks: Bookmark[], options: ExportOptions): 
 		case "html":
 			return exportToHTML(bookmarks, options);
 		default:
-			throw new Error(`Unsupported export format: ${options.format}`);
+			throw new Error(`Unsupported export format: ${JSON.stringify(options.format)}`);
 	}
 };
 
 /**
  * Download exported data as a file
- * @param content
- * @param format
- * @param filename
  */
 export const downloadExport = (content: string, format: ExportFormat, filename?: string): void => {
 	const mimeTypes: Record<ExportFormat, string> = {
@@ -330,7 +338,7 @@ export const downloadExport = (content: string, format: ExportFormat, filename?:
 		html: "html",
 	};
 
-	const defaultFilename = filename || `bookmarks-${Date.now()}.${extensions[format]}`;
+	const defaultFilename = filename ?? `bookmarks-${String(Date.now())}.${extensions[format]}`;
 
 	const blob = new Blob([content], { type: mimeTypes[format] });
 	const url = URL.createObjectURL(blob);
@@ -342,25 +350,3 @@ export const downloadExport = (content: string, format: ExportFormat, filename?:
 	link.remove();
 	URL.revokeObjectURL(url);
 };
-
-/**
- * Helper: Escape CSV values
- * @param value
- */
-const escapeCSV = (value: string): string => {
-	if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-		return `"${value.replaceAll('"', '""')}"`;
-	}
-	return value;
-};
-
-/**
- * Helper: Escape HTML special characters
- * @param value
- */
-const escapeHTML = (value: string): string => value
-		.replaceAll('&', "&amp;")
-		.replaceAll('<', "&lt;")
-		.replaceAll('>', "&gt;")
-		.replaceAll('"', "&quot;")
-		.replaceAll('\'', "&#039;");

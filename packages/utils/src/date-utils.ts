@@ -2,12 +2,13 @@
  * Date utilities for feature availability
  */
 
+import { MS_PER_DAY } from "./date-helpers.js"
+
 /**
  * Check if data version selector should be visible
  *
- * Version 1 is temporarily available during the November 2025 transition period.
- * After December 1, 2025, only Version 2 will be available.
- * @param currentDate Optional date for testing (defaults to now)
+ * Version 1 is temporarily available during the November 2025 transition period. After December 1, 2025, only Version 2 will be available.
+ * @param currentDate - Optional date for testing (defaults to now)
  * @returns true if before December 1, 2025, false otherwise
  */
 export const isDataVersionSelectorVisible = (currentDate?: Date): boolean => {
@@ -25,7 +26,7 @@ export const getVersionSelectorCutoffDate = (): Date => new Date('2025-12-01T00:
 
 /**
  * Calculate days remaining until version selector is hidden
- * @param currentDate Optional date for testing (defaults to now)
+ * @param currentDate - Optional date for testing (defaults to now)
  * @returns Number of days remaining, or 0 if past cutoff
  */
 export const getDaysUntilVersionSelectorHidden = (currentDate?: Date): number => {
@@ -36,7 +37,6 @@ export const getDaysUntilVersionSelectorHidden = (currentDate?: Date): number =>
 		return 0
 	}
 
-	const msPerDay = 24 * 60 * 60 * 1000
 	const diffMs = cutoff.getTime() - now.getTime()
-	return Math.ceil(diffMs / msPerDay)
+	return Math.ceil(diffMs / MS_PER_DAY)
 };

@@ -28,7 +28,6 @@
  * const { entityType, entityId } = parseEntityUrl('/works/W1234567890');
  * // => { entityType: 'works', entityId: 'W1234567890' }
  * ```
- * @module entity-detector
  */
 
 import type { EntityType } from "@bibgraph/types"
@@ -95,14 +94,13 @@ const QUERY_PATH_PATTERNS = [
 	/\/keywords$/i,
 ]
 
+const isEntityType = (value: string): value is EntityType => value in ENTITY_PATH_PATTERNS
+
 /**
  * Normalizes a URL string by removing hash fragments and ensuring proper format
  * @param urlString - URL string to normalize (may be partial path or full URL)
  * @returns Normalized pathname string
- * @example
- * normalizeUrl("https://example.com/works/W123#section") // "/works/W123"
- * normalizeUrl("#/works/W123") // "/works/W123"
- * normalizeUrl("/works/W123") // "/works/W123"
+ * @example normalizeUrl("https://example.com/works/W123#section") // "/works/W123" normalizeUrl("#/works/W123") // "/works/W123" normalizeUrl("/works/W123") // "/works/W123"
  */
 const normalizeUrl = (urlString: string): string => {
 	try {
@@ -153,8 +151,8 @@ export const detectEntityTypeFromURL = (urlString: string): EntityType | undefin
 
 	// Check each entity type pattern
 	for (const [entityType, pattern] of Object.entries(ENTITY_PATH_PATTERNS)) {
-		if (pattern.test(pathname)) {
-			return entityType as EntityType
+		if (pattern.test(pathname) && isEntityType(entityType)) {
+			return entityType
 		}
 	}
 
@@ -210,10 +208,12 @@ export const isEntityPage = (urlString: string): boolean => {
  * @param urlString - URL string to parse
  * @returns Object with entityType and entityId if found, or both undefined
  * @example
+ * ```typescript
  * parseEntityUrl("/works/W123") // { entityType: "works", entityId: "W123" }
  * parseEntityUrl("/authors/A456") // { entityType: "authors", entityId: "A456" }
  * parseEntityUrl("/works") // { entityType: undefined, entityId: undefined }
  * parseEntityUrl("/search") // { entityType: undefined, entityId: undefined }
+ * ```
  */
 export const parseEntityUrl = (urlString: string): {
 	entityType: EntityType | undefined

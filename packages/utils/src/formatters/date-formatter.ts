@@ -3,23 +3,36 @@
  * Provides both relative ("2 hours ago") and absolute ("Mar 15, 2024 at 2:30 PM") formats
  */
 
+const MILLISECONDS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const DAYS_PER_WEEK = 7;
+const DAYS_PER_MONTH_APPROX = 30;
+const DAYS_PER_YEAR_APPROX = 365;
+
 /**
  * Time units in milliseconds
  */
 const TIME_UNITS = {
-	SECOND: 1000,
-	MINUTE: 60 * 1000,
-	HOUR: 60 * 60 * 1000,
-	DAY: 24 * 60 * 60 * 1000,
-	WEEK: 7 * 24 * 60 * 60 * 1000,
-	MONTH: 30 * 24 * 60 * 60 * 1000,
-	YEAR: 365 * 24 * 60 * 60 * 1000,
+	SECOND: MILLISECONDS_PER_SECOND,
+	MINUTE: SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND,
+	HOUR: MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND,
+	DAY: HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND,
+	WEEK: DAYS_PER_WEEK * HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND,
+	MONTH: DAYS_PER_MONTH_APPROX * HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND,
+	YEAR: DAYS_PER_YEAR_APPROX * HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND,
 } as const;
 
 /**
  * Default threshold for switching from relative to absolute time (7 days)
  */
-const DEFAULT_THRESHOLD_MS = 7 * TIME_UNITS.DAY;
+const DEFAULT_THRESHOLD_MS = DAYS_PER_WEEK * TIME_UNITS.DAY;
+
+/**
+ * Below this many seconds, a date is rendered as "just now" instead of a count
+ */
+const JUST_NOW_THRESHOLD_SECONDS = 10;
 
 /**
  * Format a date as relative time (e.g., "2 hours ago", "3 days ago")
@@ -29,9 +42,9 @@ const DEFAULT_THRESHOLD_MS = 7 * TIME_UNITS.DAY;
  * formatRelativeTime(new Date(Date.now() - 2 * 60 * 60 * 1000)) // "2 hours ago"
  * formatRelativeTime(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)) // "3 days ago"
  */
-export const formatRelativeTime = (date: Date): string => {
+export const formatRelativeTime = (date: Readonly<Date>): string => {
 	// Handle invalid dates
-	if (!date || Number.isNaN(date.getTime())) {
+	if (Number.isNaN(date.getTime())) {
 		return 'Invalid date';
 	}
 
@@ -45,49 +58,49 @@ export const formatRelativeTime = (date: Date): string => {
 	}
 
 	// Just now (< 10 seconds)
-	if (diffMs < 10 * TIME_UNITS.SECOND) {
+	if (diffMs < JUST_NOW_THRESHOLD_SECONDS * TIME_UNITS.SECOND) {
 		return 'just now';
 	}
 
 	// Seconds (< 1 minute)
 	if (diffMs < TIME_UNITS.MINUTE) {
 		const seconds = Math.floor(diffMs / TIME_UNITS.SECOND);
-		return `${seconds} ${seconds === 1 ? 'second' : 'seconds'} ago`;
+		return `${String(seconds)} ${seconds === 1 ? 'second' : 'seconds'} ago`;
 	}
 
 	// Minutes (< 1 hour)
 	if (diffMs < TIME_UNITS.HOUR) {
 		const minutes = Math.floor(diffMs / TIME_UNITS.MINUTE);
-		return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+		return `${String(minutes)} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
 	}
 
 	// Hours (< 1 day)
 	if (diffMs < TIME_UNITS.DAY) {
 		const hours = Math.floor(diffMs / TIME_UNITS.HOUR);
-		return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+		return `${String(hours)} ${hours === 1 ? 'hour' : 'hours'} ago`;
 	}
 
 	// Days (< 1 week)
 	if (diffMs < TIME_UNITS.WEEK) {
 		const days = Math.floor(diffMs / TIME_UNITS.DAY);
-		return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+		return `${String(days)} ${days === 1 ? 'day' : 'days'} ago`;
 	}
 
 	// Weeks (< 1 month)
 	if (diffMs < TIME_UNITS.MONTH) {
 		const weeks = Math.floor(diffMs / TIME_UNITS.WEEK);
-		return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
+		return `${String(weeks)} ${weeks === 1 ? 'week' : 'weeks'} ago`;
 	}
 
 	// Months (< 1 year)
 	if (diffMs < TIME_UNITS.YEAR) {
 		const months = Math.floor(diffMs / TIME_UNITS.MONTH);
-		return `${months} ${months === 1 ? 'month' : 'months'} ago`;
+		return `${String(months)} ${months === 1 ? 'month' : 'months'} ago`;
 	}
 
 	// Years
 	const years = Math.floor(diffMs / TIME_UNITS.YEAR);
-	return `${years} ${years === 1 ? 'year' : 'years'} ago`;
+	return `${String(years)} ${years === 1 ? 'year' : 'years'} ago`;
 };
 
 /**
@@ -97,9 +110,9 @@ export const formatRelativeTime = (date: Date): string => {
  * @example
  * formatAbsoluteTime(new Date('2024-03-15T14:30:00')) // "Mar 15, 2024 at 2:30 PM"
  */
-export const formatAbsoluteTime = (date: Date): string => {
+export const formatAbsoluteTime = (date: Readonly<Date>): string => {
 	// Handle invalid dates
-	if (!date || Number.isNaN(date.getTime())) {
+	if (Number.isNaN(date.getTime())) {
 		return 'Invalid date';
 	}
 
@@ -136,9 +149,9 @@ export const formatAbsoluteTime = (date: Date): string => {
  * formatTimestamp(new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)) // "Mar 5, 2024 at 2:30 PM"
  * formatTimestamp(new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), 14 * 24 * 60 * 60 * 1000) // "10 days ago"
  */
-export const formatTimestamp = (date: Date, threshold = DEFAULT_THRESHOLD_MS): string => {
+export const formatTimestamp = (date: Readonly<Date>, threshold = DEFAULT_THRESHOLD_MS): string => {
 	// Handle invalid dates
-	if (!date || Number.isNaN(date.getTime())) {
+	if (Number.isNaN(date.getTime())) {
 		return 'Invalid date';
 	}
 

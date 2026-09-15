@@ -12,14 +12,14 @@ type GraphSnapshotStorageInput = Omit<GraphSnapshotStorage, 'id' | 'createdAt' |
 
 /**
  * Create a new graph snapshot
- * @param db Database instance
- * @param snapshot Snapshot data (without id, timestamps)
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param snapshot - Snapshot data (without id, timestamps)
+ * @param logger - Optional logger
  * @returns Snapshot ID
  */
 export const addSnapshot = async (
   db: CatalogueDB,
-  snapshot: GraphSnapshotStorageInput,
+  snapshot: Readonly<GraphSnapshotStorageInput>,
   logger?: GenericLogger
 ): Promise<string> => {
   try {
@@ -43,8 +43,8 @@ export const addSnapshot = async (
 
 /**
  * Get all snapshots
- * @param db Database instance
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param logger - Optional logger
  * @returns All snapshots
  */
 export const getSnapshots = async (
@@ -62,9 +62,9 @@ export const getSnapshots = async (
 
 /**
  * Get a specific snapshot by ID
- * @param db Database instance
- * @param id Snapshot ID
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param id - Snapshot ID
+ * @param logger - Optional logger
  * @returns Snapshot or null if not found
  */
 export const getSnapshot = async (
@@ -83,15 +83,15 @@ export const getSnapshot = async (
 
 /**
  * Update an existing snapshot
- * @param db Database instance
- * @param id Snapshot ID
- * @param updates Fields to update
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param id - Snapshot ID
+ * @param updates - Fields to update
+ * @param logger - Optional logger
  */
 export const updateSnapshot = async (
   db: CatalogueDB,
   id: string,
-  updates: Partial<Omit<GraphSnapshotStorage, 'id' | 'createdAt' | 'updatedAt'>>,
+  updates: Readonly<Partial<Omit<GraphSnapshotStorage, 'id' | 'createdAt' | 'updatedAt'>>>,
   logger?: GenericLogger
 ): Promise<void> => {
   try {
@@ -110,9 +110,9 @@ export const updateSnapshot = async (
 
 /**
  * Delete a snapshot
- * @param db Database instance
- * @param id Snapshot ID
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param id - Snapshot ID
+ * @param logger - Optional logger
  */
 export const deleteSnapshot = async (
   db: CatalogueDB,
@@ -130,9 +130,9 @@ export const deleteSnapshot = async (
 
 /**
  * Delete old auto-saved snapshots, keeping only the most recent N
- * @param db Database instance
- * @param keep Number of auto-saved snapshots to keep (default: 5)
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param keep - Number of auto-saved snapshots to keep (default: 5)
+ * @param logger - Optional logger
  */
 export const pruneAutoSaveSnapshots = async (
   db: CatalogueDB,
@@ -158,9 +158,9 @@ export const pruneAutoSaveSnapshots = async (
 
 /**
  * Get snapshot by share token
- * @param db Database instance
- * @param shareToken Share token
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param shareToken - Share token
+ * @param logger - Optional logger
  * @returns Snapshot or null if not found
  */
 export const getSnapshotByShareToken = async (

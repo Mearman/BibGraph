@@ -5,7 +5,7 @@
 
 import Dexie from "dexie"
 
-import { GenericLogger } from "../logger.js"
+import type { GenericLogger } from "../logger.js"
 
 // Generic storage interface compatible with various state management libraries
 export interface StateStorage {
@@ -56,8 +56,8 @@ const isIndexedDBAvailable = (): boolean => {
 	}
 }
 
-const getDB = (config: StorageConfig): Promise<KeyValueDB> => {
-	const cacheKey = `${config.dbName}-${config.version}`
+const getDB = async (config: Readonly<StorageConfig>): Promise<KeyValueDB> => {
+	const cacheKey = `${config.dbName}-${String(config.version)}`
 
 	if (!databaseCache.has(cacheKey)) {
 		const databasePromise = Promise.resolve(
@@ -80,11 +80,9 @@ const getDB = (config: StorageConfig): Promise<KeyValueDB> => {
 /**
  * Creates a pure Dexie storage adapter for IndexedDB operations
  * Simplified from hybrid approach - no localStorage fallback
- * @param config
- * @param logger
  */
 export const createIndexedDBStorage = (
-	config: StorageConfig,
+	config: Readonly<StorageConfig>,
 	logger?: GenericLogger
 ): StateStorage => {
 	const isUseIndexedDB = isIndexedDBAvailable()

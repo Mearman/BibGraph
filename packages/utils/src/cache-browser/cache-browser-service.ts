@@ -8,6 +8,7 @@ import { Dexie } from "dexie"
 
 type DexieInstance = InstanceType<typeof Dexie>
 import type { GenericLogger } from "../logger.js"
+import { isRecord } from "../validation.js"
 import type {
 	CacheBrowserFilters,
 	CacheBrowserOptions,
@@ -79,23 +80,21 @@ const ALL_ENTITY_TYPES: readonly CacheStorageType[] = [
 ] as const
 
 export class CacheBrowserService {
-	private config: CacheBrowserConfig
-	private logger?: GenericLogger
+	private readonly config: CacheBrowserConfig
+	private readonly logger?: GenericLogger
 	private dbCache?: DexieInstance
 
-	constructor(config: Partial<CacheBrowserConfig> = {}, logger?: GenericLogger) {
+	constructor(config: Readonly<Partial<CacheBrowserConfig>> = {}, logger?: GenericLogger) {
 		this.config = { ...DEFAULT_CONFIG, ...config }
 		this.logger = logger
 	}
 
 	/**
 	 * Browse cached entities with filtering and pagination
-	 * @param filters
-	 * @param options
 	 */
 	async browse(
 		filters: Partial<CacheBrowserFilters> = {},
-		options: Partial<CacheBrowserOptions> = {}
+		options: Readonly<Partial<CacheBrowserOptions>> = {}
 	): Promise<CacheBrowserResult> {
 		const startTime = Date.now()
 
@@ -132,7 +131,7 @@ export class CacheBrowserService {
 			}
 
 			if (this.config.includeRepositoryStore) {
-				const repoEntities = await this.scanRepositoryStore()
+				const repoEntities = this.scanRepositoryStore()
 				allEntities.push(...repoEntities)
 			}
 
@@ -189,7 +188,6 @@ export class CacheBrowserService {
 
 	/**
 	 * Clear cached entities based on filters
-	 * @param filters
 	 */
 	async clearCache(filters: Partial<CacheBrowserFilters> = {}): Promise<number> {
 		this.logger?.debug(CACHE_BROWSER_LOG_CONTEXT, "Starting cache clear operation", {
@@ -211,7 +209,7 @@ export class CacheBrowserService {
 
 		// Clear from IndexedDB
 		if (this.config.includeIndexedDB) {
-			clearedCount += await this.clearFromIndexedDB(filteredEntities)
+			clearedCount += this.clearFromIndexedDB(filteredEntities)
 		}
 
 		this.logger?.debug(CACHE_BROWSER_LOG_CONTEXT, "Cache clear completed", {
@@ -229,33 +227,27 @@ export class CacheBrowserService {
 			const database = await this.getDB()
 			const entities: CachedEntityMetadata[] = []
 
-			// Get all table names from the Dexie database
-			// Note: Dexie doesn't expose tables directly, so we'll get them from the schema
-			const tableNames: string[] = []
-			// Try to access table names through the internal schema
-			interface DexieWithTables {
-				tables: Array<{ name: string }>
-			}
-			if ('tables' in database && Array.isArray((database as DexieWithTables).tables)) {
-				tableNames.push(...(database as DexieWithTables).tables.map((table) => table.name))
-			} else {
-				// Fallback: try common OpenAlex table names
-				tableNames.push('works', 'authors', 'sources', 'institutions', 'topics', 'publishers', 'funders', 'keywords', 'concepts', 'autocomplete')
-			}
+			// Dexie exposes its tables directly on the instance.
+			const tableNames = database.tables.map((table) => table.name)
 
 			for (const tableName of tableNames) {
 				try {
 					const table = database.table(tableName)
 					await table.each((item: unknown, cursor) => {
 						if (entities.length >= this.config.maxScanItems) {
-							return false // Stop iteration
+							// Dexie's `each` has no early-exit mechanism; skip further pushes instead.
+							return
 						}
 
-						// Dexie stores objects with keys, so we need to extract key and value
-						const key = String(cursor.primaryKey)
-						const value = item
+						// Dexie stores objects with keys; primaryKey may not be a string or number.
+						const primaryKey: unknown = cursor.primaryKey
+						const key = typeof primaryKey === "string"
+							? primaryKey
+							: typeof primaryKey === "number"
+								? String(primaryKey)
+								: JSON.stringify(primaryKey)
 
-						const entityMetadata = this.extractEntityMetadata(key, value, "indexeddb", tableName)
+						const entityMetadata = this.extractEntityMetadata(key, item, "indexeddb")
 
 						if (entityMetadata && this.matchesTypeFilter({ entity: entityMetadata, filters })) {
 							entities.push(entityMetadata)
@@ -275,10 +267,8 @@ export class CacheBrowserService {
 		}
 	}
 
-	private async scanRepositoryStore(): Promise<CachedEntityMetadata[]> {
-		// This would integrate with the repository store if available
-		// For now, return empty array as repository store scanning would need
-		// to be integrated at the application level
+	private scanRepositoryStore(): CachedEntityMetadata[] {
+		// This would integrate with the repository store if available For now, return empty array as repository store scanning would need to be integrated at the application level
 		this.logger?.debug(CACHE_BROWSER_LOG_CONTEXT, "Repository store scanning not implemented yet")
 		return []
 	}
@@ -286,8 +276,7 @@ export class CacheBrowserService {
 	private extractEntityMetadata(
 		key: string,
 		value: unknown,
-		storageLocation: CachedEntityMetadata["storageLocation"],
-		storeName?: string // eslint-disable-line @typescript-eslint/no-unused-vars
+		storageLocation: CachedEntityMetadata["storageLocation"]
 	): CachedEntityMetadata | null {
 		try {
 			// Detect entity type from key
@@ -360,13 +349,12 @@ export class CacheBrowserService {
 		type: CacheStorageType
 	}): string | null {
 		// Try to extract from parsed value first
-		if (value && typeof value === "object" && value !== null) {
-			const object = value as Record<string, unknown>
-			const id = object.id
+		if (isRecord(value)) {
+			const id = value.id
 			if (typeof id === "string") {
 				return id
 			}
-			const displayName = object.display_name
+			const displayName = value.display_name
 			if (typeof displayName === "string" && displayName.startsWith(type.charAt(0).toUpperCase())) {
 				return displayName
 			}
@@ -389,44 +377,40 @@ export class CacheBrowserService {
 	}: {
 		value: unknown
 	}): CachedEntityMetadata["basicInfo"] | undefined {
-		if (!value || typeof value !== "object" || value === null) {
+		if (!isRecord(value)) {
 			return undefined
 		}
 
-		const object = value as Record<string, unknown>
-
 		return {
-			displayName: typeof object.display_name === "string" ? object.display_name : undefined,
-			description: typeof object.description === "string" ? object.description : undefined,
-			url: typeof object.url === "string" ? object.url : undefined,
-			citationCount: typeof object.cited_by_count === "number" ? object.cited_by_count : undefined,
-			worksCount: typeof object.works_count === "number" ? object.works_count : undefined,
+			displayName: typeof value.display_name === "string" ? value.display_name : undefined,
+			description: typeof value.description === "string" ? value.description : undefined,
+			url: typeof value.url === "string" ? value.url : undefined,
+			citationCount: typeof value.cited_by_count === "number" ? value.cited_by_count : undefined,
+			worksCount: typeof value.works_count === "number" ? value.works_count : undefined,
 		}
 	}
 
 	private extractExternalIds(value: unknown): Record<string, string> | undefined {
-		if (!value || typeof value !== "object" || value === null) {
+		if (!isRecord(value)) {
 			return undefined
 		}
 
-		const object = value as Record<string, unknown>
 		const externalIds: Record<string, string> = {}
 
 		// Common external ID fields
 		const idFields = ["doi", "orcid", "ror", "issn", "isbn", "pmid", "pmcid", "wikidata"]
 
 		for (const field of idFields) {
-			const fieldValue = object[field]
+			const fieldValue = value[field]
 			if (typeof fieldValue === "string") {
 				externalIds[field] = fieldValue
 			}
 		}
 
 		// Check for ids object
-		const ids = object.ids
-		if (ids && typeof ids === "object" && ids !== null) {
-			const idsObject = ids as Record<string, unknown>
-			for (const [key, value_] of Object.entries(idsObject)) {
+		const ids = value.ids
+		if (isRecord(ids)) {
+			for (const [key, value_] of Object.entries(ids)) {
 				if (typeof value_ === "string") {
 					externalIds[key] = value_
 				}
@@ -543,7 +527,7 @@ export class CacheBrowserService {
 		return entities.slice(offset, offset + limit)
 	}
 
-	private calculateStats(entities: CachedEntityMetadata[]): CacheBrowserStats {
+	private calculateStats(entities: readonly CachedEntityMetadata[]): CacheBrowserStats {
 		const entitiesByType: Record<CacheStorageType, number> = {
 			works: 0,
 			authors: 0,
@@ -588,9 +572,8 @@ export class CacheBrowserService {
 		return result.entities
 	}
 
-	private async clearFromIndexedDB(entities: CachedEntityMetadata[]): Promise<number> {
-		// Implementation for clearing IndexedDB entries
-		// This would need to be implemented based on the specific storage structure
+	private clearFromIndexedDB(entities: readonly CachedEntityMetadata[]): number {
+		// Implementation for clearing IndexedDB entries This would need to be implemented based on the specific storage structure
 		this.logger?.debug(CACHE_BROWSER_LOG_CONTEXT, "IndexedDB clearing not fully implemented", {
 			count: entities.length,
 		})
@@ -599,14 +582,10 @@ export class CacheBrowserService {
 
 	private async getDB(): Promise<DexieInstance> {
 		if (!this.dbCache) {
-			// Create a Dexie instance for the database
-			// We'll use dynamic table access since we need to scan arbitrary stores
+			// Create a Dexie instance for the database We'll use dynamic table access since we need to scan arbitrary stores
 			this.dbCache = new Dexie(this.config.dbName)
 			// Open the database without schema definition to allow dynamic access
-			interface DexieOpenable {
-				open(): Promise<DexieInstance>
-			}
-			await (this.dbCache as DexieOpenable).open()
+			await this.dbCache.open()
 		}
 		return this.dbCache
 	}

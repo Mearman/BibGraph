@@ -46,7 +46,6 @@ export const createEmptyStorage = (): InMemoryStorage => ({
 
 /**
  * Clear all data from storage
- * @param storage
  */
 export const clearStorage = (storage: InMemoryStorage): void => {
 	storage.lists.clear();

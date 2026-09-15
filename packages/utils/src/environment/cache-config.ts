@@ -6,6 +6,7 @@
  */
 
 import { type BuildContext,EnvironmentDetector } from "./environment-detector.js"
+import { BYTES_PER_MB, MS_PER_DAY, MS_PER_HOUR, MS_PER_MINUTE, MS_PER_WEEK } from "./size-and-time-units.js"
 
 /**
  * Static data path configuration
@@ -118,27 +119,36 @@ export interface CacheConfig {
 	environment: BuildContext
 }
 
+const CACHE_CONFIG_GITHUB_PAGES_DOMAIN = "bibgraph.joenash.uk"
+const CACHE_CONFIG_GITHUB_IO_DOMAIN = "mearman.github.io"
+const CACHE_CONFIG_LOCAL_DATA_PATH = "/data"
+const CACHE_CONFIG_OPENALEX_SUBPATH = "/openalex"
+
+const DEV_STORAGE_MAX_SIZE_MB = 50
+const DEV_EXPIRATION_MINUTES = 10
+const PROD_STORAGE_MAX_SIZE_MB = 200
+const E2E_STORAGE_MAX_SIZE_MB = 100
+const TEST_STORAGE_MAX_SIZE_MB = 10
+const TEST_EXPIRATION_MINUTES = 5
+const DEFAULT_STORAGE_MAX_SIZE_MB = 100
+const RESEARCH_STORAGE_MAX_SIZE_MB = 500
+const OPTIMIZED_TEST_STORAGE_MAX_SIZE_MB = 5
+
 /**
  * Cache configuration factory
  */
-export class CacheConfigFactory {
-	private static readonly GITHUB_PAGES_DOMAIN = "bibgraph.joenash.uk"
-	private static readonly GITHUB_IO_DOMAIN = "mearman.github.io"
-	private static readonly LOCAL_DATA_PATH = "/data"
-	private static readonly OPENALEX_SUBPATH = "/openalex"
-
+export const CacheConfigFactory = {
 	/**
 	 * Create static data paths configuration based on environment
-	 * @param context
 	 */
-	static createStaticDataPaths(context: BuildContext): StaticDataPaths {
+	createStaticDataPaths: (context: Readonly<BuildContext>): StaticDataPaths => {
 		if (context.isDevelopment && context.isDevServer) {
 			// Local development server - use relative paths to public directory
 			// In development with Vite, static files are served from public/
 			return {
-				baseUrl: this.LOCAL_DATA_PATH,
-				openalexPath: this.OPENALEX_SUBPATH,
-				openalexBaseUrl: `${this.LOCAL_DATA_PATH}${this.OPENALEX_SUBPATH}`,
+				baseUrl: CACHE_CONFIG_LOCAL_DATA_PATH,
+				openalexPath: CACHE_CONFIG_OPENALEX_SUBPATH,
+				openalexBaseUrl: `${CACHE_CONFIG_LOCAL_DATA_PATH}${CACHE_CONFIG_OPENALEX_SUBPATH}`,
 				isAbsolute: false,
 				cacheHeaders: {
 					"Cache-Control": "no-cache, no-store, must-revalidate",
@@ -163,9 +173,9 @@ export class CacheConfigFactory {
 				if (hasFilesystemCache) {
 					// Use filesystem cache paths for E2E tests
 					return {
-						baseUrl: this.LOCAL_DATA_PATH,
-						openalexPath: this.OPENALEX_SUBPATH,
-						openalexBaseUrl: `${this.LOCAL_DATA_PATH}${this.OPENALEX_SUBPATH}`,
+						baseUrl: CACHE_CONFIG_LOCAL_DATA_PATH,
+						openalexPath: CACHE_CONFIG_OPENALEX_SUBPATH,
+						openalexBaseUrl: `${CACHE_CONFIG_LOCAL_DATA_PATH}${CACHE_CONFIG_OPENALEX_SUBPATH}`,
 						isAbsolute: false,
 						cacheHeaders: {
 							"Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
@@ -175,9 +185,9 @@ export class CacheConfigFactory {
 				}
 				// Regular unit tests - no cache headers
 				return {
-					baseUrl: this.LOCAL_DATA_PATH,
-					openalexPath: this.OPENALEX_SUBPATH,
-					openalexBaseUrl: `${this.LOCAL_DATA_PATH}${this.OPENALEX_SUBPATH}`,
+					baseUrl: CACHE_CONFIG_LOCAL_DATA_PATH,
+					openalexPath: CACHE_CONFIG_OPENALEX_SUBPATH,
+					openalexBaseUrl: `${CACHE_CONFIG_LOCAL_DATA_PATH}${CACHE_CONFIG_OPENALEX_SUBPATH}`,
 					isAbsolute: false,
 					cacheHeaders: {
 						"Cache-Control": "no-cache",
@@ -186,9 +196,9 @@ export class CacheConfigFactory {
 			}
 			// Non-E2E test environment
 			return {
-				baseUrl: this.LOCAL_DATA_PATH,
-				openalexPath: this.OPENALEX_SUBPATH,
-				openalexBaseUrl: `${this.LOCAL_DATA_PATH}${this.OPENALEX_SUBPATH}`,
+				baseUrl: CACHE_CONFIG_LOCAL_DATA_PATH,
+				openalexPath: CACHE_CONFIG_OPENALEX_SUBPATH,
+				openalexBaseUrl: `${CACHE_CONFIG_LOCAL_DATA_PATH}${CACHE_CONFIG_OPENALEX_SUBPATH}`,
 				isAbsolute: false,
 				cacheHeaders: {
 					"Cache-Control": "no-cache",
@@ -199,14 +209,14 @@ export class CacheConfigFactory {
 		if (context.isProduction && context.isGitHubPages) {
 			// GitHub Pages production deployment
 			const baseUrl =
-				context.hostname === this.GITHUB_PAGES_DOMAIN
-					? `https://${this.GITHUB_PAGES_DOMAIN}${this.LOCAL_DATA_PATH}`
-					: `https://${this.GITHUB_IO_DOMAIN}/BibGraph${this.LOCAL_DATA_PATH}`
+				context.hostname === CACHE_CONFIG_GITHUB_PAGES_DOMAIN
+					? `https://${CACHE_CONFIG_GITHUB_PAGES_DOMAIN}${CACHE_CONFIG_LOCAL_DATA_PATH}`
+					: `https://${CACHE_CONFIG_GITHUB_IO_DOMAIN}/BibGraph${CACHE_CONFIG_LOCAL_DATA_PATH}`
 
 			return {
 				baseUrl,
-				openalexPath: this.OPENALEX_SUBPATH,
-				openalexBaseUrl: `${baseUrl}${this.OPENALEX_SUBPATH}`,
+				openalexPath: CACHE_CONFIG_OPENALEX_SUBPATH,
+				openalexBaseUrl: `${baseUrl}${CACHE_CONFIG_OPENALEX_SUBPATH}`,
 				isAbsolute: true,
 				cacheHeaders: {
 					"Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
@@ -218,9 +228,9 @@ export class CacheConfigFactory {
 		if (context.isProduction) {
 			// Production build not on GitHub Pages (potential local static server)
 			return {
-				baseUrl: this.LOCAL_DATA_PATH,
-				openalexPath: this.OPENALEX_SUBPATH,
-				openalexBaseUrl: `${this.LOCAL_DATA_PATH}${this.OPENALEX_SUBPATH}`,
+				baseUrl: CACHE_CONFIG_LOCAL_DATA_PATH,
+				openalexPath: CACHE_CONFIG_OPENALEX_SUBPATH,
+				openalexBaseUrl: `${CACHE_CONFIG_LOCAL_DATA_PATH}${CACHE_CONFIG_OPENALEX_SUBPATH}`,
 				isAbsolute: false,
 				cacheHeaders: {
 					"Cache-Control": "public, max-age=1800",
@@ -230,25 +240,24 @@ export class CacheConfigFactory {
 
 		// Default environment - minimal local paths
 		return {
-			baseUrl: this.LOCAL_DATA_PATH,
-			openalexPath: this.OPENALEX_SUBPATH,
-			openalexBaseUrl: `${this.LOCAL_DATA_PATH}${this.OPENALEX_SUBPATH}`,
+			baseUrl: CACHE_CONFIG_LOCAL_DATA_PATH,
+			openalexPath: CACHE_CONFIG_OPENALEX_SUBPATH,
+			openalexBaseUrl: `${CACHE_CONFIG_LOCAL_DATA_PATH}${CACHE_CONFIG_OPENALEX_SUBPATH}`,
 			isAbsolute: false,
 			cacheHeaders: {
 				"Cache-Control": "no-cache",
 			},
 		}
-	}
+	},
 
 	/**
 	 * Create cache storage configuration based on environment
-	 * @param context
 	 */
-	static createCacheStorageConfig(context: BuildContext): CacheStorageConfig {
+	createCacheStorageConfig: (context: Readonly<BuildContext>): CacheStorageConfig => {
 		if (context.isDevelopment) {
 			return {
-				maxSize: 50 * 1024 * 1024, // 50MB for development
-				expirationTime: 10 * 60 * 1000, // 10 minutes
+				maxSize: DEV_STORAGE_MAX_SIZE_MB * BYTES_PER_MB, // 50MB for development
+				expirationTime: DEV_EXPIRATION_MINUTES * MS_PER_MINUTE, // 10 minutes
 				persistent: false, // Don't persist in development for faster iteration
 				storagePreference: "memory",
 				compression: false, // Faster without compression in dev
@@ -258,8 +267,8 @@ export class CacheConfigFactory {
 
 		if (context.isProduction) {
 			return {
-				maxSize: 200 * 1024 * 1024, // 200MB for production
-				expirationTime: 24 * 60 * 60 * 1000, // 24 hours
+				maxSize: PROD_STORAGE_MAX_SIZE_MB * BYTES_PER_MB, // 200MB for production
+				expirationTime: MS_PER_DAY, // 24 hours
 				persistent: true, // Persist for better user experience
 				storagePreference: "indexeddb",
 				compression: true, // Save space in production
@@ -281,8 +290,8 @@ export class CacheConfigFactory {
 			if (hasFilesystemCache) {
 				// E2E tests with filesystem cache - use larger persistent cache
 				return {
-					maxSize: 100 * 1024 * 1024, // 100MB for E2E with filesystem cache
-					expirationTime: 60 * 60 * 1000, // 1 hour
+					maxSize: E2E_STORAGE_MAX_SIZE_MB * BYTES_PER_MB, // 100MB for E2E with filesystem cache
+					expirationTime: MS_PER_HOUR, // 1 hour
 					persistent: true, // Persist to leverage filesystem cache
 					storagePreference: "indexeddb",
 					compression: true, // Save space
@@ -291,8 +300,8 @@ export class CacheConfigFactory {
 			}
 			// Regular unit tests - small memory cache
 			return {
-				maxSize: 10 * 1024 * 1024, // 10MB for tests
-				expirationTime: 5 * 60 * 1000, // 5 minutes
+				maxSize: TEST_STORAGE_MAX_SIZE_MB * BYTES_PER_MB, // 10MB for tests
+				expirationTime: TEST_EXPIRATION_MINUTES * MS_PER_MINUTE, // 5 minutes
 				persistent: false, // Don't persist test data
 				storagePreference: "memory",
 				compression: false,
@@ -302,20 +311,19 @@ export class CacheConfigFactory {
 
 		// Default configuration
 		return {
-			maxSize: 100 * 1024 * 1024, // 100MB default
-			expirationTime: 60 * 60 * 1000, // 1 hour
+			maxSize: DEFAULT_STORAGE_MAX_SIZE_MB * BYTES_PER_MB, // 100MB default
+			expirationTime: MS_PER_HOUR, // 1 hour
 			persistent: true,
 			storagePreference: "indexeddb",
 			compression: true,
 			debug: false,
 		}
-	}
+	},
 
 	/**
 	 * Create network configuration based on environment
-	 * @param context
 	 */
-	static createNetworkConfig(context: BuildContext): NetworkConfig {
+	createNetworkConfig: (context: Readonly<BuildContext>): NetworkConfig => {
 		if (context.isDevelopment) {
 			return {
 				timeout: 30_000, // 30 seconds for dev (slower responses expected)
@@ -370,37 +378,33 @@ export class CacheConfigFactory {
 				burstLimit: 10,
 			},
 		}
-	}
+	},
 
 	/**
 	 * Create complete cache configuration for current environment
-	 * @param context
 	 */
-	static createCacheConfig(context?: BuildContext): CacheConfig {
+	createCacheConfig: (context?: BuildContext): CacheConfig => {
 		const environmentContext = context ?? EnvironmentDetector.getBuildContext()
 
 		return {
-			paths: this.createStaticDataPaths(environmentContext),
-			storage: this.createCacheStorageConfig(environmentContext),
-			network: this.createNetworkConfig(environmentContext),
+			paths: CacheConfigFactory.createStaticDataPaths(environmentContext),
+			storage: CacheConfigFactory.createCacheStorageConfig(environmentContext),
+			network: CacheConfigFactory.createNetworkConfig(environmentContext),
 			environment: environmentContext,
 		}
-	}
+	},
 
 	/**
 	 * Get optimized configuration for specific use cases
-	 * @param root0
-	 * @param root0.useCase
-	 * @param root0.context
 	 */
-	static createOptimizedConfig({
+	createOptimizedConfig: ({
 		useCase,
 		context,
 	}: {
 		useCase: "research" | "production" | "testing" | "development"
 		context?: BuildContext
-	}): CacheConfig {
-		const baseConfig = this.createCacheConfig(context)
+	}): CacheConfig => {
+		const baseConfig = CacheConfigFactory.createCacheConfig(context)
 
 		switch (useCase) {
 			case "research":
@@ -409,8 +413,8 @@ export class CacheConfigFactory {
 					...baseConfig,
 					storage: {
 						...baseConfig.storage,
-						maxSize: 500 * 1024 * 1024, // 500MB for research datasets
-						expirationTime: 7 * 24 * 60 * 60 * 1000, // 7 days
+						maxSize: RESEARCH_STORAGE_MAX_SIZE_MB * BYTES_PER_MB, // 500MB for research datasets
+						expirationTime: MS_PER_WEEK, // 7 days
 						persistent: true,
 						debug: true, // Enable debug for research insights
 					},
@@ -447,7 +451,7 @@ export class CacheConfigFactory {
 					...baseConfig,
 					storage: {
 						...baseConfig.storage,
-						maxSize: 5 * 1024 * 1024, // 5MB for tests
+						maxSize: OPTIMIZED_TEST_STORAGE_MAX_SIZE_MB * BYTES_PER_MB, // 5MB for tests
 						persistent: false,
 						compression: false,
 						debug: false,
@@ -481,8 +485,8 @@ export class CacheConfigFactory {
 			default:
 				return baseConfig
 		}
-	}
-}
+	},
+};
 
 /**
  * Convenience function to get current cache configuration
@@ -491,15 +495,11 @@ export const getCurrentCacheConfig = (): CacheConfig => CacheConfigFactory.creat
 
 /**
  * Convenience function to get optimized cache configuration
- * @param useCase
  */
 export const getOptimizedCacheConfig = (useCase: "research" | "production" | "testing" | "development"): CacheConfig => CacheConfigFactory.createOptimizedConfig({ useCase });
 
 /**
  * Get static data URL for a given path
- * @param root0
- * @param root0.relativePath
- * @param root0.config
  */
 export const getStaticDataUrl = ({
 	relativePath,
@@ -524,9 +524,6 @@ export const getStaticDataUrl = ({
 
 /**
  * Get OpenAlex data URL for a given entity path
- * @param root0
- * @param root0.entityPath
- * @param root0.config
  */
 export const getOpenAlexDataUrl = ({
 	entityPath,

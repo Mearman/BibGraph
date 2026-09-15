@@ -7,31 +7,46 @@ import type { EntityType } from "@bibgraph/types";
 import Dexie from "dexie";
 
 import type { GenericLogger } from "../../logger.js";
-import type { CatalogueList } from "./index.js";
+import type { CatalogueEntity, CatalogueList } from "./index.js";
 import { catalogueEventEmitter, LOG_CATEGORY, SPECIAL_LIST_IDS } from "./index.js";
 import type { CatalogueDB } from "./schema.js";
 
 /**
+ * Number of milliseconds in one second, used to convert timeout durations for log messages
+ */
+const MS_PER_SECOND = 1000;
+
+/**
+ * Number of seconds to wait for special-list initialization before timing out
+ */
+const SPECIAL_LISTS_INIT_TIMEOUT_SECONDS = 10;
+
+/**
+ * Maximum time to wait for special-list initialization before timing out, in milliseconds
+ */
+const SPECIAL_LISTS_INIT_TIMEOUT_MS = SPECIAL_LISTS_INIT_TIMEOUT_SECONDS * MS_PER_SECOND;
+
+/**
+ * Parameters accepted by {@link createList}
+ */
+export interface CreateListParams {
+	title: string;
+	description?: string;
+	type: "list" | "bibliography";
+	tags?: string[];
+	isPublic?: boolean;
+}
+
+/**
  * Create a new catalogue list
- * @param db Database instance
- * @param params List parameters
- * @param params.title
- * @param params.description
- * @param params.type
- * @param params.tags
- * @param params.isPublic
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param params - List parameters
+ * @param logger - Optional logger
  * @returns The ID of the created list
  */
 export const createList = async (
 	db: CatalogueDB,
-	params: {
-		title: string;
-		description?: string;
-		type: "list" | "bibliography";
-		tags?: string[];
-		isPublic?: boolean;
-	},
+	params: Readonly<CreateListParams>,
 	logger?: GenericLogger
 ): Promise<string> => {
 	try {
@@ -71,8 +86,8 @@ export const createList = async (
 
 /**
  * Get all catalogue lists
- * @param db Database instance
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param logger - Optional logger
  * @returns All lists ordered by update time (newest first)
  */
 export const getAllLists = async (
@@ -89,9 +104,9 @@ export const getAllLists = async (
 
 /**
  * Get a specific catalogue list by ID
- * @param db Database instance
- * @param listId List ID
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param listId - List ID
+ * @param logger - Optional logger
  * @returns The list or null if not found
  */
 export const getList = async (
@@ -110,10 +125,10 @@ export const getList = async (
 
 /**
  * Update a catalogue list
- * @param db Database instance
- * @param listId List ID
- * @param updates Fields to update
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param listId - List ID
+ * @param updates - Fields to update
+ * @param logger - Optional logger
  */
 export const updateList = async (
 	db: CatalogueDB,
@@ -144,10 +159,10 @@ export const updateList = async (
 
 /**
  * Delete a catalogue list
- * @param db Database instance
- * @param listId List ID
- * @param isSpecialList Helper function to check if list is special
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param listId - List ID
+ * @param isSpecialList - Helper function to check if list is special
+ * @param logger - Optional logger
  */
 export const deleteList = async (
 	db: CatalogueDB,
@@ -186,9 +201,9 @@ export const deleteList = async (
 
 /**
  * Search catalogue lists by title, description, or tags
- * @param db Database instance
- * @param query Search query
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param query - Search query
+ * @param logger - Optional logger
  * @returns Matching lists
  */
 export const searchLists = async (
@@ -203,8 +218,8 @@ export const searchLists = async (
 		return lists.filter(
 			(list) =>
 				list.title.toLowerCase().includes(lowercaseQuery) ||
-				Boolean(list.description?.toLowerCase().includes(lowercaseQuery)) ||
-				list.tags?.some((tag) => tag.toLowerCase().includes(lowercaseQuery))
+				(list.description?.toLowerCase().includes(lowercaseQuery) ?? false) ||
+				(list.tags?.some((tag) => tag.toLowerCase().includes(lowercaseQuery)) ?? false)
 		);
 	} catch (error) {
 		logger?.error(LOG_CATEGORY, "Failed to search catalogue lists", { query, error });
@@ -214,9 +229,9 @@ export const searchLists = async (
 
 /**
  * Get non-system lists (user-created lists only)
- * @param db Database instance
- * @param isSpecialList Helper function to check if list is special
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param isSpecialList - Helper function to check if list is special
+ * @param logger - Optional logger
  * @returns Non-system lists
  */
 export const getNonSystemLists = async (
@@ -227,8 +242,8 @@ export const getNonSystemLists = async (
 	try {
 		const allLists = await getAllLists(db, logger);
 		return allLists.filter(list =>
-			list.id && !isSpecialList(list.id) &&
-			!list.tags?.includes("system")
+			list.id !== undefined && !isSpecialList(list.id) &&
+			!(list.tags?.includes("system") ?? false)
 		);
 	} catch (error) {
 		logger?.error(LOG_CATEGORY, "Failed to get non-system lists", { error });
@@ -238,16 +253,16 @@ export const getNonSystemLists = async (
 
 /**
  * Get list statistics
- * @param db Database instance
- * @param listId List ID
- * @param getListEntities Helper function to get list entities
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param listId - List ID
+ * @param getListEntities - Helper function to get list entities
+ * @param logger - Optional logger
  * @returns Statistics including total entities and counts by type
  */
 export const getListStats = async (
 	db: CatalogueDB,
 	listId: string,
-	getListEntities: (id: string) => Promise<import("./index.js").CatalogueEntity[]>,
+	getListEntities: (id: string) => Promise<CatalogueEntity[]>,
 	logger?: GenericLogger
 ): Promise<{
 	totalEntities: number;
@@ -303,7 +318,7 @@ export const getListStats = async (
 
 /**
  * Check if a list is a special system list
- * @param listId List ID to check
+ * @param listId - List ID to check
  * @returns True if the list is a special system list
  */
 export const isSpecialList = (listId: string): boolean => {
@@ -317,23 +332,23 @@ export const isSpecialList = (listId: string): boolean => {
  */
 export const isCIEnvironment = (): boolean => {
 	return typeof process !== "undefined" &&
-		process.env?.CI === "true" ||
-		process.env?.NODE_ENV === "test";
+		process.env.CI === "true" ||
+		process.env.NODE_ENV === "test";
 };
 
 /**
  * Internal method for actual special lists initialization
- * @param db Database instance
- * @param getList Helper function to get a list
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param fetchList - Helper function to get a list
+ * @param logger - Optional logger
  */
 export const doInitializeSpecialLists = async (
 	db: CatalogueDB,
-	getList: (id: string) => Promise<CatalogueList | null>,
+	fetchList: (id: string) => Promise<CatalogueList | null>,
 	logger?: GenericLogger
 ): Promise<void> => {
-	const bookmarksList = await getList(SPECIAL_LIST_IDS.BOOKMARKS);
-	const historyList = await getList(SPECIAL_LIST_IDS.HISTORY);
+	const bookmarksList = await fetchList(SPECIAL_LIST_IDS.BOOKMARKS);
+	const historyList = await fetchList(SPECIAL_LIST_IDS.HISTORY);
 
 	if (!bookmarksList) {
 		try {
@@ -379,27 +394,25 @@ export const doInitializeSpecialLists = async (
 };
 
 /**
- * Initialize special system lists if they don't exist
- * This method is idempotent and safe to call multiple times concurrently
- * Includes timeout protection for CI environments where IndexedDB may be slow
- * @param db Database instance
- * @param getList Helper function to get a list
- * @param logger Optional logger
+ * Initialize special system lists if they don't exist This method is idempotent and safe to call multiple times concurrently Includes timeout protection for CI environments where IndexedDB may be slow
+ * @param db - Database instance
+ * @param fetchList - Helper function to get a list
+ * @param logger - Optional logger
  */
 export const initializeSpecialLists = async (
 	db: CatalogueDB,
-	getList: (id: string) => Promise<CatalogueList | null>,
+	fetchList: (id: string) => Promise<CatalogueList | null>,
 	logger?: GenericLogger
 ): Promise<void> => {
 	try {
 		// Create timeout promise to prevent hanging in CI environments
 		const timeoutPromise = new Promise<never>((_resolve, reject) => {
 			setTimeout(() => {
-				reject(new Error("Special lists initialization timeout after 10 seconds"));
-			}, 10000);
+				reject(new Error(`Special lists initialization timeout after ${String(SPECIAL_LISTS_INIT_TIMEOUT_SECONDS)} seconds`));
+			}, SPECIAL_LISTS_INIT_TIMEOUT_MS);
 		});
 
-		const initializationPromise = doInitializeSpecialLists(db, getList, logger);
+		const initializationPromise = doInitializeSpecialLists(db, fetchList, logger);
 
 		await Promise.race([initializationPromise, timeoutPromise]);
 	} catch (error) {

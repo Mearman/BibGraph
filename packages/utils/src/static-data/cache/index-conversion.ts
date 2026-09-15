@@ -6,6 +6,9 @@
 import { logger } from "../../logger.js"
 import type { DirectoryIndex, FileEntry } from "./types.js"
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value)
+
 export interface UnifiedIndexEntry {
 	$ref: string
 	lastModified: string
@@ -18,7 +21,6 @@ export type UnifiedIndex = Record<string, UnifiedIndexEntry>
  * Convert DirectoryIndex to UnifiedIndex format
  * Flattens the hierarchical DirectoryIndex structure into a flat map
  * suitable for CLI consumption
- * @param dirIndex
  */
 export const directoryIndexToUnifiedIndex = (dirIndex: DirectoryIndex): UnifiedIndex => {
 	const unified: UnifiedIndex = {}
@@ -44,7 +46,6 @@ export const directoryIndexToUnifiedIndex = (dirIndex: DirectoryIndex): UnifiedI
 /**
  * Convert UnifiedIndex to DirectoryIndex format
  * Creates a hierarchical DirectoryIndex from a flat UnifiedIndex map
- * @param unifiedIndex
  */
 export const unifiedIndexToDirectoryIndex = (unifiedIndex: UnifiedIndex): DirectoryIndex => {
 	const files: Record<string, FileEntry> = {}
@@ -72,31 +73,24 @@ export const unifiedIndexToDirectoryIndex = (unifiedIndex: UnifiedIndex): Direct
 
 /**
  * Check if an index is in UnifiedIndex format (flat structure)
- * @param index
  */
 export const isUnifiedIndex = (index: unknown): index is UnifiedIndex => {
-	if (!index || typeof index !== "object") {
+	// isRecord already rejects arrays; an empty array should not be considered a UnifiedIndex.
+	if (!isRecord(index)) {
 		return false
 	}
 
-	// Explicitly reject arrays; an empty array should not be considered a UnifiedIndex.
-	if (Array.isArray(index)) return false
-
-	// UnifiedIndex is a flat object with string keys mapping to entries with $ref, lastModified, contentHash
-	const object = index as Record<string, unknown>
-
 	// Check if it has DirectoryIndex properties (lastUpdated, files, directories)
-	if ("lastUpdated" in object || "files" in object || "directories" in object) {
+	if ("lastUpdated" in index || "files" in index || "directories" in index) {
 		return false // This is a DirectoryIndex
 	}
 
 	// Check if all values are UnifiedIndexEntry-like
-	for (const value of Object.values(object)) {
-		if (!value || typeof value !== "object") {
+	for (const value of Object.values(index)) {
+		if (!isRecord(value)) {
 			return false
 		}
-		const entry = value as Record<string, unknown>
-		if (!("$ref" in entry) || !("lastModified" in entry) || !("contentHash" in entry)) {
+		if (!("$ref" in value) || !("lastModified" in value) || !("contentHash" in value)) {
 			return false
 		}
 	}
@@ -106,25 +100,22 @@ export const isUnifiedIndex = (index: unknown): index is UnifiedIndex => {
 
 /**
  * Check if an index is in DirectoryIndex format (hierarchical structure)
- * @param index
  */
 export const isDirectoryIndex = (index: unknown): index is DirectoryIndex => {
-	if (!index || typeof index !== "object") {
+	if (!isRecord(index)) {
 		return false
 	}
 
-	const object = index as Record<string, unknown>
-
 	// DirectoryIndex must have lastUpdated
-	if (!("lastUpdated" in object) || typeof object.lastUpdated !== "string") {
+	if (!("lastUpdated" in index) || typeof index.lastUpdated !== "string") {
 		return false
 	}
 
 	// If it has files or directories, they should be objects
-	if ("files" in object && object.files !== null && typeof object.files !== "object") {
+	if ("files" in index && index.files !== null && typeof index.files !== "object") {
 		return false
 	}
-	if ("directories" in object && object.directories !== null && typeof object.directories !== "object") {
+	if ("directories" in index && index.directories !== null && typeof index.directories !== "object") {
 		return false
 	}
 
@@ -134,7 +125,6 @@ export const isDirectoryIndex = (index: unknown): index is DirectoryIndex => {
 /**
  * Smart index reader that handles both formats
  * Automatically converts to the requested format
- * @param index
  */
 export const readIndexAsUnified = (index: unknown): UnifiedIndex | null => {
 	if (isUnifiedIndex(index)) {
@@ -152,7 +142,6 @@ export const readIndexAsUnified = (index: unknown): UnifiedIndex | null => {
 /**
  * Smart index reader that handles both formats
  * Automatically converts to the requested format
- * @param index
  */
 export const readIndexAsDirectory = (index: unknown): DirectoryIndex | null => {
 	if (isDirectoryIndex(index)) {

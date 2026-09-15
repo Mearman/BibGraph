@@ -7,13 +7,13 @@ import { logger } from "./logger.js"
 
 // Service interfaces
 export interface RelationshipDetectionService {
-	detectRelationships(entities: unknown[]): Promise<unknown[]>
-	getRelationshipTypes(): string[]
+	detectRelationships: (entities: readonly unknown[]) => Promise<unknown[]>
+	getRelationshipTypes: () => string[]
 }
 
 export interface GraphDataService {
-	loadGraphData(entityId: string): Promise<unknown>
-	expandGraph(nodeId: string, expansionType: string): Promise<unknown>
+	loadGraphData: (entityId: string) => Promise<unknown>
+	expandGraph: (nodeId: string, expansionType: string) => Promise<unknown>
 }
 
 /**
@@ -24,9 +24,10 @@ export const getRelationshipDetectionService = (): RelationshipDetectionService 
 	logger.warn("services", "getRelationshipDetectionService: Using stub implementation")
 
 	return {
-		detectRelationships: (): Promise<unknown[]> => {
+		detectRelationships: async (): Promise<unknown[]> => {
 			logger.warn("services", "detectRelationships: Using stub implementation")
-			return Promise.resolve([])
+			await Promise.resolve()
+			return []
 		},
 
 		getRelationshipTypes: (): string[] => ["cites", "cited_by", "authored_by", "related_to"],
@@ -41,14 +42,16 @@ export const getGraphDataService = (): GraphDataService => {
 	logger.warn("services", "getGraphDataService: Using stub implementation")
 
 	return {
-		loadGraphData: (): Promise<unknown> => {
+		loadGraphData: async (): Promise<unknown> => {
 			logger.warn("services", "loadGraphData: Using stub implementation")
-			return Promise.resolve(null)
+			await Promise.resolve()
+			return null
 		},
 
-		expandGraph: (): Promise<unknown> => {
+		expandGraph: async (): Promise<unknown> => {
 			logger.warn("services", "expandGraph: Using stub implementation")
-			return Promise.resolve(null)
+			await Promise.resolve()
+			return null
 		},
 	}
 };

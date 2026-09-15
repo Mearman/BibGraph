@@ -59,9 +59,10 @@ describe('date-utils', () => {
 
 	describe('getDaysUntilVersionSelectorHidden', () => {
 		it('should return positive days when before cutoff', () => {
+			const EXPECTED_DAYS_BEFORE_CUTOFF = 16
 			const testDate = new Date('2025-11-15T00:00:00Z') // 16 days before cutoff
 			const days = getDaysUntilVersionSelectorHidden(testDate)
-			expect(days).toBe(16)
+			expect(days).toBe(EXPECTED_DAYS_BEFORE_CUTOFF)
 		})
 
 		it('should return 0 when at or past cutoff', () => {
@@ -79,13 +80,16 @@ describe('date-utils', () => {
 		})
 
 		it('should return correct days for multiple dates', () => {
+			const EXPECTED_DAYS_FROM_NOV_1 = 30
+			const EXPECTED_DAYS_FROM_NOV_25 = 6
+
 			// November 1, 2025 - 30 days before cutoff
 			const nov1 = new Date('2025-11-01T00:00:00Z')
-			expect(getDaysUntilVersionSelectorHidden(nov1)).toBe(30)
+			expect(getDaysUntilVersionSelectorHidden(nov1)).toBe(EXPECTED_DAYS_FROM_NOV_1)
 
 			// November 25, 2025 - 6 days before cutoff
 			const nov25 = new Date('2025-11-25T00:00:00Z')
-			expect(getDaysUntilVersionSelectorHidden(nov25)).toBe(6)
+			expect(getDaysUntilVersionSelectorHidden(nov25)).toBe(EXPECTED_DAYS_FROM_NOV_25)
 		})
 
 		it('should round up fractional days', () => {

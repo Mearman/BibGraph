@@ -3,6 +3,12 @@ import { useState } from "react";
 
 import { logger } from "../logger.js";
 
+/**
+ * Narrows an unknown value to a plain string-keyed record. `useParams`/`useSearch` are typed as `any` in this package because it has no visibility into the app's registered route tree, so their results must be narrowed with a runtime guard rather than a type assertion.
+ */
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
+
 export interface EntityRouteConfig {
 	entityType: string;
 	routePath: string;
@@ -50,15 +56,21 @@ export interface UseEntityRouteResult<T = unknown> {
  * Currently stubbed to allow the utils package to build.
  *
  * TODO: Implement with proper app-specific hooks or move to apps/web
- * @param config
  */
 export const useEntityRoute = <T = unknown>(config: EntityRouteConfig): UseEntityRouteResult<T> => {
-	const parameters = useParams({ strict: false }) as Record<string, string>;
-	const search = useSearch({ strict: false }) as Record<string, unknown>;
+	const rawParams: unknown = useParams({ strict: false });
+	const rawSearch: unknown = useSearch({ strict: false });
+	if (!isPlainObject(rawParams)) {
+		throw new TypeError("useParams({ strict: false }) did not return a params object");
+	}
+	if (!isPlainObject(rawSearch)) {
+		throw new TypeError("useSearch({ strict: false }) did not return a search object");
+	}
 	const [viewMode, setViewMode] = useState<"raw" | "rich">("rich");
 
 	// Extract entity ID from params using the config's paramKey
-	const rawId = parameters[config.paramKey] || "";
+	const rawIdValue = rawParams[config.paramKey];
+	const rawId = typeof rawIdValue === "string" ? rawIdValue : "";
 	// Safely clean the entity ID - handle undefined/null cases
 	const cleanEntityId = rawId ? rawId.replace(/^https?:\/\/[^/]*?openalex\.org\//, "") : "";
 
@@ -79,6 +91,6 @@ export const useEntityRoute = <T = unknown>(config: EntityRouteConfig): UseEntit
 		loadEntityIntoGraph: () => {
 			logger.warn("routing", "useEntityRoute: loadEntityIntoGraph not implemented");
 		},
-		routeSearch: search,
+		routeSearch: rawSearch,
 	};
 };

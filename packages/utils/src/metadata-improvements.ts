@@ -123,7 +123,7 @@ export const detectMetadataImprovements = (work: WorkMetadata): MetadataImprovem
 	const improvements: MetadataImprovement[] = [];
 
 	// XPAC works are new to Data Version 2, not improved existing works
-	if (work.is_xpac) {
+	if (work.is_xpac === true) {
 		return improvements;
 	}
 

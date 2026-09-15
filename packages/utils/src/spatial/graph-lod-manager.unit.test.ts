@@ -13,6 +13,25 @@ import {
   LODLevel,
 } from './graph-lod-manager';
 
+const CUSTOM_HIGH_GEOMETRY_SEGMENTS = 64;
+const HIGH_LOD_GEOMETRY_SEGMENTS = 32;
+const LOW_LOD_GEOMETRY_SEGMENTS = 8;
+const FRAME_TIME_60FPS_MS = 16.67;
+const AVERAGE_OF_TWO_FRAMES_MS = 8.335;
+const FRAME_COUNT_OVER_HISTORY_LIMIT = 70;
+const DEFAULT_FPS = 60;
+const TEST_OBJECT_RADIUS = 5;
+const LARGE_TEST_RADIUS = 10;
+const EXPECTED_OBJECT_COUNT = 3;
+const EDGE_TUBULAR_SEGMENTS = 8;
+const EDGE_FLAT_SEGMENTS = 4;
+const EXPECTED_FRUSTUM_PLANE_COUNT = 6;
+const NORMAL_LENGTH_PRECISION = 5;
+const DEMO_FOV_DIVISOR_45_DEG = 4;
+const DEMO_ASPECT_RATIO_WIDTH = 16;
+const DEMO_ASPECT_RATIO_HEIGHT = 9;
+const DEMO_FOV_DIVISOR_60_DEG = 3;
+
 describe('GraphLODManager', () => {
   let manager: GraphLODManager;
 
@@ -33,7 +52,7 @@ describe('GraphLODManager', () => {
       });
 
       const config = customManager.getConfig(LODLevel.HIGH);
-      expect(config.geometrySegments).toBe(64);
+      expect(config.geometrySegments).toBe(CUSTOM_HIGH_GEOMETRY_SEGMENTS);
       // Other defaults should be preserved
       expect(config.showLabels).toBe(true);
     });
@@ -130,12 +149,12 @@ describe('GraphLODManager', () => {
   describe('getConfig', () => {
     it('should return correct config for each level', () => {
       const highConfig = manager.getConfig(LODLevel.HIGH);
-      expect(highConfig.geometrySegments).toBe(32);
+      expect(highConfig.geometrySegments).toBe(HIGH_LOD_GEOMETRY_SEGMENTS);
       expect(highConfig.showLabels).toBe(true);
       expect(highConfig.useComplexMaterials).toBe(true);
 
       const lowConfig = manager.getConfig(LODLevel.LOW);
-      expect(lowConfig.geometrySegments).toBe(8);
+      expect(lowConfig.geometrySegments).toBe(LOW_LOD_GEOMETRY_SEGMENTS);
       expect(lowConfig.showLabels).toBe(false);
       expect(lowConfig.useComplexMaterials).toBe(false);
     });
@@ -165,12 +184,12 @@ describe('GraphLODManager', () => {
       testManager.recordFrameTime();
 
       // Second call with 16.67ms frame time (60fps)
-      mockNow = 16.67;
+      mockNow = FRAME_TIME_60FPS_MS;
       testManager.recordFrameTime();
 
       const metrics = testManager.getPerformanceMetrics();
       // Average of [0, 16.67] = 8.335
-      expect(metrics.frameTimeMs).toBeCloseTo(8.335, 1);
+      expect(metrics.frameTimeMs).toBeCloseTo(AVERAGE_OF_TWO_FRAMES_MS, 1);
 
       vi.restoreAllMocks();
     });
@@ -182,8 +201,8 @@ describe('GraphLODManager', () => {
       const testManager = new GraphLODManager();
 
       // Record more than 60 frames
-      for (let index = 0; index <= 70; index++) {
-        mockNow = index * 16.67;
+      for (let index = 0; index <= FRAME_COUNT_OVER_HISTORY_LIMIT; index++) {
+        mockNow = index * FRAME_TIME_60FPS_MS;
         testManager.recordFrameTime();
       }
 
@@ -198,8 +217,8 @@ describe('GraphLODManager', () => {
   describe('getPerformanceMetrics', () => {
     it('should return default metrics with no recorded frames', () => {
       const metrics = manager.getPerformanceMetrics();
-      expect(metrics.fps).toBeCloseTo(60, 0); // Default 16.67ms frame time
-      expect(metrics.frameTimeMs).toBeCloseTo(16.67, 1);
+      expect(metrics.fps).toBeCloseTo(DEFAULT_FPS, 0); // Default 16.67ms frame time
+      expect(metrics.frameTimeMs).toBeCloseTo(FRAME_TIME_60FPS_MS, 1);
       expect(metrics.visibleNodeCount).toBe(0);
       expect(metrics.memoryEstimate).toBe(0);
     });
@@ -219,7 +238,7 @@ describe('GraphLODManager', () => {
 
       const isResult = manager.isInFrustum(
         { x: 0, y: 0, z: 0 },
-        5,
+        TEST_OBJECT_RADIUS,
         frustumPlanes
       );
       expect(isResult).toBe(true);
@@ -238,7 +257,7 @@ describe('GraphLODManager', () => {
 
       const isResult = manager.isInFrustum(
         { x: 500, y: 0, z: 0 },
-        5,
+        TEST_OBJECT_RADIUS,
         frustumPlanes
       );
       expect(isResult).toBe(false);
@@ -257,7 +276,7 @@ describe('GraphLODManager', () => {
       // Object at edge but with large radius should still be visible
       const isResult = manager.isInFrustum(
         { x: 15, y: 0, z: 0 },
-        10, // Large radius
+        LARGE_TEST_RADIUS,
         frustumPlanes
       );
       expect(isResult).toBe(true);
@@ -275,7 +294,7 @@ describe('GraphLODManager', () => {
       const camera: Position3D = { x: 100, y: 0, z: 0 };
       const result = manager.batchGetLOD(objects, camera);
 
-      expect(result.size).toBe(3);
+      expect(result.size).toBe(EXPECTED_OBJECT_COUNT);
       expect(result.get(0)).toBe(LODLevel.HIGH);
       expect(result.get(1)).toBe(LODLevel.MEDIUM);
       expect(result.get(2)).toBe(LODLevel.LOW);
@@ -290,7 +309,7 @@ describe('GraphLODManager', () => {
   describe('getNodeRenderSettings', () => {
     it('should return high detail settings', () => {
       const settings = manager.getNodeRenderSettings(LODLevel.HIGH);
-      expect(settings.segments).toBe(32);
+      expect(settings.segments).toBe(HIGH_LOD_GEOMETRY_SEGMENTS);
       expect(settings.showLabel).toBe(true);
       expect(settings.materialType).toBe('phong');
       expect(settings.useRing).toBe(true);
@@ -298,7 +317,7 @@ describe('GraphLODManager', () => {
 
     it('should return low detail settings', () => {
       const settings = manager.getNodeRenderSettings(LODLevel.LOW);
-      expect(settings.segments).toBe(8);
+      expect(settings.segments).toBe(LOW_LOD_GEOMETRY_SEGMENTS);
       expect(settings.showLabel).toBe(false);
       expect(settings.materialType).toBe('basic');
       expect(settings.useRing).toBe(false);
@@ -310,14 +329,14 @@ describe('GraphLODManager', () => {
       const settings = manager.getEdgeRenderSettings(LODLevel.HIGH);
       expect(settings.useLines).toBe(false);
       expect(settings.tubular).toBe(true);
-      expect(settings.segments).toBe(8);
+      expect(settings.segments).toBe(EDGE_TUBULAR_SEGMENTS);
     });
 
     it('should return low detail settings', () => {
       const settings = manager.getEdgeRenderSettings(LODLevel.LOW);
       expect(settings.useLines).toBe(true);
       expect(settings.tubular).toBe(false);
-      expect(settings.segments).toBe(4);
+      expect(settings.segments).toBe(EDGE_FLAT_SEGMENTS);
     });
   });
 });
@@ -339,14 +358,14 @@ describe('extractFrustumPlanes', () => {
     ];
 
     const planes = extractFrustumPlanes(projectionMatrix, viewMatrix);
-    expect(planes.length).toBe(6);
+    expect(planes.length).toBe(EXPECTED_FRUSTUM_PLANE_COUNT);
 
     // Each plane should have normalized normal
     for (const plane of planes) {
       const normalLength = Math.hypot(
         plane.normal.x, plane.normal.y, plane.normal.z
       );
-      expect(normalLength).toBeCloseTo(1, 5);
+      expect(normalLength).toBeCloseTo(1, NORMAL_LENGTH_PRECISION);
     }
   });
 });
@@ -355,8 +374,8 @@ describe('createFrustumBounds', () => {
   it('should create bounding box for frustum', () => {
     const cameraPosition: Position3D = { x: 0, y: 0, z: 0 };
     const lookAt: Position3D = { x: 0, y: 0, z: -1 };
-    const fov = Math.PI / 4; // 45 degrees
-    const aspectRatio = 16 / 9;
+    const fov = Math.PI / DEMO_FOV_DIVISOR_45_DEG; // 45 degrees
+    const aspectRatio = DEMO_ASPECT_RATIO_WIDTH / DEMO_ASPECT_RATIO_HEIGHT;
     const near = 0.1;
     const far = 1000;
 
@@ -381,7 +400,7 @@ describe('createFrustumBounds', () => {
   it('should handle different look directions', () => {
     const cameraPosition: Position3D = { x: 100, y: 100, z: 100 };
     const lookAt: Position3D = { x: 200, y: 100, z: 100 };
-    const fov = Math.PI / 3; // 60 degrees
+    const fov = Math.PI / DEMO_FOV_DIVISOR_60_DEG; // 60 degrees
     const aspectRatio = 1;
     const near = 1;
     const far = 500;

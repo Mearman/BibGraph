@@ -1,52 +1,49 @@
 /**
- * Stub implementations for cache functions
- * These provide basic functionality to prevent compilation errors
- * Applications should provide their own implementations
+ * Stub implementations for cache functions These provide basic functionality to prevent compilation errors Applications should provide their own implementations
  */
 
 import { logger } from "../logger.js";
 
 /**
- * Initialize query client with cache restoration
- * Stub implementation - applications should provide their own
+ * Initialize query client with cache restoration Stub implementation - applications should provide their own
  */
-export const initializeQueryClient = (): Promise<{
+export const initializeQueryClient = async (): Promise<{
 	queryClient: unknown;
 	invalidationResult: unknown;
-}> => Promise.resolve({
+}> => {
+	await Promise.resolve();
+	return {
 		queryClient: null,
 		invalidationResult: { success: true, message: "Stub implementation" },
-	});
+	};
+};
 
 /**
- * Create a standard query client
- * Stub implementation - applications should provide their own
+ * Create a standard query client Stub implementation - applications should provide their own
  */
 export const createStandardQueryClient = (): unknown => null;
 
 /**
- * Clear expired cache entries
- * Stub implementation - applications should provide their own
+ * Clear expired cache entries Stub implementation - applications should provide their own
  */
-export const clearExpiredCache = (): Promise<void> => {
+export const clearExpiredCache = async (): Promise<void> => {
 	logger.warn("cache", "clearExpiredCache: Using stub implementation");
-	return Promise.resolve();
+	await Promise.resolve();
 };
 
 /**
- * Clear all cache layers
- * Stub implementation - applications should provide their own
+ * Clear all cache layers Stub implementation - applications should provide their own
  */
-export const clearAllCacheLayers = (): Promise<unknown> => {
+export const clearAllCacheLayers = async (): Promise<unknown> => {
 	logger.warn("cache", "clearAllCacheLayers: Using stub implementation");
-	return Promise.resolve({ success: true, message: "Stub implementation" });
+	await Promise.resolve();
+	return { success: true, message: "Stub implementation" };
 };
 
 /**
- * Clear application metadata
- * Stub implementation - applications should provide their own
+ * Clear application metadata Stub implementation - applications should provide their own
  */
-export const clearAppMetadata = (): Promise<void> => {
+export const clearAppMetadata = async (): Promise<void> => {
 	logger.warn("cache", "clearAppMetadata: Using stub implementation");
-	return Promise.resolve();
+	await Promise.resolve();
 };

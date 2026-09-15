@@ -21,11 +21,8 @@ export interface BulkOperationResult {
 
 /**
  * Remove multiple bookmarks in bulk
- * @param db
- * @param bookmarkIds
- * @param logger
  */
-export const removeBookmarks = async (db: UserInteractionsDB, bookmarkIds: number[], logger?: GenericLogger): Promise<BulkOperationResult> => {
+export const removeBookmarks = async (db: UserInteractionsDB, bookmarkIds: readonly number[], logger?: GenericLogger): Promise<BulkOperationResult> => {
 	logger?.debug(LOG_CATEGORY, "removeBookmarks service called with:", bookmarkIds);
 	let success = 0
 	let failed = 0
@@ -80,13 +77,6 @@ export const removeBookmarks = async (db: UserInteractionsDB, bookmarkIds: numbe
 
 /**
  * Update tags for multiple bookmarks in bulk
- * @param db
- * @param params
- * @param params.bookmarkIds
- * @param params.addTags
- * @param params.removeTags
- * @param params.replaceTags
- * @param logger
  */
 export const updateBookmarkTags = async (db: UserInteractionsDB, params: {
 		bookmarkIds: number[]
@@ -113,7 +103,7 @@ export const updateBookmarkTags = async (db: UserInteractionsDB, params: {
 
 					if (replaceTags === undefined) {
 						// Start with existing tags
-						updatedTags = [...(bookmark.tags || [])]
+						updatedTags = [...(bookmark.tags ?? [])]
 
 						// Add new tags
 						if (addTags) {
@@ -170,12 +160,6 @@ export const updateBookmarkTags = async (db: UserInteractionsDB, params: {
 
 /**
  * Update notes for multiple bookmarks in bulk
- * @param db
- * @param params
- * @param params.bookmarkIds
- * @param params.notes
- * @param params.action
- * @param logger
  */
 export const updateBookmarkNotes = async (db: UserInteractionsDB, params: {
 		bookmarkIds: number[]
@@ -200,11 +184,11 @@ export const updateBookmarkNotes = async (db: UserInteractionsDB, params: {
 					let updatedNotes: string
 
 					if (action === "replace" || notes === undefined) {
-						updatedNotes = notes || ""
+						updatedNotes = notes ?? ""
 					} else if (action === "append") {
-						updatedNotes = (bookmark.notes || "") + (bookmark.notes ? "\n" : "") + notes
+						updatedNotes = (bookmark.notes ?? "") + (bookmark.notes !== undefined && bookmark.notes !== "" ? "\n" : "") + notes
 					} else if (action === "prepend") {
-						updatedNotes = notes + (bookmark.notes ? "\n" : "") + (bookmark.notes || "")
+						updatedNotes = notes + (bookmark.notes !== undefined && bookmark.notes !== "" ? "\n" : "") + (bookmark.notes ?? "")
 					} else {
 						updatedNotes = notes
 					}

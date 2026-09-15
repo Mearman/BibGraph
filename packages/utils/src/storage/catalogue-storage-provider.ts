@@ -15,8 +15,6 @@
  * - BookmarkOperationsInterface: Bookmark operations
  * - HistoryOperationsInterface: Browsing history operations
  * - SearchHistoryOperationsInterface: Search query history operations
- *
- * @package
  * @see {@link https://github.com/joe/BibGraph/specs/001-storage-abstraction/spec.md}
  */
 
@@ -52,7 +50,6 @@ import type {
  * - Not exposed in interface - handled internally by implementations
  * - Dexie uses automatic transaction zones
  * - In-memory storage uses synchronous Map operations
- *
  * @example
  * ```typescript
  * // Create and use a storage provider

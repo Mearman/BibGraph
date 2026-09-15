@@ -333,7 +333,8 @@ describe("parseSearchQuery", () => {
 		})
 
 		it("preserves multiple spaces in quoted strings", () => {
-			const result = parseSearchQuery(`"${MACHINE_LEARNING.replace(" ", ' '.repeat(4))}"`)
+			const EXTRA_SPACES_COUNT = 4
+			const result = parseSearchQuery(`"${MACHINE_LEARNING.replace(" ", ' '.repeat(EXTRA_SPACES_COUNT))}"`)
 
 			expect(result.generalTerms).toEqual([{ value: "machine    learning", ...QUOTED_TERM }])
 		})

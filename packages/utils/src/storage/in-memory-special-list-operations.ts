@@ -14,7 +14,6 @@ import type { AddBookmarkParams as AddBookmarkParameters, AddToHistoryParams as 
 
 /**
  * Initialize special system lists (Bookmarks, History, Graph)
- * @param storage
  */
 export const initializeSpecialLists = (storage: InMemoryStorage): void => {
 	const bookmarksList = storage.lists.get(SPECIAL_LIST_IDS.BOOKMARKS);
@@ -68,10 +67,8 @@ export const initializeSpecialLists = (storage: InMemoryStorage): void => {
 
 /**
  * Add a bookmark
- * @param storage
- * @param params
  */
-export const addBookmark = (storage: InMemoryStorage, params: AddBookmarkParameters): string => {
+export const addBookmark = (storage: InMemoryStorage, params: Readonly<AddBookmarkParameters>): string => {
 	initializeSpecialLists(storage);
 
 	return addEntityToList(storage, {
@@ -84,8 +81,6 @@ export const addBookmark = (storage: InMemoryStorage, params: AddBookmarkParamet
 
 /**
  * Remove a bookmark
- * @param storage
- * @param entityRecordId
  */
 export const removeBookmark = (storage: InMemoryStorage, entityRecordId: string): void => {
 	removeEntityFromList(storage, SPECIAL_LIST_IDS.BOOKMARKS, entityRecordId);
@@ -93,7 +88,6 @@ export const removeBookmark = (storage: InMemoryStorage, entityRecordId: string)
 
 /**
  * Get all bookmarks
- * @param storage
  */
 export const getBookmarks = (storage: InMemoryStorage): CatalogueEntity[] => {
 	initializeSpecialLists(storage);
@@ -102,9 +96,6 @@ export const getBookmarks = (storage: InMemoryStorage): CatalogueEntity[] => {
 
 /**
  * Check if an entity is bookmarked
- * @param storage
- * @param entityType
- * @param entityId
  */
 export const isBookmarked = (storage: InMemoryStorage, entityType: EntityType, entityId: string): boolean => {
 	for (const entity of storage.entities.values()) {
@@ -123,8 +114,6 @@ export const isBookmarked = (storage: InMemoryStorage, entityType: EntityType, e
 
 /**
  * Add to history
- * @param storage
- * @param params
  */
 export const addToHistory = (storage: InMemoryStorage, params: AddToHistoryParameters): string => {
 	initializeSpecialLists(storage);
@@ -147,9 +136,9 @@ export const addToHistory = (storage: InMemoryStorage, params: AddToHistoryParam
 		const updatedEntity: CatalogueEntity = {
 			...existingEntity,
 			addedAt: params.timestamp ?? new Date(),
-			notes: `URL: ${params.url}${params.title ? `\nTitle: ${params.title}` : ''}`,
+			notes: `URL: ${params.url}${params.title !== undefined ? `\nTitle: ${params.title}` : ''}`,
 		};
-		if (existingEntity.id) {
+		if (existingEntity.id !== undefined) {
 			storage.entities.set(existingEntity.id, updatedEntity);
 			updateList(storage, SPECIAL_LIST_IDS.HISTORY, {});
 			return existingEntity.id;
@@ -157,7 +146,7 @@ export const addToHistory = (storage: InMemoryStorage, params: AddToHistoryParam
 	}
 
 	// Add new history entry
-	const notes = `URL: ${params.url}${params.title ? `\nTitle: ${params.title}` : ''}`;
+	const notes = `URL: ${params.url}${params.title !== undefined ? `\nTitle: ${params.title}` : ''}`;
 
 	return addEntityToList(storage, {
 		listId: SPECIAL_LIST_IDS.HISTORY,
@@ -169,7 +158,6 @@ export const addToHistory = (storage: InMemoryStorage, params: AddToHistoryParam
 
 /**
  * Get all history entries
- * @param storage
  */
 export const getHistory = (storage: InMemoryStorage): CatalogueEntity[] => {
 	initializeSpecialLists(storage);
@@ -178,7 +166,6 @@ export const getHistory = (storage: InMemoryStorage): CatalogueEntity[] => {
 
 /**
  * Clear all history
- * @param storage
  */
 export const clearHistory = (storage: InMemoryStorage): void => {
 	const entitiesToDelete: string[] = [];
@@ -201,8 +188,6 @@ const SHARE_EXPIRY_YEARS = 1;
 
 /**
  * Generate a share token for a list
- * @param storage
- * @param listId
  */
 export const generateShareToken = (storage: InMemoryStorage, listId: string): string => {
 	const list = storage.lists.get(listId);
@@ -223,7 +208,7 @@ export const generateShareToken = (storage: InMemoryStorage, listId: string): st
 		accessCount: 0,
 	};
 
-	if (shareRecord.id) {
+	if (shareRecord.id !== undefined) {
 		storage.shares.set(shareRecord.id, shareRecord);
 	}
 
@@ -240,8 +225,6 @@ export const generateShareToken = (storage: InMemoryStorage, listId: string): st
 
 /**
  * Get a list by share token
- * @param storage
- * @param shareToken
  */
 export const getListByShareToken = (storage: InMemoryStorage, shareToken: string): ShareAccessResult => {
 	// Find share record
@@ -268,7 +251,7 @@ export const getListByShareToken = (storage: InMemoryStorage, shareToken: string
 		accessCount: shareRecord.accessCount + 1,
 		lastAccessedAt: new Date(),
 	};
-	if (shareRecord.id) {
+	if (shareRecord.id !== undefined) {
 		storage.shares.set(shareRecord.id, updatedShareRecord);
 	}
 

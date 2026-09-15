@@ -106,6 +106,43 @@ const DEFAULT_DISTANCE_THRESHOLDS: LODDistanceThresholds = {
 };
 
 /**
+Default target frame rate, in frames per second, used for adaptive LOD when not overridden.
+ */
+const DEFAULT_TARGET_FPS = 60;
+/**
+Default minimum frame rate, in frames per second, below which adaptive LOD reduces detail.
+ */
+const DEFAULT_MIN_FPS = 30;
+/**
+Number of most recent frame times retained for computing the rolling average frame rate.
+ */
+const MAX_FRAME_TIME_HISTORY = 60;
+/**
+Frame time, in milliseconds, assumed before any real frame times have been recorded (equivalent to 60fps).
+ */
+const FALLBACK_FRAME_TIME_MS = 16.67;
+/**
+Number of milliseconds in one second, used to convert a frame time into a frames-per-second value.
+ */
+const MS_PER_SECOND = 1000;
+/**
+Fraction of the target frame rate that must be exceeded before adaptive LOD tries increasing detail again.
+ */
+const PERFORMANCE_RECOVERY_FPS_RATIO = 0.9;
+/**
+Tubular edge segment count used at LODLevel.HIGH; other levels use FLAT_EDGE_SEGMENTS.
+ */
+const TUBULAR_EDGE_SEGMENTS = 8;
+/**
+Edge segment count used below LODLevel.HIGH.
+ */
+const FLAT_EDGE_SEGMENTS = 4;
+/**
+Dimension of the square projection/view matrices multiplied for frustum extraction (4x4).
+ */
+const MATRIX_DIMENSION = 4;
+
+/**
  * Performance metrics for adaptive LOD
  */
 export interface PerformanceMetrics {
@@ -157,13 +194,13 @@ export interface LODManagerOptions {
  * Graph LOD Manager class
  */
 export class GraphLODManager {
-  private configs: Record<LODLevel, LODConfig>;
-  private distanceThresholds: LODDistanceThresholds;
-  private targetFps: number;
-  private minFps: number;
-  private adaptiveMode: boolean;
+  private readonly configs: Record<LODLevel, LODConfig>;
+  private readonly distanceThresholds: LODDistanceThresholds;
+  private readonly targetFps: number;
+  private readonly minFps: number;
+  private readonly adaptiveMode: boolean;
   private currentGlobalLOD: LODLevel;
-  private frameTimeHistory: number[];
+  private readonly frameTimeHistory: number[];
   private lastFrameTime: number;
 
   constructor(options: LODManagerOptions = {}) {
@@ -179,8 +216,8 @@ export class GraphLODManager {
       ...options.distanceThresholds,
     };
 
-    this.targetFps = options.targetFps ?? 60;
-    this.minFps = options.minFps ?? 30;
+    this.targetFps = options.targetFps ?? DEFAULT_TARGET_FPS;
+    this.minFps = options.minFps ?? DEFAULT_MIN_FPS;
     this.adaptiveMode = options.adaptiveMode ?? true;
     this.currentGlobalLOD = LODLevel.HIGH;
     this.frameTimeHistory = [];
@@ -193,7 +230,7 @@ export class GraphLODManager {
    * @param cameraPosition - Position of the camera
    * @returns LOD level to use
    */
-  getLODForDistance(objectPosition: Position3D, cameraPosition: Position3D): LODLevel {
+  getLODForDistance(objectPosition: Readonly<Position3D>, cameraPosition: Readonly<Position3D>): LODLevel {
     const distance = this.calculateDistance(objectPosition, cameraPosition);
 
     if (distance < this.distanceThresholds.high) {
@@ -211,20 +248,61 @@ export class GraphLODManager {
    * @param cameraPosition - Position of the camera
    * @returns Effective LOD level
    */
-  getEffectiveLOD(objectPosition: Position3D, cameraPosition: Position3D): LODLevel {
+  getEffectiveLOD(objectPosition: Readonly<Position3D>, cameraPosition: Readonly<Position3D>): LODLevel {
     const distanceLOD = this.getLODForDistance(objectPosition, cameraPosition);
 
     // In adaptive mode, use the lower detail level between distance and global
     if (this.adaptiveMode) {
-      return Math.max(distanceLOD, this.currentGlobalLOD) as LODLevel;
+      return GraphLODManager.lowerDetailOf(distanceLOD, this.currentGlobalLOD);
     }
 
     return distanceLOD;
   }
 
   /**
+   * Order of LOD levels from most to least detailed, used to compare and step between levels without ever widening a level to a plain number.
+   */
+  private static readonly LOD_ORDER: readonly LODLevel[] = [LODLevel.HIGH, LODLevel.MEDIUM, LODLevel.LOW];
+
+  /**
+   * Return whichever of two LOD levels renders less detail (i.e. is later in {@link GraphLODManager.LOD_ORDER}).
+   */
+  private static lowerDetailOf(a: LODLevel, b: LODLevel): LODLevel {
+    return GraphLODManager.LOD_ORDER.indexOf(a) >= GraphLODManager.LOD_ORDER.indexOf(b) ? a : b;
+  }
+
+  /**
+   * Step one level towards lower detail, clamped at {@link LODLevel.LOW}.
+   */
+  private static reduceDetail(level: LODLevel): LODLevel {
+    switch (level) {
+      case LODLevel.HIGH:
+        return LODLevel.MEDIUM;
+      case LODLevel.MEDIUM:
+      case LODLevel.LOW:
+        return LODLevel.LOW;
+      default:
+        return level satisfies never;
+    }
+  }
+
+  /**
+   * Step one level towards higher detail, clamped at {@link LODLevel.HIGH}.
+   */
+  private static increaseDetail(level: LODLevel): LODLevel {
+    switch (level) {
+      case LODLevel.LOW:
+        return LODLevel.MEDIUM;
+      case LODLevel.MEDIUM:
+      case LODLevel.HIGH:
+        return LODLevel.HIGH;
+      default:
+        return level satisfies never;
+    }
+  }
+
+  /**
    * Get the configuration for a specific LOD level
-   * @param level
    */
   getConfig(level: LODLevel): LODConfig {
     return this.configs[level];
@@ -239,7 +317,6 @@ export class GraphLODManager {
 
   /**
    * Set global LOD level manually
-   * @param level
    */
   setGlobalLOD(level: LODLevel): void {
     this.currentGlobalLOD = level;
@@ -254,9 +331,9 @@ export class GraphLODManager {
     const frameTime = now - this.lastFrameTime;
     this.lastFrameTime = now;
 
-    // Keep history of last 60 frames
+    // Keep history of last MAX_FRAME_TIME_HISTORY frames
     this.frameTimeHistory.push(frameTime);
-    if (this.frameTimeHistory.length > 60) {
+    if (this.frameTimeHistory.length > MAX_FRAME_TIME_HISTORY) {
       this.frameTimeHistory.shift();
     }
 
@@ -272,10 +349,10 @@ export class GraphLODManager {
   getPerformanceMetrics(): PerformanceMetrics {
     const avgFrameTime = this.frameTimeHistory.length > 0
       ? this.frameTimeHistory.reduce((a, b) => a + b, 0) / this.frameTimeHistory.length
-      : 16.67;
+      : FALLBACK_FRAME_TIME_MS;
 
     return {
-      fps: 1000 / avgFrameTime,
+      fps: MS_PER_SECOND / avgFrameTime,
       frameTimeMs: avgFrameTime,
       visibleNodeCount: 0, // Would be set externally
       memoryEstimate: 0, // Would require external tracking
@@ -290,9 +367,9 @@ export class GraphLODManager {
    * @returns true if object is potentially visible
    */
   isInFrustum(
-    objectPosition: Position3D,
+    objectPosition: Readonly<Position3D>,
     objectRadius: number,
-    frustumPlanes: Array<{ normal: Position3D; distance: number }>
+    frustumPlanes: readonly { normal: Position3D; distance: number }[]
   ): boolean {
     for (const plane of frustumPlanes) {
       // Distance from point to plane
@@ -318,8 +395,8 @@ export class GraphLODManager {
    * @returns Map of index to LOD level
    */
   batchGetLOD(
-    objects: Position3D[],
-    cameraPosition: Position3D
+    objects: readonly Position3D[],
+    cameraPosition: Readonly<Position3D>
   ): Map<number, LODLevel> {
     const result = new Map<number, LODLevel>();
 
@@ -332,7 +409,6 @@ export class GraphLODManager {
 
   /**
    * Get recommended node render settings based on LOD
-   * @param lod
    */
   getNodeRenderSettings(lod: LODLevel): {
     segments: number;
@@ -352,7 +428,6 @@ export class GraphLODManager {
 
   /**
    * Get recommended edge render settings based on LOD
-   * @param lod
    */
   getEdgeRenderSettings(lod: LODLevel): {
     useLines: boolean;
@@ -362,13 +437,13 @@ export class GraphLODManager {
     return {
       useLines: lod >= LODLevel.MEDIUM, // Use simple lines for medium/low
       tubular: lod === LODLevel.HIGH, // Only use tubes for high detail
-      segments: lod === LODLevel.HIGH ? 8 : 4,
+      segments: lod === LODLevel.HIGH ? TUBULAR_EDGE_SEGMENTS : FLAT_EDGE_SEGMENTS,
     };
   }
 
   // Private methods
 
-  private calculateDistance(a: Position3D, b: Position3D): number {
+  private calculateDistance(a: Readonly<Position3D>, b: Readonly<Position3D>): number {
     const dx = a.x - b.x;
     const dy = a.y - b.y;
     const dz = a.z - b.z;
@@ -380,21 +455,35 @@ export class GraphLODManager {
 
     if (metrics.fps < this.minFps && this.currentGlobalLOD < LODLevel.LOW) {
       // Performance is bad, reduce detail
-      this.currentGlobalLOD = (this.currentGlobalLOD + 1) as LODLevel;
-    } else if (metrics.fps > this.targetFps * 0.9 && this.currentGlobalLOD > LODLevel.HIGH) {
+      this.currentGlobalLOD = GraphLODManager.reduceDetail(this.currentGlobalLOD);
+    } else if (metrics.fps > this.targetFps * PERFORMANCE_RECOVERY_FPS_RATIO && this.currentGlobalLOD > LODLevel.HIGH) {
       // Performance is good, try increasing detail
-      this.currentGlobalLOD = (this.currentGlobalLOD - 1) as LODLevel;
+      this.currentGlobalLOD = GraphLODManager.increaseDetail(this.currentGlobalLOD);
     }
   }
 }
 
 /**
- * Extract frustum planes from a projection-view matrix
- * This is a simplified version for basic frustum culling
- * @param projectionMatrix
- * @param viewMatrix
+ * Multiply two 4x4 matrices (column-major)
  */
-export const extractFrustumPlanes = (projectionMatrix: number[], viewMatrix: number[]): Array<{ normal: Position3D; distance: number }> => {
+const multiplyMatrices = (a: readonly number[], b: readonly number[]): number[] => {
+  const result: number[] = Array.from<number>({length: MATRIX_DIMENSION * MATRIX_DIMENSION}).fill(0);
+
+  for (let index = 0; index < MATRIX_DIMENSION; index++) {
+    for (let index_ = 0; index_ < MATRIX_DIMENSION; index_++) {
+      for (let k = 0; k < MATRIX_DIMENSION; k++) {
+        result[index * MATRIX_DIMENSION + index_] += a[k * MATRIX_DIMENSION + index_] * b[index * MATRIX_DIMENSION + k];
+      }
+    }
+  }
+
+  return result;
+};
+
+/**
+ * Extract frustum planes from a projection-view matrix This is a simplified version for basic frustum culling
+ */
+export const extractFrustumPlanes = (projectionMatrix: readonly number[], viewMatrix: readonly number[]): { normal: Position3D; distance: number }[] => {
   // Combine matrices (simplified - assumes column-major)
   const m = multiplyMatrices(projectionMatrix, viewMatrix);
 
@@ -447,34 +536,9 @@ export const extractFrustumPlanes = (projectionMatrix: number[], viewMatrix: num
 };
 
 /**
- * Multiply two 4x4 matrices (column-major)
- * @param a
- * @param b
- */
-const multiplyMatrices = (a: number[], b: number[]): number[] => {
-  const result: number[] = Array.from<number>({length: 16}).fill(0);
-
-  for (let index = 0; index < 4; index++) {
-    for (let index_ = 0; index_ < 4; index_++) {
-      for (let k = 0; k < 4; k++) {
-        result[index * 4 + index_] += a[k * 4 + index_] * b[index * 4 + k];
-      }
-    }
-  }
-
-  return result;
-};
-
-/**
  * Create a simple frustum bounds for quick culling checks
- * @param cameraPosition
- * @param lookAt
- * @param fov
- * @param aspectRatio
- * @param near
- * @param far
  */
-export const createFrustumBounds = (cameraPosition: Position3D, lookAt: Position3D, fov: number, aspectRatio: number, near: number, far: number): BoundingBox3D => {
+export const createFrustumBounds = (cameraPosition: Readonly<Position3D>, lookAt: Readonly<Position3D>, fov: number, aspectRatio: number, near: number, far: number): BoundingBox3D => {
   // Calculate approximate frustum bounds
   const direction = {
     x: lookAt.x - cameraPosition.x,

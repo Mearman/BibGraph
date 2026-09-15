@@ -6,6 +6,7 @@
  */
 
 import { type BuildContext,EnvironmentMode } from "./environment-detector.js"
+import { BYTES_PER_GB, BYTES_PER_MB, MS_PER_DAY, MS_PER_MINUTE, MS_PER_SECOND, MS_PER_WEEK } from "./size-and-time-units.js"
 
 /**
  * Cache strategy enumeration
@@ -234,13 +235,25 @@ export interface CacheStrategyConfig {
 	metadata?: Record<string, unknown>
 }
 
+const DEV_DISK_TTL_MINUTES = 10
+const DEV_DISK_MAX_SIZE_MB = 50
+const DEV_MEMORY_TTL_MINUTES = 5
+const DEV_MEMORY_MAX_SIZE_MB = 25
+const PROD_MAX_SIZE_MB = 200
+const TEST_MEMORY_TTL_SECONDS = 30
+const TEST_MEMORY_MAX_SIZE_MB = 5
+const RESEARCH_MAX_SIZE_MB = 500
+const DEBUG_TTL_MINUTES = 2
+const DEBUG_MAX_SIZE_MB = 10
+const DEFAULT_STRATEGY_TTL_MINUTES = 5
+const DEFAULT_STRATEGY_MAX_SIZE_MB = 10
+
 /**
  * Cache strategy selector based on environment
  */
 export const CacheStrategySelector = {
 	/**
 	 * Get default cache strategy for environment mode
-	 * @param mode
 	 */
 	getDefaultStrategy: (mode: EnvironmentMode): CacheStrategy => {
 		switch (mode) {
@@ -260,7 +273,6 @@ export const CacheStrategySelector = {
 
 	/**
 	 * Get cache strategy configuration for specific strategy
-	 * @param strategy
 	 */
 	getStrategyConfig: (strategy: CacheStrategy): CacheStrategyConfig => {
 		switch (strategy) {
@@ -278,8 +290,8 @@ export const CacheStrategySelector = {
 					backgroundSync: false,
 					compression: false,
 					encryption: false,
-					ttl: 10 * 60 * 1000, // 10 minutes
-					maxSize: 50 * 1024 * 1024, // 50MB
+					ttl: DEV_DISK_TTL_MINUTES * MS_PER_MINUTE, // 10 minutes
+					maxSize: DEV_DISK_MAX_SIZE_MB * BYTES_PER_MB, // 50MB
 					debug: true,
 				}
 
@@ -293,8 +305,8 @@ export const CacheStrategySelector = {
 					backgroundSync: false,
 					compression: false,
 					encryption: false,
-					ttl: 5 * 60 * 1000, // 5 minutes
-					maxSize: 25 * 1024 * 1024, // 25MB
+					ttl: DEV_MEMORY_TTL_MINUTES * MS_PER_MINUTE, // 5 minutes
+					maxSize: DEV_MEMORY_MAX_SIZE_MB * BYTES_PER_MB, // 25MB
 					debug: true,
 				}
 
@@ -308,8 +320,8 @@ export const CacheStrategySelector = {
 					backgroundSync: true,
 					compression: true,
 					encryption: false,
-					ttl: 24 * 60 * 60 * 1000, // 24 hours
-					maxSize: 200 * 1024 * 1024, // 200MB
+					ttl: MS_PER_DAY, // 24 hours
+					maxSize: PROD_MAX_SIZE_MB * BYTES_PER_MB, // 200MB
 					debug: false,
 				}
 
@@ -327,8 +339,8 @@ export const CacheStrategySelector = {
 					backgroundSync: true,
 					compression: true,
 					encryption: false,
-					ttl: 24 * 60 * 60 * 1000, // 24 hours
-					maxSize: 200 * 1024 * 1024, // 200MB
+					ttl: MS_PER_DAY, // 24 hours
+					maxSize: PROD_MAX_SIZE_MB * BYTES_PER_MB, // 200MB
 					debug: false,
 				}
 
@@ -343,7 +355,7 @@ export const CacheStrategySelector = {
 					compression: false,
 					encryption: false,
 					ttl: 1000, // 1 second
-					maxSize: 1024 * 1024, // 1MB
+					maxSize: BYTES_PER_MB, // 1MB
 					debug: false,
 				}
 
@@ -357,8 +369,8 @@ export const CacheStrategySelector = {
 					backgroundSync: false,
 					compression: false,
 					encryption: false,
-					ttl: 30 * 1000, // 30 seconds
-					maxSize: 5 * 1024 * 1024, // 5MB
+					ttl: TEST_MEMORY_TTL_SECONDS * MS_PER_SECOND, // 30 seconds
+					maxSize: TEST_MEMORY_MAX_SIZE_MB * BYTES_PER_MB, // 5MB
 					debug: false,
 				}
 
@@ -376,8 +388,8 @@ export const CacheStrategySelector = {
 					backgroundSync: true,
 					compression: true,
 					encryption: false,
-					ttl: 7 * 24 * 60 * 60 * 1000, // 7 days
-					maxSize: 500 * 1024 * 1024, // 500MB
+					ttl: MS_PER_WEEK, // 7 days
+					maxSize: RESEARCH_MAX_SIZE_MB * BYTES_PER_MB, // 500MB
 					debug: true,
 					metadata: {
 						researchMode: true,
@@ -396,7 +408,7 @@ export const CacheStrategySelector = {
 					compression: true,
 					encryption: false,
 					ttl: Number.MAX_SAFE_INTEGER, // Never expire
-					maxSize: 1024 * 1024 * 1024, // 1GB
+					maxSize: BYTES_PER_GB, // 1GB
 					debug: false,
 				}
 
@@ -414,8 +426,8 @@ export const CacheStrategySelector = {
 					backgroundSync: false,
 					compression: false,
 					encryption: false,
-					ttl: 2 * 60 * 1000, // 2 minutes
-					maxSize: 10 * 1024 * 1024, // 10MB
+					ttl: DEBUG_TTL_MINUTES * MS_PER_MINUTE, // 2 minutes
+					maxSize: DEBUG_MAX_SIZE_MB * BYTES_PER_MB, // 10MB
 					debug: true,
 					metadata: {
 						verboseLogging: true,
@@ -434,8 +446,8 @@ export const CacheStrategySelector = {
 					backgroundSync: false,
 					compression: false,
 					encryption: false,
-					ttl: 5 * 60 * 1000,
-					maxSize: 10 * 1024 * 1024,
+					ttl: DEFAULT_STRATEGY_TTL_MINUTES * MS_PER_MINUTE,
+					maxSize: DEFAULT_STRATEGY_MAX_SIZE_MB * BYTES_PER_MB,
 					debug: false,
 				}
 		}
@@ -443,12 +455,6 @@ export const CacheStrategySelector = {
 
 	/**
 	 * Select optimal cache strategy based on build context
-	 * @param root0
-	 * @param root0.context
-	 * @param root0.options
-	 * @param root0.options.useCase
-	 * @param root0.options.offline
-	 * @param root0.options.debug
 	 */
 	selectStrategy: ({
 		context,
@@ -464,11 +470,11 @@ export const CacheStrategySelector = {
 		const { useCase, offline, debug } = options ?? {}
 
 		// Handle special cases
-		if (offline) {
+		if (offline === true) {
 			return CacheStrategy.OFFLINE_CACHE_ONLY
 		}
 
-		if (debug) {
+		if (debug === true) {
 			return CacheStrategy.DEBUG_VERBOSE
 		}
 
@@ -502,9 +508,8 @@ export const CacheStrategySelector = {
 
 	/**
 	 * Get all available strategies for current environment
-	 * @param context
 	 */
-	getAvailableStrategies: (context: BuildContext): CacheStrategy[] => {
+	getAvailableStrategies: (context: Readonly<BuildContext>): CacheStrategy[] => {
 		const strategies: CacheStrategy[] = []
 
 		// Always available
@@ -537,7 +542,6 @@ export const CacheStrategySelector = {
 
 /**
  * Convenience function to get cache strategy configuration
- * @param strategy
  */
 export const getCacheStrategyConfig = (strategy: CacheStrategy): CacheStrategyConfig => CacheStrategySelector.getStrategyConfig(strategy);
 

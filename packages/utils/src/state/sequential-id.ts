@@ -4,5 +4,5 @@
 
 export const generateSequentialId = (prefix = "id"): () => string => {
 	let counter = 0;
-	return () => `${prefix}-${++counter}`;
+	return () => `${prefix}-${String(++counter)}`;
 };

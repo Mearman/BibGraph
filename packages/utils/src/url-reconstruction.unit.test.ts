@@ -167,7 +167,7 @@ describe('URL Reconstruction Utility', () => {
 
 			for (const url of originalUrls) {
 				const parsed = parseExistingAppUrl(url)
-				if (parsed && parsed.entityType && parsed.entityId) {
+				if (parsed?.entityType !== undefined && parsed.entityId !== undefined && parsed.entityId !== "") {
 					const reconstructed = reconstructEntityUrl(parsed.entityType, parsed.entityId)
 					// DOI/ORCID have special routing, so we compare after removing prefixes
 					if (url.startsWith('/doi/')) {
@@ -222,8 +222,8 @@ describe('URL Reconstruction Utility', () => {
 
 	describe('Edge Cases', () => {
 		it('should handle undefined/null inputs gracefully', () => {
-			expect(() => reconstructEntityUrl(null as any, 'W123')).not.toThrow()
-			expect(() => reconstructEntityUrl('works', null as any)).not.toThrow()
+			expect(() => reconstructEntityUrl(null as unknown as EntityType, 'W123')).not.toThrow()
+			expect(() => reconstructEntityUrl('works', null)).not.toThrow()
 			expect(() => reconstructEntityUrl('works', '')).not.toThrow()
 		})
 
@@ -233,7 +233,8 @@ describe('URL Reconstruction Utility', () => {
 		})
 
 		it('should handle very long IDs', () => {
-			const longId = 'W' + '1'.repeat(100)
+			const LONG_ID_DIGIT_COUNT = 100
+			const longId = 'W' + '1'.repeat(LONG_ID_DIGIT_COUNT)
 			expect(reconstructEntityUrl('works', longId)).toBe(`/works/${longId}`)
 		})
 
@@ -265,26 +266,30 @@ describe('URL Reconstruction Utility', () => {
 
 	describe('Performance', () => {
 		it('should handle large numbers of URL reconstructions efficiently', () => {
+			const RECONSTRUCTION_ITERATIONS = 1000
+			const MAX_RECONSTRUCTION_DURATION_MS = 100 // Should complete in under 100ms
 			const start = performance.now()
 
-			for (let index = 0; index < 1000; index++) {
-				reconstructEntityUrl('works', `W${index}`)
-				reconstructEntityUrl('authors', `A${index}`)
-				reconstructEntityUrl('sources', `S${index}`)
+			for (let index = 0; index < RECONSTRUCTION_ITERATIONS; index++) {
+				reconstructEntityUrl('works', `W${String(index)}`)
+				reconstructEntityUrl('authors', `A${String(index)}`)
+				reconstructEntityUrl('sources', `S${String(index)}`)
 			}
 
 			const duration = performance.now() - start
-			expect(duration).toBeLessThan(100) // Should complete in under 100ms
+			expect(duration).toBeLessThan(MAX_RECONSTRUCTION_DURATION_MS)
 		})
 
 		it('should handle URL parsing efficiently', () => {
-			const urls = Array.from({ length: 100 }, (_, index) => `/works/W${index}`)
+			const URL_PARSE_COUNT = 100
+			const MAX_PARSE_DURATION_MS = 50 // Should complete in under 50ms
+			const urls = Array.from({ length: URL_PARSE_COUNT }, (_, index) => `/works/W${String(index)}`)
 
 			const start = performance.now()
 			for (const url of urls) parseExistingAppUrl(url)
 			const duration = performance.now() - start
 
-			expect(duration).toBeLessThan(50) // Should complete in under 50ms
+			expect(duration).toBeLessThan(MAX_PARSE_DURATION_MS)
 		})
 	})
 })

@@ -15,6 +15,26 @@ import { DexieStorageProvider } from './dexie-storage-provider.js';
 // Check if IndexedDB is available
 const hasIndexedDB = typeof indexedDB !== 'undefined';
 
+/**
+ * Number of nodes added in the first batch of the size-persistence test
+ */
+const FIRST_BATCH_SIZE = 50;
+
+/**
+ * Total node count after the second batch of the size-persistence test (50 initial + 25 more)
+ */
+const SECOND_BATCH_TOTAL_SIZE = 75;
+
+/**
+ * Number of nodes added in the clear-persistence test
+ */
+const CLEAR_TEST_NODE_COUNT = 10;
+
+/**
+ * Number of nodes each provider should see once every tab's node has synced
+ */
+const CONCURRENT_TEST_EXPECTED_NODE_COUNT = 3;
+
 describe.skipIf(!hasIndexedDB)('Dexie Storage Provider Integration', () => {
 	let provider: CatalogueStorageProvider;
 
@@ -104,18 +124,18 @@ describe.skipIf(!hasIndexedDB)('Dexie Storage Provider Integration', () => {
 
 		it('should persist size state across sessions', async () => {
 			// Add multiple nodes
-			for (let index = 0; index < 50; index++) {
+			for (let index = 0; index < FIRST_BATCH_SIZE; index++) {
 				await provider.addToGraphList({
-					entityId: `W${index}`,
+					entityId: `W${String(index)}`,
 					entityType: 'works',
-					label: `Work ${index}`,
+					label: `Work ${String(index)}`,
 					provenance: 'user',
 				});
 			}
 
 			// Verify size with first provider
 			let size = await provider.getGraphListSize();
-			expect(size).toBe(50);
+			expect(size).toBe(FIRST_BATCH_SIZE);
 
 			// Create new provider instance
 			const newProvider = new DexieStorageProvider();
@@ -123,14 +143,14 @@ describe.skipIf(!hasIndexedDB)('Dexie Storage Provider Integration', () => {
 
 			// Verify size persists
 			size = await newProvider.getGraphListSize();
-			expect(size).toBe(50);
+			expect(size).toBe(FIRST_BATCH_SIZE);
 
 			// Add more nodes with new provider
-			for (let index = 50; index < 75; index++) {
+			for (let index = FIRST_BATCH_SIZE; index < SECOND_BATCH_TOTAL_SIZE; index++) {
 				await newProvider.addToGraphList({
-					entityId: `W${index}`,
+					entityId: `W${String(index)}`,
 					entityType: 'works',
-					label: `Work ${index}`,
+					label: `Work ${String(index)}`,
 					provenance: 'expansion',
 				});
 			}
@@ -141,7 +161,7 @@ describe.skipIf(!hasIndexedDB)('Dexie Storage Provider Integration', () => {
 
 			// Verify total size
 			size = await thirdProvider.getGraphListSize();
-			expect(size).toBe(75);
+			expect(size).toBe(SECOND_BATCH_TOTAL_SIZE);
 		});
 
 		it('should persist removal operations across sessions', async () => {
@@ -185,17 +205,17 @@ describe.skipIf(!hasIndexedDB)('Dexie Storage Provider Integration', () => {
 
 		it('should persist clear operations across sessions', async () => {
 			// Add nodes
-			for (let index = 0; index < 10; index++) {
+			for (let index = 0; index < CLEAR_TEST_NODE_COUNT; index++) {
 				await provider.addToGraphList({
-					entityId: `W${index}`,
+					entityId: `W${String(index)}`,
 					entityType: 'works',
-					label: `Work ${index}`,
+					label: `Work ${String(index)}`,
 					provenance: 'user',
 				});
 			}
 
 			let size = await provider.getGraphListSize();
-			expect(size).toBe(10);
+			expect(size).toBe(CLEAR_TEST_NODE_COUNT);
 
 			// Create new provider and clear
 			const newProvider = new DexieStorageProvider();
@@ -250,9 +270,9 @@ describe.skipIf(!hasIndexedDB)('Dexie Storage Provider Integration', () => {
 			const nodes2 = await provider2.getGraphList();
 			const nodes3 = await provider3.getGraphList();
 
-			expect(nodes1).toHaveLength(3);
-			expect(nodes2).toHaveLength(3);
-			expect(nodes3).toHaveLength(3);
+			expect(nodes1).toHaveLength(CONCURRENT_TEST_EXPECTED_NODE_COUNT);
+			expect(nodes2).toHaveLength(CONCURRENT_TEST_EXPECTED_NODE_COUNT);
+			expect(nodes3).toHaveLength(CONCURRENT_TEST_EXPECTED_NODE_COUNT);
 
 			// Verify each provider sees all nodes
 			for (const nodes of [nodes1, nodes2, nodes3]) {

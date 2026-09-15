@@ -1,6 +1,5 @@
 /**
- * Query parser for BibGraph search functionality
- * Handles quotes, wildcards (*), and field prefixes (title:, author:)
+ * Query parser for BibGraph search functionality Handles quotes, wildcards (*), and field prefixes (title:, author:)
  */
 
 export interface QueryTerm {
@@ -18,61 +17,11 @@ export interface ParsedQuery {
 	generalTerms: QueryTerm[]
 }
 
-/**
- * Parse a search query string into structured components
- *
- * Supports:
- * - Quoted phrases: "machine learning"
- * - Wildcards: *AI*, machine*, *learning
- * - Field queries: title:value, author:"John Smith", title: "quoted value"
- * @param query - The search query string to parse
- * @returns Parsed query object with field queries and general terms
- * @example
- * ```typescript
- * const result = parseSearchQuery('title:"neural networks" author:smith *AI*');
- * // result.fieldQueries: [
- * //   { field: 'title', value: 'neural networks', isWildcard: false, isQuoted: true },
- * //   { field: 'author', value: 'smith', isWildcard: false, isQuoted: false }
- * // ]
- * // result.generalTerms: [
- * //   { value: '*AI*', isWildcard: true, isQuoted: false }
- * // ]
- * ```
- */
-export const parseSearchQuery = (query: string): ParsedQuery => {
-	const fieldQueries: FieldQuery[] = []
-	const generalTerms: QueryTerm[] = []
-
-	// Early return for empty/whitespace-only queries
-	if (!query?.trim()) {
-		return { fieldQueries, generalTerms }
-	}
-
-	const tokens = tokenizeQuery(query)
-	let index = 0
-
-	while (index < tokens.length) {
-		const token = tokens[index]
-
-		if (tryParseFieldQueryWithSpace({ tokens, index: index, fieldQueries })) {
-			index += 2 // Skip both field and value tokens
-		} else if (tryParseFieldQueryInOneToken({ token, fieldQueries })) {
-			index++
-		} else {
-			processGeneralTerm({ token, generalTerms })
-			index++
-		}
-	}
-
-	return { fieldQueries, generalTerms }
-};
-
 const tokenizeQuery = (query: string): string[] => {
 	// Regex to match different token types in order of priority:
 	// 1. Quoted spans (standalone or the value of a field query) are single tokens
 	// 2. Everything else splits on whitespace
-	// A manual scanner rather than a regex: alternations with greedy prefixes
-	// are what CodeQL's polynomial-redos query flags, and this is clearer anyway.
+	// A manual scanner rather than a regex: alternations with greedy prefixes are what CodeQL's polynomial-redos query flags, and this is clearer anyway.
 	const tokens: string[] = [];
 	let index = 0;
 	while (index < query.length) {
@@ -91,13 +40,11 @@ const tokenizeQuery = (query: string): string[] => {
 			index = closing + 1;
 			continue;
 		}
-		// An unquoted run ends at whitespace, or at a quote only when that quote
-		// closes later: field:"quoted value" splits into 'field:' + '"quoted value"',
-		// while an unclosed quote is just an ordinary character in the run.
+		// An unquoted run ends at whitespace, or at a quote only when that quote closes later: field:"quoted value" splits into 'field:' + '"quoted value"', while an unclosed quote is just an ordinary character in the run.
 		const remainder = query.slice(index);
 		let gap = remainder.search(/[\s"]/);
 		while (gap !== -1 && remainder[gap] === '"') {
-			if (remainder.indexOf('"', gap + 1) !== -1) {
+			if (remainder.includes('"', gap + 1)) {
 				break;
 			}
 			const nextGap = remainder.slice(gap + 1).search(/[\s"]/);
@@ -107,6 +54,19 @@ const tokenizeQuery = (query: string): string[] => {
 		index += gap === -1 ? remainder.length : gap;
 	}
 	return tokens
+};
+
+const createFieldQuery = ({ field, value }: { field: string; value: string }): FieldQuery => {
+	const isQuoted = value.startsWith('"') && value.endsWith('"')
+	const cleanValue = isQuoted ? value.slice(1, -1) : value
+	const isWildcard = cleanValue.includes("*")
+
+	return {
+		field,
+		value: cleanValue,
+		isWildcard,
+		isQuoted,
+	}
 };
 
 const tryParseFieldQueryWithSpace = ({
@@ -146,7 +106,7 @@ const tryParseFieldQueryInOneToken = ({
 	fieldQueries: FieldQuery[]
 }): boolean => {
 	// Check if this is a field query in one token (format: field:value)
-	const fieldMatch = token.match(/^([A-Z_]\w*):(.+)$/i)
+	const fieldMatch = /^([A-Z_]\w*):(.+)$/i.exec(token)
 
 	if (fieldMatch) {
 		const [, field, value] = fieldMatch
@@ -158,24 +118,8 @@ const tryParseFieldQueryInOneToken = ({
 	return false
 };
 
-const createFieldQuery = ({ field, value }: { field: string; value: string }): FieldQuery => {
-	const isQuoted = value.startsWith('"') && value.endsWith('"')
-	const cleanValue = isQuoted ? value.slice(1, -1) : value
-	const isWildcard = cleanValue.includes("*")
-
-	return {
-		field,
-		value: cleanValue,
-		isWildcard,
-		isQuoted,
-	}
-};
-
 /**
  * Process a token as a general term and add it to the generalTerms array
- * @param root0
- * @param root0.token
- * @param root0.generalTerms
  */
 const processGeneralTerm = ({
 	token,
@@ -196,22 +140,66 @@ const processGeneralTerm = ({
 };
 
 /**
+ * Parse a search query string into structured components
+ *
+ * Supports:
+ * - Quoted phrases: "machine learning"
+ * - Wildcards: *AI*, machine*, *learning
+ * - Field queries: title:value, author:"John Smith", title: "quoted value"
+ * @param query - The search query string to parse
+ * @returns Parsed query object with field queries and general terms
+ * @example
+ * ```typescript
+ * const result = parseSearchQuery('title:"neural networks" author:smith *AI*');
+ * // result.fieldQueries: [
+ * //   { field: 'title', value: 'neural networks', isWildcard: false, isQuoted: true },
+ * //   { field: 'author', value: 'smith', isWildcard: false, isQuoted: false }
+ * // ]
+ * // result.generalTerms: [
+ * //   { value: '*AI*', isWildcard: true, isQuoted: false }
+ * // ]
+ * ```
+ */
+export const parseSearchQuery = (query: string): ParsedQuery => {
+	const fieldQueries: FieldQuery[] = []
+	const generalTerms: QueryTerm[] = []
+
+	// Early return for empty/whitespace-only queries
+	if (!query.trim()) {
+		return { fieldQueries, generalTerms }
+	}
+
+	const tokens = tokenizeQuery(query)
+	let index = 0
+
+	while (index < tokens.length) {
+		const token = tokens[index]
+
+		if (tryParseFieldQueryWithSpace({ tokens, index: index, fieldQueries })) {
+			index += 2 // Skip both field and value tokens
+		} else if (tryParseFieldQueryInOneToken({ token, fieldQueries })) {
+			index++
+		} else {
+			processGeneralTerm({ token, generalTerms })
+			index++
+		}
+	}
+
+	return { fieldQueries, generalTerms }
+};
+
+/**
  * Type guard to check if a query term is a field query
- * @param term
  */
 export const isFieldQuery = (term: QueryTerm | FieldQuery): term is FieldQuery => "field" in term;
 
 /**
  * Get all unique field names from parsed query
- * @param parsedQuery
  */
-export const getQueryFields = (parsedQuery: ParsedQuery): string[] => [...new Set(parsedQuery.fieldQueries.map((fq) => fq.field))];
+export const getQueryFields = (parsedQuery: Readonly<ParsedQuery>): string[] => [...new Set(parsedQuery.fieldQueries.map((fq) => fq.field))];
 
 /**
  * Get field queries for a specific field
- * @param root0
- * @param root0.parsedQuery
- * @param root0.field
  */
 export const getFieldQueries = ({
 	parsedQuery,
@@ -223,7 +211,6 @@ export const getFieldQueries = ({
 
 /**
  * Check if the parsed query contains any wildcards
- * @param parsedQuery
  */
-export const hasWildcards = (parsedQuery: ParsedQuery): boolean => parsedQuery.fieldQueries.some((fq) => fq.isWildcard) ||
+export const hasWildcards = (parsedQuery: Readonly<ParsedQuery>): boolean => parsedQuery.fieldQueries.some((fq) => fq.isWildcard) ||
 		parsedQuery.generalTerms.some((gt) => gt.isWildcard);

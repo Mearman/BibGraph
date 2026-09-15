@@ -8,8 +8,6 @@ import type { InMemoryStorage } from './in-memory-storage-types.js';
 
 /**
  * Internal helper to create and store a snapshot
- * @param storage
- * @param snapshot
  */
 const createAndStoreSnapshot = (
 	storage: InMemoryStorage,
@@ -38,20 +36,8 @@ const createAndStoreSnapshot = (
 
 /**
  * Save a new snapshot (legacy method signature)
- * @param storage
- * @param snapshot
- * @param snapshot.name
- * @param snapshot.nodes
- * @param snapshot.edges
- * @param snapshot.zoom
- * @param snapshot.panX
- * @param snapshot.panY
- * @param snapshot.layoutType
- * @param snapshot.nodePositions
- * @param snapshot.annotations
- * @param snapshot.isAutoSave
  */
-export const saveSnapshot = (storage: InMemoryStorage, snapshot: {
+export const saveSnapshot = (storage: InMemoryStorage, snapshot: Readonly<{
 		name: string;
 		nodes: string;
 		edges: string;
@@ -62,33 +48,26 @@ export const saveSnapshot = (storage: InMemoryStorage, snapshot: {
 		nodePositions?: string;
 		annotations?: string;
 		isAutoSave?: boolean;
-	}): string => createAndStoreSnapshot(storage, snapshot);
+	}>): string => createAndStoreSnapshot(storage, snapshot);
 
 /**
  * Add a new snapshot
- * @param storage
- * @param snapshot
  */
 export const addSnapshot = (storage: InMemoryStorage, snapshot: Omit<GraphSnapshotStorage, 'id' | 'createdAt' | 'updatedAt' | 'isAutoSave'> & { isAutoSave?: boolean }): string =>
 	createAndStoreSnapshot(storage, snapshot);
 
 /**
  * Get all snapshots
- * @param storage
  */
 export const getSnapshots = (storage: InMemoryStorage): GraphSnapshotStorage[] => [...storage.snapshots.values()];
 
 /**
  * Get a specific snapshot by ID
- * @param storage
- * @param snapshotId
  */
 export const getSnapshot = (storage: InMemoryStorage, snapshotId: string): GraphSnapshotStorage | null => storage.snapshots.get(snapshotId) ?? null;
 
 /**
  * Delete a snapshot
- * @param storage
- * @param snapshotId
  */
 export const deleteSnapshot = (storage: InMemoryStorage, snapshotId: string): void => {
 	storage.snapshots.delete(snapshotId);
@@ -96,20 +75,8 @@ export const deleteSnapshot = (storage: InMemoryStorage, snapshotId: string): vo
 
 /**
  * Update a snapshot
- * @param storage
- * @param snapshotId
- * @param updates
- * @param updates.name
- * @param updates.nodes
- * @param updates.edges
- * @param updates.zoom
- * @param updates.panX
- * @param updates.panY
- * @param updates.layoutType
- * @param updates.nodePositions
- * @param updates.annotations
  */
-export const updateSnapshot = (storage: InMemoryStorage, snapshotId: string, updates: {
+export const updateSnapshot = (storage: InMemoryStorage, snapshotId: string, updates: Readonly<{
 		name?: string;
 		nodes?: string;
 		edges?: string;
@@ -119,7 +86,7 @@ export const updateSnapshot = (storage: InMemoryStorage, snapshotId: string, upd
 		layoutType?: string;
 		nodePositions?: string;
 		annotations?: string;
-	}): void => {
+	}>): void => {
 	const snapshot = storage.snapshots.get(snapshotId);
 	if (!snapshot) {
 		throw new Error('Snapshot not found');
@@ -134,8 +101,6 @@ export const updateSnapshot = (storage: InMemoryStorage, snapshotId: string, upd
 
 /**
  * Prune old auto-save snapshots, keeping only the most recent N
- * @param storage
- * @param maxCount
  */
 export const pruneAutoSaveSnapshots = (storage: InMemoryStorage, maxCount: number): void => {
 	const autoSnapshots = [...storage.snapshots.values()]
@@ -145,7 +110,7 @@ export const pruneAutoSaveSnapshots = (storage: InMemoryStorage, maxCount: numbe
 	if (autoSnapshots.length > maxCount) {
 		const toDelete = autoSnapshots.slice(0, autoSnapshots.length - maxCount);
 		for (const snap of toDelete) {
-			if (snap.id) {
+			if (snap.id !== undefined) {
 				storage.snapshots.delete(snap.id);
 			}
 		}

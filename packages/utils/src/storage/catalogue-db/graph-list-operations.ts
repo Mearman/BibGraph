@@ -1,6 +1,5 @@
 /**
- * Graph List Operations
- * Feature 038-graph-list: Special list for graph working set
+ * Graph List Operations Feature 038-graph-list: Special list for graph working set
  */
 
 import type { AddToGraphListParams, GraphListNode, PruneGraphListResult } from "@bibgraph/types";
@@ -11,15 +10,38 @@ import { catalogueEventEmitter,LOG_CATEGORY, SPECIAL_LIST_IDS } from "./index.js
 import type { CatalogueDB } from "./schema.js";
 
 /**
+ * Helper: Parse provenance from notes field
+ */
+const parseProvenance = (notes: string | undefined): GraphListNode['provenance'] => {
+  if (notes === undefined || notes === "") return 'user';
+  // Notes format: "provenance:TYPE|label:LABEL"
+  const match = /^provenance:([^|]+)/.exec(notes);
+  if (match) {
+    const prov = match[1];
+    if (prov === 'user' || prov === 'collection-load' || prov === 'expansion' || prov === 'auto-population') {
+      return prov;
+    }
+  }
+  return 'user';
+};
+
+/**
+ * Helper: Serialize provenance and label to notes field
+ */
+const serializeProvenanceWithLabel = (provenance: string, label: string): string => {
+  return `provenance:${provenance}|label:${label}`;
+};
+
+/**
  * Add a node to the graph list
- * @param db Database instance
- * @param params Node data
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param params - Node data
+ * @param logger - Optional logger
  * @returns Entity record ID
  */
 export const addToGraphList = async (
   db: CatalogueDB,
-  params: AddToGraphListParams,
+  params: Readonly<AddToGraphListParams>,
   logger?: GenericLogger
 ): Promise<string> => {
   // Check size limit
@@ -29,7 +51,7 @@ export const addToGraphList = async (
     .count();
 
   if (currentSize >= GRAPH_LIST_CONFIG.MAX_SIZE) {
-    throw new Error(`Graph list is full (${GRAPH_LIST_CONFIG.MAX_SIZE} nodes). Remove some nodes to add more.`);
+    throw new Error(`Graph list is full (${String(GRAPH_LIST_CONFIG.MAX_SIZE)} nodes). Remove some nodes to add more.`);
   }
 
   // Check if node already exists
@@ -38,7 +60,7 @@ export const addToGraphList = async (
     .equals([SPECIAL_LIST_IDS.GRAPH, params.entityType, params.entityId])
     .first();
 
-  if (existing && existing.id !== undefined) {
+  if (existing?.id !== undefined) {
     // Update provenance
     await db.catalogueEntities.update(existing.id, {
       notes: serializeProvenanceWithLabel(params.provenance, params.label),
@@ -73,9 +95,9 @@ export const addToGraphList = async (
 
 /**
  * Remove a node from the graph list
- * @param db Database instance
- * @param entityId Entity ID to remove
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param entityId - Entity ID to remove
+ * @param logger - Optional logger
  */
 export const removeFromGraphList = async (
   db: CatalogueDB,
@@ -88,7 +110,7 @@ export const removeFromGraphList = async (
     .filter(e => e.entityId === entityId)
     .first();
 
-  if (entity && entity.id) {
+  if (entity?.id !== undefined) {
     await db.catalogueEntities.delete(entity.id);
     logger?.debug(LOG_CATEGORY, `Removed node from graph list: ${entityId}`);
     catalogueEventEmitter.emit({
@@ -101,8 +123,8 @@ export const removeFromGraphList = async (
 
 /**
  * Clear all nodes from the graph list
- * @param db Database instance
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param logger - Optional logger
  */
 export const clearGraphList = async (
   db: CatalogueDB,
@@ -117,7 +139,7 @@ export const clearGraphList = async (
 
 /**
  * Get current size of graph list
- * @param db Database instance
+ * @param db - Database instance
  */
 export const getGraphListSize = async (db: CatalogueDB): Promise<number> => {
   return await db.catalogueEntities
@@ -128,8 +150,8 @@ export const getGraphListSize = async (db: CatalogueDB): Promise<number> => {
 
 /**
  * Get all nodes in the graph list
- * @param db Database instance
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param logger - Optional logger
  */
 export const getGraphList = async (
   db: CatalogueDB,
@@ -147,7 +169,7 @@ export const getGraphList = async (
         id: String(entity.id),
         entityId: entity.entityId,
         entityType: entity.entityType,
-        label: entity.notes || entity.entityId,
+        label: entity.notes ?? entity.entityId,
         addedAt: entity.addedAt,
         provenance: parseProvenance(entity.notes),
       }));
@@ -159,8 +181,8 @@ export const getGraphList = async (
 
 /**
  * Check if a node exists in the graph list
- * @param db Database instance
- * @param entityId Entity ID
+ * @param db - Database instance
+ * @param entityId - Entity ID
  */
 export const isInGraphList = async (db: CatalogueDB, entityId: string): Promise<boolean> => {
   const count = await db.catalogueEntities
@@ -173,8 +195,8 @@ export const isInGraphList = async (db: CatalogueDB, entityId: string): Promise<
 
 /**
  * Prune old auto-populated nodes
- * @param db Database instance
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param logger - Optional logger
  */
 export const pruneGraphList = async (
   db: CatalogueDB,
@@ -193,7 +215,7 @@ export const pruneGraphList = async (
 
   const removedNodeIds: string[] = [];
   for (const entity of toPrune) {
-    if (!entity.id) {
+    if (entity.id === undefined) {
     	continue;
     }
 
@@ -201,7 +223,7 @@ export const pruneGraphList = async (
     removedNodeIds.push(entity.entityId);
   }
 
-  logger?.debug(LOG_CATEGORY, `Pruned ${removedNodeIds.length} auto-populated nodes from graph list`);
+  logger?.debug(LOG_CATEGORY, `Pruned ${String(removedNodeIds.length)} auto-populated nodes from graph list`);
   return {
     removedCount: removedNodeIds.length,
     removedNodeIds,
@@ -210,13 +232,13 @@ export const pruneGraphList = async (
 
 /**
  * Batch add nodes to graph list
- * @param db Database instance
- * @param nodes Nodes to add
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param nodes - Nodes to add
+ * @param logger - Optional logger
  */
 export const batchAddToGraphList = async (
   db: CatalogueDB,
-  nodes: AddToGraphListParams[],
+  nodes: readonly AddToGraphListParams[],
   logger?: GenericLogger
 ): Promise<string[]> => {
   const addedIds: string[] = [];
@@ -224,7 +246,7 @@ export const batchAddToGraphList = async (
     try {
       const currentSize = await getGraphListSize(db);
       if (currentSize >= GRAPH_LIST_CONFIG.MAX_SIZE) {
-        logger?.warn(LOG_CATEGORY, `Graph list full, stopping batch add at ${addedIds.length} nodes`);
+        logger?.warn(LOG_CATEGORY, `Graph list full, stopping batch add at ${String(addedIds.length)} nodes`);
         break;
       }
       const id = await addToGraphList(db, node, logger);
@@ -237,32 +259,3 @@ export const batchAddToGraphList = async (
   return addedIds;
 };
 
-// ============================================================================
-// HELPERS
-// ============================================================================
-
-/**
- * Helper: Parse provenance from notes field
- * @param notes
- */
-const parseProvenance = (notes: string | undefined): GraphListNode['provenance'] => {
-  if (!notes) return 'user';
-  // Notes format: "provenance:TYPE|label:LABEL"
-  const match = notes.match(/^provenance:([^|]+)/);
-  if (match) {
-    const prov = match[1];
-    if (prov === 'user' || prov === 'collection-load' || prov === 'expansion' || prov === 'auto-population') {
-      return prov;
-    }
-  }
-  return 'user';
-};
-
-/**
- * Helper: Serialize provenance and label to notes field
- * @param provenance
- * @param label
- */
-const serializeProvenanceWithLabel = (provenance: string, label: string): string => {
-  return `provenance:${provenance}|label:${label}`;
-};

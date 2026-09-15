@@ -57,21 +57,20 @@ export const EXTERNAL_ID_PATTERNS = {
 
 /**
  * Type guard to check if a string matches a pattern
- * @param pattern
- * @param id
  */
-const matchesPattern = (pattern: RegExp, id: string): boolean => {
+const matchesPattern = (pattern: Readonly<RegExp>, id: string): boolean => {
 	return pattern.test(id)
 }
 
+const isKnownEntityType = (value: string): value is EntityType => value in ENTITY_ID_PATTERNS
+
 /**
  * Infer entity type from a standard OpenAlex ID
- * @param id
  */
 export const inferEntityTypeFromOpenAlexId = (id: string): EntityType | null => {
 	for (const [entityType, pattern] of Object.entries(ENTITY_ID_PATTERNS)) {
-		if (matchesPattern(pattern, id)) {
-			return entityType as EntityType
+		if (matchesPattern(pattern, id) && isKnownEntityType(entityType)) {
+			return entityType
 		}
 	}
 	return null
@@ -79,7 +78,6 @@ export const inferEntityTypeFromOpenAlexId = (id: string): EntityType | null => 
 
 /**
  * Infer entity type from external ID (DOI, ORCID, ISSN, etc.)
- * @param id
  */
 export const inferEntityTypeFromExternalId = (id: string): EntityType | null => {
 	// Check DOI patterns
@@ -118,7 +116,6 @@ export const inferEntityTypeFromExternalId = (id: string): EntityType | null => 
 
 /**
  * Comprehensive entity type inference from any ID format
- * @param id
  */
 export const inferEntityType = (id: string): EntityType | null => {
 	// Try OpenAlex ID patterns first
@@ -131,11 +128,10 @@ export const inferEntityType = (id: string): EntityType | null => {
 
 /**
  * Get entity type from a typed entity object
- * @param entity
  */
-export const getEntityTypeFromEntity = <
-	T extends Work | Author | Source | InstitutionEntity | Topic | Concept | Publisher | Funder,
->(entity: T): EntityType => {
+export const getEntityTypeFromEntity = (
+	entity: Work | Author | Source | InstitutionEntity | Topic | Concept | Publisher | Funder
+): EntityType => {
 	// Use type narrowing based on unique properties
 	if ("orcid" in entity) return "authors"
 	if ("issn" in entity || "issn_l" in entity) return "sources"

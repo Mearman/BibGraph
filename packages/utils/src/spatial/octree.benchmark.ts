@@ -6,7 +6,78 @@
 
 import type { BoundingBox3D,Position3D } from '@bibgraph/types';
 
-import { createOctreeFromItems,Octree } from './octree';
+import type {Octree } from './octree';
+import { createOctreeFromItems } from './octree';
+
+/**
+Upper bound on the number of warmup iterations run before timing a benchmark.
+ */
+const WARMUP_ITERATIONS_CAP = 100;
+/**
+Fraction of the real iteration count used to size the warmup run (1/WARMUP_SAMPLE_RATE).
+ */
+const WARMUP_SAMPLE_RATE = 10;
+/**
+Number of milliseconds in one second, used to convert an average time into an operations-per-second rate.
+ */
+const MS_PER_SECOND = 1000;
+/**
+Column width, in characters, for a benchmark's name in the printed results table.
+ */
+const NAME_COLUMN_WIDTH = 40;
+/**
+Number of decimal places shown for a benchmark's average time.
+ */
+const AVG_TIME_DECIMAL_PLACES = 4;
+/**
+Column width, in characters, for a benchmark's average time in the printed results table.
+ */
+const TIME_COLUMN_WIDTH = 10;
+/**
+Column width, in characters, for a benchmark's operations-per-second figure in the printed results table.
+ */
+const OPS_COLUMN_WIDTH = 12;
+/**
+Width, in characters, of the '=' separator rules printed around report sections.
+ */
+const SEPARATOR_WIDTH = 70;
+const SMALL_NODE_COUNT = 100;
+const MEDIUM_NODE_COUNT = 500;
+const LARGE_NODE_COUNT = 1000;
+const XLARGE_NODE_COUNT = 5000;
+const XXLARGE_NODE_COUNT = 10_000;
+/**
+Node counts exercised by each benchmark round.
+ */
+const NODE_COUNTS = [SMALL_NODE_COUNT, MEDIUM_NODE_COUNT, LARGE_NODE_COUNT, XLARGE_NODE_COUNT, XXLARGE_NODE_COUNT];
+/**
+Node count above which a benchmark round uses fewer iterations to keep runtime reasonable.
+ */
+const LARGE_DATASET_THRESHOLD = 1000;
+/**
+Iteration count used for expensive per-round benchmarks once the dataset exceeds LARGE_DATASET_THRESHOLD.
+ */
+const FEW_ITERATIONS = 10;
+/**
+Iteration count used for expensive per-round benchmarks below LARGE_DATASET_THRESHOLD.
+ */
+const MANY_ITERATIONS = 100;
+/**
+Iteration count used for the cheaper, fixed-cost query benchmarks.
+ */
+const QUERY_BENCHMARK_ITERATIONS = 1000;
+/**
+Radius used for the sphere-query benchmark.
+ */
+const SPHERE_QUERY_RADIUS = 200;
+/**
+Neighbour count used for the k-nearest-neighbours benchmark.
+ */
+const K_NEAREST_COUNT = 10;
+/**
+Frame time budget, in milliseconds, for 60fps rendering.
+ */
+const FRAME_BUDGET_MS = 16.67;
 
 interface BenchmarkResult {
   name: string;
@@ -16,9 +87,9 @@ interface BenchmarkResult {
   opsPerSecond: number;
 }
 
-const benchmark = (name: string, function_: () => void, iterations: number = 1000): BenchmarkResult => {
+const benchmark = (name: string, function_: () => void, iterations = QUERY_BENCHMARK_ITERATIONS): BenchmarkResult => {
   // Warmup
-  for (let index = 0; index < Math.min(100, iterations / 10); index++) {
+  for (let index = 0; index < Math.min(WARMUP_ITERATIONS_CAP, iterations / WARMUP_SAMPLE_RATE); index++) {
     function_();
   }
 
@@ -34,7 +105,7 @@ const benchmark = (name: string, function_: () => void, iterations: number = 100
     iterations,
     totalTimeMs,
     avgTimeMs,
-    opsPerSecond: 1000 / avgTimeMs,
+    opsPerSecond: MS_PER_SECOND / avgTimeMs,
   };
 };
 
@@ -54,12 +125,12 @@ const generateRandomPoints = (count: number, bounds: BoundingBox3D): Position3D[
   return points;
 };
 
-const formatResult = (result: BenchmarkResult): string => `${result.name.padEnd(40)} ${result.avgTimeMs.toFixed(4).padStart(10)}ms  ${Math.round(result.opsPerSecond).toLocaleString().padStart(12)} ops/s`;
+const formatResult = (result: Readonly<BenchmarkResult>): string => `${result.name.padEnd(NAME_COLUMN_WIDTH)} ${result.avgTimeMs.toFixed(AVG_TIME_DECIMAL_PLACES).padStart(TIME_COLUMN_WIDTH)}ms  ${Math.round(result.opsPerSecond).toLocaleString().padStart(OPS_COLUMN_WIDTH)} ops/s`;
 
-const runBenchmarks = async () => {
-  console.log('='.repeat(70));
+const runBenchmarks = (): void => {
+  console.log('='.repeat(SEPARATOR_WIDTH));
   console.log('Octree Performance Benchmarks');
-  console.log('='.repeat(70));
+  console.log('='.repeat(SEPARATOR_WIDTH));
   console.log('');
 
   const bounds: BoundingBox3D = {
@@ -70,20 +141,20 @@ const runBenchmarks = async () => {
   const results: BenchmarkResult[] = [];
 
   // Test different data sizes
-  for (const nodeCount of [100, 500, 1000, 5000, 10_000]) {
-    console.log(`\n--- ${nodeCount} nodes ---`);
+  for (const nodeCount of NODE_COUNTS) {
+    console.log(`\n--- ${String(nodeCount)} nodes ---`);
 
     const points = generateRandomPoints(nodeCount, bounds);
-    const items = points.map((p, index) => ({ position: p, data: `node-${index}` }));
+    const items = points.map((p, index) => ({ position: p, data: `node-${String(index)}` }));
 
     // Build octree
     let octree: Octree<string>;
     results.push(benchmark(
-      `Build octree (${nodeCount} nodes)`,
+      `Build octree (${String(nodeCount)} nodes)`,
       () => {
         octree = createOctreeFromItems(items);
       },
-      nodeCount > 1000 ? 10 : 100
+      nodeCount > LARGE_DATASET_THRESHOLD ? FEW_ITERATIONS : MANY_ITERATIONS
     ));
     console.log(formatResult(results[results.length - 1] ?? { name: "unknown", iterations: 0, totalTimeMs: 0, avgTimeMs: 0, opsPerSecond: 0 }));
 
@@ -93,12 +164,12 @@ const runBenchmarks = async () => {
     // Insert operations
     const newPoint = { x: 0, y: 0, z: 0 };
     results.push(benchmark(
-      `Insert single node (${nodeCount} existing)`,
+      `Insert single node (${String(nodeCount)} existing)`,
       () => {
         const testOctree = createOctreeFromItems(items);
         testOctree.insert(newPoint, 'new-node');
       },
-      nodeCount > 1000 ? 10 : 100
+      nodeCount > LARGE_DATASET_THRESHOLD ? FEW_ITERATIONS : MANY_ITERATIONS
     ));
     console.log(formatResult(results[results.length - 1] ?? { name: "unknown", iterations: 0, totalTimeMs: 0, avgTimeMs: 0, opsPerSecond: 0 }));
 
@@ -108,11 +179,11 @@ const runBenchmarks = async () => {
       max: { x: 100, y: 100, z: 100 },
     };
     results.push(benchmark(
-      `Range query small (${nodeCount} nodes)`,
+      `Range query small (${String(nodeCount)} nodes)`,
       () => {
         octree.queryRange(smallQuery);
       },
-      1000
+      QUERY_BENCHMARK_ITERATIONS
     ));
     console.log(formatResult(results[results.length - 1] ?? { name: "unknown", iterations: 0, totalTimeMs: 0, avgTimeMs: 0, opsPerSecond: 0 }));
 
@@ -122,48 +193,48 @@ const runBenchmarks = async () => {
       max: { x: 500, y: 500, z: 500 },
     };
     results.push(benchmark(
-      `Range query large (${nodeCount} nodes)`,
+      `Range query large (${String(nodeCount)} nodes)`,
       () => {
         octree.queryRange(largeQuery);
       },
-      1000
+      QUERY_BENCHMARK_ITERATIONS
     ));
     console.log(formatResult(results[results.length - 1] ?? { name: "unknown", iterations: 0, totalTimeMs: 0, avgTimeMs: 0, opsPerSecond: 0 }));
 
     // Sphere query
     results.push(benchmark(
-      `Sphere query r=200 (${nodeCount} nodes)`,
+      `Sphere query r=200 (${String(nodeCount)} nodes)`,
       () => {
-        octree.querySphere({ x: 0, y: 0, z: 0 }, 200);
+        octree.querySphere({ x: 0, y: 0, z: 0 }, SPHERE_QUERY_RADIUS);
       },
-      1000
+      QUERY_BENCHMARK_ITERATIONS
     ));
     console.log(formatResult(results[results.length - 1] ?? { name: "unknown", iterations: 0, totalTimeMs: 0, avgTimeMs: 0, opsPerSecond: 0 }));
 
     // Find nearest
     results.push(benchmark(
-      `Find nearest (${nodeCount} nodes)`,
+      `Find nearest (${String(nodeCount)} nodes)`,
       () => {
         octree.findNearest({ x: 0, y: 0, z: 0 });
       },
-      1000
+      QUERY_BENCHMARK_ITERATIONS
     ));
     console.log(formatResult(results[results.length - 1] ?? { name: "unknown", iterations: 0, totalTimeMs: 0, avgTimeMs: 0, opsPerSecond: 0 }));
 
     // Find k-nearest (k=10)
     results.push(benchmark(
-      `Find 10 nearest (${nodeCount} nodes)`,
+      `Find 10 nearest (${String(nodeCount)} nodes)`,
       () => {
-        octree.findKNearest({ x: 0, y: 0, z: 0 }, 10);
+        octree.findKNearest({ x: 0, y: 0, z: 0 }, K_NEAREST_COUNT);
       },
-      1000
+      QUERY_BENCHMARK_ITERATIONS
     ));
     console.log(formatResult(results[results.length - 1] ?? { name: "unknown", iterations: 0, totalTimeMs: 0, avgTimeMs: 0, opsPerSecond: 0 }));
   }
 
-  console.log('\n' + '='.repeat(70));
+  console.log('\n' + '='.repeat(SEPARATOR_WIDTH));
   console.log('Benchmark Summary');
-  console.log('='.repeat(70));
+  console.log('='.repeat(SEPARATOR_WIDTH));
   console.log('');
   console.log('Performance targets for 60fps (16.67ms budget):');
   console.log('- Range queries should complete in <1ms');
@@ -172,7 +243,7 @@ const runBenchmarks = async () => {
   console.log('');
 
   // Check if any operations exceed budget
-  const slowOperations = results.filter(r => r.avgTimeMs > 16.67);
+  const slowOperations = results.filter(r => r.avgTimeMs > FRAME_BUDGET_MS);
   if (slowOperations.length > 0) {
     console.log('Operations exceeding frame budget:');
     for (const r of slowOperations) console.log(`  - ${r.name}: ${r.avgTimeMs.toFixed(2)}ms`);
@@ -183,5 +254,9 @@ const runBenchmarks = async () => {
 
 // Only run when executed directly (not when imported)
 if (import.meta.url.endsWith('octree.benchmark.ts')) {
-  runBenchmarks().catch(console.error);
+  try {
+    runBenchmarks();
+  } catch (error) {
+    console.error(error);
+  }
 }

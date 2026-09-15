@@ -13,29 +13,24 @@ import type { CatalogueDB } from "./schema.js";
 
 /**
  * Add a single entity to a catalogue list
- * @param db Database instance
- * @param getList Helper function to get a list
- * @param updateList Helper function to update a list
- * @param params Entity parameters
- * @param params.listId
- * @param params.entityType
- * @param params.entityId
- * @param params.notes
- * @param params.position
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param getList - Helper function to get a list
+ * @param updateList - Helper function to update a list
+ * @param params - Entity parameters
+ * @param logger - Optional logger
  * @returns The ID of the created entity record
  */
 export const addEntityToList = async (
 	db: CatalogueDB,
 	getList: (id: string) => Promise<CatalogueList | null>,
 	updateList: (id: string, updates: Record<string, unknown>) => Promise<void>,
-	params: {
+	params: Readonly<{
 		listId: string;
 		entityType: EntityType;
 		entityId: string;
 		notes?: string;
 		position?: number;
-	},
+	}>,
 	logger?: GenericLogger
 ): Promise<string> => {
 	try {
@@ -55,7 +50,7 @@ export const addEntityToList = async (
 			.equals([params.listId, params.entityType, params.entityId])
 			.first();
 
-		if (existing && existing.id) {
+		if (existing?.id !== undefined) {
 			// Instead of throwing, return the existing ID
 			logger?.debug(LOG_CATEGORY, "Entity already exists in list, returning existing ID", {
 				listId: params.listId,
@@ -85,7 +80,7 @@ export const addEntityToList = async (
 			entityId: params.entityId,
 			addedAt: new Date(),
 			notes: params.notes,
-			position: position ?? 0,
+			position,
 		};
 
 		await db.catalogueEntities.add(entity);
@@ -122,7 +117,7 @@ export const addEntityToList = async (
 					.equals([params.listId, params.entityType, params.entityId])
 					.first();
 
-				if (existing?.id) {
+				if (existing?.id !== undefined) {
 					return existing.id;
 				}
 			} catch (findError) {
@@ -143,11 +138,11 @@ export const addEntityToList = async (
 
 /**
  * Remove an entity from a catalogue list
- * @param db Database instance
- * @param updateList Helper function to update a list
- * @param listId List ID
- * @param entityRecordId Entity record ID
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param updateList - Helper function to update a list
+ * @param listId - List ID
+ * @param entityRecordId - Entity record ID
+ * @param logger - Optional logger
  */
 export const removeEntityFromList = async (
 	db: CatalogueDB,
@@ -184,11 +179,11 @@ export const removeEntityFromList = async (
 
 /**
  * Update entity notes
- * @param db Database instance
- * @param updateList Helper function to update a list
- * @param entityRecordId Entity record ID
- * @param notes Notes to set
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param updateList - Helper function to update a list
+ * @param entityRecordId - Entity record ID
+ * @param notes - Notes to set
+ * @param logger - Optional logger
  */
 export const updateEntityNotes = async (
 	db: CatalogueDB,
@@ -222,20 +217,17 @@ export const updateEntityNotes = async (
 /**
  * Update entity data (entityType, entityId, and optionally notes)
  * Used primarily for migration scenarios where entity identification changes
- * @param db Database instance
- * @param updateList Helper function to update a list
- * @param entityRecordId Entity record ID
- * @param data Update data
- * @param data.entityType
- * @param data.entityId
- * @param data.notes
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param updateList - Helper function to update a list
+ * @param entityRecordId - Entity record ID
+ * @param data - Update data
+ * @param logger - Optional logger
  */
 export const updateEntityData = async (
 	db: CatalogueDB,
 	updateList: (id: string, updates: Record<string, unknown>) => Promise<void>,
 	entityRecordId: string,
-	data: { entityType: EntityType; entityId: string; notes?: string },
+	data: Readonly<{ entityType: EntityType; entityId: string; notes?: string }>,
 	logger?: GenericLogger
 ): Promise<void> => {
 	try {
@@ -263,9 +255,9 @@ export const updateEntityData = async (
 
 /**
  * Get all entities in a catalogue list
- * @param db Database instance
- * @param listId List ID
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param listId - List ID
+ * @param logger - Optional logger
  * @returns Array of entities sorted by position
  */
 export const getListEntities = async (
@@ -286,12 +278,12 @@ export const getListEntities = async (
 
 /**
  * Add multiple entities to a catalogue list
- * @param db Database instance
- * @param getList Helper function to get a list
- * @param updateList Helper function to update a list
- * @param listId List ID
- * @param entities Array of entities to add
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param getList - Helper function to get a list
+ * @param updateList - Helper function to update a list
+ * @param listId - List ID
+ * @param entities - Array of entities to add
+ * @param logger - Optional logger
  * @returns Object with success and failed counts
  */
 export const addEntitiesToList = async (
@@ -299,11 +291,11 @@ export const addEntitiesToList = async (
 	getList: (id: string) => Promise<CatalogueList | null>,
 	updateList: (id: string, updates: Record<string, unknown>) => Promise<void>,
 	listId: string,
-	entities: Array<{
+	entities: readonly {
 		entityType: EntityType;
 		entityId: string;
 		notes?: string;
-	}>,
+	}[],
 	logger?: GenericLogger
 ): Promise<{ success: number; failed: number }> => {
 	let success = 0;
@@ -400,21 +392,21 @@ export const addEntitiesToList = async (
 
 /**
  * Reorder entities in a list by updating their positions
- * @param db Database instance
- * @param getList Helper function to get a list
- * @param getListEntities Helper function to get list entities
- * @param updateList Helper function to update a list
- * @param listId List ID
- * @param orderedEntityIds Array of entity record IDs in new order
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param getList - Helper function to get a list
+ * @param getEntitiesForList - Helper function to get list entities
+ * @param updateList - Helper function to update a list
+ * @param listId - List ID
+ * @param orderedEntityIds - Array of entity record IDs in new order
+ * @param logger - Optional logger
  */
 export const reorderEntities = async (
 	db: CatalogueDB,
 	getList: (id: string) => Promise<CatalogueList | null>,
-	getListEntities: (id: string) => Promise<CatalogueEntity[]>,
+	getEntitiesForList: (id: string) => Promise<CatalogueEntity[]>,
 	updateList: (id: string, updates: Record<string, unknown>) => Promise<void>,
 	listId: string,
-	orderedEntityIds: string[],
+	orderedEntityIds: readonly string[],
 	logger?: GenericLogger
 ): Promise<void> => {
 	try {
@@ -425,7 +417,7 @@ export const reorderEntities = async (
 		}
 
 		// Get all entities for the list to validate IDs
-		const listEntities = await getListEntities(listId);
+		const listEntities = await getEntitiesForList(listId);
 		const entityIdSet = new Set(listEntities.map(e => e.id));
 
 		// Validate that all provided IDs exist in the list

@@ -3,7 +3,7 @@
  * Provides LRU eviction and TTL support
  */
 
-import { GenericLogger } from "../logger.js"
+import type { GenericLogger } from "../logger.js"
 
 interface CacheEntry<T> {
 	value: T
@@ -32,18 +32,18 @@ export interface MemoryCacheConfig {
  * Generic in-memory cache with LRU eviction and TTL support
  */
 export class MemoryCache<T> {
-	private cache = new Map<string, CacheEntry<T>>()
+	private readonly cache = new Map<string, CacheEntry<T>>()
 	private accessOrder: string[] = []
-	private config: MemoryCacheConfig
-	private stats = {
+	private readonly config: MemoryCacheConfig
+	private readonly stats = {
 		hits: 0,
 		misses: 0,
 		evictions: 0,
 	}
 
 	constructor(
-		config: Partial<MemoryCacheConfig> = {},
-		private logger?: GenericLogger
+		config: Readonly<Partial<MemoryCacheConfig>> = {},
+		private readonly logger?: GenericLogger
 	) {
 		this.config = {
 			maxSize: 1000,
@@ -54,7 +54,6 @@ export class MemoryCache<T> {
 
 	/**
 	 * Get a value from the cache
-	 * @param key
 	 */
 	get(key: string): T | undefined {
 		const entry = this.cache.get(key)
@@ -101,10 +100,6 @@ export class MemoryCache<T> {
 
 	/**
 	 * Set a value in the cache
-	 * @param root0
-	 * @param root0.key
-	 * @param root0.value
-	 * @param root0.ttl
 	 */
 	set({ key, value, ttl }: { key: string; value: T; ttl?: number }): void {
 		const now = Date.now()
@@ -149,7 +144,6 @@ export class MemoryCache<T> {
 
 	/**
 	 * Delete a value from the cache
-	 * @param key
 	 */
 	delete(key: string): boolean {
 		const isExisted = this.cache.delete(key)
@@ -165,7 +159,6 @@ export class MemoryCache<T> {
 
 	/**
 	 * Check if a key exists in the cache (without updating access)
-	 * @param key
 	 */
 	has(key: string): boolean {
 		const entry = this.cache.get(key)
@@ -242,7 +235,6 @@ export class MemoryCache<T> {
 
 	/**
 	 * Get entries matching a pattern
-	 * @param pattern
 	 */
 	getByPattern(pattern: string): Map<string, T> {
 		const result = new Map<string, T>()
@@ -263,7 +255,6 @@ export class MemoryCache<T> {
 
 	/**
 	 * Delete entries matching a pattern
-	 * @param pattern
 	 */
 	deleteByPattern(pattern: string): number {
 		const isWildcard = pattern.endsWith("*")
@@ -292,7 +283,7 @@ export class MemoryCache<T> {
 	}
 
 	private isExpired(entry: CacheEntry<T>): boolean {
-		if (!entry.ttl) return false
+		if (entry.ttl === undefined) return false
 		return Date.now() - entry.timestamp > entry.ttl
 	}
 
@@ -300,19 +291,17 @@ export class MemoryCache<T> {
 		if (this.accessOrder.length === 0) return
 
 		const lruKey = this.accessOrder[0]
-		if (lruKey !== undefined) {
-			this.cache.delete(lruKey)
-			this.accessOrder.shift()
+		this.cache.delete(lruKey)
+		this.accessOrder.shift()
 
-			if (this.config.enableStats) {
-				this.stats.evictions++
-			}
-
-			this.logger?.debug("cache", "LRU eviction", {
-				evictedKey: lruKey,
-				size: this.cache.size,
-			})
+		if (this.config.enableStats) {
+			this.stats.evictions++
 		}
+
+		this.logger?.debug("cache", "LRU eviction", {
+			evictedKey: lruKey,
+			size: this.cache.size,
+		})
 	}
 
 	private updateAccessOrder(key: string): void {

@@ -46,7 +46,6 @@ export const getBuildInfo = (): BuildInfo => {
 
 /**
  * Format build timestamp to human-readable string
- * @param timestamp
  */
 export const formatBuildTimestamp = (timestamp: string): string => {
 	try {
@@ -66,9 +65,6 @@ export const formatBuildTimestamp = (timestamp: string): string => {
 
 /**
  * Generate GitHub commit URL
- * @param root0
- * @param root0.repositoryUrl
- * @param root0.commitHash
  */
 export const getCommitUrl = ({
 	repositoryUrl,
@@ -88,9 +84,6 @@ export const getCommitUrl = ({
 
 /**
  * Generate GitHub release URL
- * @param root0
- * @param root0.repositoryUrl
- * @param root0.version
  */
 export const getReleaseUrl = ({
 	repositoryUrl,
@@ -114,7 +107,6 @@ export const getReleaseUrl = ({
 
 /**
  * Get relative time since build
- * @param buildTimestamp
  */
 export const getRelativeBuildTime = (buildTimestamp: string): string => {
 	try {
