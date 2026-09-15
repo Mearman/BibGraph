@@ -21,12 +21,10 @@ import {
 	validateEntityType,
 	validateFetchCommandOptions,
 } from "../cli-validation.js"
-import { OpenAlexCLI } from "../openalex-cli-class.js"
+import type { OpenAlexCLI } from "../openalex-cli-class.js"
 
 /**
  * Register fetch command with program
- * @param program
- * @param cli
  */
 export const registerFetchCommand = (program: Command, cli: OpenAlexCLI): void => {
 	program
@@ -51,7 +49,7 @@ export const registerFetchCommand = (program: Command, cli: OpenAlexCLI): void =
 			try {
 				const result = await cli.queryWithCache(staticEntityType, queryOptions, cacheOptions)
 
-				if (!result) {
+				if (result === null || result === undefined) {
 					console.error("No results found")
 					process.exit(1)
 				}

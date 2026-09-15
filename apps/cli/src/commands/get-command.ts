@@ -22,12 +22,10 @@ import {
 	validateEntityType,
 	validateGetCommandOptions,
 } from "../cli-validation.js"
-import { OpenAlexCLI } from "../openalex-cli-class.js"
+import type { OpenAlexCLI } from "../openalex-cli-class.js"
 
 /**
  * Register get-typed command with program
- * @param program
- * @param cli
  */
 export const registerGetTypedCommand = (program: Command, cli: OpenAlexCLI): void => {
 	program
@@ -63,8 +61,6 @@ export const registerGetTypedCommand = (program: Command, cli: OpenAlexCLI): voi
 
 /**
  * Register get command with program (auto-detect entity type)
- * @param program
- * @param cli
  */
 export const registerGetCommand = (program: Command, cli: OpenAlexCLI): void => {
 	program

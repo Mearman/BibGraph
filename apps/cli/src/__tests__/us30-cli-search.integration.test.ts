@@ -16,6 +16,7 @@ const SKIP_NO_STATIC_DATA =
 	"Skipping test: No static data available. Run 'pnpm cli static:generate' to generate static data."
 const SKIP_NO_AUTHOR_DATA = "Skipping test: No static author data available for search test."
 const SKIP_NO_WORKS_DATA = "Skipping test: No static works data available for search test."
+const MIN_SEARCH_WORD_LENGTH = 3
 
 describe("US-30: CLI Entity Search", () => {
 	let cli: OpenAlexCLI
@@ -72,7 +73,9 @@ describe("US-30: CLI Entity Search", () => {
 			expect(firstWork).toBeTruthy()
 
 			// Search using a word from the title
-			const titleWords = firstWork!.display_name.split(" ").filter((w: string) => w.length > 3)
+			const titleWords = firstWork!.display_name
+				.split(" ")
+				.filter((w: string) => w.length > MIN_SEARCH_WORD_LENGTH)
 			if (titleWords.length === 0) {
 				console.log("Skipping: work title too short for meaningful search")
 				return
@@ -134,7 +137,7 @@ describe("US-30: CLI Entity Search", () => {
 
 			// JSON format: entity should be serializable to valid JSON
 			const jsonString = JSON.stringify(entity)
-			const parsed = JSON.parse(jsonString)
+			const parsed = JSON.parse(jsonString) as { id: string; display_name: string }
 			expect(parsed.id).toBe(entity?.id)
 			expect(parsed.display_name).toBe(entity?.display_name)
 
@@ -173,7 +176,8 @@ describe("US-30: CLI Entity Search", () => {
 
 			vi.mocked(fetch).mockResolvedValue(rateLimitResponse)
 
-			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+			// Deliberate no-op: silence expected console.error output during this test
+			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => undefined)
 
 			// Attempting to fetch from API should throw with rate limit status
 			await expect(cli.fetchFromAPI("authors", { search: "test" })).rejects.toThrow(

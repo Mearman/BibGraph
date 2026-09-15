@@ -121,8 +121,9 @@ describe("US-31: CLI Cache Management", () => {
 
 			// Run static data generation (rebuild) for available entity types
 			// This exercises the generateStaticDataFromPatterns method
-			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-			const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {})
+			// Deliberate no-op: silence expected console.error/debug output during this test
+			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => undefined)
+			const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => undefined)
 
 			const result = await cli.generateStaticDataFromPatterns()
 

@@ -4,7 +4,7 @@
 
 import type { Command } from "commander"
 
-import { StaticCacheManager } from "../cache/static-cache-manager.js"
+import type { StaticCacheManager } from "../cache/static-cache-manager.js"
 import {
 	CACHE_GENERATE_STATIC_CMD,
 	ENTITY_TYPE_OPTION,
@@ -26,12 +26,31 @@ import {
 } from "../cli-schemas.js"
 import type { StaticEntityType } from "../entity-detection.js"
 import { SUPPORTED_ENTITIES } from "../entity-detection.js"
-import { OpenAlexCLI } from "../openalex-cli-class.js"
+import type { OpenAlexCLI } from "../openalex-cli-class.js"
+
+/**
+Width, in characters, of the divider line printed under a cache-command header.
+ */
+const CACHE_DIVIDER_WIDTH = 50
+/**
+Multiplier used to convert a 0-1 cache-hit ratio into a percentage.
+ */
+const PERCENTAGE_MULTIPLIER = 100
+/**
+Number of bytes in a kilobyte, used to format byte counts for display.
+ */
+const BYTES_PER_KB = 1024
+/**
+Width, in characters, that a printed row number is padded to.
+ */
+const ROW_NUMBER_WIDTH = 3
+/**
+Maximum number of fields previewed per entity before eliding the rest.
+ */
+const MAX_FIELDS_PREVIEW = 5
 
 /**
  * Register cache:stats command
- * @param program
- * @param cli
  */
 export const registerCacheStatsCommand = (program: Command, cli: OpenAlexCLI): void => {
 	program
@@ -52,14 +71,14 @@ export const registerCacheStatsCommand = (program: Command, cli: OpenAlexCLI): v
 				console.log(JSON.stringify(stats, null, 2))
 			} else {
 				console.log("\nSynthetic Cache Statistics:")
-				console.log("=".repeat(50))
+				console.log("=".repeat(CACHE_DIVIDER_WIDTH))
 
 				if (stats.performance) {
 					console.log("Performance Metrics:")
 					console.log(`  Total Requests: ${stats.performance.totalRequests.toString()}`)
-					console.log(`  Cache Hit Rate: ${(stats.performance.cacheHitRate * 100).toFixed(1)}%`)
+					console.log(`  Cache Hit Rate: ${(stats.performance.cacheHitRate * PERCENTAGE_MULTIPLIER).toFixed(1)}%`)
 					console.log(`  Surgical Requests: ${stats.performance.surgicalRequestCount.toString()}`)
-					console.log(`  Bandwidth Saved: ${(stats.performance.bandwidthSaved / 1024).toFixed(1)} KB`)
+					console.log(`  Bandwidth Saved: ${(stats.performance.bandwidthSaved / BYTES_PER_KB).toFixed(1)} KB`)
 					console.log("")
 				}
 
@@ -68,7 +87,7 @@ export const registerCacheStatsCommand = (program: Command, cli: OpenAlexCLI): v
 					console.log(`  Entities: ${(stats.storage.memory.entities ?? 0).toString()}`)
 					console.log(`  Fields: ${(stats.storage.memory.fields ?? 0).toString()}`)
 					console.log(`  Collections: ${(stats.storage.memory.collections ?? 0).toString()}`)
-					console.log(`  Size: ${((stats.storage.memory.size ?? 0) / 1024).toFixed(1)} KB`)
+					console.log(`  Size: ${((stats.storage.memory.size ?? 0) / BYTES_PER_KB).toFixed(1)} KB`)
 				}
 			}
 		})
@@ -76,8 +95,6 @@ export const registerCacheStatsCommand = (program: Command, cli: OpenAlexCLI): v
 
 /**
  * Register cache:field-coverage command
- * @param program
- * @param cli
  */
 export const registerCacheFieldCoverageCommand = (program: Command, cli: OpenAlexCLI): void => {
 	program
@@ -107,7 +124,7 @@ export const registerCacheFieldCoverageCommand = (program: Command, cli: OpenAle
 				console.log(JSON.stringify(coverage, null, 2))
 			} else {
 				console.log(`\nField Coverage for ${entityType.toUpperCase()}: ${entityId}`)
-				console.log("=".repeat(50))
+				console.log("=".repeat(CACHE_DIVIDER_WIDTH))
 
 				console.log(`Memory: ${coverage.memory.length.toString()} fields`)
 				if (coverage.memory.length > 0) {
@@ -136,8 +153,6 @@ export const registerCacheFieldCoverageCommand = (program: Command, cli: OpenAle
 
 /**
  * Register cache:popular-entities command
- * @param program
- * @param cli
  */
 export const registerCachePopularEntitiesCommand = (program: Command, cli: OpenAlexCLI): void => {
 	program
@@ -146,7 +161,7 @@ export const registerCachePopularEntitiesCommand = (program: Command, cli: OpenA
 		.argument("<entity-type>", "Type of entity")
 		.option(LIMIT_OPTION, LIMIT_RESULTS_DESC)
 		.option(FORMAT_OPTION, FORMAT_TABLE_DESC)
-		.action(async (entityType: string, options: unknown) => {
+		.action((entityType: string, options: unknown) => {
 			const entityTypeValidation = StaticEntityTypeSchema.safeParse(entityType)
 			if (!entityTypeValidation.success) {
 				console.error(`Unsupported entity type: ${entityType}`)
@@ -161,7 +176,7 @@ export const registerCachePopularEntitiesCommand = (program: Command, cli: OpenA
 			}
 
 			const validatedOptions = optionsValidation.data
-			const entities = await cli.getWellPopulatedEntities()
+			const entities = cli.getWellPopulatedEntities()
 
 			if (validatedOptions.format === "json") {
 				console.log(JSON.stringify(entities, null, 2))
@@ -169,14 +184,14 @@ export const registerCachePopularEntitiesCommand = (program: Command, cli: OpenA
 				console.log(
 					`\nWell-Populated ${entityType.toUpperCase()} Entities (${entities.length.toString()}):`
 				)
-				console.log("=".repeat(50))
+				console.log("=".repeat(CACHE_DIVIDER_WIDTH))
 
 				for (const [index, entity] of entities.entries()) {
 					console.log(
-						`${(index + 1).toString().padStart(3)}: ${entity.entityId} (${entity.fieldCount.toString()} fields)`
+						`${(index + 1).toString().padStart(ROW_NUMBER_WIDTH)}: ${entity.entityId} (${entity.fieldCount.toString()} fields)`
 					)
 					if (entity.fields.length > 0) {
-						const displayFields = entity.fields.slice(0, 5)
+						const displayFields = entity.fields.slice(0, MAX_FIELDS_PREVIEW)
 						const extraCount = entity.fields.length - displayFields.length
 						const fieldsText = displayFields.join(", ")
 						const suffix = extraCount > 0 ? ` +${extraCount.toString()} more` : ""
@@ -189,8 +204,6 @@ export const registerCachePopularEntitiesCommand = (program: Command, cli: OpenA
 
 /**
  * Register cache:popular-collections command
- * @param program
- * @param cli
  */
 export const registerCachePopularCollectionsCommand = (program: Command, cli: OpenAlexCLI): void => {
 	program
@@ -198,7 +211,7 @@ export const registerCachePopularCollectionsCommand = (program: Command, cli: Op
 		.description("Show popular cached collections with high entity counts")
 		.option(LIMIT_OPTION, LIMIT_RESULTS_DESC)
 		.option(FORMAT_OPTION, FORMAT_TABLE_DESC)
-		.action(async (options: unknown) => {
+		.action((options: unknown) => {
 			const optionsValidation = CachePopularCollectionsCommandOptionsSchema.safeParse(options)
 			if (!optionsValidation.success) {
 				console.error(`Invalid options: ${optionsValidation.error.message}`)
@@ -206,16 +219,16 @@ export const registerCachePopularCollectionsCommand = (program: Command, cli: Op
 			}
 
 			const validatedOptions = optionsValidation.data
-			const collections = await cli.getPopularCollections()
+			const collections = cli.getPopularCollections()
 
 			if (validatedOptions.format === "json") {
 				console.log(JSON.stringify(collections, null, 2))
 			} else {
 				console.log(`\nPopular Cached Collections (${collections.length.toString()}):`)
-				console.log("=".repeat(50))
+				console.log("=".repeat(CACHE_DIVIDER_WIDTH))
 
 				for (const [index, collection] of collections.entries()) {
-					console.log(`${(index + 1).toString().padStart(3)}: ${collection.queryKey}`)
+					console.log(`${(index + 1).toString().padStart(ROW_NUMBER_WIDTH)}: ${collection.queryKey}`)
 					console.log(
 						`     Entities: ${collection.entityCount.toString()}, Pages: ${collection.pageCount.toString()}`
 					)
@@ -226,8 +239,6 @@ export const registerCachePopularCollectionsCommand = (program: Command, cli: Op
 
 /**
  * Register cache:clear command
- * @param program
- * @param cli
  */
 export const registerCacheClearCommand = (program: Command, cli: OpenAlexCLI): void => {
 	program
@@ -242,7 +253,7 @@ export const registerCacheClearCommand = (program: Command, cli: OpenAlexCLI): v
 			}
 
 			const validatedOptions = optionsValidation.data
-			if (!validatedOptions.confirm) {
+			if (validatedOptions.confirm !== true) {
 				console.log("This will clear all synthetic cache data including:")
 				console.log("- Entity field accumulations in memory")
 				console.log("- Collection result mappings")
@@ -261,8 +272,6 @@ export const registerCacheClearCommand = (program: Command, cli: OpenAlexCLI): v
 
 /**
  * Register cache:generate-static command
- * @param program
- * @param staticCacheManager
  */
 export const registerCacheGenerateStaticCommand = (
 	program: Command,
@@ -286,7 +295,7 @@ export const registerCacheGenerateStaticCommand = (
 			const validatedOptions = optionsValidation.data
 			let entityType: StaticEntityType | undefined
 
-			if (validatedOptions.entityType) {
+			if (validatedOptions.entityType !== undefined && validatedOptions.entityType !== "") {
 				const entityTypeValidation = StaticEntityTypeSchema.safeParse(validatedOptions.entityType)
 				if (!entityTypeValidation.success) {
 					console.error(`Unsupported entity type: ${validatedOptions.entityType}`)
@@ -298,7 +307,7 @@ export const registerCacheGenerateStaticCommand = (
 
 			const config = staticCacheManager.getConfig()
 			console.log(`\nStatic Cache Generation (${config.mode} mode):`)
-			console.log("=".repeat(50))
+			console.log("=".repeat(CACHE_DIVIDER_WIDTH))
 
 			if (config.mode === "production") {
 				console.error("Error: Cannot generate static cache in production mode")
@@ -307,19 +316,20 @@ export const registerCacheGenerateStaticCommand = (
 			}
 
 			try {
-				const limit = validatedOptions.limit ? Number.parseInt(validatedOptions.limit) : undefined
+				const limit = validatedOptions.limit !== undefined && validatedOptions.limit !== "" ? Number.parseInt(validatedOptions.limit) : undefined
+				const isDryRun = validatedOptions.dryRun === true
 				const generateOptions = {
 					entityTypes: entityType ? [entityType] : undefined,
 					limit,
-					force: !!validatedOptions.force,
-					dryRun: !!validatedOptions.dryRun,
+					force: validatedOptions.force === true,
+					dryRun: isDryRun,
 				}
 
 				await staticCacheManager.generateStaticCache(generateOptions)
 
-				console.log(`\nGeneration ${validatedOptions.dryRun ? "(Dry Run) " : ""}completed successfully`)
+				console.log(`\nGeneration ${isDryRun ? "(Dry Run) " : ""}completed successfully`)
 
-				if (!validatedOptions.dryRun) {
+				if (!isDryRun) {
 					console.log("Run 'pnpm cli cache:validate-static' to verify the generated cache")
 				}
 			} catch (error) {
@@ -331,8 +341,6 @@ export const registerCacheGenerateStaticCommand = (
 
 /**
  * Register cache:validate-static command
- * @param program
- * @param staticCacheManager
  */
 export const registerCacheValidateStaticCommand = (
 	program: Command,
@@ -354,7 +362,7 @@ export const registerCacheValidateStaticCommand = (
 			const config = staticCacheManager.getConfig()
 
 			console.log(`\nStatic Cache Validation (${config.mode} mode):`)
-			console.log("=".repeat(50))
+			console.log("=".repeat(CACHE_DIVIDER_WIDTH))
 
 			try {
 				const validation = await staticCacheManager.validateCache()
@@ -369,7 +377,7 @@ export const registerCacheValidateStaticCommand = (
 					console.log(`Missing Indexes: ${validation.missingIndexes.length.toString()}`)
 				}
 
-				if (validatedOptions.verbose || !validation.isValid) {
+				if (validatedOptions.verbose === true || !validation.isValid) {
 					if (validation.errors.length > 0) {
 						console.log("\nErrors:")
 						for (const [index, error] of validation.errors.entries()) {
@@ -405,8 +413,6 @@ export const registerCacheValidateStaticCommand = (
 
 /**
  * Register cache:clear-static command
- * @param program
- * @param staticCacheManager
  */
 export const registerCacheClearStaticCommand = (
 	program: Command,
@@ -434,7 +440,7 @@ export const registerCacheClearStaticCommand = (
 			}
 
 			let entityTypes: StaticEntityType[] | undefined
-			if (validatedOptions.entityType) {
+			if (validatedOptions.entityType !== undefined && validatedOptions.entityType !== "") {
 				const entityTypeValidation = StaticEntityTypeSchema.safeParse(validatedOptions.entityType)
 				if (!entityTypeValidation.success) {
 					console.error(`Unsupported entity type: ${validatedOptions.entityType}`)
@@ -444,7 +450,7 @@ export const registerCacheClearStaticCommand = (
 				entityTypes = [entityTypeValidation.data]
 			}
 
-			if (!validatedOptions.confirm) {
+			if (validatedOptions.confirm !== true) {
 				console.log("This will clear static cache data including:")
 				if (entityTypes) {
 					console.log(`- Entity data for: ${entityTypes.join(", ")}`)
@@ -473,9 +479,6 @@ export const registerCacheClearStaticCommand = (
 
 /**
  * Register all cache commands
- * @param program
- * @param cli
- * @param staticCacheManager
  */
 export const registerCacheCommands = (
 	program: Command,

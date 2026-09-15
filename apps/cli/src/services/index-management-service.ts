@@ -23,14 +23,51 @@ export interface CLIIndexEntry {
 export type CLIUnifiedIndex = Record<string, CLIIndexEntry>
 
 /**
+ * Narrows an unknown parsed value to {@link CLIIndexEntry}.
+ */
+const isCLIIndexEntry = (value: unknown): value is CLIIndexEntry => {
+	if (typeof value !== "object" || value === null) {
+		return false
+	}
+	if (!("$ref" in value) || !("lastModified" in value) || !("contentHash" in value)) {
+		return false
+	}
+	return (
+		typeof value.$ref === "string" && typeof value.lastModified === "string" && typeof value.contentHash === "string"
+	)
+}
+
+/**
+ * Narrows an unknown parsed value to {@link CLIUnifiedIndex}: a plain object whose every value is a valid {@link CLIIndexEntry}.
+ */
+const isCLIUnifiedIndex = (value: unknown): value is CLIUnifiedIndex => {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		return false
+	}
+	return Object.values(value).every(isCLIIndexEntry)
+}
+
+/**
+ * Narrows an unknown parsed value to an object carrying a string `id` field.
+ */
+const isEntityWithId = (value: unknown): value is { id: string } => {
+	if (typeof value !== "object" || value === null) {
+		return false
+	}
+	if (!("id" in value)) {
+		return false
+	}
+	return typeof value.id === "string"
+}
+
+/**
  * Service for managing unified indices
  */
 export class IndexManagementService {
-	constructor(private dataPath: string) {}
+	constructor(private readonly dataPath: string) {}
 
 	/**
 	 * Check if static data exists for entity type
-	 * @param entityType
 	 */
 	async hasStaticData(entityType: StaticEntityType): Promise<boolean> {
 		try {
@@ -44,13 +81,13 @@ export class IndexManagementService {
 
 	/**
 	 * Load index for entity type
-	 * @param entityType
 	 */
 	async loadIndex(entityType: StaticEntityType): Promise<CLIUnifiedIndex | null> {
 		try {
 			const indexPath = join(this.dataPath, entityType, "unified-index.json")
 			const content = await readFile(indexPath, "utf-8")
-			return JSON.parse(content) as CLIUnifiedIndex
+			const parsed: unknown = JSON.parse(content)
+			return isCLIUnifiedIndex(parsed) ? parsed : null
 		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Index not found for ${entityType}`)
 			return null
@@ -59,8 +96,6 @@ export class IndexManagementService {
 
 	/**
 	 * Get entity summary from index
-	 * @param entityType
-	 * @param entityId
 	 */
 	async getEntitySummary(
 		entityType: StaticEntityType,
@@ -68,7 +103,7 @@ export class IndexManagementService {
 	): Promise<{ id: string; display_name: string } | null> {
 		try {
 			const index = await this.loadUnifiedIndex(entityType)
-			if (!index || !index[entityId]) {
+			if (index === null || !(entityId in index)) {
 				return null
 			}
 
@@ -85,13 +120,13 @@ export class IndexManagementService {
 
 	/**
 	 * Load unified index for entity type
-	 * @param entityType
 	 */
 	async loadUnifiedIndex(entityType: StaticEntityType): Promise<CLIUnifiedIndex | null> {
 		try {
 			const indexPath = join(this.dataPath, entityType, "unified-index.json")
 			const content = await readFile(indexPath, "utf-8")
-			return JSON.parse(content) as CLIUnifiedIndex
+			const parsed: unknown = JSON.parse(content)
+			return isCLIUnifiedIndex(parsed) ? parsed : null
 		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Unified index not found for ${entityType}`)
 			return null
@@ -100,8 +135,6 @@ export class IndexManagementService {
 
 	/**
 	 * Save unified index for entity type
-	 * @param entityType
-	 * @param index
 	 */
 	async saveUnifiedIndex(entityType: StaticEntityType, index: CLIUnifiedIndex): Promise<void> {
 		try {
@@ -116,14 +149,11 @@ export class IndexManagementService {
 
 	/**
 	 * Update unified index with new entry
-	 * @param entityType
-	 * @param canonicalUrl
-	 * @param entry
 	 */
 	async updateUnifiedIndex(
 		entityType: StaticEntityType,
 		canonicalUrl: string,
-		entry: CLIIndexEntry
+		entry: Readonly<CLIIndexEntry>
 	): Promise<void> {
 		try {
 			const index = await this.loadUnifiedIndex(entityType)
@@ -145,7 +175,6 @@ export class IndexManagementService {
 
 	/**
 	 * Rebuild unified index from existing entity files
-	 * @param entityType
 	 */
 	async rebuildUnifiedIndex(entityType: StaticEntityType): Promise<void> {
 		try {
@@ -163,11 +192,11 @@ export class IndexManagementService {
 					const fileStat = await stat(filePath)
 					const content = await readFile(filePath, "utf-8")
 
-					const entity = JSON.parse(content)
-					if (entity.id) {
+					const parsedEntity: unknown = JSON.parse(content)
+					if (isEntityWithId(parsedEntity)) {
 						const contentHash = this.generateContentHash(content)
-						index[entity.id] = {
-							$ref: entity.id,
+						index[parsedEntity.id] = {
+							$ref: parsedEntity.id,
 							lastModified: fileStat.mtime.toISOString(),
 							contentHash,
 						}
@@ -187,15 +216,17 @@ export class IndexManagementService {
 
 	/**
 	 * Generate content hash
-	 * @param content
 	 */
 	private generateContentHash(content: string): string {
+		const HASH_SHIFT_BITS = 5
+		const HASH_STRING_RADIX = 36
+
 		let hash = 0
 		for (let index = 0; index < content.length; index++) {
 			const char = content.charCodeAt(index)
-			hash = (hash << 5) - hash + char
+			hash = (hash << HASH_SHIFT_BITS) - hash + char
 			hash &= hash // Convert to 32bit integer
 		}
-		return hash.toString(36)
+		return hash.toString(HASH_STRING_RADIX)
 	}
 }

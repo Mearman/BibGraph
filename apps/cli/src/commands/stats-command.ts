@@ -7,12 +7,23 @@ import type { Command } from "commander"
 import { FORMAT_OPTION, FORMAT_TABLE_DESC } from "../cli-options.js"
 import { StaticEntityTypeSchema, StatsCommandOptionsSchema } from "../cli-schemas.js"
 import { SUPPORTED_ENTITIES } from "../entity-detection.js"
-import { OpenAlexCLI } from "../openalex-cli-class.js"
+import type { OpenAlexCLI } from "../openalex-cli-class.js"
+
+/**
+Width, in characters, that a stats row's entity-type column is padded to.
+ */
+const STATS_ENTITY_TYPE_COLUMN_WIDTH = 12
+/**
+Width, in characters, that a stats row's entity-count column is padded to.
+ */
+const STATS_ENTITY_COUNT_COLUMN_WIDTH = 4
+/**
+Width, in characters, of the divider line printed under the stats header.
+ */
+const STATS_DIVIDER_WIDTH = 50
 
 /**
  * Register stats command with program
- * @param program
- * @param cli
  */
 export const registerStatsCommand = (program: Command, cli: OpenAlexCLI): void => {
 	program
@@ -33,13 +44,13 @@ export const registerStatsCommand = (program: Command, cli: OpenAlexCLI): void =
 				console.log(JSON.stringify(stats, null, 2))
 			} else {
 				console.log("\nOpenAlex Static Data Statistics:")
-				console.log("=".repeat(50))
+				console.log("=".repeat(STATS_DIVIDER_WIDTH))
 
 				for (const [entityType, data] of Object.entries(stats)) {
 					const lastModule = new Date(data.lastModified).toLocaleString()
 
 					console.log(
-						`${entityType.toUpperCase().padEnd(12)}: ${data.count.toString().padStart(4)} entities, last: ${lastModule}`
+						`${entityType.toUpperCase().padEnd(STATS_ENTITY_TYPE_COLUMN_WIDTH)}: ${data.count.toString().padStart(STATS_ENTITY_COUNT_COLUMN_WIDTH)} entities, last: ${lastModule}`
 					)
 				}
 			}
@@ -48,8 +59,6 @@ export const registerStatsCommand = (program: Command, cli: OpenAlexCLI): void =
 
 /**
  * Register index command with program
- * @param program
- * @param cli
  */
 export const registerIndexCommand = (program: Command, cli: OpenAlexCLI): void => {
 	program

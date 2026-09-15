@@ -7,12 +7,15 @@ import type { Command } from "commander"
 import { FORMAT_OPTION, FORMAT_TABLE_DESC } from "../cli-options.js"
 import { ListCommandOptionsSchema,StaticEntityTypeSchema } from "../cli-schemas.js"
 import { SUPPORTED_ENTITIES } from "../entity-detection.js"
-import { OpenAlexCLI } from "../openalex-cli-class.js"
+import type { OpenAlexCLI } from "../openalex-cli-class.js"
+
+/**
+Width, in characters, that entity list row numbers are padded to.
+ */
+const LIST_ROW_NUMBER_WIDTH = 3
 
 /**
  * Register list command with program
- * @param program
- * @param cli
  */
 export const registerListCommand = (program: Command, cli: OpenAlexCLI): void => {
 	program
@@ -39,7 +42,7 @@ export const registerListCommand = (program: Command, cli: OpenAlexCLI): void =>
 			const validatedOptions = optionsValidation.data
 			const entities = await cli.listEntities(staticEntityType)
 
-			if (validatedOptions.count) {
+			if (validatedOptions.count === true) {
 				console.log(entities.length)
 				return
 			}
@@ -49,7 +52,7 @@ export const registerListCommand = (program: Command, cli: OpenAlexCLI): void =>
 			} else {
 				console.log(`\n${entityType.toUpperCase()} (${entities.length.toString()} entities):`)
 				for (const [index, id] of entities.entries()) {
-					console.log(`${(index + 1).toString().padStart(3)}: ${id}`)
+					console.log(`${(index + 1).toString().padStart(LIST_ROW_NUMBER_WIDTH)}: ${id}`)
 				}
 			}
 		})

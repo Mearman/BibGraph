@@ -24,26 +24,50 @@ interface CLIQueryIndex {
 }
 
 /**
+ * Narrows an unknown parsed value to {@link CLIQueryIndexEntry}.
+ */
+const isCLIQueryIndexEntry = (value: unknown): value is CLIQueryIndexEntry => {
+	if (typeof value !== "object" || value === null) {
+		return false
+	}
+	if (!("url" in value) || !("lastModified" in value) || !("contentHash" in value)) {
+		return false
+	}
+	return typeof value.url === "string" && typeof value.lastModified === "string" && typeof value.contentHash === "string"
+}
+
+/**
+ * Narrows an unknown parsed value to {@link CLIQueryIndex}.
+ */
+const isCLIQueryIndex = (value: unknown): value is CLIQueryIndex => {
+	if (typeof value !== "object" || value === null) {
+		return false
+	}
+	if (!("queries" in value) || !Array.isArray(value.queries)) {
+		return false
+	}
+	return value.queries.every(isCLIQueryIndexEntry)
+}
+
+/**
  * Service for managing cached query results
  */
 export class QueryCacheService {
-	constructor(private dataPath: string) {}
+	constructor(private readonly dataPath: string) {}
 
 	/**
 	 * Load cached query result
-	 * @param entityType
-	 * @param queryUrl
 	 */
 	async loadQuery(entityType: StaticEntityType, queryUrl: string): Promise<unknown> {
 		// First try to load from query index
 		const indexedQuery = await this.tryLoadFromQueryIndex(entityType, queryUrl)
-		if (indexedQuery) {
+		if (indexedQuery !== undefined) {
 			return indexedQuery
 		}
 
 		// Fallback to scanning directory for matching query file
 		const scannedQuery = await this.scanDirectoryForQuery(entityType, queryUrl)
-		if (scannedQuery) {
+		if (scannedQuery !== undefined) {
 			return scannedQuery
 		}
 
@@ -52,8 +76,6 @@ export class QueryCacheService {
 
 	/**
 	 * Try to load query from query index
-	 * @param entityType
-	 * @param queryUrl
 	 */
 	private async tryLoadFromQueryIndex(
 		entityType: StaticEntityType,
@@ -62,9 +84,12 @@ export class QueryCacheService {
 		try {
 			const queryIndexPath = join(this.dataPath, entityType, "query-index.json")
 			const content = await readFile(queryIndexPath, "utf-8")
-			const queryIndex = JSON.parse(content) as CLIQueryIndex
+			const parsedIndex: unknown = JSON.parse(content)
+			if (!isCLIQueryIndex(parsedIndex)) {
+				return undefined
+			}
 
-			const isQueryEntry = queryIndex.queries.some((q) => q.url === queryUrl)
+			const isQueryEntry = parsedIndex.queries.some((q) => q.url === queryUrl)
 			if (!isQueryEntry) {
 				return undefined
 			}
@@ -73,7 +98,8 @@ export class QueryCacheService {
 			const queryPath = join(this.dataPath, entityType, "queries", filename)
 
 			const queryContent = await readFile(queryPath, "utf-8")
-			return JSON.parse(queryContent)
+			const parsedQuery: unknown = JSON.parse(queryContent)
+			return parsedQuery
 		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Query not found in index: ${queryUrl}`)
 			return undefined
@@ -82,8 +108,6 @@ export class QueryCacheService {
 
 	/**
 	 * Scan directory for query file matching URL
-	 * @param entityType
-	 * @param queryUrl
 	 */
 	private async scanDirectoryForQuery(
 		entityType: StaticEntityType,
@@ -95,7 +119,7 @@ export class QueryCacheService {
 
 			for (const file of files) {
 				const result = await this.tryMatchQueryFile(queryDir, file, queryUrl)
-				if (result) {
+				if (result !== undefined) {
 					return result
 				}
 			}
@@ -109,9 +133,6 @@ export class QueryCacheService {
 
 	/**
 	 * Try to match query file by URL
-	 * @param queryDir
-	 * @param file
-	 * @param queryUrl
 	 */
 	private async tryMatchQueryFile(
 		queryDir: string,
@@ -132,13 +153,11 @@ export class QueryCacheService {
 
 	/**
 	 * Load query file from disk
-	 * @param queryDir
-	 * @param file
 	 */
 	private async loadQueryFile(queryDir: string, file: string): Promise<unknown> {
 		try {
 			const queryPath = join(queryDir, file)
-			return this.loadQueryFileFromPath(queryPath)
+			return await this.loadQueryFileFromPath(queryPath)
 		} catch (error) {
 			logError(logger, `Failed to load query file: ${file}`, error, LOG_CONTEXT_GENERAL)
 			return undefined
@@ -147,12 +166,12 @@ export class QueryCacheService {
 
 	/**
 	 * Load query file from specific path
-	 * @param filePath
 	 */
 	private async loadQueryFileFromPath(filePath: string): Promise<unknown> {
 		try {
 			const content = await readFile(filePath, "utf-8")
-			return JSON.parse(content)
+			const parsed: unknown = JSON.parse(content)
+			return parsed
 		} catch (error) {
 			logError(logger, `Failed to read query file: ${filePath}`, error, LOG_CONTEXT_GENERAL)
 			return undefined
@@ -161,13 +180,13 @@ export class QueryCacheService {
 
 	/**
 	 * Load query index for entity type
-	 * @param entityType
 	 */
 	async loadQueryIndex(entityType: StaticEntityType): Promise<CLIQueryIndex | null> {
 		try {
 			const queryIndexPath = join(this.dataPath, entityType, "query-index.json")
 			const content = await readFile(queryIndexPath, "utf-8")
-			return JSON.parse(content) as CLIQueryIndex
+			const parsed: unknown = JSON.parse(content)
+			return isCLIQueryIndex(parsed) ? parsed : null
 		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Query index not found for ${entityType}`)
 			return null
@@ -176,8 +195,6 @@ export class QueryCacheService {
 
 	/**
 	 * Save query index for entity type
-	 * @param entityType
-	 * @param queryIndex
 	 */
 	async saveQueryIndex(entityType: StaticEntityType, queryIndex: CLIQueryIndex): Promise<void> {
 		try {
@@ -191,7 +208,6 @@ export class QueryCacheService {
 
 	/**
 	 * List all cached queries for entity type
-	 * @param entityType
 	 */
 	async listCachedQueries(entityType: StaticEntityType): Promise<
 		{
@@ -217,7 +233,6 @@ export class QueryCacheService {
 
 	/**
 	 * Scan query files from filesystem
-	 * @param entityType
 	 */
 	async scanQueryFilesFromFilesystem(entityType: StaticEntityType): Promise<
 		{
@@ -250,8 +265,6 @@ export class QueryCacheService {
 
 	/**
 	 * Process individual query file
-	 * @param queryDir
-	 * @param file
 	 */
 	private async processQueryFile(
 		queryDir: string,

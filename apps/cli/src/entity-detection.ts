@@ -6,7 +6,6 @@ import type { EntityType } from "@bibgraph/types"
 
 /**
  * Map OpenAlex ID prefixes to entity types
- * @param prefix
  */
 const prefixToEntityType = (prefix: string): EntityType => {
 	switch (prefix) {
@@ -42,19 +41,18 @@ const prefixToEntityType = (prefix: string): EntityType => {
 
 /**
  * Detect entity type from OpenAlex ID
- * @param entityId
  */
 export const detectEntityType = (entityId: string): EntityType => {
 	// Detect from ID format (W123456789, A123456789, etc.)
-	const match = entityId.match(/^https:\/\/openalex\.org\/([AFIPSTW])\d+$/)
-	if (match?.[1]) {
+	const match = /^https:\/\/openalex\.org\/([AFIPSTW])\d+$/.exec(entityId)
+	if (match?.[1] !== undefined) {
 		const prefix = match[1]
 		return prefixToEntityType(prefix)
 	}
 
 	// Handle bare IDs
-	const bareMatch = entityId.match(/^([AFIPSTW])\d+$/)
-	if (bareMatch?.[1]) {
+	const bareMatch = /^([AFIPSTW])\d+$/.exec(entityId)
+	if (bareMatch?.[1] !== undefined) {
 		const prefix = bareMatch[1]
 		return prefixToEntityType(prefix)
 	}
@@ -76,13 +74,17 @@ export const SUPPORTED_ENTITIES = [
 
 export type StaticEntityType = (typeof SUPPORTED_ENTITIES)[number]
 
+const SUPPORTED_ENTITY_SET: ReadonlySet<string> = new Set(SUPPORTED_ENTITIES)
+
+const isStaticEntityType = (entityType: EntityType): entityType is StaticEntityType =>
+	SUPPORTED_ENTITY_SET.has(entityType)
+
 /**
  * Convert EntityType to StaticEntityType
- * @param entityType
  */
 export const toStaticEntityType = (entityType: EntityType): StaticEntityType => {
-	if (SUPPORTED_ENTITIES.includes(entityType as StaticEntityType)) {
-		return entityType as StaticEntityType
+	if (isStaticEntityType(entityType)) {
+		return entityType
 	}
 	throw new Error(`Unsupported entity type for CLI: ${entityType}`)
 };

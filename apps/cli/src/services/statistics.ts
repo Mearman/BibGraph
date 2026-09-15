@@ -44,7 +44,7 @@ interface FieldCoverageByTier {
  * Service for cache statistics and analysis
  */
 export class StatisticsService {
-	constructor(private dataPath: string) {}
+	constructor(private readonly dataPath: string) {}
 
 	/**
 	 * Get comprehensive cache statistics
@@ -56,8 +56,13 @@ export class StatisticsService {
 		totalStorageSize: number
 	}> {
 		const entityTypes: StaticEntityType[] = ["authors", "works", "institutions", "topics", "publishers", "funders"]
-		const stats = {
-			entityTypes: [] as StaticEntityType[],
+		const stats: {
+			entityTypes: StaticEntityType[]
+			totalCachedEntities: number
+			totalCachedQueries: number
+			totalStorageSize: number
+		} = {
+			entityTypes: [],
 			totalCachedEntities: 0,
 			totalCachedQueries: 0,
 			totalStorageSize: 0,
@@ -115,7 +120,8 @@ export class StatisticsService {
 	 * Clear synthetic cache (no-op for CLI filesystem cache)
 	 */
 	async clearSyntheticCache(): Promise<void> {
-		// CLI uses filesystem cache, so there's no synthetic/memory cache to clear
+		// CLI uses filesystem cache, so there's no synthetic/memory cache to clear; the await is a deliberate no-op that keeps this method genuinely async so it matches its Promise-returning signature and the other cache-clearing operations it's called alongside.
+		await Promise.resolve()
 		logger.info(LOG_CONTEXT_GENERAL, "CLI uses filesystem cache - no synthetic cache to clear")
 	}
 
@@ -180,7 +186,6 @@ export class StatisticsService {
 
 	/**
 	 * Count entities for given type
-	 * @param entityType
 	 */
 	private async countEntities(entityType: StaticEntityType): Promise<number> {
 		try {
@@ -197,7 +202,6 @@ export class StatisticsService {
 
 	/**
 	 * Count queries for given type
-	 * @param entityType
 	 */
 	private async countQueries(entityType: StaticEntityType): Promise<number> {
 		try {
@@ -212,7 +216,6 @@ export class StatisticsService {
 
 	/**
 	 * Calculate directory size
-	 * @param dirPath
 	 */
 	private async calculateDirectorySize(dirPath: string): Promise<number> {
 		try {
@@ -238,8 +241,6 @@ export class StatisticsService {
 
 	/**
 	 * Analyze field coverage from sample entity
-	 * @param entityType
-	 * @param fieldCoverage
 	 */
 	private async analyzeFieldCoverage(
 		entityType: StaticEntityType,
@@ -254,13 +255,16 @@ export class StatisticsService {
 				(file) => file.endsWith(".json") && file !== "unified-index.json" && !file.startsWith("query-")
 			)
 
-			if (!entityFile) {
+			if (entityFile === undefined) {
 				return
 			}
 
 			const filePath = join(entityDir, entityFile)
 			const content = await readFile(filePath, "utf-8")
-			const entity = JSON.parse(content)
+			const entity: unknown = JSON.parse(content)
+			if (typeof entity !== "object" || entity === null) {
+				return
+			}
 
 			// Extract all field names
 			const fields = Object.keys(entity)
