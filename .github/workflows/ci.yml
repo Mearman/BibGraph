@@ -27,7 +27,7 @@ permissions:
 
 env:
   NODE_VERSION: "24"
-  PNPM_VERSION: "10.18.3"
+  PNPM_VERSION: "12.4.1"
   NODE_OPTIONS: "--max-old-space-size=8192"
   # Skip Husky hooks in CI to prevent build loops
   HUSKY: 0
