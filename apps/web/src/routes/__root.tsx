@@ -5,6 +5,7 @@ import { ErrorBoundary } from "@/components/error/ErrorBoundary";
 import { RouterErrorComponent } from "@/components/error/RouterErrorComponent";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { NavigationTracker } from "@/components/NavigationTracker";
+import NotFoundPage from "@/components/routing/NotFoundPage";
 import { UrlFixer } from "@/components/UrlFixer";
 import { ActivityProvider } from "@/contexts/ActivityContext";
 import { GraphVisualizationProvider } from "@/contexts/GraphVisualizationContext";
@@ -55,6 +56,7 @@ const RootLayout = () => {
 export const Route = createRootRoute({
   component: RootLayout,
   errorComponent: RouterErrorComponent,
+  notFoundComponent: NotFoundPage,
   beforeLoad: ({ location }) => {
     // Handle URLs like /#/https://api.openalex.org/path -> /#/path
     const { pathname, href } = location;
