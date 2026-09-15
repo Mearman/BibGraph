@@ -9,7 +9,6 @@
  * - Edge property filtering (via EdgePropertyFilter)
  * - Configurable weight calculation (property mapping or custom function)
  * - Bidirectional traversal support
- * @module cache/dexie/graph-adapter
  */
 
 import type {
@@ -17,6 +16,7 @@ import type {
   GraphEdgeRecord,
   GraphNodeRecord,
   TraversalOptions,
+  WeightableEdgeProperty,
   WeightConfig,
   WeightFunction,
 } from '@bibgraph/types';
@@ -28,24 +28,38 @@ import type { PersistentGraph } from './persistent-graph';
  */
 type AdapterWeightFunction = WeightFunction<GraphNodeRecord, GraphEdgeRecord>;
 
+const DEFAULT_UNWEIGHTED_VALUE = 1;
+const MIN_WEIGHT_DIVISOR = 0.001;
+
+/**
+ * Read a numeric edge property value, falling back to a default when the property is absent or not a number.
+ */
+const readNumericEdgeProperty = (
+  edge: Readonly<GraphEdgeRecord>,
+  property: WeightableEdgeProperty,
+  defaultWeight: number
+): number => {
+  const value: unknown = edge[property];
+  return typeof value === "number" ? value : defaultWeight;
+};
+
 /**
  * Build a weight function from WeightConfig
- * @param config
  */
 const buildWeightFunction = (
-	config?: WeightConfig<GraphNodeRecord, GraphEdgeRecord>
+	config?: WeightConfig
 ): AdapterWeightFunction => {
   if (!config) {
-    return () => 1;
+    return () => DEFAULT_UNWEIGHTED_VALUE;
   }
 
   // Custom weight function takes precedence
   if (config.weightFn) {
     const baseFunction = config.weightFn;
-    if (config.invert) {
+    if (config.invert === true) {
       return (edge, source, target) => {
         const weight = baseFunction(edge, source, target);
-        return 1 / Math.max(weight, 0.001);
+        return 1 / Math.max(weight, MIN_WEIGHT_DIVISOR);
       };
     }
     return baseFunction;
@@ -54,21 +68,19 @@ const buildWeightFunction = (
   // Property-based weight
   if (config.property) {
     const property = config.property;
-    const defaultWeight = config.defaultWeight ?? 1;
+    const defaultWeight = config.defaultWeight ?? DEFAULT_UNWEIGHTED_VALUE;
 
-    if (config.invert) {
+    if (config.invert === true) {
       return (edge) => {
-        const value = (edge[property] as number | undefined) ?? defaultWeight;
-        return 1 / Math.max(value, 0.001);
+        const value = readNumericEdgeProperty(edge, property, defaultWeight);
+        return 1 / Math.max(value, MIN_WEIGHT_DIVISOR);
       };
     }
 
-    return (edge) => {
-      return (edge[property] as number | undefined) ?? defaultWeight;
-    };
+    return (edge) => readNumericEdgeProperty(edge, property, defaultWeight);
   }
 
-  return () => config.defaultWeight ?? 1;
+  return () => config.defaultWeight ?? DEFAULT_UNWEIGHTED_VALUE;
 };
 
 /**
@@ -95,18 +107,18 @@ const buildWeightFunction = (
  */
 export class PersistentGraphAdapter {
   private readonly graph: PersistentGraph;
-  private readonly options: TraversalOptions<GraphNodeRecord, GraphEdgeRecord>;
+  private readonly options: TraversalOptions;
   private readonly weightFn: AdapterWeightFunction;
   private readonly nodeTypeSet: Set<EntityType> | null;
 
   constructor(
     graph: PersistentGraph,
-    options?: TraversalOptions<GraphNodeRecord, GraphEdgeRecord>
+    options?: TraversalOptions
   ) {
     this.graph = graph;
     this.options = options ?? {};
     this.weightFn = buildWeightFunction(this.options.weight);
-    this.nodeTypeSet = this.options.nodeTypes?.length
+    this.nodeTypeSet = this.options.nodeTypes !== undefined && this.options.nodeTypes.length > 0
       ? new Set(this.options.nodeTypes)
       : null;
   }
@@ -117,7 +129,6 @@ export class PersistentGraphAdapter {
 
   /**
    * Get a node by ID (filtered by node types if configured)
-   * @param id
    */
   getNode(id: string): GraphNodeRecord | undefined {
     const node = this.graph.getNode(id);
@@ -133,7 +144,6 @@ export class PersistentGraphAdapter {
 
   /**
    * Check if node exists (respecting filters)
-   * @param id
    */
   hasNode(id: string): boolean {
     return this.getNode(id) !== undefined;
@@ -168,7 +178,6 @@ export class PersistentGraphAdapter {
 
   /**
    * Get neighbor node IDs (filtered and direction-aware)
-   * @param id
    */
   getNeighbors(id: string): string[] {
     const direction = this.options.direction ?? 'both';
@@ -184,7 +193,7 @@ export class PersistentGraphAdapter {
       const nodeTypeSet = this.nodeTypeSet;
       neighbors = neighbors.filter((neighborId) => {
         const node = this.graph.getNode(neighborId);
-        return node && nodeTypeSet.has(node.entityType);
+        return node !== undefined && nodeTypeSet.has(node.entityType);
       });
     }
 
@@ -193,7 +202,6 @@ export class PersistentGraphAdapter {
 
   /**
    * Get outgoing edges from a node (filtered)
-   * @param id
    */
   getOutgoingEdges(id: string): GraphEdgeRecord[] {
     const direction = this.options.direction ?? 'both';
@@ -218,7 +226,7 @@ export class PersistentGraphAdapter {
       edges = edges.filter((edge) => {
         const targetId = edge.source === id ? edge.target : edge.source;
         const targetNode = this.graph.getNode(targetId);
-        return targetNode && nodeTypeSet.has(targetNode.entityType);
+        return targetNode !== undefined && nodeTypeSet.has(targetNode.entityType);
       });
     }
 
@@ -259,7 +267,6 @@ export class PersistentGraphAdapter {
 
   /**
    * Calculate weight for an edge
-   * @param edge
    */
   getEdgeWeight(edge: GraphEdgeRecord): number {
     const source = this.graph.getNode(edge.source);
@@ -279,7 +286,7 @@ export class PersistentGraphAdapter {
   /**
    * Get current traversal options
    */
-  getOptions(): TraversalOptions<GraphNodeRecord, GraphEdgeRecord> {
+  getOptions(): TraversalOptions {
     return this.options;
   }
 
@@ -292,10 +299,9 @@ export class PersistentGraphAdapter {
 
   /**
    * Create a new adapter with modified options
-   * @param newOptions
    */
   withOptions(
-    newOptions: Partial<TraversalOptions<GraphNodeRecord, GraphEdgeRecord>>
+    newOptions: Partial<TraversalOptions>
   ): PersistentGraphAdapter {
     return new PersistentGraphAdapter(this.graph, {
       ...this.options,
@@ -309,11 +315,10 @@ export class PersistentGraphAdapter {
 
   /**
    * Apply edge property filter to edges
-   * @param edges
    */
-  private applyEdgeFilter(edges: GraphEdgeRecord[]): GraphEdgeRecord[] {
+  private applyEdgeFilter(edges: readonly GraphEdgeRecord[]): GraphEdgeRecord[] {
     const filter = this.options.edgeFilter;
-    if (!filter) return edges;
+    if (!filter) return [...edges];
 
     return edges.filter((edge) => {
       if (filter.authorPosition !== undefined && edge.authorPosition !== filter.authorPosition) {
@@ -340,13 +345,12 @@ export class PersistentGraphAdapter {
         ) {
         return false;
       }
-      if (
-          filter.yearsInclude !== undefined &&
-          filter.yearsInclude.length > 0 &&
-          (!edge.years || filter.yearsInclude.every((year) => !edge.years?.includes(year)))
-        ) {
+      if (filter.yearsInclude !== undefined && filter.yearsInclude.length > 0) {
+        const { years } = edge;
+        if (years === undefined || filter.yearsInclude.every((year) => !years.includes(year))) {
           return false;
         }
+      }
       if (filter.awardId !== undefined && edge.awardId !== filter.awardId) {
         return false;
       }
@@ -373,5 +377,5 @@ export class PersistentGraphAdapter {
  */
 export const createGraphAdapter = (
 	graph: PersistentGraph,
-	options?: TraversalOptions<GraphNodeRecord, GraphEdgeRecord>
+	options?: TraversalOptions
 ): PersistentGraphAdapter => new PersistentGraphAdapter(graph, options);

@@ -9,6 +9,7 @@ import type { CacheTierInterface } from "../../cache-tiers-types";
 import type { CachedEntityEntry , StaticDataResult } from "../../static-data-provider";
 import { CacheTier } from "../../static-data-provider";
 import type { StaticEntityType } from "../../static-data-utils";
+import { toStaticEntityType } from "../../static-data-utils";
 
 interface CacheEntry {
 	data: unknown;
@@ -22,11 +23,12 @@ interface CacheStats {
 	totalLoadTime: number;
 }
 
+const DEFAULT_MAX_CACHE_SIZE = 1000;
+
 /**
  * Calculate cache statistics from raw stats
- * @param stats
  */
-const calculateCacheStats = (stats: CacheStats): {
+const calculateCacheStats = (stats: Readonly<CacheStats>): {
 	requests: number;
 	hits: number;
 	averageLoadTime: number;
@@ -41,8 +43,8 @@ const calculateCacheStats = (stats: CacheStats): {
  * Memory cache implementation with LRU eviction
  */
 export class MemoryCacheTier implements CacheTierInterface {
-	private cache = new Map<string, CacheEntry>();
-	private maxSize = 1000;
+	private readonly cache = new Map<string, CacheEntry>();
+	private readonly maxSize = DEFAULT_MAX_CACHE_SIZE;
 	private stats: CacheStats = { requests: 0, hits: 0, totalLoadTime: 0 };
 	private readonly LOG_PREFIX = "memory-cache";
 
@@ -56,10 +58,10 @@ export class MemoryCacheTier implements CacheTierInterface {
 	enumerateEntities(): CachedEntityEntry[] {
 		const entries: CachedEntityEntry[] = [];
 		for (const [key, entry] of this.cache) {
-			const [entityType, entityId] = key.split(":") as [
-				StaticEntityType,
-				string,
-			];
+			const separatorIndex = key.indexOf(":");
+			if (separatorIndex === -1) continue;
+			const entityType = toStaticEntityType(key.slice(0, separatorIndex));
+			const entityId = key.slice(separatorIndex + 1);
 			entries.push({
 				entityType,
 				entityId,
@@ -94,7 +96,7 @@ export class MemoryCacheTier implements CacheTierInterface {
 			oldestKey = key;
 		}
 
-		if (oldestKey) {
+		if (oldestKey !== null) {
 			this.cache.delete(oldestKey);
 			logger.debug(this.LOG_PREFIX, "Evicted LRU entry from memory cache", {
 				key: oldestKey,
@@ -106,6 +108,7 @@ export class MemoryCacheTier implements CacheTierInterface {
 		entityType: StaticEntityType,
 		id: string,
 	): Promise<StaticDataResult> {
+		await Promise.resolve();
 		const startTime = Date.now();
 		this.stats.requests++;
 
@@ -135,6 +138,7 @@ export class MemoryCacheTier implements CacheTierInterface {
 	}
 
 	async has(entityType: StaticEntityType, id: string): Promise<boolean> {
+		await Promise.resolve();
 		const key = this.getKey(entityType, id);
 		return this.cache.has(key);
 	}
@@ -144,6 +148,7 @@ export class MemoryCacheTier implements CacheTierInterface {
 		id: string,
 		data: unknown,
 	): Promise<void> {
+		await Promise.resolve();
 		const key = this.getKey(entityType, id);
 		this.cache.set(key, {
 			data,
@@ -155,6 +160,7 @@ export class MemoryCacheTier implements CacheTierInterface {
 	}
 
 	async clear(): Promise<void> {
+		await Promise.resolve();
 		this.cache.clear();
 		this.stats = { requests: 0, hits: 0, totalLoadTime: 0 };
 	}
@@ -164,6 +170,7 @@ export class MemoryCacheTier implements CacheTierInterface {
 		hits: number;
 		averageLoadTime: number;
 	}> {
+		await Promise.resolve();
 		return calculateCacheStats(this.stats);
 	}
 }

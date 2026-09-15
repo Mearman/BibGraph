@@ -12,11 +12,17 @@ import type {
   TopicsFilters,
   Work,
 } from "@bibgraph/types";
+import { authorSchema, AutocompleteBaseResponseSchema, topicSchema, workSchema } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
 
-import { OpenAlexBaseClient } from "../client";
+import type { OpenAlexBaseClient } from "../client";
 import { isValidWikidata, normalizeExternalId } from "../utils/id-resolver";
 import { buildFilterString } from "../utils/query-builder";
+
+/**
+Maximum number of topics returned by a random sample
+ */
+const MAX_RANDOM_SAMPLE_SIZE = 50;
 
 /**
  * Search options for topics API
@@ -34,7 +40,7 @@ export interface TopicSearchOptions {
  * Topics represent research areas, subjects, and academic fields
  */
 export class TopicsApi {
-  private client: OpenAlexBaseClient;
+  private readonly client: OpenAlexBaseClient;
 
   constructor(client: OpenAlexBaseClient) {
     this.client = client;
@@ -64,12 +70,13 @@ export class TopicsApi {
     // Check if this might be a Wikidata ID and normalize it
     if (isValidWikidata(id)) {
       const normalizedId = normalizeExternalId(id, "wikidata");
-      if (normalizedId) {
+      if (normalizedId !== null) {
         // The normalizer returns Q notation, but OpenAlex API expects wikidata: prefix
         const wikidataFormat = normalizedId.startsWith("Q")
           ? `wikidata:${normalizedId}`
           : normalizedId;
         return this.client.getById<Topic>({
+          schema: topicSchema,
           endpoint: "topics",
           id: wikidataFormat,
           params,
@@ -80,10 +87,10 @@ export class TopicsApi {
 
     // Handle case where ID is already in wikidata: format
     if (id.startsWith("wikidata:Q")) {
-      return this.client.getById<Topic>({ endpoint: "topics", id, params });
+      return this.client.getById<Topic>({ schema: topicSchema, endpoint: "topics", id, params });
     }
 
-    return this.client.getById<Topic>({ endpoint: "topics", id, params });
+    return this.client.getById<Topic>({ schema: topicSchema, endpoint: "topics", id, params });
   }
 
   /**
@@ -104,7 +111,7 @@ export class TopicsApi {
   async getMultiple(
     params: QueryParams & TopicsFilters = {},
   ): Promise<OpenAlexResponse<Topic>> {
-    return this.client.getResponse<Topic>("topics", params);
+    return this.client.getResponse<Topic>("topics", params, topicSchema);
   }
 
   /**
@@ -116,12 +123,11 @@ export class TopicsApi {
     params: TopicSearchOptions = {},
   ): Promise<OpenAlexResponse<Topic>> {
     const processedParameters = this.buildQueryParams(params);
-    return this.client.getResponse<Topic>("topics", processedParameters);
+    return this.client.getResponse<Topic>("topics", processedParameters, topicSchema);
   }
 
   /**
    * Build query parameters with proper filter processing
-   * @param options
    */
   private buildQueryParams(options: TopicSearchOptions = {}): QueryParams {
     const { filters, sort, page, per_page, select, ...otherOptions } = options;
@@ -136,7 +142,7 @@ export class TopicsApi {
     }
 
     // Add sort if provided
-    if (sort) {
+    if (sort !== undefined) {
       queryParameters.sort = sort;
     }
 
@@ -211,9 +217,10 @@ export class TopicsApi {
         q: query.trim(),
       };
 
-      const response = await this.client.getResponse<AutocompleteResult>(
+      const response = await this.client.get(
         endpoint,
         queryParameters,
+        AutocompleteBaseResponseSchema,
       );
 
       return response.results.map((result) => ({
@@ -257,8 +264,8 @@ export class TopicsApi {
   ): Promise<OpenAlexResponse<Topic>> {
     return this.getMultiple({
       ...params,
-      sample: Math.min(count, 50),
-      per_page: Math.min(count, 50),
+      sample: Math.min(count, MAX_RANDOM_SAMPLE_SIZE),
+      per_page: Math.min(count, MAX_RANDOM_SAMPLE_SIZE),
     });
   }
 
@@ -275,7 +282,7 @@ export class TopicsApi {
     return this.client.getResponse<Work>("works", {
       ...params,
       filter: `topics.id:${topicId}`,
-    });
+    }, workSchema);
   }
 
   /**
@@ -291,7 +298,7 @@ export class TopicsApi {
     return this.client.getResponse<Author>("authors", {
       ...params,
       filter: `topics.id:${topicId}`,
-    });
+    }, authorSchema);
   }
 
   /**
@@ -305,7 +312,7 @@ export class TopicsApi {
     params: QueryParams = {},
   ): Promise<OpenAlexResponse<Topic>> {
     const filters: TopicsFilters = {};
-    if (fieldId) {
+    if (fieldId !== undefined) {
       filters["field.id"] = fieldId;
     }
 
@@ -326,7 +333,7 @@ export class TopicsApi {
     params: QueryParams = {},
   ): Promise<OpenAlexResponse<Topic>> {
     const filters: TopicsFilters = {};
-    if (domainId) {
+    if (domainId !== undefined) {
       filters["domain.id"] = domainId;
     }
 
@@ -362,7 +369,7 @@ export class TopicsApi {
     params: QueryParams & TopicsFilters = {},
     batchSize = 200,
   ): AsyncGenerator<Topic[], void, unknown> {
-    yield* this.client.stream<Topic>("topics", params, batchSize);
+    yield* this.client.stream<Topic>("topics", params,topicSchema,  batchSize);
   }
 
   /**
@@ -375,6 +382,6 @@ export class TopicsApi {
     params: QueryParams & TopicsFilters = {},
     maxResults?: number,
   ): Promise<Topic[]> {
-    return this.client.getAll<Topic>("topics", params, maxResults);
+    return this.client.getAll<Topic>("topics", params,topicSchema,  maxResults);
   }
 }

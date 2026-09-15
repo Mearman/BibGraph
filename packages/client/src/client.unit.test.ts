@@ -4,7 +4,9 @@
  * query parameter building, and response parsing
  */
 
-// Mock fetch BEFORE any imports
+import { beforeEach,describe, expect, it, vi } from "vitest";
+
+// Mock fetch BEFORE any imports that might capture a reference to it
 const mockFetch = vi.fn();
 
 // Mock global fetch using Object.defineProperty for Node.js compatibility
@@ -14,11 +16,28 @@ Object.defineProperty(global, "fetch", {
 });
 
 import type { OpenAlexResponse } from "@bibgraph/types";
-import { beforeEach,describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
+import type { ValidationSchema } from "./client";
 import { OpenAlexBaseClient } from "./client";
 import type { OpenAlexClientConfig } from "./internal/client-config";
 import { OpenAlexApiError } from "./internal/errors";
+
+/**
+ * Test-only schema that accepts any parsed value, for exercising the client's fetch plumbing without constraining mock payloads to a real entity schema
+ */
+const passthroughSchema = <T = unknown>(): ValidationSchema<T> => ({
+  parse: (data: unknown) => data as T,
+});
+
+
+const DEFAULT_DAILY_REQUEST_LIMIT = 100_000;
+const RETRY_TEST_TIMEOUT_MS = 10_000;
+const EXPECTED_CALLS_WITH_TWO_RETRIES = 3;
+const EXPECTED_CALLS_AFTER_SECOND_FAILURE = 6;
+const GET_ALL_TEST_BATCH_SIZE = 3;
+const RAPID_REQUEST_COUNT = 10;
+const LARGE_SELECT_FIELD_COUNT = 100;
 
 describe("OpenAlexBaseClient", () => {
   let client: OpenAlexBaseClient;
@@ -49,7 +68,7 @@ describe("OpenAlexBaseClient", () => {
     mockResponse = createMockResponse();
 
     // Default mock - create a new response for each call
-    mockFetch.mockImplementation(() => Promise.resolve(createMockResponse()));
+    mockFetch.mockImplementation(() => createMockResponse());
 
     client = new OpenAlexBaseClient();
   });
@@ -60,7 +79,7 @@ describe("OpenAlexBaseClient", () => {
       const rateLimitStatus = defaultClient.getRateLimitStatus();
 
       expect(rateLimitStatus.requestsToday).toBe(0);
-      expect(rateLimitStatus.requestsRemaining).toBe(100_000);
+      expect(rateLimitStatus.requestsRemaining).toBe(DEFAULT_DAILY_REQUEST_LIMIT);
       expect(rateLimitStatus.dailyResetTime).toBeInstanceOf(Date);
     });
 
@@ -79,7 +98,7 @@ describe("OpenAlexBaseClient", () => {
 
       const customClient = new OpenAlexBaseClient(config);
 
-      await customClient.get("works");
+      await customClient.get("works", {}, passthroughSchema());
 
       // Verify the custom baseUrl and userEmail are used
       expect(mockFetch).toHaveBeenCalledWith(
@@ -107,7 +126,7 @@ describe("OpenAlexBaseClient", () => {
       const customClient = new OpenAlexBaseClient(config);
       const status = customClient.getRateLimitStatus();
 
-      expect(status.requestsRemaining).toBe(100_000); // Uses default requestsPerDay
+      expect(status.requestsRemaining).toBe(DEFAULT_DAILY_REQUEST_LIMIT); // Uses default requestsPerDay
     });
 
     it("should update configuration dynamically", async () => {
@@ -118,7 +137,7 @@ describe("OpenAlexBaseClient", () => {
         },
       });
 
-      await client.get("authors");
+      await client.get("authors", {}, passthroughSchema());
 
       const callUrl = mockFetch.mock.calls[0][0] as string;
       expect(callUrl).toContain("mailto=updated%40example.com");
@@ -127,7 +146,7 @@ describe("OpenAlexBaseClient", () => {
 
   describe("URL Building and Query Parameters", () => {
     it("should build basic URL correctly", async () => {
-      await client.get("works");
+      await client.get("works", {}, passthroughSchema());
 
       expect(mockFetch).toHaveBeenCalledWith(
         "https://api.openalex.org/works",
@@ -143,7 +162,7 @@ describe("OpenAlexBaseClient", () => {
     it("should include user email in query parameters when configured", async () => {
       client.updateConfig({ userEmail: "researcher@university.edu" });
 
-      await client.get("works");
+      await client.get("works", {}, passthroughSchema());
 
       const callUrl = mockFetch.mock.calls[0][0] as string;
       expect(callUrl).toContain("mailto=researcher%40university.edu");
@@ -157,7 +176,7 @@ describe("OpenAlexBaseClient", () => {
         select: ["id", "display_name", "publication_year"],
         sample: 100,
         seed: 42,
-      });
+      }, passthroughSchema());
 
       const callUrl = mockFetch.mock.calls[0][0] as string;
       const url = new URL(callUrl);
@@ -178,7 +197,7 @@ describe("OpenAlexBaseClient", () => {
         per_page: null as unknown as number,
         filter: undefined,
         select: ["id"],
-      });
+      }, passthroughSchema());
 
       const callUrl = mockFetch.mock.calls[0][0] as string;
       const url = new URL(callUrl);
@@ -193,7 +212,7 @@ describe("OpenAlexBaseClient", () => {
       await client.get("works", {
         search: "machine learning & AI",
         filter: 'title.search:"deep learning"',
-      });
+      }, passthroughSchema());
 
       const callUrl = mockFetch.mock.calls[0][0] as string;
       const url = new URL(callUrl);
@@ -209,16 +228,16 @@ describe("OpenAlexBaseClient", () => {
     it("should return accurate initial rate limit status", () => {
       const status = client.getRateLimitStatus();
       expect(status.requestsToday).toBe(0);
-      expect(status.requestsRemaining).toBe(100_000);
+      expect(status.requestsRemaining).toBe(DEFAULT_DAILY_REQUEST_LIMIT);
       expect(status.dailyResetTime).toBeInstanceOf(Date);
     });
 
     it("should track requests made", async () => {
-      await client.get("works");
+      await client.get("works", {}, passthroughSchema());
 
       const status = client.getRateLimitStatus();
       expect(status.requestsToday).toBe(1);
-      expect(status.requestsRemaining).toBe(99_999);
+      expect(status.requestsRemaining).toBe(DEFAULT_DAILY_REQUEST_LIMIT - 1);
     });
   });
 
@@ -230,7 +249,7 @@ describe("OpenAlexBaseClient", () => {
       );
       mockFetch.mockResolvedValueOnce(errorResponse);
 
-      await expect(client.get("works/W999999999")).rejects.toThrow(
+      await expect(client.get("works/W999999999", {}, passthroughSchema())).rejects.toThrow(
         OpenAlexApiError,
       );
       expect(mockFetch).toHaveBeenCalledTimes(1); // No retries for 404
@@ -243,7 +262,7 @@ describe("OpenAlexBaseClient", () => {
         ),
       );
 
-      await expect(client.get("works/W999999999")).rejects.toThrow(
+      await expect(client.get("works/W999999999", {}, passthroughSchema())).rejects.toThrow(
         "Work not found",
       );
     });
@@ -264,11 +283,11 @@ describe("OpenAlexBaseClient", () => {
         .mockResolvedValueOnce(errorResponse)
         .mockResolvedValueOnce(mockResponse);
 
-      const result = await client.get("works");
+      const result = await client.get("works", {}, passthroughSchema());
 
-      expect(mockFetch).toHaveBeenCalledTimes(3); // Original + 2 retries
+      expect(mockFetch).toHaveBeenCalledTimes(EXPECTED_CALLS_WITH_TWO_RETRIES); // Original + 2 retries
       expect(result).toBeDefined();
-    }, 10_000); // 10 second timeout
+    }, RETRY_TEST_TIMEOUT_MS); // 10 second timeout
 
     it("should throw OpenAlexApiError after max retries for server errors", async () => {
       const errorResponse = Response.json(
@@ -281,9 +300,9 @@ describe("OpenAlexBaseClient", () => {
       mockFetch.mockResolvedValue(errorResponse);
       client = new OpenAlexBaseClient({ retries: 1, retryDelay: 1 });
 
-      await expect(client.get("works")).rejects.toThrow(OpenAlexApiError);
-      expect(mockFetch).toHaveBeenCalledTimes(2); // Original + 1 retry
-    }, 10_000); // 10 second timeout
+      await expect(client.get("works", {}, passthroughSchema())).rejects.toThrow(OpenAlexApiError);
+      expect(mockFetch).toHaveBeenCalledTimes(EXPECTED_CALLS_WITH_TWO_RETRIES - 1); // Original + 1 retry
+    }, RETRY_TEST_TIMEOUT_MS); // 10 second timeout
 
     it("should handle network errors with retries", async () => {
       const networkError = new Error("Network error");
@@ -292,9 +311,9 @@ describe("OpenAlexBaseClient", () => {
         .mockRejectedValueOnce(networkError)
         .mockResolvedValueOnce(mockResponse);
 
-      const result = await client.get("works");
+      const result = await client.get("works", {}, passthroughSchema());
 
-      expect(mockFetch).toHaveBeenCalledTimes(3); // Original + 2 retries
+      expect(mockFetch).toHaveBeenCalledTimes(EXPECTED_CALLS_WITH_TWO_RETRIES); // Original + 2 retries
       expect(result).toBeDefined();
     });
 
@@ -304,14 +323,14 @@ describe("OpenAlexBaseClient", () => {
 
       client = new OpenAlexBaseClient({ retries: 2, retryDelay: 10 }); // Reduce retry delay for faster test
 
-      await expect(client.get("works")).rejects.toThrow(OpenAlexApiError);
-      expect(mockFetch).toHaveBeenCalledTimes(3); // Original + 2 retries
+      await expect(client.get("works", {}, passthroughSchema())).rejects.toThrow(OpenAlexApiError);
+      expect(mockFetch).toHaveBeenCalledTimes(EXPECTED_CALLS_WITH_TWO_RETRIES); // Original + 2 retries
 
       // Reset mock for second test
       mockFetch.mockRejectedValue(networkError);
-      await expect(client.get("works")).rejects.toThrow(/Network error/);
-      expect(mockFetch).toHaveBeenCalledTimes(6); // Another 3 calls
-    }, 10_000); // 10 second timeout for this test
+      await expect(client.get("works", {}, passthroughSchema())).rejects.toThrow(/Network error/);
+      expect(mockFetch).toHaveBeenCalledTimes(EXPECTED_CALLS_AFTER_SECOND_FAILURE); // Another 3 calls
+    }, RETRY_TEST_TIMEOUT_MS); // 10 second timeout for this test
 
     it("should handle timeout errors", async () => {
       // Mock AbortError which is thrown on timeout
@@ -321,11 +340,11 @@ describe("OpenAlexBaseClient", () => {
       );
       mockFetch.mockRejectedValueOnce(timeoutError);
 
-      await expect(client.get("works")).rejects.toThrow(OpenAlexApiError);
+      await expect(client.get("works", {}, passthroughSchema())).rejects.toThrow(OpenAlexApiError);
 
       // Reset mock for second test
       mockFetch.mockRejectedValueOnce(timeoutError);
-      await expect(client.get("works")).rejects.toThrow(
+      await expect(client.get("works", {}, passthroughSchema())).rejects.toThrow(
         /Request timeout after/,
       );
     });
@@ -340,7 +359,7 @@ describe("OpenAlexBaseClient", () => {
       );
       mockFetch.mockResolvedValueOnce(errorResponse);
 
-      const promise = client.get("works");
+      const promise = client.get("works", {}, passthroughSchema());
       await expect(promise).rejects.toBeInstanceOf(OpenAlexApiError);
       await expect(promise).rejects.toMatchObject({
         message: "Invalid filter parameter",
@@ -355,7 +374,7 @@ describe("OpenAlexBaseClient", () => {
       });
       mockFetch.mockResolvedValueOnce(errorResponse);
 
-      const promise = client.get("works");
+      const promise = client.get("works", {}, passthroughSchema());
       await expect(promise).rejects.toBeInstanceOf(OpenAlexApiError);
       await expect(promise).rejects.toMatchObject({
         message: "HTTP 400 Bad Request",
@@ -372,7 +391,7 @@ describe("OpenAlexBaseClient", () => {
       );
       mockFetch.mockResolvedValueOnce(clientError);
 
-      await expect(client.get("works")).rejects.toThrow(OpenAlexApiError);
+      await expect(client.get("works", {}, passthroughSchema())).rejects.toThrow(OpenAlexApiError);
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
@@ -382,7 +401,7 @@ describe("OpenAlexBaseClient", () => {
       const networkError = new Error("Network error");
       mockFetch.mockRejectedValueOnce(networkError);
 
-      await expect(client.get("works")).rejects.toThrow(OpenAlexApiError);
+      await expect(client.get("works", {}, passthroughSchema())).rejects.toThrow(OpenAlexApiError);
       expect(mockFetch).toHaveBeenCalledTimes(1); // No retries
     });
   });
@@ -399,7 +418,7 @@ describe("OpenAlexBaseClient", () => {
       });
       mockFetch.mockResolvedValueOnce(jsonResponse);
 
-      const result = await client.get("works");
+      const result = await client.get("works", {}, passthroughSchema());
       expect(result).toEqual(testData);
     });
 
@@ -411,7 +430,7 @@ describe("OpenAlexBaseClient", () => {
       mockFetch.mockResolvedValueOnce(emptyResponse);
 
       // This should throw an error when trying to parse empty string as JSON
-      await expect(client.get("works")).rejects.toThrow();
+      await expect(client.get("works", {}, passthroughSchema())).rejects.toThrow();
     });
 
     it("should handle malformed JSON responses", async () => {
@@ -421,13 +440,13 @@ describe("OpenAlexBaseClient", () => {
       });
       mockFetch.mockResolvedValueOnce(malformedResponse);
 
-      await expect(client.get("works")).rejects.toThrow();
+      await expect(client.get("works", {}, passthroughSchema())).rejects.toThrow();
     });
   });
 
   describe("HTTP Methods", () => {
     it("should make GET requests for get method", async () => {
-      await client.get("works");
+      await client.get("works", {}, passthroughSchema());
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining("/works"),
@@ -452,7 +471,7 @@ describe("OpenAlexBaseClient", () => {
         }),
       );
 
-      const result = await client.getResponse("works");
+      const result = await client.getResponse("works", {}, z.unknown());
       expect(result).toEqual(responseData);
     });
 
@@ -464,8 +483,13 @@ describe("OpenAlexBaseClient", () => {
         }),
       );
 
-      const result = await client.getById("works", "W123", {
+      const result = await client.getById({
+        endpoint: "works",
+        id: "W123",
+        params: {
         select: ["id", "display_name"],
+      },
+        schema: passthroughSchema(),
       });
 
       expect(result).toEqual(workData);
@@ -485,7 +509,12 @@ describe("OpenAlexBaseClient", () => {
         }),
       );
 
-      await client.getById("works", "W123/special-chars", {});
+      await client.getById({
+        endpoint: "works",
+        id: "W123/special-chars",
+        params: {},
+        schema: passthroughSchema(),
+      });
 
       const callUrl = mockFetch.mock.calls[0][0] as string;
       expect(callUrl).toContain("/works/W123%2Fspecial-chars");
@@ -506,7 +535,7 @@ describe("OpenAlexBaseClient", () => {
         }),
       );
 
-      const results: { id: string }[][] = await Array.fromAsync(client.stream<{ id: string }>("works", {}, 2));
+      const results: unknown[][] = await Array.fromAsync(client.stream("works", {}, z.unknown(), 2));
 
       // Only one batch since cursor extraction is not implemented
       expect(results).toHaveLength(1);
@@ -528,7 +557,7 @@ describe("OpenAlexBaseClient", () => {
         }),
       );
 
-      const results = await client.getAll("works", {}, 3);
+      const results = await client.getAll("works", {}, z.unknown(), GET_ALL_TEST_BATCH_SIZE);
 
       // Only first batch results since streaming stops
       expect(results).toHaveLength(2);
@@ -548,7 +577,7 @@ describe("OpenAlexBaseClient", () => {
         }),
       );
 
-      const results = await client.getAll("works");
+      const results = await client.getAll("works", {}, z.unknown());
 
       // Only first batch results since streaming stops when no cursor
       expect(results).toHaveLength(2);
@@ -558,7 +587,7 @@ describe("OpenAlexBaseClient", () => {
 
   describe("Request Headers and User Agent", () => {
     it("should set correct default headers", async () => {
-      await client.get("works");
+      await client.get("works", {}, passthroughSchema());
 
       const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(options.headers).toMatchObject({
@@ -571,13 +600,13 @@ describe("OpenAlexBaseClient", () => {
   describe("Memory and Performance", () => {
     it("should handle rapid successive requests without memory leaks", async () => {
       // Make many requests in succession
-      const promises = Array.from({ length: 10 }, (_, index) =>
-        client.get(`works${String(index)}`),
+      const promises = Array.from({ length: RAPID_REQUEST_COUNT }, async (_, index) =>
+        client.get(`works${String(index)}`, {}, passthroughSchema()),
       );
       const results = await Promise.all(promises);
 
-      expect(results).toHaveLength(10);
-      expect(mockFetch).toHaveBeenCalledTimes(10);
+      expect(results).toHaveLength(RAPID_REQUEST_COUNT);
+      expect(mockFetch).toHaveBeenCalledTimes(RAPID_REQUEST_COUNT);
     });
 
     it("should handle very large query parameters efficiently", async () => {
@@ -601,7 +630,7 @@ describe("OpenAlexBaseClient", () => {
       );
 
       await expect(
-        client.get("works", { select: largeSelect }),
+        client.get("works", { select: largeSelect }, passthroughSchema()),
       ).rejects.toThrow(OpenAlexApiError);
 
       const callUrl = mockFetch.mock.calls[0][0] as string;
@@ -610,7 +639,7 @@ describe("OpenAlexBaseClient", () => {
 
       expect(selectParameter).toContain("field0,field1");
       expect(selectParameter).toContain("field99");
-      expect(selectParameter?.split(",").length).toBe(100);
+      expect(selectParameter?.split(",").length).toBe(LARGE_SELECT_FIELD_COUNT);
     });
   });
 
@@ -628,14 +657,14 @@ describe("OpenAlexBaseClient", () => {
       mockFetch.mockResolvedValueOnce(responseWithoutContentType);
       mockFetch.mockResolvedValueOnce(responseWithoutContentType2);
 
-      await expect(client.get("works")).rejects.toThrow(OpenAlexApiError);
-      await expect(client.get("works")).rejects.toThrow(
+      await expect(client.get("works", {}, passthroughSchema())).rejects.toThrow(OpenAlexApiError);
+      await expect(client.get("works", {}, passthroughSchema())).rejects.toThrow(
         "Expected JSON response but got text/plain",
       );
     });
 
     it("should handle requests with empty endpoint", async () => {
-      await client.get("");
+      await client.get("", {}, passthroughSchema());
 
       const callUrl = mockFetch.mock.calls[0][0] as string;
       expect(callUrl).toBe("https://api.openalex.org/");
@@ -647,10 +676,10 @@ describe("OpenAlexBaseClient", () => {
 
       client = new OpenAlexBaseClient({ retries: 0 });
 
-      const promise = client.get("works");
+      const promise = client.get("works", {}, passthroughSchema());
       await expect(promise).rejects.toBeInstanceOf(OpenAlexApiError);
       await expect(promise).rejects.toMatchObject({
-        message: expect.stringContaining("Failed to fetch"),
+        message: expect.stringContaining("Failed to fetch") as unknown,
       });
     });
   });

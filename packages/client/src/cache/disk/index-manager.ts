@@ -19,8 +19,6 @@ export const INDEX_FILE_NAME = "index.json";
 /**
  * Compare two DirectoryIndex objects to determine if content has changed
  * Excludes the lastUpdated field from comparison
- * @param oldIndex
- * @param newIndex
  */
 export const indexContentEquals = (oldIndex: DirectoryIndex, newIndex: DirectoryIndex): boolean => {
 	// Compare files
@@ -39,8 +37,8 @@ export const indexContentEquals = (oldIndex: DirectoryIndex, newIndex: Directory
 			return false;
 		}
 
-		const oldFile = oldFiles[oldFileKey] as FileEntry;
-		const newFile = newFiles[newFileKeys[index]] as FileEntry;
+		const oldFile = oldFiles[oldFileKey];
+		const newFile = newFiles[newFileKeys[index]];
 
 		// Compare all FileEntry fields
 		if (
@@ -74,8 +72,8 @@ export const indexContentEquals = (oldIndex: DirectoryIndex, newIndex: Directory
 
 		// Compare directory entry fields
 		if (
-			oldDir?.$ref !== newDir?.$ref ||
-			oldDir?.lastModified !== newDir?.lastModified
+			oldDir.$ref !== newDir.$ref ||
+			oldDir.lastModified !== newDir.lastModified
 		) {
 			return false;
 		}
@@ -85,72 +83,21 @@ export const indexContentEquals = (oldIndex: DirectoryIndex, newIndex: Directory
 };
 
 /**
- * Update hierarchical index.json files from the saved file up to the root
- * @param entityInfo
- * @param filePaths
- * @param filePaths.dataFile
- * @param filePaths.directoryPath
- * @param data
- * @param basePath
- * @param skipContainingDirectory
+ * File paths for the data file just written and its containing directory.
  */
-export const updateHierarchicalIndexes = async (
-	entityInfo: EntityInfo,
-	filePaths: { dataFile: string; directoryPath: string },
-	data: InterceptedData,
-	basePath: string,
-	skipContainingDirectory = true,
-): Promise<void> => {
-	await NodeModules.initializeNodeModules();
-	const { path } = NodeModules.getNodeModules();
-
-	try {
-		// Start from the immediate directory containing the data file
-		let currentPath = filePaths.directoryPath;
-		if (skipContainingDirectory) {
-			currentPath = path.dirname(currentPath);
-		}
-		const resolvedBasePath = path.resolve(basePath);
-
-		while (currentPath?.startsWith(resolvedBasePath)) {
-			await updateDirectoryIndex(
-				currentPath,
-				entityInfo,
-				filePaths,
-				data,
-				basePath,
-			);
-
-			// Move up one directory level
-			const parentPath = path.dirname(currentPath);
-			if (parentPath === currentPath || !parentPath.startsWith(resolvedBasePath)) {
-				break;
-			}
-			currentPath = parentPath;
-		}
-	} catch (error) {
-		logError(logger, "Failed to update hierarchical indexes", error);
-		throw new Error(
-			`Index update failed: ${error instanceof Error ? error.message : UNKNOWN_ERROR_MESSAGE}`,
-		);
-	}
-};
+interface DataFilePaths {
+	dataFile: string;
+	directoryPath: string;
+}
 
 /**
  * Update a single directory's index.json file
- * @param directoryPath
- * @param entityInfo
- * @param filePaths
- * @param filePaths.dataFile
- * @param filePaths.directoryPath
- * @param data
- * @param basePath
  */
 const updateDirectoryIndex = async (
 	directoryPath: string,
-	entityInfo: EntityInfo,
-	filePaths: { dataFile: string; directoryPath: string },
-	data: InterceptedData,
+	entityInfo: Readonly<EntityInfo>,
+	filePaths: Readonly<DataFilePaths>,
+	data: Readonly<InterceptedData>,
 	basePath: string,
 ): Promise<void> => {
 	await NodeModules.initializeNodeModules();
@@ -199,8 +146,8 @@ const updateDirectoryIndex = async (
 		// Handle containing directory case
 		if (
 			isContainingDirectory &&
-			entityInfo.isQueryResponse &&
-			entityInfo.queryParams
+			entityInfo.isQueryResponse === true &&
+			entityInfo.queryParams !== undefined
 		) {
 			const filename = path.basename(filePaths.dataFile, ".json");
 			indexData.files ??= {};
@@ -227,11 +174,11 @@ const updateDirectoryIndex = async (
 
 		// Handle parent directory case
 		if (!isContainingDirectory) {
-			const relativePath = path.relative(
+			const childRelativePath = path.relative(
 				directoryPath,
 				filePaths.directoryPath,
 			);
-			const childDirName = relativePath.split(path.sep)[0];
+			const childDirName = childRelativePath.split(path.sep)[0];
 			if (childDirName && childDirName !== ".") {
 				indexData.directories ??= {};
 				indexData.directories[childDirName] = {
@@ -272,10 +219,52 @@ const updateDirectoryIndex = async (
 };
 
 /**
+ * Update hierarchical index.json files from the saved file up to the root
+ */
+export const updateHierarchicalIndexes = async (
+	entityInfo: Readonly<EntityInfo>,
+	filePaths: Readonly<DataFilePaths>,
+	data: Readonly<InterceptedData>,
+	basePath: string,
+	skipContainingDirectory = true,
+): Promise<void> => {
+	await NodeModules.initializeNodeModules();
+	const { path } = NodeModules.getNodeModules();
+
+	try {
+		// Start from the immediate directory containing the data file
+		let currentPath = filePaths.directoryPath;
+		if (skipContainingDirectory) {
+			currentPath = path.dirname(currentPath);
+		}
+		const resolvedBasePath = path.resolve(basePath);
+
+		while (currentPath.startsWith(resolvedBasePath)) {
+			await updateDirectoryIndex(
+				currentPath,
+				entityInfo,
+				filePaths,
+				data,
+				basePath,
+			);
+
+			// Move up one directory level
+			const parentPath = path.dirname(currentPath);
+			if (parentPath === currentPath || !parentPath.startsWith(resolvedBasePath)) {
+				break;
+			}
+			currentPath = parentPath;
+		}
+	} catch (error) {
+		logError(logger, "Failed to update hierarchical indexes", error);
+		throw new Error(
+			`Index update failed: ${error instanceof Error ? error.message : UNKNOWN_ERROR_MESSAGE}`,
+		);
+	}
+};
+
+/**
  * Read or create directory index at specified path
- * @param directoryPath
- * @param basePath
- * @param _basePath
  */
 export const readOrCreateDirectoryIndex = async (
 	directoryPath: string,
@@ -312,10 +301,6 @@ export const readOrCreateDirectoryIndex = async (
 
 /**
  * Create a basic single-URL FileEntry
- * @param baseName
- * @param url
- * @param lastRetrieved
- * @param contentHash
  */
 export const createBasicFileEntry = (
 	baseName: string,

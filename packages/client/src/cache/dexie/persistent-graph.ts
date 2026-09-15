@@ -4,7 +4,6 @@
  * Combines in-memory graph operations with Dexie persistence for fast
  * traversal and durable storage. Implements write-through caching:
  * all mutations immediately persist to IndexedDB.
- * @module cache/dexie/persistent-graph
  */
 
 import {
@@ -51,10 +50,10 @@ import {
  * to IndexedDB immediately.
  */
 export class PersistentGraph {
-  private tier: GraphIndexTier;
+  private readonly tier: GraphIndexTier;
   private hydrationState: HydrationState = 'not_started';
   private hydrationPromise: Promise<void> | null = null;
-  private cache: GraphCache = {
+  private readonly cache: GraphCache = {
     nodes: new Map(),
     edges: new Map(),
     outboundEdges: new Map(),
@@ -184,7 +183,7 @@ export class PersistentGraph {
     }
 
     const shouldUpgrade = shouldUpgradeCompleteness(existing.completeness, completeness);
-    if (!shouldUpgrade && !label && !metadata) {
+    if (!shouldUpgrade && (label === undefined || label === "") && !metadata) {
       return;
     }
 
@@ -283,7 +282,7 @@ export class PersistentGraph {
       .map((id) => this.cache.edges.get(id))
       .filter((e): e is GraphEdgeRecord => e !== undefined);
 
-    if (type) {
+    if (type !== undefined) {
       edges = edges.filter((e) => e.type === type);
     }
 
@@ -308,7 +307,7 @@ export class PersistentGraph {
       .map((id) => this.cache.edges.get(id))
       .filter((e): e is GraphEdgeRecord => e !== undefined);
 
-    if (type) {
+    if (type !== undefined) {
       edges = edges.filter((e) => e.type === type);
     }
 
@@ -355,7 +354,7 @@ export class PersistentGraph {
     }
 
     let result = [...neighbors];
-    if (limit && limit > 0) {
+    if (limit !== undefined && limit > 0) {
       result = result.slice(0, limit);
     }
 
@@ -385,7 +384,7 @@ export class PersistentGraph {
     return applyEdgeFilter([...this.cache.edges.values()], filter);
   }
 
-  getSubgraph(nodeIds: string[]): SubgraphResult {
+  getSubgraph(nodeIds: readonly string[]): SubgraphResult {
     const nodeSet = new Set(nodeIds);
     const nodes: GraphNodeRecord[] = [];
     const edges: GraphEdgeRecord[] = [];
@@ -442,7 +441,7 @@ export class PersistentGraph {
   // Bulk Operations
   // ===========================================================================
 
-  async addNodes(inputs: GraphNodeInput[]): Promise<void> {
+  async addNodes(inputs: readonly GraphNodeInput[]): Promise<void> {
     await this.ensureHydrated();
 
     const newInputs: GraphNodeInput[] = [];
@@ -469,7 +468,7 @@ export class PersistentGraph {
     logger.debug(LOG_PREFIX, 'Bulk nodes added', { count: newInputs.length });
   }
 
-  async addEdges(inputs: GraphEdgeInput[]): Promise<number> {
+  async addEdges(inputs: readonly GraphEdgeInput[]): Promise<number> {
     await this.ensureHydrated();
 
     const newInputs = inputs.filter((input) => {
@@ -512,9 +511,7 @@ export class PersistentGraph {
 let persistentGraphInstance: PersistentGraph | null = null;
 
 export const getPersistentGraph = (): PersistentGraph => {
-  if (!persistentGraphInstance) {
-    persistentGraphInstance = new PersistentGraph();
-  }
+  persistentGraphInstance ??= new PersistentGraph();
   return persistentGraphInstance;
 };
 

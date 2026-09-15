@@ -19,7 +19,6 @@ const COMPLETENESS_ORDER: Record<CompletenessStatus, number> = {
 /**
  * Check if completeness should be upgraded from current to proposed status.
  * Only allows upgrades: stub → partial → full (never downgrades)
- *
  * @param current - The current completeness status
  * @param proposed - The proposed new completeness status
  * @returns true if proposed is higher than current

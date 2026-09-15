@@ -24,7 +24,6 @@ export const buildInstitutionQueryParams = (options: InstitutionSearchOptions & 
   // Support both 'filters' (plural) and 'filter' (singular) for test compatibility
   const filtersToProcess = filters ?? filter;
   if (
-    filtersToProcess &&
     typeof filtersToProcess === "object" &&
     Object.keys(filtersToProcess).length > 0
   ) {
@@ -32,10 +31,10 @@ export const buildInstitutionQueryParams = (options: InstitutionSearchOptions & 
   }
 
   // Add other parameters
-  if (sort) queryParameters.sort = sort;
-  if (page) queryParameters.page = page;
-  if (per_page) queryParameters.per_page = per_page;
-  if (select) queryParameters.select = select;
+  if (sort !== undefined) queryParameters.sort = sort;
+  if (page !== undefined) queryParameters.page = page;
+  if (per_page !== undefined) queryParameters.per_page = per_page;
+  if (select !== undefined) queryParameters.select = select;
 
   return queryParameters;
 };

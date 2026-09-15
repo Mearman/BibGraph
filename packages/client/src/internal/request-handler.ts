@@ -1,9 +1,7 @@
-import { hostnameMatches } from "@bibgraph/utils";
 /**
- * Request Handler Utilities
- * Handles HTTP request execution, retries, rate limiting, and error handling
+ * Request Handler Utilities Handles HTTP request execution, retries, rate limiting, and error handling
  */
-import { logger } from "@bibgraph/utils";
+import { hostnameMatches, logger } from "@bibgraph/utils";
 
 import type { FullyConfiguredClient, RateLimitState } from "./client-config";
 import { isTestEnvironment } from "./environment-detection";
@@ -11,16 +9,30 @@ import { OpenAlexRateLimitError } from "./errors";
 import { calculateRetryDelay, RETRY_CONFIG } from "./rate-limit";
 
 /**
+Milliseconds in one second, used to convert second-denominated values
+ */
+const MS_PER_SECOND = 1000;
+
+/**
+Maximum characters of a URL shown in a debug/warn log line before truncating
+ */
+const DEBUG_URL_PREVIEW_LENGTH = 100;
+
+/**
+Sentinel retry-count value meaning "use the library's own default retry config"
+ */
+const DEFAULT_RETRY_COUNT = 3;
+
+/**
  * Global cooldown map per host to avoid repeated bursts after 429s
  */
-export const hostCooldowns: Map<string, number> = new Map();
+export const hostCooldowns = new Map<string, number>();
 
 /**
  * Sleep for the specified number of milliseconds
- * @param ms
  */
-export const sleep = (ms: number): Promise<void> => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export const sleep = async (ms: number): Promise<void> => {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
 };
 
 /**
@@ -37,14 +49,13 @@ export const getNextMidnightUTC = (): number => {
 /**
  * Parse Retry-After header value into milliseconds
  * Accepts either integer seconds or HTTP-date formats
- * @param value
  */
 export const parseRetryAfterToMs = (value: string | null | undefined): number | undefined => {
-  if (!value) return undefined;
+  if (value === null || value === undefined || value === "") return undefined;
   // If it's an integer number of seconds
   const seconds = Number(value);
   if (!Number.isNaN(seconds) && Number.isFinite(seconds)) {
-    return Math.max(0, Math.floor(seconds)) * 1000;
+    return Math.max(0, Math.floor(seconds)) * MS_PER_SECOND;
   }
 
   // Try parsing as HTTP-date
@@ -59,10 +70,6 @@ export const parseRetryAfterToMs = (value: string | null | undefined): number | 
 
 /**
  * Log warning when making real API calls in test environment
- * @param root0
- * @param root0.url
- * @param root0.options
- * @param root0.retryCount
  */
 export const logRealApiCall = ({
   url,
@@ -75,8 +82,7 @@ export const logRealApiCall = ({
 }): void => {
   // Only warn if we're actually in a test environment (NODE_ENV=test or VITEST)
   const isTestEnvironment_ = Boolean(
-    globalThis.process?.env?.VITEST ??
-      globalThis.process?.env?.NODE_ENV === "test",
+    process.env.VITEST ?? (process.env.NODE_ENV === "test"),
   );
 
   if (isTestEnvironment_ && hostnameMatches(url, "openalex.org")) {
@@ -84,7 +90,7 @@ export const logRealApiCall = ({
       "client",
       "Making real OpenAlex API call in test environment",
       {
-        url: url.slice(0, 100), // Truncate for readability
+        url: url.slice(0, DEBUG_URL_PREVIEW_LENGTH), // Truncate for readability
         method: options.method ?? "GET",
         retryCount,
       },
@@ -94,16 +100,15 @@ export const logRealApiCall = ({
 
 /**
  * Get maximum retry counts for different error types
- * @param configRetries
  */
 export const getMaxRetries = (configRetries: number): { server: number; network: number } => {
   return {
     server:
-      configRetries === 3
+      configRetries === DEFAULT_RETRY_COUNT
         ? RETRY_CONFIG.server.maxAttempts
         : configRetries,
     network:
-      configRetries === 3
+      configRetries === DEFAULT_RETRY_COUNT
         ? RETRY_CONFIG.network.maxAttempts
         : configRetries,
   };
@@ -111,13 +116,12 @@ export const getMaxRetries = (configRetries: number): { server: number; network:
 
 /**
  * Check if a host is in cooldown period after rate limiting
- * @param url
  */
 export const checkHostCooldown = (url: string): void => {
   try {
     const host = new URL(url).hostname;
     const cooldownUntil = hostCooldowns.get(host);
-    if (cooldownUntil && Date.now() < cooldownUntil) {
+    if (cooldownUntil !== undefined && Date.now() < cooldownUntil) {
       throw new OpenAlexRateLimitError({
         message: `Host ${host} is in cooldown until ${new Date(cooldownUntil).toISOString()}`,
         retryAfter: cooldownUntil - Date.now(),
@@ -134,16 +138,13 @@ export const checkHostCooldown = (url: string): void => {
 
 /**
  * Build request options with default headers
- * @param options
- * @param config
  */
 export const buildRequestOptions = (
   options: RequestInit,
   config: FullyConfiguredClient,
 ): RequestInit => {
   // Filter out signal entirely - we'll handle it separately to prevent test environment errors
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { signal, ...filteredOptions } = options;
+  const { signal: _signal, ...filteredOptions } = options;
 
   return {
     ...filteredOptions,
@@ -160,55 +161,41 @@ export const buildRequestOptions = (
 };
 
 /**
- * Check and enforce rate limits before making a request
- * @param config
- * @param rateLimitState
+ * Check and enforce rate limits before making a request. Pure with respect to the rate-limit state: callers own the mutations (daily counter reset and post-request bookkeeping) on their own state object, so this function only reads, waits, and throws.
  */
 export const enforceRateLimit = async (
   config: FullyConfiguredClient,
-  rateLimitState: RateLimitState,
+  rateLimitState: Readonly<RateLimitState>,
 ): Promise<void> => {
   const now = Date.now();
-
-  // Reset daily counter if it's a new day
-  if (now >= rateLimitState.dailyResetTime) {
-    rateLimitState.requestsToday = 0;
-    rateLimitState.dailyResetTime = getNextMidnightUTC();
-  }
 
   // Check daily limit
   if (rateLimitState.requestsToday >= config.rateLimit.requestsPerDay) {
     const resetTime = new Date(rateLimitState.dailyResetTime);
     throw new OpenAlexRateLimitError({
-      message: `Daily request limit of ${config.rateLimit.requestsPerDay} exceeded. Resets at ${resetTime.toISOString()}`,
+      message: `Daily request limit of ${String(config.rateLimit.requestsPerDay)} exceeded. Resets at ${resetTime.toISOString()}`,
       retryAfter: rateLimitState.dailyResetTime - now,
     });
   }
 
   // Check per-second limit
-  const minTimeBetweenRequests = 1000 / config.rateLimit.requestsPerSecond;
+  const minTimeBetweenRequests = MS_PER_SECOND / config.rateLimit.requestsPerSecond;
   const timeSinceLastRequest = now - rateLimitState.lastRequestTime;
 
   if (timeSinceLastRequest < minTimeBetweenRequests) {
     const waitTime = minTimeBetweenRequests - timeSinceLastRequest;
     await sleep(waitTime);
   }
-
-  // Update state
-  rateLimitState.requestsToday++;
-  rateLimitState.lastRequestTime = Date.now();
 };
 
 /**
  * Set host cooldown after rate limit errors
- * @param url
- * @param retryAfterMs
  */
 export const setHostCooldown = (url: string, retryAfterMs?: number): void => {
   try {
     const host = new URL(url).hostname;
     const DEFAULT_COOLDOWN_MS = 10_000;
-    if (retryAfterMs) {
+    if (retryAfterMs !== undefined) {
       hostCooldowns.set(host, Date.now() + retryAfterMs);
     } else {
       hostCooldowns.set(host, Date.now() + DEFAULT_COOLDOWN_MS);
@@ -220,10 +207,6 @@ export const setHostCooldown = (url: string, retryAfterMs?: number): void => {
 
 /**
  * Create a fetch request with timeout and abort signal handling
- * @param url
- * @param requestOptions
- * @param options
- * @param timeoutMs
  */
 export const createFetchWithTimeout = (
   url: string,
@@ -237,7 +220,7 @@ export const createFetchWithTimeout = (
   }, timeoutMs);
 
   // Handle signal merging - if original request has a signal, abort both
-  if (options.signal && typeof options.signal === 'object' && options.signal !== null) {
+  if (options.signal !== undefined && options.signal !== null) {
     try {
       if (options.signal.aborted) {
         throw new DOMException("The operation was aborted.", "AbortError");
@@ -256,12 +239,7 @@ export const createFetchWithTimeout = (
   };
 
   // Check if we're in a test environment - disable AbortSignal usage entirely in tests
-  if (
-    controller.signal &&
-    typeof controller.signal === 'object' &&
-    controller.signal !== null &&
-    !isTestEnvironment()
-  ) {
+  if (!isTestEnvironment()) {
     // Only use AbortSignal in non-test environments to avoid polyfill compatibility issues
     fetchOptions.signal = controller.signal;
   }
@@ -271,21 +249,14 @@ export const createFetchWithTimeout = (
 
 /**
  * Remove signal from options to prevent AbortSignal issues in retries
- * @param options
  */
 export const getCleanOptions = (options: RequestInit): RequestInit => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { signal, ...cleanOptions } = options;
+  const { signal: _signal, ...cleanOptions } = options;
   return cleanOptions;
 };
 
 /**
  * Calculate retry delay based on configuration and attempt number
- * @param retryCount
- * @param configRetries
- * @param configRetryDelay
- * @param retryConfig
- * @param retryAfterMs
  */
 export const getRetryDelay = (
   retryCount: number,
@@ -294,7 +265,7 @@ export const getRetryDelay = (
   retryConfig: typeof RETRY_CONFIG.server | typeof RETRY_CONFIG.network,
   retryAfterMs?: number,
 ): number => {
-  if (configRetries === 3) {
+  if (configRetries === DEFAULT_RETRY_COUNT) {
     return calculateRetryDelay(retryCount, retryConfig, retryAfterMs);
   }
   return configRetryDelay * Math.pow(2, retryCount);

@@ -5,13 +5,20 @@
  * with multi-tier fallback to the OpenAlex API.
  */
 
+import type { Mock } from "vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   type CachedClientConfig,
   CachedOpenAlexClient,
 } from "../../cached-client";
+import type {
+  CacheStatistics,
+  EnvironmentInfo,
+  StaticDataResult,
+} from "../../internal/static-data-provider";
 import { CacheTier, staticDataProvider } from "../../internal/static-data-provider";
+import type { StaticEntityType } from "../../internal/static-data-utils";
 
 // Mock the static data provider
 vi.mock("../../internal/static-data-provider", () => ({
@@ -34,16 +41,18 @@ vi.mock("../../internal/static-data-provider", () => ({
 // Mock the base client
 vi.mock("../../client", () => ({
   OpenAlexBaseClient: class {
-    constructor(config: any) {
+    constructor(config: unknown) {
       this.config = config;
     }
-    config: any;
-     
-    async getById<T>(_parameters: { endpoint: string; id: string; params?: any }): Promise<T> {
+    config: unknown;
+
+    async getById<T>(_parameters: { endpoint: string; id: string; params?: unknown }): Promise<T> {
+      // Yield to the microtask queue to emulate a real (async) API call before it fails.
+      await Promise.resolve();
       throw new Error("API call failed");
     }
-     
-    updateConfig(_config: any): void {
+
+    updateConfig(_config: unknown): void {
       // Mock implementation
     }
   },
@@ -52,91 +61,91 @@ vi.mock("../../client", () => ({
 // Mock entity APIs
 vi.mock("../../entities/works", () => ({
   WorksApi: class {
-    constructor(client: any) {
+    constructor(client: unknown) {
       this.client = client;
     }
-    client: any;
+    client: unknown;
   },
 }));
 
 vi.mock("../../entities/authors", () => ({
   AuthorsApi: class {
-    constructor(client: any) {
+    constructor(client: unknown) {
       this.client = client;
     }
-    client: any;
+    client: unknown;
   },
 }));
 
 vi.mock("../../entities/sources", () => ({
   SourcesApi: class {
-    constructor(client: any) {
+    constructor(client: unknown) {
       this.client = client;
     }
-    client: any;
+    client: unknown;
   },
 }));
 
 vi.mock("../../entities/institutions", () => ({
   InstitutionsApi: class {
-    constructor(client: any) {
+    constructor(client: unknown) {
       this.client = client;
     }
-    client: any;
+    client: unknown;
   },
 }));
 
 vi.mock("../../entities/topics", () => ({
   TopicsApi: class {
-    constructor(client: any) {
+    constructor(client: unknown) {
       this.client = client;
     }
-    client: any;
+    client: unknown;
   },
 }));
 
 vi.mock("../../entities/publishers", () => ({
   PublishersApi: class {
-    constructor(client: any) {
+    constructor(client: unknown) {
       this.client = client;
     }
-    client: any;
+    client: unknown;
   },
 }));
 
 vi.mock("../../entities/funders", () => ({
   FundersApi: class {
-    constructor(client: any) {
+    constructor(client: unknown) {
       this.client = client;
     }
-    client: any;
+    client: unknown;
   },
 }));
 
 vi.mock("../../entities/keywords", () => ({
   KeywordsApi: class {
-    constructor(client: any) {
+    constructor(client: unknown) {
       this.client = client;
     }
-    client: any;
+    client: unknown;
   },
 }));
 
 vi.mock("../../entities/text-analysis", () => ({
   TextAnalysisApi: class {
-    constructor(client: any) {
+    constructor(client: unknown) {
       this.client = client;
     }
-    client: any;
+    client: unknown;
   },
 }));
 
 vi.mock("../../entities/concepts", () => ({
   ConceptsApi: class {
-    constructor(client: any) {
+    constructor(client: unknown) {
       this.client = client;
     }
-    client: any;
+    client: unknown;
   },
 }));
 
@@ -155,8 +164,17 @@ vi.mock("@bibgraph/utils", () => ({
   },
 }));
 
-// Type the mocked functions
-const mockedStaticDataProvider = staticDataProvider as any;
+// Type the mocked functions. `staticDataProvider`'s real (unmocked) type is a class instance with real methods; the vi.mock factory above replaces it at runtime with a plain object of vi.fn() mocks that carries no "this" binding concerns, so it's described with its own local, accurate interface (property syntax, not method syntax) rather than the real class's type.
+interface StaticDataProviderMock {
+  configure: Mock<(config: Readonly<{ gitHubPagesBaseUrl?: string }>) => void>;
+  getStaticData: Mock<(entityType: StaticEntityType, id: string) => Promise<StaticDataResult>>;
+  hasStaticData: Mock<(entityType: StaticEntityType, id: string) => Promise<boolean>>;
+  getCacheStatistics: Mock<() => Promise<CacheStatistics>>;
+  clearCache: Mock<() => Promise<void>>;
+  getEnvironmentInfo: Mock<() => EnvironmentInfo>;
+}
+
+const mockedStaticDataProvider = staticDataProvider as unknown as StaticDataProviderMock;
 
 describe("Cache Integration - CachedOpenAlexClient", () => {
   let cachedClient: CachedOpenAlexClient;
@@ -172,11 +190,19 @@ describe("Cache Integration - CachedOpenAlexClient", () => {
     });
     mockedStaticDataProvider.hasStaticData.mockResolvedValue(false);
     mockedStaticDataProvider.getCacheStatistics.mockResolvedValue({
-      totalSize: 0,
-      memorySize: 0,
-      diskSize: 0,
-      githubPagesSize: 0,
-      entries: [],
+      totalRequests: 0,
+      hits: 0,
+      misses: 0,
+      hitRate: 0,
+      tierStats: {
+        [CacheTier.MEMORY]: { requests: 0, hits: 0, averageLoadTime: 0 },
+        [CacheTier.INDEXED_DB]: { requests: 0, hits: 0, averageLoadTime: 0 },
+        [CacheTier.LOCAL_DISK]: { requests: 0, hits: 0, averageLoadTime: 0 },
+        [CacheTier.GITHUB_PAGES]: { requests: 0, hits: 0, averageLoadTime: 0 },
+        [CacheTier.API]: { requests: 0, hits: 0, averageLoadTime: 0 },
+      },
+      bandwidthSaved: 0,
+      lastUpdated: 0,
     });
     mockedStaticDataProvider.clearCache.mockResolvedValue();
     mockedStaticDataProvider.getEnvironmentInfo.mockReturnValue({
@@ -285,10 +311,11 @@ describe("Cache Integration - CachedOpenAlexClient", () => {
         misses: 20,
         hitRate: 0.8,
         tierStats: {
-          memory: { requests: 50, hits: 40, averageLoadTime: 10 },
-          local_disk: { requests: 30, hits: 25, averageLoadTime: 50 },
-          github_pages: { requests: 15, hits: 12, averageLoadTime: 200 },
-          api: { requests: 5, hits: 3, averageLoadTime: 1000 },
+          [CacheTier.MEMORY]: { requests: 50, hits: 40, averageLoadTime: 10 },
+          [CacheTier.INDEXED_DB]: { requests: 0, hits: 0, averageLoadTime: 0 },
+          [CacheTier.LOCAL_DISK]: { requests: 30, hits: 25, averageLoadTime: 50 },
+          [CacheTier.GITHUB_PAGES]: { requests: 15, hits: 12, averageLoadTime: 200 },
+          [CacheTier.API]: { requests: 5, hits: 3, averageLoadTime: 1000 },
         },
         bandwidthSaved: 1000,
         lastUpdated: Date.now(),
@@ -392,7 +419,7 @@ describe("Cache Integration - CachedOpenAlexClient", () => {
       const result = await cachedClient.client.getEntity("W123");
 
       expect(result).toEqual(testData);
-      expect(staticDataProvider.getStaticData).toHaveBeenCalledTimes(2);
+      expect(mockedStaticDataProvider.getStaticData).toHaveBeenCalledTimes(2);
     });
 
     it("should return null when both cache and API fail", async () => {
@@ -418,7 +445,7 @@ describe("Cache Integration - CachedOpenAlexClient", () => {
 
       const isExists = await cachedClient.hasStaticEntity("W123");
       expect(isExists).toBe(true);
-      expect(staticDataProvider.hasStaticData).toHaveBeenCalledWith(
+      expect(mockedStaticDataProvider.hasStaticData).toHaveBeenCalledWith(
         "works",
         "W123",
       );
@@ -429,7 +456,7 @@ describe("Cache Integration - CachedOpenAlexClient", () => {
 
       const isExists = await cachedClient.hasStaticEntity("W123");
       expect(isExists).toBe(false);
-      expect(staticDataProvider.hasStaticData).not.toHaveBeenCalled();
+      expect(mockedStaticDataProvider.hasStaticData).not.toHaveBeenCalled();
     });
 
     it("should clear static cache", async () => {

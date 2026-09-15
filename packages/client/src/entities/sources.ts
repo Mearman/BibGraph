@@ -13,7 +13,6 @@
  * - Scheme Notation: `issn:1234-5678`, `eissn:1234-5678`
  * - Bare Format: `12345678`
  * - Check Digit Variants: `1234-567X`, `1234567X`
- *
  * @example ISSN Usage
  * ```typescript
  * // Standard ISSN lookup
@@ -38,8 +37,9 @@ import type {
   SourcesFilters,
   Work,
 } from "@bibgraph/types";
+import { AutocompleteBaseResponseSchema, sourceSchema, workSchema } from "@bibgraph/types";
 
-import { OpenAlexBaseClient } from "../client";
+import type { OpenAlexBaseClient } from "../client";
 import { logger } from "../internal/logger";
 import { buildFilterString } from "../utils/query-builder";
 import {
@@ -52,15 +52,11 @@ import {
   type SourceSearchOptions,
 } from "./sources-query-builder";
 
-// Re-export types for DTS bundling (vite-plugin-dts requires explicit type re-exports)
-// eslint-disable-next-line custom/no-reexport-from-non-barrel
-export type { SourceSearchOptions } from "./sources-query-builder";
-
 export class SourcesApi {
   private readonly DEFAULT_SORT = "works_count:desc";
   private readonly WORKS_COUNT_DESC = this.DEFAULT_SORT;
 
-  constructor(private client: OpenAlexBaseClient) {}
+  constructor(private readonly client: OpenAlexBaseClient) {}
 
   /**
    * Get a single source/journal by ID or ISSN
@@ -83,7 +79,7 @@ export class SourcesApi {
       const normalizedISSN = validateAndNormalizeISSN(id, {
         validateChecksum: false,
       });
-      if (normalizedISSN) {
+      if (normalizedISSN !== null) {
         logger.debug("issn", `Resolving ISSN ${id} as ${normalizedISSN}`);
 
         const response = await this.getSourcesByISSN(normalizedISSN, {
@@ -99,7 +95,7 @@ export class SourcesApi {
       throw new Error(`Invalid ISSN format: ${id}`);
     }
 
-    return this.client.getById<Source>({ endpoint: "sources", id, params });
+    return this.client.getById<Source>({ schema: sourceSchema, endpoint: "sources", id, params });
   }
 
   /**
@@ -111,7 +107,7 @@ export class SourcesApi {
     params: SourceSearchOptions = {},
   ): Promise<OpenAlexResponse<Source>> {
     const queryParameters = buildSourceFilterParameters(params);
-    return this.client.getResponse<Source>("sources", queryParameters);
+    return this.client.getResponse<Source>("sources", queryParameters, sourceSchema);
   }
 
   /**
@@ -135,7 +131,7 @@ export class SourcesApi {
     if (options.select !== undefined) parameters.select = options.select;
     if (options.filters) parameters.filter = buildFilterString(options.filters);
 
-    return this.client.getResponse<Source>("sources", parameters);
+    return this.client.getResponse<Source>("sources", parameters, sourceSchema);
   }
 
   /**
@@ -154,9 +150,10 @@ export class SourcesApi {
         q: query.trim(),
       };
 
-      const response = await this.client.getResponse<AutocompleteResult>(
+      const response = await this.client.get(
         endpoint,
         queryParameters,
+        AutocompleteBaseResponseSchema,
       );
 
       return response.results.map((result) => ({
@@ -193,7 +190,7 @@ export class SourcesApi {
     };
 
     const queryParameters = buildSourceFilterParameters(searchOptions);
-    return this.client.getResponse<Source>("sources", queryParameters);
+    return this.client.getResponse<Source>("sources", queryParameters, sourceSchema);
   }
 
   /**
@@ -213,7 +210,7 @@ export class SourcesApi {
     };
 
     const queryParameters = buildSourceFilterParameters(searchOptions);
-    return this.client.getResponse<Source>("sources", queryParameters);
+    return this.client.getResponse<Source>("sources", queryParameters, sourceSchema);
   }
 
   /**
@@ -231,8 +228,7 @@ export class SourcesApi {
       country_code: countryCode,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { filter, ...parametersWithoutFilter } = params;
+    const { filter: _filter, ...parametersWithoutFilter } = params;
     const isString = (value: unknown): value is string =>
       typeof value === "string";
 
@@ -245,7 +241,7 @@ export class SourcesApi {
     };
 
     const queryParameters = buildSourceFilterParameters(searchOptions);
-    return this.client.getResponse<Source>("sources", queryParameters);
+    return this.client.getResponse<Source>("sources", queryParameters, sourceSchema);
   }
 
   /**
@@ -263,7 +259,7 @@ export class SourcesApi {
       filter: `primary_location.source.id:${sourceId}`,
     };
 
-    return this.client.getResponse<Work>("works", worksParameters);
+    return this.client.getResponse<Work>("works", worksParameters, workSchema);
   }
 
   /**
@@ -309,7 +305,7 @@ export class SourcesApi {
   ): Promise<OpenAlexResponse<Source>> {
     const MAX_SAMPLE_SIZE = 10_000;
     if (count > MAX_SAMPLE_SIZE) {
-      throw new Error(`Random sample size cannot exceed ${MAX_SAMPLE_SIZE}`);
+      throw new Error(`Random sample size cannot exceed ${String(MAX_SAMPLE_SIZE)}`);
     }
 
     const options: SourceSearchOptions = {
@@ -323,7 +319,7 @@ export class SourcesApi {
     }
 
     const queryParameters = buildSourceFilterParameters(options);
-    return this.client.getResponse<Source>("sources", queryParameters);
+    return this.client.getResponse<Source>("sources", queryParameters, sourceSchema);
   }
 
   /**
@@ -381,11 +377,11 @@ export class SourcesApi {
     const filters: SourcesFilters = {};
 
     if (minAPC !== undefined && maxAPC !== undefined) {
-      filters["apc_usd"] = `${minAPC.toString()}-${maxAPC.toString()}`;
+      filters.apc_usd = `${minAPC.toString()}-${maxAPC.toString()}`;
     } else if (minAPC !== undefined) {
-      filters["apc_usd"] = `>${minAPC.toString()}`;
+      filters.apc_usd = `>${minAPC.toString()}`;
     } else if (maxAPC !== undefined) {
-      filters["apc_usd"] = `<${maxAPC.toString()}`;
+      filters.apc_usd = `<${maxAPC.toString()}`;
     }
 
     const searchOptions: SourceSearchOptions = {
@@ -436,15 +432,14 @@ export class SourcesApi {
     if (filterString) {
       queryParameters.filter = filterString;
     }
-    yield* this.client.stream<Source>("sources", queryParameters, batchSize);
+    yield* this.client.stream<Source>("sources", queryParameters,sourceSchema,  batchSize);
   }
 
   /**
    * Get sources by ISSN identifier with format support
    * @param issn - ISSN identifier (supports multiple formats)
    * @param params - Additional query parameters
-   * @param options - ISSN validation options
-   * @param options.validateChecksum
+   * @param options - ISSN validation options, including whether to verify the ISSN checksum digit
    * @returns Promise resolving to sources matching the ISSN
    * @example
    * ```typescript
@@ -456,10 +451,10 @@ export class SourcesApi {
   async getSourcesByISSN(
     issn: string,
     params: QueryParams = {},
-    options: { validateChecksum?: boolean } = {},
+    options: Readonly<{ validateChecksum?: boolean }> = {},
   ): Promise<OpenAlexResponse<Source>> {
     const normalizedISSN = validateAndNormalizeISSN(issn, options);
-    if (!normalizedISSN) {
+    if (normalizedISSN === null) {
       throw new Error(`Invalid ISSN format: ${issn}`);
     }
 
@@ -483,8 +478,7 @@ export class SourcesApi {
   /**
    * Validate ISSN format and optionally verify checksum
    * @param issn - ISSN to validate
-   * @param options - Validation options
-   * @param options.validateChecksum
+   * @param options - Validation options, including whether to verify the ISSN checksum digit
    * @returns Validation result with normalized ISSN if valid
    * @example
    * ```typescript
@@ -497,7 +491,7 @@ export class SourcesApi {
    */
   validateISSN(
     issn: string,
-    options: { validateChecksum?: boolean } = {},
+    options: Readonly<{ validateChecksum?: boolean }> = {},
   ): {
     isValid: boolean;
     normalized?: string;
@@ -517,8 +511,7 @@ export class SourcesApi {
    * Get sources for multiple ISSNs in a single request
    * @param issns - Array of ISSN identifiers (any supported format)
    * @param params - Additional query parameters
-   * @param options - ISSN validation options
-   * @param options.validateChecksum
+   * @param options - ISSN validation options, including whether to verify the ISSN checksum digit
    * @returns Promise resolving to sources matching any of the ISSNs
    * @example
    * ```typescript
@@ -530,11 +523,11 @@ export class SourcesApi {
    * ```
    */
   async getSourcesByMultipleISSNs(
-    issns: string[],
+    issns: readonly string[],
     params: QueryParams = {},
-    options: { validateChecksum?: boolean } = {},
+    options: Readonly<{ validateChecksum?: boolean }> = {},
   ): Promise<OpenAlexResponse<Source>> {
-    if (!Array.isArray(issns) || issns.length === 0) {
+    if (issns.length === 0) {
       throw new Error("ISSN array must be non-empty");
     }
 
@@ -543,7 +536,7 @@ export class SourcesApi {
 
     for (const issn of issns) {
       const normalized = validateAndNormalizeISSN(issn, options);
-      if (normalized) {
+      if (normalized !== null) {
         normalizedISSNs.push(normalized);
       } else {
         invalidISSNs.push(issn);

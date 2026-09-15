@@ -20,18 +20,19 @@ import type {
 } from "@bibgraph/types";
 
 import { cachedOpenAlex } from "./cached-client";
-import { OpenAlexBaseClient } from "./client";
+import type { OpenAlexBaseClient } from "./client";
 import { AuthorsApi } from "./entities/authors";
 import { ConceptsApi } from "./entities/concepts";
 import { FundersApi } from "./entities/funders";
-import {
-  InstitutionsApi,
-  InstitutionSearchOptions,
-} from "./entities/institutions";
+import { InstitutionsApi } from "./entities/institutions";
+import type { InstitutionSearchOptions } from "./entities/institutions/types";
 import { KeywordsApi } from "./entities/keywords";
-import { PublishersApi, PublisherSearchOptions } from "./entities/publishers";
-import { SourcesApi, SourceSearchOptions } from "./entities/sources";
-import { TopicsApi, TopicSearchOptions } from "./entities/topics";
+import type { PublisherSearchOptions } from "./entities/publishers";
+import { PublishersApi } from "./entities/publishers";
+import { SourcesApi } from "./entities/sources";
+import type { SourceSearchOptions } from "./entities/sources-query-builder";
+import type { TopicSearchOptions } from "./entities/topics";
+import { TopicsApi } from "./entities/topics";
 import { WorksApi } from "./entities/works";
 
 // Shared client instance for helper functions
@@ -53,8 +54,6 @@ const getSharedClient = (): OpenAlexBaseClient => {
 
 /**
  * Get a single author by ID
- * @param id
- * @param params
  */
 export const getAuthorById = async (id: string, params: QueryParams = {}): Promise<Author> => {
   const client = getSharedClient();
@@ -64,7 +63,6 @@ export const getAuthorById = async (id: string, params: QueryParams = {}): Promi
 
 /**
  * Get multiple authors with optional filtering
- * @param params
  */
 export const getAuthors = async (params: QueryParams = {}): Promise<OpenAlexResponse<Author>> => {
   const client = getSharedClient();
@@ -78,8 +76,6 @@ export const getAuthors = async (params: QueryParams = {}): Promise<OpenAlexResp
 
 /**
  * Get a single work by ID
- * @param id
- * @param params
  */
 export const getWorkById = async (id: string, params: QueryParams = {}): Promise<Work> => {
   const client = getSharedClient();
@@ -89,7 +85,6 @@ export const getWorkById = async (id: string, params: QueryParams = {}): Promise
 
 /**
  * Get multiple works with optional filtering
- * @param params
  */
 export const getWorks = async (params: QueryParams = {}): Promise<OpenAlexResponse<Work>> => {
   const client = getSharedClient();
@@ -103,8 +98,6 @@ export const getWorks = async (params: QueryParams = {}): Promise<OpenAlexRespon
 
 /**
  * Get a single concept by ID
- * @param id
- * @param params
  */
 export const getConceptById = async (id: string, params: QueryParams = {}): Promise<Concept> => {
   const client = getSharedClient();
@@ -114,7 +107,6 @@ export const getConceptById = async (id: string, params: QueryParams = {}): Prom
 
 /**
  * Get multiple concepts with optional filtering
- * @param params
  */
 export const getConcepts = async (params: QueryParams = {}): Promise<OpenAlexResponse<Concept>> => {
   const client = getSharedClient();
@@ -128,8 +120,6 @@ export const getConcepts = async (params: QueryParams = {}): Promise<OpenAlexRes
 
 /**
  * Get a single institution by ID
- * @param id
- * @param params
  */
 export const getInstitutionById = async (id: string, params: QueryParams = {}): Promise<InstitutionEntity> => {
   const client = getSharedClient();
@@ -139,7 +129,6 @@ export const getInstitutionById = async (id: string, params: QueryParams = {}): 
 
 /**
  * Get multiple institutions with optional filtering
- * @param params
  */
 export const getInstitutions = async (params: InstitutionSearchOptions = {}): Promise<OpenAlexResponse<InstitutionEntity>> => {
   const client = getSharedClient();
@@ -153,8 +142,6 @@ export const getInstitutions = async (params: InstitutionSearchOptions = {}): Pr
 
 /**
  * Get a single funder by ID
- * @param id
- * @param params
  */
 export const getFunderById = async (id: string, params: QueryParams = {}): Promise<Funder> => {
   const client = getSharedClient();
@@ -164,7 +151,6 @@ export const getFunderById = async (id: string, params: QueryParams = {}): Promi
 
 /**
  * Get multiple funders with optional filtering
- * @param params
  */
 export const getFunders = async (params: QueryParams = {}): Promise<OpenAlexResponse<Funder>> => {
   const client = getSharedClient();
@@ -178,8 +164,6 @@ export const getFunders = async (params: QueryParams = {}): Promise<OpenAlexResp
 
 /**
  * Get a single publisher by ID
- * @param id
- * @param params
  */
 export const getPublisherById = async (id: string, params: QueryParams = {}): Promise<Publisher> => {
   const client = getSharedClient();
@@ -189,7 +173,6 @@ export const getPublisherById = async (id: string, params: QueryParams = {}): Pr
 
 /**
  * Get multiple publishers with optional filtering
- * @param params
  */
 export const getPublishers = async (params: PublisherSearchOptions = {}): Promise<OpenAlexResponse<Publisher>> => {
   const client = getSharedClient();
@@ -203,8 +186,6 @@ export const getPublishers = async (params: PublisherSearchOptions = {}): Promis
 
 /**
  * Get a single source by ID
- * @param id
- * @param params
  */
 export const getSourceById = async (id: string, params: QueryParams = {}): Promise<Source> => {
   const client = getSharedClient();
@@ -214,7 +195,6 @@ export const getSourceById = async (id: string, params: QueryParams = {}): Promi
 
 /**
  * Get multiple sources with optional filtering
- * @param params
  */
 export const getSources = async (params: SourceSearchOptions = {}): Promise<OpenAlexResponse<Source>> => {
   const client = getSharedClient();
@@ -228,8 +208,6 @@ export const getSources = async (params: SourceSearchOptions = {}): Promise<Open
 
 /**
  * Get a single topic by ID
- * @param id
- * @param params
  */
 export const getTopicById = async (id: string, params: QueryParams = {}): Promise<Topic> => {
   const client = getSharedClient();
@@ -239,7 +217,6 @@ export const getTopicById = async (id: string, params: QueryParams = {}): Promis
 
 /**
  * Get multiple topics with optional filtering
- * @param params
  */
 export const getTopics = async (params: TopicSearchOptions = {}): Promise<OpenAlexResponse<Topic>> => {
   const client = getSharedClient();
@@ -253,8 +230,6 @@ export const getTopics = async (params: TopicSearchOptions = {}): Promise<OpenAl
 
 /**
  * Get a single keyword by ID
- * @param id
- * @param params
  */
 export const getKeywordById = async (id: string, params: QueryParams = {}): Promise<Keyword> => {
   const client = getSharedClient();
@@ -264,7 +239,6 @@ export const getKeywordById = async (id: string, params: QueryParams = {}): Prom
 
 /**
  * Get multiple keywords with optional filtering
- * @param params
  */
 export const getKeywords = async (params: QueryParams = {}): Promise<OpenAlexResponse<Keyword>> => {
   const client = getSharedClient();
@@ -279,7 +253,6 @@ export const getKeywords = async (params: QueryParams = {}): Promise<OpenAlexRes
 /**
  * Set a custom client instance for all helper functions
  * Useful for testing or when you need specific client configuration
- * @param client
  */
 export const setSharedClient = (client: OpenAlexBaseClient): void => {
   _sharedClient = client;

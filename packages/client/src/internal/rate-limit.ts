@@ -55,17 +55,19 @@ export const RETRY_CONFIG = {
 };
 
 /**
+Base delay used when a retry config is missing the expected backoff fields
+ */
+const FALLBACK_BASE_DELAY_MS = 1000;
+
+/**
  * Calculate retry delay with exponential backoff and jitter
- * @param attemptIndex
- * @param config
- * @param retryAfterMs
  */
 export const calculateRetryDelay = (attemptIndex: number, config:
     | typeof RETRY_CONFIG.rateLimited
     | typeof RETRY_CONFIG.network
     | typeof RETRY_CONFIG.server, retryAfterMs?: number): number => {
   // If server provides Retry-After header, respect it
-  if (retryAfterMs) {
+  if (retryAfterMs !== undefined) {
     return retryAfterMs;
   }
 
@@ -77,7 +79,7 @@ export const calculateRetryDelay = (attemptIndex: number, config:
     !("maxDelay" in config)
   ) {
     // Fallback to default delays
-    return 1000 * 2 ** attemptIndex;
+    return FALLBACK_BASE_DELAY_MS * 2 ** attemptIndex;
   }
 
   // Exponential backoff with jitter

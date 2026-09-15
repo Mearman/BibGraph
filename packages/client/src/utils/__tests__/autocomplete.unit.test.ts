@@ -19,24 +19,31 @@ const createMockClient = () => ({
   },
 });
 
+const MOCK_CITED_BY_BASE = 100;
+const MOCK_CITED_BY_STEP = 10;
+const MOCK_WORKS_COUNT_BASE = 50;
+const MOCK_WORKS_COUNT_STEP = 5;
+const MOCK_META_PAGE = 1;
+const MOCK_META_PER_PAGE = 25;
+
 // Mock autocomplete response
 const createMockAutocompleteResponse = (
-  count: number = 3,
+  count = 3,
   entityType: EntityType = "works",
 ) => ({
   results: Array.from({ length: count }, (_, index) => ({
-    id: `https://openalex.org/${entityType[0].toUpperCase()}${index + 1}`,
-    display_name: `Test ${entityType} ${index + 1}`,
-    hint: `Hint for ${entityType} ${index + 1}`,
-    cited_by_count: 100 - index * 10,
-    works_count: entityType === "authors" ? 50 - index * 5 : undefined,
+    id: `https://openalex.org/${entityType[0].toUpperCase()}${String(index + 1)}`,
+    display_name: `Test ${entityType} ${String(index + 1)}`,
+    hint: `Hint for ${entityType} ${String(index + 1)}`,
+    cited_by_count: MOCK_CITED_BY_BASE - index * MOCK_CITED_BY_STEP,
+    works_count: entityType === "authors" ? MOCK_WORKS_COUNT_BASE - index * MOCK_WORKS_COUNT_STEP : undefined,
     entity_type: entityType,
-    external_id: `external-${index + 1}`,
+    external_id: `external-${String(index + 1)}`,
   })),
   meta: {
     count,
-    page: 1,
-    per_page: 25,
+    page: MOCK_META_PAGE,
+    per_page: MOCK_META_PER_PAGE,
   },
 });
 
@@ -59,7 +66,8 @@ describe("CompleteAutocompleteApi", () => {
 
   describe("autocompleteGeneral", () => {
     it("should search across all entity types", async () => {
-      const mockResponse = createMockAutocompleteResponse(5, "works");
+      const WORKS_MOCK_COUNT = 5;
+      const mockResponse = createMockAutocompleteResponse(WORKS_MOCK_COUNT, "works");
       mockClient.get.mockResolvedValue(mockResponse);
 
       const results = await autocompleteApi.autocompleteGeneral(
@@ -69,7 +77,7 @@ describe("CompleteAutocompleteApi", () => {
       expect(mockClient.get).toHaveBeenCalledWith("autocomplete", {
         q: "machine learning",
       });
-      expect(results).toHaveLength(5);
+      expect(results).toHaveLength(WORKS_MOCK_COUNT);
       expect(results[0]).toHaveProperty("display_name");
       expect(results[0]).toHaveProperty("entity_type");
     });
@@ -94,24 +102,27 @@ describe("CompleteAutocompleteApi", () => {
     });
 
     it("should sort results by cited_by_count descending", async () => {
+      const CITED_BY_WORK_1 = 50;
+      const CITED_BY_WORK_2 = 100;
+      const CITED_BY_WORK_3 = 75;
       const mockResponse = {
         results: [
           {
             id: "https://openalex.org/W1",
             display_name: "Work 1",
-            cited_by_count: 50,
+            cited_by_count: CITED_BY_WORK_1,
             entity_type: "work" as EntityType,
           },
           {
             id: "https://openalex.org/W2",
             display_name: "Work 2",
-            cited_by_count: 100,
+            cited_by_count: CITED_BY_WORK_2,
             entity_type: "work" as EntityType,
           },
           {
             id: "https://openalex.org/W3",
             display_name: "Work 3",
-            cited_by_count: 75,
+            cited_by_count: CITED_BY_WORK_3,
             entity_type: "work" as EntityType,
           },
         ],
@@ -120,12 +131,14 @@ describe("CompleteAutocompleteApi", () => {
 
       const results = await autocompleteApi.autocompleteGeneral("test");
 
-      expect(results[0].cited_by_count).toBe(100);
-      expect(results[1].cited_by_count).toBe(75);
-      expect(results[2].cited_by_count).toBe(50);
+      expect(results[0].cited_by_count).toBe(CITED_BY_WORK_2);
+      expect(results[1].cited_by_count).toBe(CITED_BY_WORK_3);
+      expect(results[2].cited_by_count).toBe(CITED_BY_WORK_1);
     });
 
     it("should handle results without cited_by_count", async () => {
+      const AUTHOR_2_CITED_BY_COUNT = 100;
+      const EXPECTED_RESULT_COUNT = 2;
       const mockResponse = {
         results: [
           {
@@ -136,7 +149,7 @@ describe("CompleteAutocompleteApi", () => {
           {
             id: "https://openalex.org/A2",
             display_name: "Author 2",
-            cited_by_count: 100,
+            cited_by_count: AUTHOR_2_CITED_BY_COUNT,
             entity_type: "author" as EntityType,
           },
         ],
@@ -145,9 +158,9 @@ describe("CompleteAutocompleteApi", () => {
 
       const results = await autocompleteApi.autocompleteGeneral("test");
 
-      expect(results).toHaveLength(2);
+      expect(results).toHaveLength(EXPECTED_RESULT_COUNT);
       // Items with cited_by_count should come first
-      expect(results[0].cited_by_count).toBe(100);
+      expect(results[0].cited_by_count).toBe(AUTHOR_2_CITED_BY_COUNT);
     });
   });
 
@@ -167,10 +180,11 @@ describe("CompleteAutocompleteApi", () => {
     });
 
     it("should return empty array for whitespace-only query string", async () => {
+      const WHITESPACE_QUERY_LENGTH = 3;
       const mockResponse = { results: [] };
       mockClient.get.mockResolvedValue(mockResponse);
 
-      const results = await autocompleteApi.autocompleteGeneral(' '.repeat(3));
+      const results = await autocompleteApi.autocompleteGeneral(' '.repeat(WHITESPACE_QUERY_LENGTH));
 
       // Whitespace queries return empty results
       expect(results).toEqual([]);

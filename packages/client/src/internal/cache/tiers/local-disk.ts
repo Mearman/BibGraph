@@ -18,9 +18,8 @@ interface CacheStats {
 
 /**
  * Calculate cache statistics from raw stats
- * @param stats
  */
-const calculateCacheStats = (stats: CacheStats): {
+const calculateCacheStats = (stats: Readonly<CacheStats>): {
 	requests: number;
 	hits: number;
 	averageLoadTime: number;
@@ -36,7 +35,7 @@ const calculateCacheStats = (stats: CacheStats): {
  */
 export class LocalDiskCacheTier implements CacheTierInterface {
 	private stats: CacheStats = { requests: 0, hits: 0, totalLoadTime: 0 };
-	private cacheDir = "./cache/static-data";
+	private readonly cacheDir = "./cache/static-data";
 	private readonly LOG_PREFIX = "local-disk-cache";
 
 	private getFilePath(entityType: StaticEntityType, id: string): string {
@@ -67,7 +66,7 @@ export class LocalDiskCacheTier implements CacheTierInterface {
 				return { found: false };
 			}
 
-			const parsedData = JSON.parse(fs.readFileSync(filePath, "utf8"));
+			const parsedData: unknown = JSON.parse(fs.readFileSync(filePath, "utf8"));
 			// Validate that parsedData is a valid value (not null/undefined for our use case)
 			if (parsedData === null || parsedData === undefined) {
 				throw new Error(`Invalid JSON data in file: ${filePath}`);
@@ -159,6 +158,7 @@ export class LocalDiskCacheTier implements CacheTierInterface {
 		hits: number;
 		averageLoadTime: number;
 	}> {
+		await Promise.resolve();
 		return calculateCacheStats(this.stats);
 	}
 }

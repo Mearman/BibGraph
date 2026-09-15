@@ -113,10 +113,10 @@ export interface GroupTrend {
  */
 export interface TemporalTrendsResult {
   trends: GroupTrend[];
-  overall_trend: Array<{
+  overall_trend: {
     year: number;
     total_count: number;
-  }>;
+  }[];
 }
 
 /**

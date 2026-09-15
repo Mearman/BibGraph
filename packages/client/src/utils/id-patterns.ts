@@ -25,11 +25,11 @@ const doiPattern: IdPattern = {
 
     // Remove doi: prefix
     if (doi.toLowerCase().startsWith("doi:")) {
-      doi = doi.slice(4);
+      doi = doi.slice("doi:".length);
     }
 
     // Extract from URL
-    const urlMatch = doi.match(/https?:\/\/(?:dx\.)?doi\.org\/(.+)$/i);
+    const urlMatch = /https?:\/\/(?:dx\.)?doi\.org\/(.+)$/i.exec(doi);
     if (urlMatch) {
       doi = urlMatch[1];
     }
@@ -40,7 +40,7 @@ const doiPattern: IdPattern = {
     }
 
     // Return URL format if preferred, otherwise canonical format
-    return config?.preferUrls ? `https://doi.org/${doi}` : doi;
+    return config?.preferUrls === true ? `https://doi.org/${doi}` : doi;
   },
   examples: [
     "10.1038/nature12373",
@@ -62,7 +62,7 @@ const orcidPattern: IdPattern = {
     /orcid\.org\/(\d{4}-\d{4}-\d{4}-\d{3}[0-9X])/i,
   ],
   normalize: (match: string): string | null => {
-    const orcidMatch = match.match(/(\d{4}-\d{4}-\d{4}-\d{3}[0-9X])/i);
+    const orcidMatch = /(\d{4}-\d{4}-\d{4}-\d{3}[0-9X])/i.exec(match);
     if (!orcidMatch) return null;
 
     const orcid = orcidMatch[1].toUpperCase();
@@ -98,7 +98,7 @@ const openalexPattern: IdPattern = {
     let openalexId = match.trim();
 
     // Extract from URL
-    const urlMatch = openalexId.match(/openalex\.org\/([ACFIKPQSTW]\d+)$/i);
+    const urlMatch = /openalex\.org\/([ACFIKPQSTW]\d+)$/i.exec(openalexId);
     if (urlMatch) {
       openalexId = urlMatch[1];
     }
@@ -124,7 +124,7 @@ const openalexPattern: IdPattern = {
     openalexId = openalexId.toUpperCase();
 
     // Return URL format if preferred, otherwise bare ID
-    return config?.preferUrls
+    return config?.preferUrls === true
       ? `https://openalex.org/${openalexId}`
       : openalexId;
   },
@@ -150,7 +150,7 @@ const rorPattern: IdPattern = {
     let rorId = match.trim();
 
     // Extract ROR ID from URL
-    const urlMatch = rorId.match(/ror\.org\/([0-9a-z]{9})$/i);
+    const urlMatch = /ror\.org\/([0-9a-z]{9})$/i.exec(rorId);
     if (urlMatch) {
       rorId = urlMatch[1];
     }
@@ -183,7 +183,7 @@ const issnPattern: IdPattern = {
     /^ISSN\s*(?::\s*)?(\d{4}-\d{3}[0-9X])$/i,
   ],
   normalize: (match: string): string | null => {
-    const issnMatch = match.match(/(\d{4}-\d{3}[0-9X])/i);
+    const issnMatch = /(\d{4}-\d{3}[0-9X])/i.exec(match);
     if (!issnMatch) return null;
 
     const issn = issnMatch[1].toUpperCase();
@@ -218,14 +218,14 @@ const pmidPattern: IdPattern = {
 
     // Remove PMID: prefix
     if (pmid.toLowerCase().startsWith("pmid")) {
-      const pmidMatch = pmid.match(/pmid\s*(?::\s*)?(\d+)$/i);
+      const pmidMatch = /pmid\s*(?::\s*)?(\d+)$/i.exec(pmid);
       if (pmidMatch) {
         pmid = pmidMatch[1];
       }
     }
 
     // Extract from PubMed URL
-    const urlMatch = pmid.match(/pubmed\.ncbi\.nlm\.nih\.gov\/(\d+)/i);
+    const urlMatch = /pubmed\.ncbi\.nlm\.nih\.gov\/(\d+)/i.exec(pmid);
     if (urlMatch) {
       pmid = urlMatch[1];
     }
@@ -242,8 +242,8 @@ const pmidPattern: IdPattern = {
     }
 
     // Return URL format if preferred, otherwise just the number
-    return config?.preferUrls
-      ? `https://pubmed.ncbi.nlm.nih.gov/${pmidNumber}/`
+    return config?.preferUrls === true
+      ? `https://pubmed.ncbi.nlm.nih.gov/${String(pmidNumber)}/`
       : pmidNumber.toString();
   },
   examples: [
@@ -269,9 +269,7 @@ const wikidataPattern: IdPattern = {
     let wikidataId = match.trim();
 
     // Extract Q number from URL
-    const urlMatch = wikidataId.match(
-      /wikidata\.org\/(?:entity|wiki)\/Q(\d+)$/i
-    );
+    const urlMatch = /wikidata\.org\/(?:entity|wiki)\/Q(\d+)$/i.exec(wikidataId);
     if (urlMatch) {
       wikidataId = `Q${urlMatch[1]}`;
     }
@@ -282,7 +280,7 @@ const wikidataPattern: IdPattern = {
     }
 
     // Return URL format if preferred, otherwise Q notation
-    return config?.preferUrls
+    return config?.preferUrls === true
       ? `https://www.wikidata.org/wiki/${wikidataId}`
       : wikidataId;
   },

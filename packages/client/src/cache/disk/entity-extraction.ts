@@ -1,6 +1,5 @@
 /**
- * Entity extraction and path generation for disk cache
- * Handles extracting entity type/id from URLs and responses, and generating file paths
+ * Entity extraction and path generation for disk cache Handles extracting entity type/id from URLs and responses, and generating file paths
  */
 
 import type { EntityType, OpenAlexEntity, OpenAlexResponse } from "@bibgraph/types";
@@ -10,6 +9,11 @@ import * as NodeModules from "./nodejs-modules";
 
 const ERROR_MESSAGE_ENTITY_EXTRACTION_FAILED = "Entity info extraction failed";
 const UNKNOWN_ERROR_MESSAGE = "Unknown error";
+
+/**
+ * Number of characters of a content hash used as a short, human-scannable suffix (e.g. for fallback entity IDs and autocomplete filenames without query params).
+ */
+const HASH_SUFFIX_LENGTH = 8;
 
 /**
  * Entity information extracted from URL or response
@@ -94,53 +98,161 @@ export interface CacheMetadata {
 }
 
 /**
- * Extract entity type and ID from URL or response data
- * @param data
+ * Whether the value is a URL whose host is exactly the expected registry (or a subdomain of it) -- a plain substring check would accept attacker hosts like orcid.org.evil.example.
  */
-export const extractEntityInfo = async (data: InterceptedData): Promise<EntityInfo> => {
+const isExpectedHost = (value: string, expectedHost: string): boolean => {
 	try {
-		// Try to extract from URL first
-		const urlInfo = extractEntityInfoFromUrl(data.url);
+		return new URL(value).hostname === expectedHost ||
+			new URL(value).hostname.endsWith(`.${expectedHost}`);
+	} catch {
+		return false;
+	}
+};
 
-		// Check if this is an autocomplete response (special case)
-		if (urlInfo.entityId?.startsWith("autocomplete/")) {
-			return urlInfo;
-		}
+/**
+ * Check if a string looks like an external canonical ID
+ */
+const isExternalCanonicalId = (id: string): boolean => {
+	// DOI patterns
+	if (isExpectedHost(id, "doi.org") || /^10\.\d+\/\S+$/.test(id)) {
+		return true;
+	}
 
-		if (urlInfo.entityType) {
-			return urlInfo;
-		}
+	// ORCID patterns
+	if (id.includes("orcid.org/") || /^\d{4}-\d{4}-\d{4}-\d{3}[0-9X]$/i.test(id)) {
+		return true;
+	}
 
-		// Try to extract from response data
-		const responseInfo = extractEntityInfoFromResponse(data.responseData);
-		if (responseInfo.entityType) {
-			// Check if the original URL contains an external canonical ID
-			const externalIdInfo = extractExternalCanonicalIdFromUrl(data.url);
-			if (externalIdInfo) {
-				// Use the external ID for caching instead of the OpenAlex ID
-				return { ...externalIdInfo, ...responseInfo };
+	// ROR patterns
+	if (id.includes("ror.org/") || /^[0-9a-z]{9}$/i.test(id)) {
+		return true;
+	}
+
+	return false;
+};
+
+/**
+ * Extract external canonical ID from URL for proper caching
+ */
+export const extractExternalCanonicalIdFromUrl = (url: string): {
+	entityType?: EntityType;
+	entityId?: string;
+} | null => {
+	try {
+		const urlObject = new URL(url);
+		const pathParts = urlObject.pathname.split("/").filter(Boolean);
+
+		// Check if this is a works route with an external canonical ID
+		if (pathParts.length >= 2 && pathParts[0] === "works") {
+			const potentialId = decodeURIComponent(pathParts[1]);
+
+			// Check if this looks like an external canonical ID
+			if (isExternalCanonicalId(potentialId)) {
+				// Determine entity type from the external ID
+				let entityType: EntityType;
+
+				if (
+					isExpectedHost(potentialId, "orcid.org") ||
+					/^\d{4}-\d{4}-\d{4}-\d{3}[0-9X]$/i.test(potentialId)
+				) {
+					entityType = "authors";
+				} else if (
+					isExpectedHost(potentialId, "ror.org") ||
+					/^[0-9a-z]{9}$/i.test(potentialId)
+				) {
+					entityType = "institutions";
+				} else {
+					// Default to works for DOI and other cases
+					entityType = "works";
+				}
+
+				return {
+					entityType,
+					entityId: potentialId,
+				};
 			}
-			return { ...responseInfo, ...urlInfo };
 		}
 
-		// Default fallback - use URL hash
-		const urlHash = await generateContentHash(data.url);
-		return {
-			entityType: "works", // Default entity type
-			entityId: `unknown_${urlHash.slice(0, 8)}`,
-		};
-	} catch (error) {
-		const { logError, logger } = await import("@bibgraph/utils");
-		logError(logger, "Failed to extract entity info", error);
-		throw new Error(
-			`${ERROR_MESSAGE_ENTITY_EXTRACTION_FAILED}: ${error instanceof Error ? error.message : UNKNOWN_ERROR_MESSAGE}`,
-		);
+		return null;
+	} catch {
+		return null;
+	}
+};
+
+/**
+ * Type guard for OpenAlex entity
+ */
+const isOpenAlexEntity = (data: unknown): data is OpenAlexEntity => {
+	if (typeof data !== "object" || data === null) return false;
+	if (!("id" in data) || !("display_name" in data)) return false;
+	return typeof data.id === "string" && typeof data.display_name === "string";
+};
+
+/**
+ * Type guard for OpenAlex response
+ */
+const isOpenAlexResponse = (
+	data: unknown,
+): data is OpenAlexResponse<OpenAlexEntity> => {
+	if (typeof data !== "object" || data === null) return false;
+	if (!("results" in data) || !("meta" in data)) return false;
+	return Array.isArray(data.results) && typeof data.meta === "object";
+};
+
+/**
+ * Detect entity type from entity data
+ */
+const detectEntityType = (entity: OpenAlexEntity): EntityType => {
+	// Try to detect based on specific properties
+	if ("doi" in entity || "publication_year" in entity) return "works";
+	if ("orcid" in entity || "last_known_institutions" in entity) return "authors";
+	if ("issn_l" in entity || "publisher" in entity) return "sources";
+	if ("ror" in entity || "country_code" in entity) return "institutions";
+	if ("description" in entity && "keywords" in entity) return "topics";
+	if ("wikidata" in entity && "level" in entity) return "concepts";
+	if ("hierarchy_level" in entity || "parent_publisher" in entity) return "publishers";
+	if ("grants_count" in entity) return "funders";
+
+	// Default fallback
+	return "works";
+};
+
+/**
+ * Extract entity info from response data
+ */
+export const extractEntityInfoFromResponse = (responseData: unknown): EntityInfo => {
+	try {
+		// Single entity response
+		if (isOpenAlexEntity(responseData)) {
+			const entityType = detectEntityType(responseData);
+			return {
+				entityType,
+				entityId: responseData.id,
+				isQueryResponse: false,
+			};
+		}
+
+		// Collection response
+		if (isOpenAlexResponse(responseData) && responseData.results.length > 0) {
+			const firstResult = responseData.results[0];
+			if (isOpenAlexEntity(firstResult)) {
+				const entityType = detectEntityType(firstResult);
+				return {
+					entityType,
+					entityId: entityType, // Use entity type as ID for collections
+					isQueryResponse: true,
+				};
+			}
+		}
+
+		return {};
+	} catch {
+		return {};
 	}
 };
 
 /**
  * Extract entity info from URL path
- * @param url
  */
 export const extractEntityInfoFromUrl = (url: string): EntityInfo => {
 	try {
@@ -231,184 +343,87 @@ export const extractEntityInfoFromUrl = (url: string): EntityInfo => {
 };
 
 /**
- * Extract entity info from response data
- * @param responseData
+ * Extract entity type and ID from URL or response data
  */
-export const extractEntityInfoFromResponse = (responseData: unknown): EntityInfo => {
+export const extractEntityInfo = async (data: InterceptedData): Promise<EntityInfo> => {
 	try {
-		// Single entity response
-		if (isOpenAlexEntity(responseData)) {
-			const entityType = detectEntityType(responseData);
-			return {
-				entityType,
-				entityId: responseData.id,
-				isQueryResponse: false,
-			};
+		// Try to extract from URL first
+		const urlInfo = extractEntityInfoFromUrl(data.url);
+
+		// Check if this is an autocomplete response (special case)
+		if (urlInfo.entityId?.startsWith("autocomplete/") === true) {
+			return urlInfo;
 		}
 
-		// Collection response
-		if (isOpenAlexResponse(responseData) && responseData.results.length > 0) {
-			const firstResult = responseData.results[0];
-			if (isOpenAlexEntity(firstResult)) {
-				const entityType = detectEntityType(firstResult);
-				return {
-					entityType,
-					entityId: entityType, // Use entity type as ID for collections
-					isQueryResponse: true,
-				};
+		if (urlInfo.entityType) {
+			return urlInfo;
+		}
+
+		// Try to extract from response data
+		const responseInfo = extractEntityInfoFromResponse(data.responseData);
+		if (responseInfo.entityType) {
+			// Check if the original URL contains an external canonical ID
+			const externalIdInfo = extractExternalCanonicalIdFromUrl(data.url);
+			if (externalIdInfo) {
+				// Use the external ID for caching instead of the OpenAlex ID
+				return { ...externalIdInfo, ...responseInfo };
 			}
+			return { ...responseInfo, ...urlInfo };
 		}
 
-		return {};
-	} catch {
-		return {};
+		// Default fallback - use URL hash
+		const urlHash = await generateContentHash(data.url);
+		return {
+			entityType: "works", // Default entity type
+			entityId: `unknown_${urlHash.slice(0, HASH_SUFFIX_LENGTH)}`,
+		};
+	} catch (error) {
+		const { logError, logger } = await import("@bibgraph/utils");
+		logError(logger, "Failed to extract entity info", error);
+		throw new Error(
+			`${ERROR_MESSAGE_ENTITY_EXTRACTION_FAILED}: ${error instanceof Error ? error.message : UNKNOWN_ERROR_MESSAGE}`,
+		);
 	}
 };
 
 /**
- * Whether the value is a URL whose host is exactly the expected registry
- * (or a subdomain of it) -- a plain substring check would accept attacker
- * hosts like orcid.org.evil.example.
- * @param value
- * @param expectedHost
+ * Sanitize filename to be filesystem-safe Uses hash for very long filenames to avoid ENAMETOOLONG errors
  */
-const isExpectedHost = (value: string, expectedHost: string): boolean => {
-	try {
-		return new URL(value).hostname === expectedHost ||
-			new URL(value).hostname.endsWith(`.${expectedHost}`);
-	} catch {
-		return false;
-	}
-};
+const MAX_FILENAME_LENGTH = 100;
+const FILENAME_HASH_SHIFT_BITS = 5;
+const FILENAME_HASH_RADIX = 36;
+const TRUNCATED_FILENAME_LENGTH = 50;
 
-/**
- * Extract external canonical ID from URL for proper caching
- * @param url
- */
-export const extractExternalCanonicalIdFromUrl = (url: string): {
-	entityType?: EntityType;
-	entityId?: string;
-} | null => {
-	try {
-		const urlObject = new URL(url);
-		const pathParts = urlObject.pathname.split("/").filter(Boolean);
+const sanitizeFilename = (filename: string): string => {
+	const sanitized = filename
+		.replaceAll(/["*/:<>?\\|]/g, "_") // Replace invalid characters
+		.replaceAll(/\s+/g, "_") // Replace spaces with underscores
+		.replaceAll(/_{2,}/g, "_") // Replace multiple underscores with single
+		.replace(/^_/, "") // Remove leading underscore
+		.replace(/_$/, ""); // Remove trailing underscore
 
-		// Check if this is a works route with an external canonical ID
-		if (pathParts.length >= 2 && pathParts[0] === "works") {
-			const potentialId = decodeURIComponent(pathParts[1]);
-
-			// Check if this looks like an external canonical ID
-			if (isExternalCanonicalId(potentialId)) {
-				// Determine entity type from the external ID
-				let entityType: EntityType;
-
-				if (
-					isExpectedHost(potentialId, "orcid.org") ||
-					/^\d{4}-\d{4}-\d{4}-\d{3}[0-9X]$/i.test(potentialId)
-				) {
-					entityType = "authors";
-				} else if (
-					isExpectedHost(potentialId, "ror.org") ||
-					/^[0-9a-z]{9}$/i.test(potentialId)
-				) {
-					entityType = "institutions";
-				} else {
-					// Default to works for DOI and other cases
-					entityType = "works";
-				}
-
-				return {
-					entityType,
-					entityId: potentialId,
-				};
-			}
+	// If filename is too long, use a hash to ensure it fits filesystem limits Keep it under 100 chars to leave room for directory path and .json extension
+	if (sanitized.length > MAX_FILENAME_LENGTH) {
+		// Create a simple hash from the filename
+		let hash = 0;
+		for (let index = 0; index < filename.length; index++) {
+			const char = filename.charCodeAt(index);
+			hash = (hash << FILENAME_HASH_SHIFT_BITS) - hash + char;
+			hash &= hash; // Convert to 32-bit integer
 		}
-
-		return null;
-	} catch {
-		return null;
-	}
-};
-
-/**
- * Check if a string looks like an external canonical ID
- * @param id
- */
-const isExternalCanonicalId = (id: string): boolean => {
-	// DOI patterns
-	if (isExpectedHost(id, "doi.org") || /^10\.\d+\/\S+$/.test(id)) {
-		return true;
+		const hashString = Math.abs(hash).toString(FILENAME_HASH_RADIX);
+		// Return first 50 chars + hash to make it somewhat readable
+		return `${sanitized.slice(0, TRUNCATED_FILENAME_LENGTH)}_${hashString}`;
 	}
 
-	// ORCID patterns
-	if (id.includes("orcid.org/") || /^\d{4}-\d{4}-\d{4}-\d{3}[0-9X]$/i.test(id)) {
-		return true;
-	}
-
-	// ROR patterns
-	if (id.includes("ror.org/") || /^[0-9a-z]{9}$/i.test(id)) {
-		return true;
-	}
-
-	return false;
-};
-
-/**
- * Type guard for OpenAlex entity
- * @param data
- */
-const isOpenAlexEntity = (data: unknown): data is OpenAlexEntity => {
-	const object = data as Record<string, unknown>;
-	return (
-		typeof data === "object" &&
-		data !== null &&
-		typeof object.id === "string" &&
-		typeof object.display_name === "string"
-	);
-};
-
-/**
- * Type guard for OpenAlex response
- * @param data
- */
-const isOpenAlexResponse = (
-	data: unknown,
-): data is OpenAlexResponse<OpenAlexEntity> => {
-	const object = data as Record<string, unknown>;
-	return (
-		typeof data === "object" &&
-		data !== null &&
-		Array.isArray(object.results) &&
-		typeof object.meta === "object"
-	);
-};
-
-/**
- * Detect entity type from entity data
- * @param entity
- */
-const detectEntityType = (entity: OpenAlexEntity): EntityType => {
-	// Try to detect based on specific properties
-	if ("doi" in entity || "publication_year" in entity) return "works";
-	if ("orcid" in entity || "last_known_institutions" in entity) return "authors";
-	if ("issn_l" in entity || "publisher" in entity) return "sources";
-	if ("ror" in entity || "country_code" in entity) return "institutions";
-	if ("description" in entity && "keywords" in entity) return "topics";
-	if ("wikidata" in entity && "level" in entity) return "concepts";
-	if ("hierarchy_level" in entity || "parent_publisher" in entity) return "publishers";
-	if ("grants_count" in entity) return "funders";
-
-	// Default fallback
-	return "works";
+	return sanitized;
 };
 
 /**
  * Generate file paths for cached data
- * @param entityInfo
- * @param basePath
  */
 export const generateFilePaths = async (
-	entityInfo: EntityInfo,
+	entityInfo: Readonly<EntityInfo>,
 	basePath: string,
 ): Promise<{ dataFile: string; directoryPath: string }> => {
 	await NodeModules.initializeNodeModules();
@@ -420,10 +435,9 @@ export const generateFilePaths = async (
 	let filename: string;
 
 	// Handle autocomplete responses specially
-	if (entityInfo.entityId?.startsWith("autocomplete/")) {
-		if (entityInfo.queryParams) {
-			// Autocomplete: autocomplete/works/q=query.json or autocomplete/general/q=query.json
-			// queryParams already contains the serialized query string (e.g., "q=neural+networks")
+	if (entityInfo.entityId?.startsWith("autocomplete/") === true) {
+		if (entityInfo.queryParams !== undefined) {
+			// Autocomplete: autocomplete/works/q=query.json or autocomplete/general/q=query.json queryParams already contains the serialized query string (e.g., "q=neural+networks")
 			const sanitizedQuery = sanitizeFilename(entityInfo.queryParams);
 			const [, subdirectory] = entityInfo.entityId.split("/", 2);
 			directoryPath = path.join(basePath, "autocomplete", subdirectory);
@@ -433,20 +447,20 @@ export const generateFilePaths = async (
 			const urlHash = await generateContentHash(entityInfo.entityId);
 			const [, subdirectory] = entityInfo.entityId.split("/", 2);
 			directoryPath = path.join(basePath, "autocomplete", subdirectory);
-			filename = urlHash.slice(0, 8);
+			filename = urlHash.slice(0, HASH_SUFFIX_LENGTH);
 		}
-	} else if (entityInfo.isQueryResponse && entityInfo.queryParams) {
+	} else if (entityInfo.isQueryResponse === true && entityInfo.queryParams !== undefined) {
 		// Query/filter response: works/queries/filter=author.id:A123&select=display_name.json
 		const sanitizedQuery = sanitizeFilename(`filter=${entityInfo.queryParams}`);
 		directoryPath = path.join(basePath, entityType, "queries");
 		filename = sanitizedQuery;
-	} else if (entityInfo.entityId && !entityInfo.isQueryResponse) {
+	} else if (entityInfo.entityId !== undefined && entityInfo.isQueryResponse !== true) {
 		// Single entity: works/W123456789.json
 		const sanitizedId = sanitizeFilename(entityInfo.entityId);
 		directoryPath = path.join(basePath, entityType);
 		filename = sanitizedId;
 	} else if (
-		entityInfo.isQueryResponse &&
+		entityInfo.isQueryResponse === true &&
 		entityInfo.entityId === entityType
 	) {
 		// Collection response: works.json (not works/works.json)
@@ -466,39 +480,7 @@ export const generateFilePaths = async (
 };
 
 /**
- * Sanitize filename to be filesystem-safe
- * Uses hash for very long filenames to avoid ENAMETOOLONG errors
- * @param filename
- */
-const sanitizeFilename = (filename: string): string => {
-	const sanitized = filename
-		.replaceAll(/["*/:<>?\\|]/g, "_") // Replace invalid characters
-		.replaceAll(/\s+/g, "_") // Replace spaces with underscores
-		.replaceAll(/_{2,}/g, "_") // Replace multiple underscores with single
-		.replace(/^_/, "") // Remove leading underscore
-		.replace(/_$/, ""); // Remove trailing underscore
-
-	// If filename is too long, use a hash to ensure it fits filesystem limits
-	// Keep it under 100 chars to leave room for directory path and .json extension
-	if (sanitized.length > 100) {
-		// Create a simple hash from the filename
-		let hash = 0;
-		for (let index = 0; index < filename.length; index++) {
-			const char = filename.charCodeAt(index);
-			hash = (hash << 5) - hash + char;
-			hash &= hash; // Convert to 32-bit integer
-		}
-		const hashString = Math.abs(hash).toString(36);
-		// Return first 50 chars + hash to make it somewhat readable
-		return `${sanitized.slice(0, 50)}_${hashString}`;
-	}
-
-	return sanitized;
-};
-
-/**
  * Exclude meta field from response data before caching
- * @param responseData
  */
 export const excludeMetaField = (responseData: unknown): unknown => {
 	if (
@@ -506,8 +488,7 @@ export const excludeMetaField = (responseData: unknown): unknown => {
 		responseData !== null &&
 		"meta" in responseData
 	) {
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		const { meta, ...rest } = responseData as Record<string, unknown>;
+		const { meta: _meta, ...rest } = responseData;
 		return rest;
 	}
 	return responseData;
@@ -515,7 +496,6 @@ export const excludeMetaField = (responseData: unknown): unknown => {
 
 /**
  * Check if response data has empty results
- * @param responseData
  */
 export const hasEmptyResults = (responseData: unknown): boolean => {
 	if (
@@ -523,8 +503,7 @@ export const hasEmptyResults = (responseData: unknown): boolean => {
 		responseData !== null &&
 		"results" in responseData
 	) {
-		const data = responseData as Record<string, unknown>;
-		return Array.isArray(data.results) && data.results.length === 0;
+		return Array.isArray(responseData.results) && responseData.results.length === 0;
 	}
 	return false;
 };

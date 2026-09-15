@@ -8,8 +8,6 @@ import type { EdgePropertyFilter, GraphEdgeRecord } from '@bibgraph/types';
 
 /**
  * Check if an edge matches the author position filter
- * @param edge
- * @param filter
  */
 const matchesAuthorPosition = (
   edge: GraphEdgeRecord,
@@ -23,8 +21,6 @@ const matchesAuthorPosition = (
 
 /**
  * Check if an edge matches the corresponding author filter
- * @param edge
- * @param filter
  */
 const matchesCorresponding = (
   edge: GraphEdgeRecord,
@@ -38,8 +34,6 @@ const matchesCorresponding = (
 
 /**
  * Check if an edge matches the open access filter
- * @param edge
- * @param filter
  */
 const matchesOpenAccess = (
   edge: GraphEdgeRecord,
@@ -53,8 +47,6 @@ const matchesOpenAccess = (
 
 /**
  * Check if an edge matches the version filter
- * @param edge
- * @param filter
  */
 const matchesVersion = (
   edge: GraphEdgeRecord,
@@ -68,8 +60,6 @@ const matchesVersion = (
 
 /**
  * Check if an edge matches the score range filters
- * @param edge
- * @param filter
  */
 const matchesScoreRange = (
   edge: GraphEdgeRecord,
@@ -86,8 +76,6 @@ const matchesScoreRange = (
 
 /**
  * Check if an edge matches the years inclusion filter
- * @param edge
- * @param filter
  */
 const matchesYearsInclude = (
   edge: GraphEdgeRecord,
@@ -96,16 +84,15 @@ const matchesYearsInclude = (
   if (filter.yearsInclude === undefined || filter.yearsInclude.length === 0) {
     return true;
   }
-  if (!edge.years) {
+  const { years } = edge;
+  if (!years) {
     return false;
   }
-  return filter.yearsInclude.some((year) => edge.years?.includes(year));
+  return filter.yearsInclude.some((year) => years.includes(year));
 };
 
 /**
  * Check if an edge matches the award ID filter
- * @param edge
- * @param filter
  */
 const matchesAwardId = (
   edge: GraphEdgeRecord,
@@ -119,8 +106,6 @@ const matchesAwardId = (
 
 /**
  * Check if an edge matches the role filter
- * @param edge
- * @param filter
  */
 const matchesRole = (
   edge: GraphEdgeRecord,
@@ -134,8 +119,6 @@ const matchesRole = (
 
 /**
  * Check if a single edge matches all filter criteria
- * @param edge
- * @param filter
  */
 const edgeMatchesFilter = (
   edge: GraphEdgeRecord,
@@ -155,13 +138,12 @@ const edgeMatchesFilter = (
 
 /**
  * Apply edge property filter to an array of edges
- *
  * @param edges - Array of edges to filter
  * @param filter - Filter criteria to apply
  * @returns Filtered array of edges matching all criteria
  */
 export const applyEdgeFilter = (
-  edges: GraphEdgeRecord[],
+  edges: readonly GraphEdgeRecord[],
   filter: EdgePropertyFilter
 ): GraphEdgeRecord[] => {
   return edges.filter((edge) => edgeMatchesFilter(edge, filter));

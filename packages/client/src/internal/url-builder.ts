@@ -10,7 +10,6 @@ import type { FullyConfiguredClient } from "./client-config";
 
 /**
  * Check if a URL is absolute (has a protocol)
- * @param url
  */
 export const isAbsoluteUrl = (url: string): boolean => {
   try {
@@ -25,21 +24,21 @@ export const isAbsoluteUrl = (url: string): boolean => {
  * Get the origin from the current environment (browser or Node.js)
  */
 export const getEnvironmentOrigin = (): string | null => {
-  if (typeof window !== "undefined" && window.location?.origin) {
+  if (typeof window !== "undefined" && window.location.origin !== "") {
     return window.location.origin;
   }
 
   if (typeof globalThis !== "undefined") {
     const globalLocation =
       "location" in globalThis ? location : undefined;
-    if (globalLocation?.origin) {
+    if (globalLocation !== undefined && globalLocation.origin !== "") {
       return globalLocation.origin;
     }
   }
 
   if (
     typeof process !== "undefined" &&
-    typeof process.env?.VITE_ORIGIN === "string" &&
+    typeof process.env.VITE_ORIGIN === "string" &&
     process.env.VITE_ORIGIN.length > 0
   ) {
     return process.env.VITE_ORIGIN;
@@ -50,7 +49,6 @@ export const getEnvironmentOrigin = (): string | null => {
 
 /**
  * Resolve a base URL to an absolute URL
- * @param baseUrl
  */
 export const resolveBaseUrl = (baseUrl: string): string => {
   if (isAbsoluteUrl(baseUrl)) {
@@ -62,7 +60,7 @@ export const resolveBaseUrl = (baseUrl: string): string => {
   }
 
   const origin = getEnvironmentOrigin();
-  if (origin) {
+  if (origin !== null && origin !== "") {
     const resolvedUrl = new URL(baseUrl, origin);
     return resolvedUrl.toString().replace(/\/+$/, "");
   }
@@ -85,9 +83,6 @@ export const resolveBaseUrl = (baseUrl: string): string => {
 /**
  * Build a complete URL with query parameters
  * Handles special cases like the 'select' parameter which must not be URL-encoded
- * @param endpoint
- * @param params
- * @param config
  */
 export const buildUrl = (
   endpoint: string,
@@ -104,12 +99,12 @@ export const buildUrl = (
   const url = new URL(normalizedEndpoint, baseWithSlash);
 
   // Add user email if provided (recommended by OpenAlex)
-  if (config.userEmail) {
+  if (config.userEmail !== undefined && config.userEmail !== "") {
     url.searchParams.set("mailto", config.userEmail);
   }
 
   // Add API key if provided (for higher rate limits)
-  if (config.apiKey) {
+  if (config.apiKey !== undefined && config.apiKey !== "") {
     url.searchParams.set("api_key", config.apiKey);
   }
 
@@ -150,7 +145,7 @@ export const buildUrl = (
   let finalUrl = url.toString();
 
   // Manually append select parameter with unencoded commas if present
-  if (selectValue !== undefined && selectValue !== null) {
+  if (selectValue !== undefined) {
     const selectString = Array.isArray(selectValue)
       ? selectValue.join(",")
       : String(selectValue);

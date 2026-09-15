@@ -33,7 +33,8 @@
 	"dependencies": {
 		"@bibgraph/types": "workspace:*",
 		"@bibgraph/utils": "workspace:*",
-		"dexie": "4.4.5"
+		"dexie": "4.4.5",
+		"zod": "4.5.4"
 	},
 	"devDependencies": {
 		"@testing-library/jest-dom": "7.0.1",

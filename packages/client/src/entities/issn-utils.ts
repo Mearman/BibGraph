@@ -6,11 +6,29 @@
  * - Normalization to standard format (1234-5678)
  * - Checksum verification (ISO 3297)
  * - Error handling and logging
- *
- * @module issn-utils
  */
 
 import { logger } from "../internal/logger";
+
+/**
+Number of digits before the hyphen in standard ISSN format (1234-5678)
+ */
+const ISSN_PREFIX_DIGIT_COUNT = 4;
+
+/**
+Number of digits (excluding the check digit) used in the ISO 3297 checksum calculation
+ */
+const ISSN_CHECKSUM_DIGIT_COUNT = 7;
+
+/**
+Weight applied to the first digit in the ISO 3297 checksum calculation, decreasing by 1 per subsequent digit
+ */
+const ISSN_CHECKSUM_WEIGHT_BASE = 8;
+
+/**
+Modulus used in the ISO 3297 checksum calculation
+ */
+const ISSN_CHECKSUM_MODULUS = 11;
 
 /**
  * ISSN validation options
@@ -76,7 +94,7 @@ export const normalizeISSN = (issn: string): string | null => {
 
   // Add hyphen if missing (bare 8-digit format)
   if (/^\d{7}[\dX]$/.test(cleaned)) {
-    return `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
+    return `${cleaned.slice(0, ISSN_PREFIX_DIGIT_COUNT)}-${cleaned.slice(ISSN_PREFIX_DIGIT_COUNT)}`;
   }
 
   // Already in standard format
@@ -94,7 +112,7 @@ export const normalizeISSN = (issn: string): string | null => {
  */
 export const validateISSNChecksum = (issn: string): boolean => {
   const normalized = normalizeISSN(issn);
-  if (!normalized) {
+  if (normalized === null) {
     return false;
   }
 
@@ -103,17 +121,17 @@ export const validateISSNChecksum = (issn: string): boolean => {
 
   // Calculate checksum for first 7 digits
   let sum = 0;
-  for (let index = 0; index < 7; index++) {
-    sum += Number.parseInt(digits[index]) * (8 - index);
+  for (let index = 0; index < ISSN_CHECKSUM_DIGIT_COUNT; index++) {
+    sum += Number.parseInt(digits[index]) * (ISSN_CHECKSUM_WEIGHT_BASE - index);
   }
 
-  const remainder = sum % 11;
+  const remainder = sum % ISSN_CHECKSUM_MODULUS;
   const expectedCheckDigit =
     remainder === 0
       ? "0"
       : (remainder === 1
         ? "X"
-        : (11 - remainder).toString());
+        : (ISSN_CHECKSUM_MODULUS - remainder).toString());
 
   const actualCheckDigit = digits[7];
   return actualCheckDigit === expectedCheckDigit;
@@ -148,15 +166,15 @@ export const isISSNIdentifier = (id: string): boolean => {
  * @param options - Validation options
  * @returns Normalized ISSN if valid, null otherwise
  */
-export const validateAndNormalizeISSN = (issn: string, options: ISSNValidationOptions = {}): string | null => {
+export const validateAndNormalizeISSN = (issn: string, options: Readonly<ISSNValidationOptions> = {}): string | null => {
   const normalized = normalizeISSN(issn);
-  if (!normalized) {
+  if (normalized === null) {
     logger.warn("issn", `Invalid ISSN format: ${issn}`);
     return null;
   }
 
   // Optionally validate checksum
-  if (options.validateChecksum && !validateISSNChecksum(normalized)) {
+  if (options.validateChecksum === true && !validateISSNChecksum(normalized)) {
     logger.warn(
       "issn",
       `Invalid ISSN checksum: ${issn} (normalized: ${normalized})`,
@@ -184,7 +202,7 @@ export const detectISSNFormat = (issn: string): "standard" | "with_prefix" | "sc
   }
 
   if (/^(?:EISSN|ISSN)[\s:]/i.test(trimmed)) {
-    return /:/.test(trimmed) ? "scheme_notation" : "with_prefix";
+    return trimmed.includes(":") ? "scheme_notation" : "with_prefix";
   }
 
   if (/^\d{7}[\dX]$/i.test(trimmed)) {
@@ -200,7 +218,7 @@ export const detectISSNFormat = (issn: string): "standard" | "with_prefix" | "sc
  * @param options - Validation options
  * @returns Validation result with normalized ISSN if valid
  */
-export const validateISSN = (issn: string, options: ISSNValidationOptions = {}): ISSNValidationResult => {
+export const validateISSN = (issn: string, options: Readonly<ISSNValidationOptions> = {}): ISSNValidationResult => {
   if (!issn || typeof issn !== "string") {
     return { isValid: false, error: "ISSN must be a non-empty string" };
   }
@@ -209,7 +227,7 @@ export const validateISSN = (issn: string, options: ISSNValidationOptions = {}):
 
   // Validate and normalize
   const normalized = validateAndNormalizeISSN(issn, { validateChecksum: false });
-  if (!normalized) {
+  if (normalized === null) {
     return { isValid: false, error: "Invalid ISSN format" };
   }
 
@@ -220,7 +238,7 @@ export const validateISSN = (issn: string, options: ISSNValidationOptions = {}):
   };
 
   // Optional checksum validation
-  if (options.validateChecksum) {
+  if (options.validateChecksum === true) {
     return {
       ...result,
       checksumValid: validateISSNChecksum(normalized),

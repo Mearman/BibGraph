@@ -61,7 +61,7 @@ export interface FilterExpression {
   /**
   Array of conditions or nested expressions
    */
-  conditions: Array<FilterCondition | FilterExpression>;
+  conditions: (FilterCondition | FilterExpression)[];
 }
 
 /**
@@ -101,10 +101,10 @@ export interface FilterValidationResult {
   /**
   Array of field-specific validation errors
    */
-  fieldErrors?: Array<{
+  fieldErrors?: {
     field: string;
     error: string;
-  }>;
+  }[];
 }
 
 /**
@@ -140,7 +140,7 @@ export class FilterBuilder {
    * Create a new FilterBuilder instance
    * @param options - Configuration options for the builder
    */
-  constructor(options: FilterBuilderOptions = {}) {
+  constructor(options: Readonly<FilterBuilderOptions> = {}) {
     this.options = {
       defaultOperator: options.defaultOperator ?? "AND",
       urlEncode: options.urlEncode ?? false,
@@ -165,11 +165,7 @@ export class FilterBuilder {
    * // Result: "publication_year:2023,is_oa:true,authorships.author.id:A1234|A5678"
    * ```
    */
-  buildFromObject(filters: Record<string, FilterValue>): string {
-    if (!filters || typeof filters !== "object") {
-      return "";
-    }
-
+  buildFromObject(filters: Record<string, FilterValue | null | undefined>): string {
     const filterParts: string[] = [];
 
     for (const [field, value] of Object.entries(filters)) {
@@ -197,7 +193,7 @@ export class FilterBuilder {
    *
    * Converts a structured filter expression with logical operators to OpenAlex format.
    * Supports nested expressions and complex logical combinations.
-   * @param _expression - The filter expression to convert (not yet implemented)
+   * Not yet implemented; always throws.
    * @example
    * ```typescript
    * const filterString = builder.buildFromExpression({
@@ -225,7 +221,7 @@ export class FilterBuilder {
    *
    * Converts an array of individual filter conditions to OpenAlex format,
    * combining them with the default logical operator.
-   * @param _conditions - Array of filter conditions (not yet implemented)
+   * Not yet implemented; always throws.
    * @example
    * ```typescript
    * const filterString = builder.buildFromConditions([
@@ -244,7 +240,7 @@ export class FilterBuilder {
    *
    * Checks if the provided filter object is valid for OpenAlex API usage.
    * Validates field names, value types, and overall structure.
-   * @param _filters - The filter object to validate (not yet implemented)
+   * Not yet implemented; always throws.
    * @example
    * ```typescript
    * const validation = builder.validateFilters({
@@ -267,7 +263,7 @@ export class FilterBuilder {
    *
    * Checks if the provided filter expression is valid and properly structured.
    * Validates logical operators, field names, and nested expressions.
-   * @param _expression - The filter expression to validate (not yet implemented)
+   * Not yet implemented; always throws.
    */
   validateExpression(): FilterValidationResult {
     // Implementation will be added in separate task
@@ -279,7 +275,7 @@ export class FilterBuilder {
    *
    * Escapes special characters in filter values to prevent query parsing issues.
    * Handles quotes, pipes, commas, and other OpenAlex-specific characters.
-   * @param _value - The filter value to escape (not yet implemented)
+   * Not yet implemented; always throws.
    * @example
    * ```typescript
    * const escaped = builder.escapeValue('machine "learning" & AI');
@@ -292,18 +288,9 @@ export class FilterBuilder {
   }
 
   /**
-   * Parse an OpenAlex filter string back to filter object
-   *
-   * Converts an OpenAlex API filter string back to a structured filter object.
-   * Useful for parsing existing queries or reverse-engineering filters.
-   * @param filterString - The OpenAlex filter string to parse
-   * @param value
-   * @returns Parsed filter object
-   * @example
-   * ```typescript
-   * const filters = builder.parseFilterString('publication_year:2023,is_oa:true');
-   * // Result: { 'publication_year': '2023', 'is_oa': 'true' }
-   * ```
+   * Parse a single filter value string back to its typed FilterValue representation.
+   * @param value - The raw filter value substring to parse
+   * @returns The parsed value as a boolean, number, string, or string array
    */
   private parseFilterValue(value: string): FilterValue {
     // Handle array values (pipe-separated)
@@ -345,8 +332,20 @@ export class FilterBuilder {
     return { field, value: this.parseFilterValue(value) };
   }
 
+  /**
+   * Parse an OpenAlex filter string back to filter object
+   *
+   * Converts an OpenAlex API filter string back to a structured filter object. Useful for parsing existing queries or reverse-engineering filters.
+   * @param filterString - The OpenAlex filter string to parse
+   * @returns Parsed filter object
+   * @example
+   * ```typescript
+   * const filters = builder.parseFilterString('publication_year:2023,is_oa:true');
+   * // Result: { 'publication_year': '2023', 'is_oa': 'true' }
+   * ```
+   */
   parseFilterString(filterString: string): Record<string, FilterValue> {
-    if (!filterString || typeof filterString !== "string") {
+    if (filterString === "") {
       return {};
     }
 
@@ -372,7 +371,7 @@ export class FilterBuilder {
    * @param newOptions - Partial options to update
    * @returns This FilterBuilder instance for method chaining
    */
-  updateOptions(newOptions: Partial<FilterBuilderOptions>): this {
+  updateOptions(newOptions: Readonly<Partial<FilterBuilderOptions>>): this {
     this.options = {
       ...this.options,
       ...newOptions,
@@ -434,51 +433,51 @@ export const buildFilterStringFromFilters = (filters: EntityFilters | Partial<En
   // FilterValue = string | number | boolean | string[] | number[]
   const convertedFilters: Record<string, FilterValue> = {};
 
-  if (filters && typeof filters === "object") {
-    for (const [key, value] of Object.entries(filters)) {
-      if (value === undefined || value === null) {
-        continue;
-      }
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === undefined || value === null) {
+      continue;
+    }
 
-      // Proper type checking instead of type assertion
-      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-        convertedFilters[key] = value;
-      } else if (Array.isArray(value)) {
-        // Check if all array elements are strings or numbers
-        if (value.every(item => typeof item === 'string' || typeof item === 'number')) {
-          // Create properly typed arrays without casting
-          const stringArray: string[] = [];
-          const numberArray: number[] = [];
+    // Proper type checking instead of type assertion
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      convertedFilters[key] = value;
+    } else if (Array.isArray(value)) {
+      // Check if all array elements are strings or numbers
+      if (value.every(item => typeof item === 'string' || typeof item === 'number')) {
+        // Create properly typed arrays without casting
+        const stringArray: string[] = [];
+        const numberArray: number[] = [];
 
-          let isAllStrings = true;
-          let isAllNumbers = true;
+        let isAllStrings = true;
+        let isAllNumbers = true;
 
-          for (const item of value) {
-            if (typeof item === 'string') {
-              stringArray.push(item);
-              isAllNumbers = false;
-            } else if (typeof item === 'number') {
-              numberArray.push(item);
-              isAllStrings = false;
-            }
+        for (const item of value) {
+          if (typeof item === 'string') {
+            stringArray.push(item);
+            isAllNumbers = false;
+          } else if (typeof item === 'number') {
+            numberArray.push(item);
+            isAllStrings = false;
           }
+        }
 
-          if (isAllStrings) {
-            convertedFilters[key] = stringArray;
-          } else if (isAllNumbers) {
-            convertedFilters[key] = numberArray;
-          } else {
-            // Mixed array - convert all to strings
-            convertedFilters[key] = [...stringArray, ...numberArray.map(String)];
-          }
+        if (isAllStrings) {
+          convertedFilters[key] = stringArray;
+        } else if (isAllNumbers) {
+          convertedFilters[key] = numberArray;
         } else {
-          // Convert mixed array to strings
-          convertedFilters[key] = value.map(String);
+          // Mixed array - convert all to strings
+          convertedFilters[key] = [...stringArray, ...numberArray.map(String)];
         }
       } else {
-        // For any other type, convert to string
-        convertedFilters[key] = String(value);
+        // Convert mixed array to strings
+        convertedFilters[key] = value.map(String);
       }
+    } else if (typeof value === "bigint") {
+      convertedFilters[key] = String(value);
+    } else {
+      // For any other type (plain objects, functions, symbols), serialize to JSON
+      convertedFilters[key] = JSON.stringify(value);
     }
   }
 

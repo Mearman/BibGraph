@@ -33,10 +33,9 @@ export const extractMetricFromRecord = (
   record: unknown,
   metric: string,
 ): number => {
-  if (record && typeof record === "object") {
-    const groupRecord = record as Record<string, unknown>;
-    const value = metric in groupRecord ? groupRecord[metric] : undefined;
-    if (typeof value === "number" && !Number.isNaN(value)) {
+  if (isPerformerRecord(record)) {
+    const value = metric in record ? record[metric] : undefined;
+    if (isFiniteNumber(value)) {
       return value;
     }
   }

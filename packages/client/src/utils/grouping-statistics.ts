@@ -7,6 +7,7 @@ import type { EntityType } from "@bibgraph/types";
 
 import type { OpenAlexBaseClient } from "../client";
 import { logger } from "../internal/logger";
+import { recordResultsResponseSchema } from "./aggregate-schemas";
 import { isFiniteNumber } from "./grouping-type-guards";
 import type {
   AdvancedGroupParams as AdvancedGroupParameters,
@@ -22,12 +23,13 @@ import type {
  * @returns Calculated percentile value
  */
 export const calculatePercentile = (
-  sortedArray: number[],
+  sortedArray: readonly number[],
   percentile: number,
 ): number => {
   if (sortedArray.length === 0) return 0;
 
-  const index = (percentile / 100) * (sortedArray.length - 1);
+  const PERCENTAGE_SCALE = 100;
+  const index = (percentile / PERCENTAGE_SCALE) * (sortedArray.length - 1);
   const lower = Math.floor(index);
   const upper = Math.ceil(index);
   const weight = index - lower;
@@ -62,7 +64,7 @@ export const calculateBasicStats = (
  * @returns Growth rate as percentage, or undefined if insufficient data
  */
 export const calculateGrowthRate = (
-  temporalData: TemporalDataPoint[],
+  temporalData: readonly TemporalDataPoint[],
 ): number | undefined => {
   if (temporalData.length < 2) {
     return undefined;
@@ -76,7 +78,8 @@ export const calculateGrowthRate = (
   const earlyAvg = early.reduce((sum, d) => sum + d.count, 0) / early.length;
 
   if (earlyAvg > 0) {
-    return ((recentAvg - earlyAvg) / earlyAvg) * 100;
+    const PERCENTAGE_SCALE = 100;
+    return ((recentAvg - earlyAvg) / earlyAvg) * PERCENTAGE_SCALE;
   }
 
   return undefined;
@@ -96,7 +99,7 @@ export const calculateGroupPercentiles = async (
   client: OpenAlexBaseClient,
   entityType: EntityType,
   groupBy: string,
-  group: GroupResult,
+  group: Readonly<GroupResult>,
   metric: string,
   params: AdvancedGroupParameters,
 ): Promise<CalculatedPercentiles | undefined> => {
@@ -109,18 +112,17 @@ export const calculateGroupPercentiles = async (
 
   try {
     const groupFilter = `${groupBy}:${group.key}`;
-    const fullFilter = params.filter
-      ? `${params.filter},${groupFilter}`
-      : groupFilter;
+    const fullFilter =
+      params.filter !== undefined && params.filter !== ""
+        ? `${params.filter},${groupFilter}`
+        : groupFilter;
 
-    const sample = await client.getResponse<{
-      results: Array<Record<string, unknown>>;
-    }>(entityType, {
+    const sample = await client.get(entityType, {
       filter: fullFilter,
       sort: metric,
       per_page: Math.min(MAX_SAMPLE_SIZE, group.count),
       select: [metric],
-    });
+    }, recordResultsResponseSchema);
 
     const values = sample.results
       .map((item: Record<string, unknown>) => {
@@ -131,11 +133,15 @@ export const calculateGroupPercentiles = async (
 
     if (values.length === 0) return undefined;
 
+    const P25 = 25;
+    const P50 = 50;
+    const P75 = 75;
+    const P90 = 90;
     return {
-      p25: calculatePercentile(values, 25),
-      p50: calculatePercentile(values, 50),
-      p75: calculatePercentile(values, 75),
-      p90: calculatePercentile(values, 90),
+      p25: calculatePercentile(values, P25),
+      p50: calculatePercentile(values, P50),
+      p75: calculatePercentile(values, P75),
+      p90: calculatePercentile(values, P90),
     };
   } catch (error: unknown) {
     logger.warn(

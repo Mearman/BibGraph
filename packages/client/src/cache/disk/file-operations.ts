@@ -29,7 +29,6 @@ export interface FileOperationsConfig {
 
 /**
  * Ensure directory structure exists
- * @param dirPath
  */
 export const ensureDirectoryStructure = async (dirPath: string): Promise<void> => {
 	try {
@@ -46,9 +45,6 @@ export const ensureDirectoryStructure = async (dirPath: string): Promise<void> =
 
 /**
  * Write file atomically using temporary file
- * @param root0
- * @param root0.filePath
- * @param root0.content
  */
 export const writeFileAtomic = async ({
 	filePath,
@@ -92,14 +88,13 @@ export const writeFileAtomic = async ({
  * (older than timeout) are automatically removed to prevent deadlocks from
  * crashed processes. Essential for safe concurrent writes in multi-tab
  * development or server environments.
- * @param filePath
- * @param activeLocks
- * @param config
  */
+const LOCK_POLL_INTERVAL_MS = 50;
+
 export const acquireFileLock = async (
 	filePath: string,
 	activeLocks: Map<string, FileLock>,
-	config: FileOperationsConfig,
+	config: Readonly<FileOperationsConfig>,
 ): Promise<string> => {
 	await NodeModules.initializeNodeModules();
 	const { crypto } = NodeModules.getNodeModules();
@@ -137,20 +132,16 @@ export const acquireFileLock = async (
 		}
 
 		// Wait before retrying
-		await NodeModules.sleep(50);
+		await NodeModules.sleep(LOCK_POLL_INTERVAL_MS);
 	}
 
 	throw new Error(
-		`Failed to acquire file lock for ${filePath} within ${maxWaitTime}ms`,
+		`Failed to acquire file lock for ${filePath} within ${String(maxWaitTime)}ms`,
 	);
 };
 
 /**
  * Release file lock
- * @param root0
- * @param root0.lockId
- * @param root0.filePath
- * @param activeLocks
  */
 export const releaseFileLock = (
 	{ lockId, filePath }: { lockId: string; filePath: string },
@@ -175,8 +166,6 @@ export const releaseFileLock = (
 
 /**
  * Check available disk space
- * @param basePath
- * @param minDiskSpaceBytes
  */
 export const ensureSufficientDiskSpace = async (
 	basePath: string,

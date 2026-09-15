@@ -5,8 +5,33 @@
 
 import type { EntityType } from "@bibgraph/types";
 
-import { OpenAlexBaseClient } from "../client";
+import type { OpenAlexBaseClient } from "../client";
 import { logger } from "../internal/logger";
+import { citedByResultsResponseSchema, groupByResponseSchema, metaCountResponseSchema } from "./aggregate-schemas";
+
+const PERCENTAGE_MULTIPLIER = 100;
+const MONTHS_PER_YEAR = 12;
+const TOP_GROUPS_LIMIT = 20;
+const DETAILED_STATS_PER_GROUP_LIMIT = 10;
+/**
+Placeholder growth-rate simulation range: yields a value in [-GROWTH_RATE_OFFSET, GROWTH_RATE_RANGE - GROWTH_RATE_OFFSET).
+ */
+const GROWTH_RATE_RANGE = 20;
+const GROWTH_RATE_OFFSET = 10;
+const TOP_PERCENTILE_RATIO = 0.01;
+const MIN_VALID_PUBLICATION_YEAR = 1900;
+const PEAK_YEARS_COUNT = 3;
+const FALLBACK_PEAK_YEAR_1 = 2020;
+const FALLBACK_PEAK_YEAR_2 = 2021;
+const FALLBACK_PEAK_YEAR_3 = 2022;
+const FALLBACK_PEAK_PUBLICATION_YEARS = [FALLBACK_PEAK_YEAR_1, FALLBACK_PEAK_YEAR_2, FALLBACK_PEAK_YEAR_3];
+const PLACEHOLDER_HIGH_QUARTILE_CITATIONS = 5;
+const PLACEHOLDER_TOP_QUARTILE_CITATIONS = 20;
+const PLACEHOLDER_DECILE_5 = 3;
+const PLACEHOLDER_DECILE_6 = 5;
+const PLACEHOLDER_DECILE_7 = 8;
+const PLACEHOLDER_DECILE_8 = 15;
+const PLACEHOLDER_DECILE_9 = 30;
 
 /**
  * Database-wide statistics
@@ -56,15 +81,15 @@ export interface EntityAnalytics {
   };
   trend_analysis: {
     recent_growth: number; // percentage growth in last 5 years
-    publication_trends: Array<{
+    publication_trends: {
       year: number;
       count: number;
       cumulative_count: number;
-    }>;
-    seasonal_patterns?: Array<{
+    }[];
+    seasonal_patterns?: {
       month: number;
       avg_publications: number;
-    }>;
+    }[];
   };
   collaboration_metrics?: {
     avg_authors_per_work: number;
@@ -84,11 +109,11 @@ export interface ImpactMetrics {
   };
   field_normalized_metrics: {
     avg_field_citation_ratio: number;
-    top_fields_by_impact: Array<{
+    top_fields_by_impact: {
       field: string;
       avg_citations: number;
       total_works: number;
-    }>;
+    }[];
   };
   temporal_impact: {
     citation_half_life: number; // years
@@ -101,11 +126,10 @@ export interface ImpactMetrics {
  * Statistical Analysis API class
  */
 export class StatisticsApi {
-	constructor(private client: OpenAlexBaseClient) {}
+	constructor(private readonly client: OpenAlexBaseClient) {}
 
 	/**
 	 * Get comprehensive database statistics
-	 * @param params - Statistical analysis parameters
 	 * @returns Promise resolving to database-wide statistics
 	 * @example
 	 * ```typescript
@@ -123,7 +147,7 @@ export class StatisticsApi {
 
 		const entityCountPromises = entityTypes.map(async (entityType) => {
 			try {
-				const response = await this.client.getResponse<{ meta: { count: number } }>(entityType, { per_page: 1 });
+				const response = await this.client.get(entityType, { per_page: 1 }, metaCountResponseSchema);
 				return { entityType, count: response.meta.count };
 			} catch {
 				return { entityType, count: 0 };
@@ -174,17 +198,17 @@ export class StatisticsApi {
 				const previousYearFilter = `from_created_date:${String(currentYear - 2)}-01-01,to_created_date:${String(currentYear - 2)}-12-31`;
 
 				const [lastYearResponse, previousYearResponse] = await Promise.all([
-					this.client.getResponse<{ meta: { count: number } }>(entityType, { filter: lastYearFilter, per_page: 1 }),
-					this.client.getResponse<{ meta: { count: number } }>(entityType, { filter: previousYearFilter, per_page: 1 })
+					this.client.get(entityType, { filter: lastYearFilter, per_page: 1 }, metaCountResponseSchema),
+					this.client.get(entityType, { filter: previousYearFilter, per_page: 1 }, metaCountResponseSchema)
 				]);
 
 				const lastYearCount = lastYearResponse.meta.count;
 				const previousYearCount = previousYearResponse.meta.count;
-				const yearlyGrowth = previousYearCount > 0 ? ((lastYearCount - previousYearCount) / previousYearCount) * 100 : 0;
+				const yearlyGrowth = previousYearCount > 0 ? ((lastYearCount - previousYearCount) / previousYearCount) * PERCENTAGE_MULTIPLIER : 0;
 
 				growthRates[entityType] = {
 					yearly_growth: yearlyGrowth,
-					monthly_growth: yearlyGrowth / 12, // Approximation
+					monthly_growth: yearlyGrowth / MONTHS_PER_YEAR, // Approximation
 					total_added_last_year: lastYearCount,
 				};
 			} catch {
@@ -221,7 +245,6 @@ export class StatisticsApi {
 	/**
 	 * Get detailed analytics for a specific entity type
 	 * @param entityType - Type of entity to analyze
-	 * @param params - Analysis parameters
 	 * @returns Promise resolving to entity analytics
 	 * @example
 	 * ```typescript
@@ -254,8 +277,6 @@ export class StatisticsApi {
 
 	/**
 	 * Get research impact metrics
-	 * @param entityType - Type of entity to analyze
-	 * @param params - Analysis parameters
 	 * @returns Promise resolving to impact metrics
 	 * @example
 	 * ```typescript
@@ -283,7 +304,6 @@ export class StatisticsApi {
 	 * Get comparative statistics between entity groups
 	 * @param entityType - Type of entity to compare
 	 * @param groupBy - Field to group by for comparison
-	 * @param params - Analysis parameters
 	 * @returns Promise resolving to comparative statistics
 	 * @example
 	 * ```typescript
@@ -298,7 +318,7 @@ export class StatisticsApi {
 		entityType: EntityType,
 		groupBy: string
 	): Promise<{
-    groups: Array<{
+    groups: {
       group: string;
       group_display_name: string;
       metrics: {
@@ -313,7 +333,7 @@ export class StatisticsApi {
         by_citations: number;
         by_growth: number;
       };
-    }>;
+    }[];
     overall_metrics: {
       total_entities: number;
       total_citations: number;
@@ -321,24 +341,24 @@ export class StatisticsApi {
     };
   }> {
 		// Get grouped data
-		const groupedResponse = await this.client.getResponse<{ group_by?: Array<{ key: string; key_display_name?: string; count: number; cited_by_count?: number }> }>(entityType, {
+		const groupedResponse = await this.client.get(entityType, {
 			group_by: groupBy,
 			per_page: 1,
-		});
+		}, groupByResponseSchema);
 
 		const groupBy_data = groupedResponse.group_by;
 		if (!groupBy_data) {
 			throw new Error(`Grouping not supported for ${entityType} by ${groupBy}`);
 		}
 
-		const groups = groupBy_data.slice(0, 20); // Top 20 groups
+		const groups = groupBy_data.slice(0, TOP_GROUPS_LIMIT); // Top N groups
 		const totalEntities = groups.reduce((sum: number, group) => sum + group.count, 0);
 		const totalCitations = groups.reduce((sum: number, group) => {
 			const citedByCount = this.extractCitedByCount(group);
 			return sum + citedByCount;
 		}, 0);
 
-		const groupMetrics: Array<{
+		const groupMetrics: {
       group: string;
       group_display_name: string;
       metrics: {
@@ -353,22 +373,19 @@ export class StatisticsApi {
         by_citations: number;
         by_growth: number;
       };
-    }> = [];
+    }[] = [];
 
-		for (let index = 0; index < Math.min(10, groups.length); index++) {
+		for (let index = 0; index < Math.min(DETAILED_STATS_PER_GROUP_LIMIT, groups.length); index++) {
 			const group = groups[index];
-			if (!group) {
-				continue;
-			}
 
 			try {
 				// Get more detailed stats for each group
 				const groupFilter = `${groupBy}:${group.key}`;
-				const groupStats = await this.client.getResponse<{ results: Array<{ cited_by_count?: number }> }>(entityType, {
+				const groupStats = await this.client.get(entityType, {
 					filter: groupFilter,
 					per_page: 100,
 					sort: "cited_by_count",
-				});
+				}, citedByResultsResponseSchema);
 
 				const citations = groupStats.results.map((item) => this.extractCitedByCount(item));
 				const avgCitations = citations.reduce((sum, c) => sum + c, 0) / citations.length;
@@ -376,17 +393,17 @@ export class StatisticsApi {
 				const medianCitations = sortedCitations[Math.floor(sortedCitations.length / 2)] || 0;
 
 				// Simplified growth rate calculation
-				const growthRate = Math.random() * 20 - 10; // Placeholder - would need historical data
+				const growthRate = Math.random() * GROWTH_RATE_RANGE - GROWTH_RATE_OFFSET; // Placeholder - would need historical data
 
 				groupMetrics.push({
 					group: group.key,
-					group_display_name: group.key_display_name ?? group.key,
+					group_display_name: group.key_display_name,
 					metrics: {
 						total_count: group.count,
 						avg_citations: avgCitations,
 						median_citations: medianCitations,
 						growth_rate: growthRate,
-						market_share: (group.count / totalEntities) * 100,
+						market_share: (group.count / totalEntities) * PERCENTAGE_MULTIPLIER,
 					},
 					rankings: {
 						by_count: index + 1,
@@ -432,10 +449,10 @@ export class StatisticsApi {
 	private async getCoverageMetrics() {
 		try {
 			const [worksWithDoi, worksOpenAccess, authorsWithOrcid, institutionsWithRor] = await Promise.all([
-				this.client.getResponse<{ meta: { count: number } }>("works", { filter: "has_doi:true", per_page: 1 }),
-				this.client.getResponse<{ meta: { count: number } }>("works", { filter: "is_oa:true", per_page: 1 }),
-				this.client.getResponse<{ meta: { count: number } }>("authors", { filter: "has_orcid:true", per_page: 1 }),
-				this.client.getResponse<{ meta: { count: number } }>("institutions", { filter: "has_ror:true", per_page: 1 }),
+				this.client.get("works", { filter: "has_doi:true", per_page: 1 }, metaCountResponseSchema),
+				this.client.get("works", { filter: "is_oa:true", per_page: 1 }, metaCountResponseSchema),
+				this.client.get("authors", { filter: "has_orcid:true", per_page: 1 }, metaCountResponseSchema),
+				this.client.get("institutions", { filter: "has_ror:true", per_page: 1 }, metaCountResponseSchema),
 			]);
 
 			return {
@@ -459,18 +476,18 @@ export class StatisticsApi {
 	 */
 	private async getCitationMetrics() {
 		try {
-			const worksResponse = await this.client.getResponse<{ results: Array<{ cited_by_count?: number }> }>("works", {
+			const worksResponse = await this.client.get("works", {
 				per_page: 100,
 				sort: "cited_by_count",
 				select: ["cited_by_count"]
-			});
+			}, citedByResultsResponseSchema);
 
 			const citations = worksResponse.results.map((work) => this.extractCitedByCount(work));
 			const totalCitations = citations.reduce((sum, c) => sum + c, 0);
 			const avgCitations = totalCitations / citations.length;
 
 			// Top 1% threshold (simplified)
-			const topPercentileThreshold = citations[Math.floor(citations.length * 0.01)] || 0;
+			const topPercentileThreshold = citations[Math.floor(citations.length * TOP_PERCENTILE_RATIO)] || 0;
 
 			return {
 				total_citations: totalCitations,
@@ -491,21 +508,21 @@ export class StatisticsApi {
 	 */
 	private async getTemporalDistribution() {
 		try {
-			const yearGrouping = await this.client.getResponse<{ group_by?: Array<{ key: string; count: number }> }>("works", {
+			const yearGrouping = await this.client.get("works", {
 				group_by: "publication_year",
 				per_page: 1,
-			});
+			}, groupByResponseSchema);
 
 			const yearData = yearGrouping.group_by;
 			if (yearData) {
-				const years = yearData.map((group) => Number.parseInt(group.key)).filter(y => y > 1900);
+				const years = yearData.map((group) => Number.parseInt(group.key)).filter(y => y > MIN_VALID_PUBLICATION_YEAR);
 				const yearCounts = yearData.map((group) => ({ year: Number.parseInt(group.key), count: group.count }));
 
 				// Find peak years (top 3 by publication count)
 				const peakYears = yearCounts
-					.filter((yc) => yc.year > 1900)
+					.filter((yc) => yc.year > MIN_VALID_PUBLICATION_YEAR)
 					.sort((a, b) => b.count - a.count)
-					.slice(0, 3)
+					.slice(0, PEAK_YEARS_COUNT)
 					.map((yc) => yc.year);
 
 				return {
@@ -519,9 +536,9 @@ export class StatisticsApi {
 		}
 
 		return {
-			oldest_work_year: 1900,
+			oldest_work_year: MIN_VALID_PUBLICATION_YEAR,
 			newest_work_year: new Date().getFullYear(),
-			peak_publication_years: [2020, 2021, 2022],
+			peak_publication_years: FALLBACK_PEAK_PUBLICATION_YEARS,
 		};
 	}
 
@@ -530,16 +547,16 @@ export class StatisticsApi {
 	 */
 	private async getGeographicDistribution(): Promise<Record<string, number>> {
 		try {
-			const countryGrouping = await this.client.getResponse<{ group_by?: Array<{ key: string; key_display_name?: string; count: number }> }>("institutions", {
+			const countryGrouping = await this.client.get("institutions", {
 				group_by: "country_code",
 				per_page: 1,
-			});
+			}, groupByResponseSchema);
 
 			const countryData = countryGrouping.group_by;
 			if (countryData) {
 				const distribution: Record<string, number> = {};
-				for (const group of countryData.slice(0, 20)) {
-					const displayName = group.key_display_name ?? group.key;
+				for (const group of countryData.slice(0, TOP_GROUPS_LIMIT)) {
+					const displayName = group.key_display_name;
 					distribution[displayName] = group.count;
 				}
 				return distribution;
@@ -562,8 +579,8 @@ export class StatisticsApi {
 		// Implementation for distribution analysis
 		return {
 			citation_distribution: {
-				quartiles: [0, 1, 5, 20] satisfies [number, number, number, number],
-				deciles: [0, 0, 1, 1, 2, 3, 5, 8, 15, 30],
+				quartiles: [0, 1, PLACEHOLDER_HIGH_QUARTILE_CITATIONS, PLACEHOLDER_TOP_QUARTILE_CITATIONS] satisfies [number, number, number, number],
+				deciles: [0, 0, 1, 1, 2, PLACEHOLDER_DECILE_5, PLACEHOLDER_DECILE_6, PLACEHOLDER_DECILE_7, PLACEHOLDER_DECILE_8, PLACEHOLDER_DECILE_9],
 				highly_cited_threshold: 100,
 			},
 			activity_distribution: {
@@ -627,7 +644,6 @@ export class StatisticsApi {
 
 	/**
 	 * Type guard to safely extract cited_by_count from unknown objects
-	 * @param item
 	 */
 	private extractCitedByCount(item: unknown): number {
 		if (this.isObjectWithCitedByCount(item)) {
@@ -641,7 +657,6 @@ export class StatisticsApi {
 
 	/**
 	 * Type guard to check if an item has a cited_by_count property
-	 * @param item
 	 */
 	private isObjectWithCitedByCount(item: unknown): item is { cited_by_count?: unknown } {
 		return item !== null && typeof item === "object" && "cited_by_count" in item;
@@ -649,9 +664,8 @@ export class StatisticsApi {
 
 	/**
 	 * Calculate Shannon diversity index
-	 * @param counts
 	 */
-	private calculateShannonDiversity(counts: number[]): number {
+	private calculateShannonDiversity(counts: readonly number[]): number {
 		const total = counts.reduce((sum, count) => sum + count, 0);
 		if (total === 0) return 0;
 

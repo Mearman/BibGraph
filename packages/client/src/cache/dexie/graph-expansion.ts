@@ -9,7 +9,6 @@
  * 2. Extracts and indexes all relationships
  * 3. Creates stub nodes for newly discovered entities
  * 4. Marks the node as expanded
- * @module cache/dexie/graph-expansion
  */
 
 import type { EntityType } from '@bibgraph/types';
@@ -52,8 +51,7 @@ const ID_PREFIX_TO_TYPE: Record<string, EntityType> = {
 
 /**
  * Infer entity type from OpenAlex ID prefix
- * e.g., "W123456" -> "works", "A789012" -> "authors"
- * @param id
+ * e.g., "W123456" resolves to "works", "A789012" resolves to "authors"
  */
 const inferEntityTypeFromId = (id: string): EntityType | undefined => {
   if (!id || id.length < 2) return undefined;
@@ -64,7 +62,6 @@ const inferEntityTypeFromId = (id: string): EntityType | undefined => {
 /**
  * Check if a label looks like an ID-only label (no display name resolved)
  * ID-only labels match the OpenAlex ID pattern: letter followed by digits
- * @param label
  */
 const isIdOnlyLabel = (label: string): boolean => /^[A-Z]\d+$/i.test(label);
 
@@ -80,7 +77,7 @@ const BATCH_SIZE = 100;
  * @param stubs - Stub nodes to resolve labels for
  * @returns Map of entity ID to resolved display_name
  */
-const resolveStubLabels = async (stubs: Array<{ id: string; entityType: EntityType; label: string }>): Promise<Map<string, string>> => {
+const resolveStubLabels = async (stubs: readonly { id: string; entityType: EntityType; label: string }[]): Promise<Map<string, string>> => {
   const labelMap = new Map<string, string>();
 
   // Filter to only stubs with ID-only labels
@@ -90,10 +87,10 @@ const resolveStubLabels = async (stubs: Array<{ id: string; entityType: EntityTy
     return labelMap;
   }
 
-  logger.debug(LOG_PREFIX, `Resolving labels for ${needsResolution.length} stub nodes using batch queries`);
+  logger.debug(LOG_PREFIX, `Resolving labels for ${String(needsResolution.length)} stub nodes using batch queries`);
 
   // Group stubs by entity type for batch queries
-  const stubsByType = new Map<EntityType, Array<{ id: string; label: string }>>();
+  const stubsByType = new Map<EntityType, { id: string; label: string }[]>();
   for (const stub of needsResolution) {
     const existing = stubsByType.get(stub.entityType) ?? [];
     existing.push({ id: stub.id, label: stub.label });
@@ -110,7 +107,7 @@ const resolveStubLabels = async (stubs: Array<{ id: string; entityType: EntityTy
 
       try {
         // Use batch query with OR syntax - different helpers per entity type
-        let results: Array<{ id: string; display_name?: string; title?: string }> = [];
+        let results: { id: string; display_name?: string; title?: string }[] = [];
 
         switch (entityType) {
           case 'works': {
@@ -119,7 +116,7 @@ const resolveStubLabels = async (stubs: Array<{ id: string; entityType: EntityTy
               select: selectFields,
               per_page: batch.length,
             });
-            results = response.results as Array<{ id: string; display_name?: string; title?: string }>;
+            results = response.results;
             break;
           }
           case 'authors': {
@@ -128,7 +125,7 @@ const resolveStubLabels = async (stubs: Array<{ id: string; entityType: EntityTy
               select: selectFields,
               per_page: batch.length,
             });
-            results = response.results as Array<{ id: string; display_name?: string; title?: string }>;
+            results = response.results;
             break;
           }
           case 'institutions': {
@@ -137,7 +134,7 @@ const resolveStubLabels = async (stubs: Array<{ id: string; entityType: EntityTy
               select: selectFields,
               per_page: batch.length,
             });
-            results = response.results as Array<{ id: string; display_name?: string; title?: string }>;
+            results = response.results;
             break;
           }
           case 'sources': {
@@ -146,19 +143,27 @@ const resolveStubLabels = async (stubs: Array<{ id: string; entityType: EntityTy
               select: selectFields,
               per_page: batch.length,
             });
-            results = response.results as Array<{ id: string; display_name?: string; title?: string }>;
+            results = response.results;
             break;
           }
+          case 'topics':
+          case 'concepts':
+          case 'publishers':
+          case 'funders':
+          case 'keywords':
+          case 'domains':
+          case 'fields':
+          case 'subfields':
           default:
             // For other entity types without batch support, skip batch resolution
-            logger.debug(LOG_PREFIX, `Batch resolution not supported for ${entityType}, skipping ${batch.length} stubs`);
+            logger.debug(LOG_PREFIX, `Batch resolution not supported for ${entityType}, skipping ${String(batch.length)} stubs`);
             continue;
         }
 
         // Map resolved entities to their display names
         for (const entity of results) {
           const displayName = entity.display_name ?? entity.title;
-          if (displayName && entity.id) {
+          if (displayName !== undefined && entity.id) {
             // Normalize ID to short form for consistent lookup
             const shortId = entity.id.replace('https://openalex.org/', '');
             labelMap.set(shortId, displayName);
@@ -173,7 +178,7 @@ const resolveStubLabels = async (stubs: Array<{ id: string; entityType: EntityTy
     }
   }
 
-  logger.debug(LOG_PREFIX, `Resolved ${labelMap.size} of ${needsResolution.length} stub labels via batch queries`);
+  logger.debug(LOG_PREFIX, `Resolved ${String(labelMap.size)} of ${String(needsResolution.length)} stub labels via batch queries`);
 
   return labelMap;
 };
@@ -243,30 +248,31 @@ export interface NodeExpansionResult {
 
 /**
  * Fetch entity data by type and ID
- * @param entityType
- * @param entityId
  */
 const fetchEntityData = async (entityType: EntityType, entityId: string): Promise<Record<string, unknown> | null> => {
   try {
     switch (entityType) {
       case 'works':
-        return (await getWorkById(entityId)) as unknown as Record<string, unknown>;
+        return await getWorkById(entityId);
       case 'authors':
-        return (await getAuthorById(entityId)) as unknown as Record<string, unknown>;
+        return await getAuthorById(entityId);
       case 'institutions':
-        return (await getInstitutionById(entityId)) as unknown as Record<string, unknown>;
+        return await getInstitutionById(entityId);
       case 'sources':
-        return (await getSourceById(entityId)) as unknown as Record<string, unknown>;
+        return await getSourceById(entityId);
       case 'topics':
-        return (await getTopicById(entityId)) as unknown as Record<string, unknown>;
+        return await getTopicById(entityId);
       case 'funders':
-        return (await getFunderById(entityId)) as unknown as Record<string, unknown>;
+        return await getFunderById(entityId);
       case 'publishers':
-        return (await getPublisherById(entityId)) as unknown as Record<string, unknown>;
+        return await getPublisherById(entityId);
       case 'concepts':
-        return (await getConceptById(entityId)) as unknown as Record<string, unknown>;
+        return await getConceptById(entityId);
       case 'keywords':
-        return (await getKeywordById(entityId)) as unknown as Record<string, unknown>;
+        return await getKeywordById(entityId);
+      case 'domains':
+      case 'fields':
+      case 'subfields':
       default:
         logger.warn(LOG_PREFIX, `Unsupported entity type: ${entityType}`);
         return null;
@@ -288,7 +294,6 @@ const fetchEntityData = async (entityType: EntityType, entityId: string): Promis
  * 5. Marks the node as expanded with timestamp
  * @param graph - The PersistentGraph instance
  * @param nodeId - The ID of the node to expand
- * @param entityType
  * @returns Expansion result with statistics
  */
 export const expandNode = async (graph: PersistentGraph, nodeId: string, entityType?: EntityType): Promise<NodeExpansionResult> => {
@@ -473,8 +478,6 @@ export const expandNode = async (graph: PersistentGraph, nodeId: string, entityT
 
 /**
  * Check if a node is fully expanded (has expandedAt timestamp)
- * @param graph
- * @param nodeId
  */
 export const isNodeExpanded = (graph: PersistentGraph, nodeId: string): boolean => {
   const node = graph.getNode(nodeId);
@@ -483,8 +486,6 @@ export const isNodeExpanded = (graph: PersistentGraph, nodeId: string): boolean 
 
 /**
  * Check if a node is a stub (completeness === 'stub')
- * @param graph
- * @param nodeId
  */
 export const isStubNode = (graph: PersistentGraph, nodeId: string): boolean => {
   const node = graph.getNode(nodeId);

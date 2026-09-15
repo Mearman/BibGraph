@@ -10,8 +10,10 @@ import type {
   QueryParams,
   SampleParams,
 } from "@bibgraph/types";
+import { z } from "zod";
 
-import { OpenAlexBaseClient } from "../client";
+import type { OpenAlexBaseClient } from "../client";
+import { getEndpointEntitySchema } from "../internal/entity-schemas";
 import { logError,logger } from "../internal/logger";
 
 /**
@@ -37,10 +39,25 @@ export interface AdvancedSampleParams extends SampleParams {
 }
 
 /**
+ * Top-level shape of a group_by aggregate response, as used to discover strata distribution before stratified sampling. Not an OpenAlexResponse envelope: aggregate responses are addressed by their group_by array, not a results array.
+ */
+const strataDistributionSchema = z.object({
+  group_by: z
+    .array(
+      z.object({
+        key: z.string(),
+        key_display_name: z.string().optional(),
+        count: z.number(),
+      }),
+    )
+    .optional(),
+});
+
+/**
  * Sampling API class providing random sampling methods
  */
 export class SamplingApi {
-  constructor(private client: OpenAlexBaseClient) {}
+  constructor(private readonly client: OpenAlexBaseClient) {}
 
   /**
    * Get random sample of entities from any entity type
@@ -56,16 +73,17 @@ export class SamplingApi {
    * });
    * ```
    */
-  async randomSample<T = OpenAlexEntity>(
+  async randomSample(
     entityType: EntityType,
     params: SampleParams = {},
-  ): Promise<OpenAlexResponse<T>> {
+  ): Promise<OpenAlexResponse<OpenAlexEntity>> {
+    const MAX_PER_PAGE = 200;
     const { sample_size = 25, seed, ...queryParameters }: SampleParams = params;
 
     const sampleParameters: QueryParams = {
       ...queryParameters,
       sort: "random",
-      per_page: Math.min(sample_size, 200), // OpenAlex typically limits to 200 per page
+      per_page: Math.min(sample_size, MAX_PER_PAGE), // OpenAlex typically limits to 200 per page
     };
 
     // Add seed for reproducible sampling
@@ -73,7 +91,7 @@ export class SamplingApi {
       sampleParameters.seed = seed;
     }
 
-    return this.client.getResponse<T>(entityType, sampleParameters);
+    return this.client.getResponse(entityType, sampleParameters, getEndpointEntitySchema(entityType));
   }
 
   /**
@@ -96,26 +114,20 @@ export class SamplingApi {
     params: AdvancedSampleParams = {},
   ): Promise<{
     samples: OpenAlexEntity[];
-    strata_info: Array<{
+    strata_info: {
       stratum: string;
       count: number;
       sample_count: number;
-    }>;
+    }[];
   }> {
     const { sample_size = 100, seed, ...queryParameters } = params;
 
     // First, get distribution of the stratification field
-    const groupedResponse = await this.client.getResponse<{
-      group_by?: Array<{
-        key: string;
-        key_display_name?: string;
-        count: number;
-      }>;
-    }>(entityType, {
+    const groupedResponse = await this.client.get(entityType, {
       ...queryParameters,
       group_by: stratifyBy,
       per_page: 100, // Get top strata
-    });
+    }, strataDistributionSchema);
 
     if (!groupedResponse.group_by) {
       // Fallback to regular random sample if grouping not supported
@@ -132,15 +144,16 @@ export class SamplingApi {
       };
     }
 
-    const strata = groupedResponse.group_by.slice(0, 10); // Limit to top 10 strata
+    const MAX_STRATA = 10;
+    const strata = groupedResponse.group_by.slice(0, MAX_STRATA); // Limit to top strata
     const totalCount = strata.reduce((sum, s) => sum + s.count, 0);
 
     const samples: OpenAlexEntity[] = [];
-    const strataInfo: Array<{
+    const strataInfo: {
       stratum: string;
       count: number;
       sample_count: number;
-    }> = [];
+    }[] = [];
 
     // Sample proportionally from each stratum
     for (const stratum of strata) {
@@ -154,9 +167,10 @@ export class SamplingApi {
         const stratumParameters: SampleParams = {
           ...queryParameters,
           sample_size: stratumSampleSize,
-          filter: queryParameters.filter
-            ? `${queryParameters.filter},${stratifyBy}:${stratum.key}`
-            : `${stratifyBy}:${stratum.key}`,
+          filter:
+            queryParameters.filter !== undefined && queryParameters.filter !== ""
+              ? `${queryParameters.filter},${stratifyBy}:${stratum.key}`
+              : `${stratifyBy}:${stratum.key}`,
         };
         if (seed !== undefined) {
           stratumParameters.seed = seed + stratum.key.length;
@@ -168,7 +182,9 @@ export class SamplingApi {
 
         samples.push(...stratumSample.results);
         strataInfo.push({
-          stratum: stratum.key_display_name || stratum.key,
+          stratum: stratum.key_display_name !== "" && stratum.key_display_name !== undefined
+            ? stratum.key_display_name
+            : stratum.key,
           count: stratum.count,
           sample_count: stratumSample.results.length,
         });
@@ -179,7 +195,9 @@ export class SamplingApi {
           error,
         });
         strataInfo.push({
-          stratum: stratum.key_display_name || stratum.key,
+          stratum: stratum.key_display_name !== "" && stratum.key_display_name !== undefined
+            ? stratum.key_display_name
+            : stratum.key,
           count: stratum.count,
           sample_count: 0,
         });
@@ -207,11 +225,11 @@ export class SamplingApi {
     params: AdvancedSampleParams = {},
   ): Promise<{
     samples: OpenAlexEntity[];
-    temporal_distribution: Array<{
+    temporal_distribution: {
       period: string;
       count: number;
       sample_count: number;
-    }>;
+    }[];
   }> {
     const currentYear = new Date().getFullYear();
     const periods = [
@@ -225,11 +243,11 @@ export class SamplingApi {
     const samplesPerPeriod = Math.ceil(sample_size / periods.length);
 
     const samples: OpenAlexEntity[] = [];
-    const temporalDistribution: Array<{
+    const temporalDistribution: {
       period: string;
       count: number;
       sample_count: number;
-    }> = [];
+    }[] = [];
 
     for (const period of periods) {
       try {
@@ -238,9 +256,10 @@ export class SamplingApi {
             ? `publication_year:${String(period.start)}-${String(period.end)}`
             : `from_created_date:${String(period.start)}-01-01,to_created_date:${String(period.end)}-12-31`;
 
-        const periodFilter = params.filter
-          ? `${params.filter},${dateFilter}`
-          : dateFilter;
+        const periodFilter =
+          params.filter !== undefined && params.filter !== ""
+            ? `${params.filter},${dateFilter}`
+            : dateFilter;
 
         const periodSample = await this.randomSample(entityType, {
           ...params,
@@ -284,16 +303,17 @@ export class SamplingApi {
    * });
    * ```
    */
-  async citationWeightedSample<T = OpenAlexEntity>(
+  async citationWeightedSample(
     entityType: EntityType,
     params: AdvancedSampleParams = {},
-  ): Promise<OpenAlexResponse<T>> {
+  ): Promise<OpenAlexResponse<OpenAlexEntity>> {
     // For citation-weighted sampling, we'll use a mixed approach:
     // 70% from highly cited entities, 30% from regular sample
 
     const { sample_size = 50, seed, ...queryParameters }: SampleParams = params;
 
-    const highlyCitedSize = Math.floor(sample_size * 0.7);
+    const HIGHLY_CITED_SHARE = 0.7;
+    const highlyCitedSize = Math.floor(sample_size * HIGHLY_CITED_SHARE);
     const regularSize = sample_size - highlyCitedSize;
 
     const [highlyCitedSample, regularSample] = await Promise.all([
@@ -302,15 +322,16 @@ export class SamplingApi {
         const highlyCitedParameters: SampleParams = {
           ...queryParameters,
           sample_size: highlyCitedSize,
-          filter: queryParameters.filter
-            ? `${queryParameters.filter},cited_by_count:>10`
-            : "cited_by_count:>10",
+          filter:
+            queryParameters.filter !== undefined && queryParameters.filter !== ""
+              ? `${queryParameters.filter},cited_by_count:>10`
+              : "cited_by_count:>10",
           sort: "random", // Still random within highly cited
         };
         if (seed !== undefined) {
           highlyCitedParameters.seed = seed;
         }
-        return this.randomSample<T>(entityType, highlyCitedParameters);
+        return this.randomSample(entityType, highlyCitedParameters);
       })(),
 
       // Regular random sample
@@ -320,9 +341,10 @@ export class SamplingApi {
           sample_size: regularSize,
         };
         if (seed !== undefined) {
-          regularParameters.seed = seed + 1000;
+          const REGULAR_SEED_OFFSET = 1000;
+          regularParameters.seed = seed + REGULAR_SEED_OFFSET;
         }
-        return this.randomSample<T>(entityType, regularParameters);
+        return this.randomSample(entityType, regularParameters);
       })(),
     ]);
 
@@ -333,14 +355,13 @@ export class SamplingApi {
     ];
 
     // Shuffle using seed if provided
-    if (seed === undefined) {
-      this.shuffleArray(combinedResults);
-    } else {
-      this.shuffleArray(combinedResults, seed);
-    }
+    const shuffledResults =
+      seed === undefined
+        ? this.shuffleArray(combinedResults)
+        : this.shuffleArray(combinedResults, seed);
 
     return {
-      results: combinedResults,
+      results: shuffledResults,
       meta: {
         count: highlyCitedSample.meta.count + regularSample.meta.count,
         db_response_time_ms:
@@ -366,18 +387,18 @@ export class SamplingApi {
    * );
    * ```
    */
-  async abTestSample<T extends { id: string } = OpenAlexEntity>(
+  async abTestSample(
     entityType: EntityType,
     groupA: SampleParams,
     groupB: SampleParams,
   ): Promise<{
-    groupA: OpenAlexResponse<T>;
-    groupB: OpenAlexResponse<T>;
-    overlap: T[];
+    groupA: OpenAlexResponse<OpenAlexEntity>;
+    groupB: OpenAlexResponse<OpenAlexEntity>;
+    overlap: OpenAlexEntity[];
   }> {
     const [sampleA, sampleB] = await Promise.all([
-      this.randomSample<T>(entityType, groupA),
-      this.randomSample<T>(entityType, groupB),
+      this.randomSample(entityType, groupA),
+      this.randomSample(entityType, groupB),
     ]);
 
     // Check for overlap (entities appearing in both samples)
@@ -403,23 +424,23 @@ export class SamplingApi {
    * });
    * ```
    */
-  async qualitySample<T = OpenAlexEntity>(
+  async qualitySample(
     entityType: EntityType,
     params: AdvancedSampleParams = {},
-  ): Promise<OpenAlexResponse<T>> {
+  ): Promise<OpenAlexResponse<OpenAlexEntity>> {
     const qualityFilters = this.getQualityFilters(entityType);
 
-    return this.randomSample<T>(entityType, {
+    return this.randomSample(entityType, {
       ...params,
-      filter: params.filter
-        ? `${params.filter},${qualityFilters}`
-        : qualityFilters,
+      filter:
+        params.filter !== undefined && params.filter !== ""
+          ? `${params.filter},${qualityFilters}`
+          : qualityFilters,
     });
   }
 
   /**
    * Get quality filters for different entity types
-   * @param entityType
    */
   private getQualityFilters(entityType: EntityType): string {
     switch (entityType) {
@@ -431,35 +452,49 @@ export class SamplingApi {
         return "works_count:>100"; // Active sources
       case "institutions":
         return "works_count:>50"; // Active institutions
-      default:
+      case "topics":
+      case "concepts":
+      case "publishers":
+      case "funders":
+      case "keywords":
+      case "domains":
+      case "fields":
+      case "subfields":
         return "works_count:>1"; // At least some activity
+      default:
+        return entityType satisfies never;
     }
   }
 
   /**
    * Fisher-Yates shuffle algorithm with optional seed
-   * @param array
-   * @param seed
    */
-  private shuffleArray(array: unknown[], seed?: number): void {
+  private shuffleArray<T>(array: readonly T[], seed?: number): T[] {
+    const shuffled = [...array];
     // Simple seeded random number generator (not cryptographically secure)
-    const random = seed ? this.seededRandom(seed) : Math.random;
+    const random = seed !== undefined ? this.seededRandom(seed) : Math.random;
 
-    for (let index = array.length - 1; index > 0; index--) {
+    for (let index = shuffled.length - 1; index > 0; index--) {
       const index_ = Math.floor(random() * (index + 1));
-      [array[index], array[index_]] = [array[index_], array[index]];
+      [shuffled[index], shuffled[index_]] = [shuffled[index_], shuffled[index]];
     }
+    return shuffled;
   }
 
   /**
    * Simple seeded random number generator
-   * @param seed
    */
   private seededRandom(seed: number): () => number {
+    // Linear congruential generator constants (Numerical Recipes parameters).
+    const LCG_MULTIPLIER = 1_664_525;
+    const LCG_INCREMENT = 1_013_904_223;
+    const LCG_MODULUS_BITS = 32;
+    const modulus = Math.pow(2, LCG_MODULUS_BITS);
+
     let state = seed;
     return () => {
-      state = (state * 1_664_525 + 1_013_904_223) % Math.pow(2, 32);
-      return state / Math.pow(2, 32);
+      state = (state * LCG_MULTIPLIER + LCG_INCREMENT) % modulus;
+      return state / modulus;
     };
   }
 }

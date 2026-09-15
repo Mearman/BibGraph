@@ -7,6 +7,29 @@ import { logger } from "@bibgraph/utils";
 
 import { calculateRetryDelay,RETRY_CONFIG } from "../internal/rate-limit";
 
+// Time conversion factors
+const SECONDS_PER_MINUTE = 60;
+const MILLISECONDS_PER_SECOND = 1000;
+
+// Default pipeline tuning values
+const CACHE_TTL_MINUTES = 5;
+const DEDUPE_WINDOW_MINUTES = 5;
+const DEFAULT_MAX_DEDUPE_ENTRIES = 1000;
+const DEFAULT_MAX_RETRIES = 3;
+
+// Generated request ID shape: `req_<timestamp>_<random substring>`
+const REQUEST_ID_RADIX = 36;
+const REQUEST_ID_RANDOM_LENGTH = 11;
+
+// Logging and networking limits
+const URL_LOG_TRUNCATE_LENGTH = 100;
+const REQUEST_TIMEOUT_MS = 30_000;
+
+// HTTP status thresholds used for error classification
+const HTTP_STATUS_TOO_MANY_REQUESTS = 429;
+const HTTP_STATUS_CLIENT_ERROR_MIN = 400;
+const HTTP_STATUS_SERVER_ERROR_MIN = 500;
+
 /**
  * Request context passed through the pipeline
  */
@@ -173,16 +196,96 @@ export interface PipelineOptions {
 }
 
 /**
+ * Classify an error into categories with retry recommendations
+ */
+export const classifyError = (error: Error, response?: Response): ErrorClassification => {
+  // Network errors
+  if (error.name === "TypeError" && error.message.includes("fetch")) {
+    return {
+      type: ErrorType.NETWORK,
+      retryable: true,
+      retryDelay: calculateRetryDelay(0, RETRY_CONFIG.network),
+      userMessage:
+        "Network connection error. Please check your internet connection.",
+      internalMessage: "Fetch network error - likely connectivity issue",
+    };
+  }
+
+  // Timeout errors
+  if (error.name === "AbortError" || error.message.includes("timeout")) {
+    return {
+      type: ErrorType.TIMEOUT,
+      retryable: true,
+      retryDelay: calculateRetryDelay(0, RETRY_CONFIG.network),
+      userMessage: "Request timed out. Please try again.",
+      internalMessage: "Request timeout - abort signal triggered",
+    };
+  }
+
+  // Rate limit errors
+  if (response?.status === HTTP_STATUS_TOO_MANY_REQUESTS) {
+    const retryAfter = response.headers.get("Retry-After");
+    const retryDelay =
+      retryAfter !== null
+        ? Number.parseInt(retryAfter, 10) * MILLISECONDS_PER_SECOND
+        : undefined;
+
+    return {
+      type: ErrorType.RATE_LIMIT,
+      retryable: true,
+      retryDelay:
+        retryDelay ?? calculateRetryDelay(0, RETRY_CONFIG.rateLimited),
+      userMessage:
+        "Too many requests. Please wait a moment before trying again.",
+      internalMessage: `Rate limited (HTTP 429) - retry after ${retryAfter ?? "unknown"} seconds`,
+    };
+  }
+
+  // Server errors (5xx)
+  if (response && response.status >= HTTP_STATUS_SERVER_ERROR_MIN) {
+    return {
+      type: ErrorType.SERVER,
+      retryable: true,
+      retryDelay: calculateRetryDelay(0, RETRY_CONFIG.server),
+      userMessage: "Server error. Please try again later.",
+      internalMessage: `Server error (HTTP ${String(response.status)})`,
+    };
+  }
+
+  // Client errors (4xx)
+  if (
+    response &&
+    response.status >= HTTP_STATUS_CLIENT_ERROR_MIN &&
+    response.status < HTTP_STATUS_SERVER_ERROR_MIN
+  ) {
+    return {
+      type: ErrorType.CLIENT,
+      retryable: false,
+      userMessage: "Request error. Please check your request parameters.",
+      internalMessage: `Client error (HTTP ${String(response.status)})`,
+    };
+  }
+
+  // Unknown errors
+  return {
+    type: ErrorType.UNKNOWN,
+    retryable: false,
+    userMessage: "An unexpected error occurred. Please try again.",
+    internalMessage: `Unknown error: ${error.message}`,
+  };
+};
+
+/**
  * Default pipeline options
  */
 const DEFAULT_OPTIONS: Required<PipelineOptions> = {
   enableCache: true,
-  cacheTtl: 5 * 60 * 1000, // 5 minutes
+  cacheTtl: CACHE_TTL_MINUTES * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND,
   enableDedupe: true,
-  dedupeWindow: 5 * 60 * 1000, // 5 minutes
-  maxDedupeEntries: 1000,
+  dedupeWindow: DEDUPE_WINDOW_MINUTES * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND,
+  maxDedupeEntries: DEFAULT_MAX_DEDUPE_ENTRIES,
   enableRetry: true,
-  maxRetries: 3,
+  maxRetries: DEFAULT_MAX_RETRIES,
   enableLogging: true,
   enableErrorClassification: true,
   cacheKeyGenerator: (context: RequestContext) => {
@@ -203,22 +306,20 @@ const DEFAULT_OPTIONS: Required<PipelineOptions> = {
  * Request pipeline with composable middleware
  */
 export class RequestPipeline {
-  private cache = new Map<string, CacheEntry>();
-  private dedupeMap = new Map<string, DeduplicationEntry>();
-  private options: Required<PipelineOptions>;
+  private readonly cache = new Map<string, CacheEntry>();
+  private readonly dedupeMap = new Map<string, DeduplicationEntry>();
+  private readonly options: Required<PipelineOptions>;
 
-  constructor(options: PipelineOptions = {}) {
+  constructor(options: Readonly<PipelineOptions> = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
   }
 
   /**
    * Execute a request through the pipeline
-   * @param url
-   * @param options
    */
   async execute(url: string, options: RequestInit = {}): Promise<Response> {
     const context: RequestContext = {
-      requestId: `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
+      requestId: `req_${String(Date.now())}_${Math.random().toString(REQUEST_ID_RADIX).slice(2, REQUEST_ID_RANDOM_LENGTH)}`,
       url,
       method: options.method ?? "GET",
       options,
@@ -244,13 +345,16 @@ export class RequestPipeline {
       middlewares.push(this.errorClassificationMiddleware.bind(this));
     }
 
-    const dispatch = (index: number): Promise<ResponseContext> => {
+    const dispatch = async (index: number): Promise<ResponseContext> => {
       if (index === middlewares.length) {
-        return this.executionMiddleware({ context });
+        return await this.executionMiddleware({ context });
       }
 
       const middleware = middlewares[index];
-      return middleware({ context, next: () => dispatch(index + 1) });
+      return await middleware({
+        context,
+        next: async () => await dispatch(index + 1),
+      });
     };
 
     const result = await dispatch(0);
@@ -264,9 +368,6 @@ export class RequestPipeline {
 
   /**
    * Logging middleware
-   * @param root0
-   * @param root0.context
-   * @param root0.next
    */
   private async loggingMiddleware({
     context,
@@ -278,14 +379,14 @@ export class RequestPipeline {
     logger.debug("pipeline", "Request started", {
       requestId: context.requestId,
       method: context.method,
-      url: context.url.slice(0, 100),
+      url: context.url.slice(0, URL_LOG_TRUNCATE_LENGTH),
     });
 
     const result = await next();
 
     logger.debug("pipeline", "Request completed", {
       requestId: context.requestId,
-      status: result.response?.status,
+      status: result.response.status,
       responseTime: result.responseTime,
       fromCache: result.fromCache,
       error: result.error?.message,
@@ -296,9 +397,6 @@ export class RequestPipeline {
 
   /**
    * Cache lookup middleware
-   * @param root0
-   * @param root0.context
-   * @param root0.next
    */
   private async cacheMiddleware({
     context,
@@ -351,9 +449,6 @@ export class RequestPipeline {
 
   /**
    * Request deduplication middleware
-   * @param root0
-   * @param root0.context
-   * @param root0.next
    */
   private async dedupeMiddleware({
     context,
@@ -424,9 +519,6 @@ export class RequestPipeline {
 
   /**
    * Retry middleware with exponential backoff
-   * @param root0
-   * @param root0.context
-   * @param root0.next
    */
   private async retryMiddleware({
     context,
@@ -502,9 +594,6 @@ export class RequestPipeline {
 
   /**
    * Error classification middleware
-   * @param root0
-   * @param root0.context
-   * @param root0.next
    */
   private async errorClassificationMiddleware({
     context,
@@ -533,9 +622,6 @@ export class RequestPipeline {
 
   /**
    * Actual request execution middleware
-   * @param root0
-   * @param root0.context
-   * @param root0.next
    */
   private async executionMiddleware({
     context,
@@ -549,13 +635,13 @@ export class RequestPipeline {
       logger.debug("pipeline", "Executing request", {
         requestId: context.requestId,
         method: context.method,
-        url: context.url.slice(0, 100),
+        url: context.url.slice(0, URL_LOG_TRUNCATE_LENGTH),
       });
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
-      }, 30_000); // 30 second timeout
+      }, REQUEST_TIMEOUT_MS); // 30 second timeout
 
       const response = await fetch(context.url, {
         ...context.options,
@@ -609,10 +695,11 @@ export class RequestPipeline {
 
   /**
    * Sleep utility for delays
-   * @param ms
    */
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+  private async sleep(ms: number): Promise<void> {
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, ms);
+    });
   }
 
   /**
@@ -639,85 +726,9 @@ export class RequestPipeline {
 }
 
 /**
- * Classify an error into categories with retry recommendations
- * @param error
- * @param response
- */
-export const classifyError = (error: Error, response?: Response): ErrorClassification => {
-  // Network errors
-  if (error.name === "TypeError" && error.message.includes("fetch")) {
-    return {
-      type: ErrorType.NETWORK,
-      retryable: true,
-      retryDelay: calculateRetryDelay(0, RETRY_CONFIG.network),
-      userMessage:
-        "Network connection error. Please check your internet connection.",
-      internalMessage: "Fetch network error - likely connectivity issue",
-    };
-  }
-
-  // Timeout errors
-  if (error.name === "AbortError" || error.message.includes("timeout")) {
-    return {
-      type: ErrorType.TIMEOUT,
-      retryable: true,
-      retryDelay: calculateRetryDelay(0, RETRY_CONFIG.network),
-      userMessage: "Request timed out. Please try again.",
-      internalMessage: "Request timeout - abort signal triggered",
-    };
-  }
-
-  // Rate limit errors
-  if (response?.status === 429) {
-    const retryAfter = response.headers.get("Retry-After");
-    const retryDelay = retryAfter ? Number.parseInt(retryAfter, 10) * 1000 : undefined;
-
-    return {
-      type: ErrorType.RATE_LIMIT,
-      retryable: true,
-      retryDelay:
-        retryDelay ?? calculateRetryDelay(0, RETRY_CONFIG.rateLimited),
-      userMessage:
-        "Too many requests. Please wait a moment before trying again.",
-      internalMessage: `Rate limited (HTTP 429) - retry after ${retryAfter ?? "unknown"} seconds`,
-    };
-  }
-
-  // Server errors (5xx)
-  if (response && response.status >= 500) {
-    return {
-      type: ErrorType.SERVER,
-      retryable: true,
-      retryDelay: calculateRetryDelay(0, RETRY_CONFIG.server),
-      userMessage: "Server error. Please try again later.",
-      internalMessage: `Server error (HTTP ${response.status})`,
-    };
-  }
-
-  // Client errors (4xx)
-  if (response && response.status >= 400 && response.status < 500) {
-    return {
-      type: ErrorType.CLIENT,
-      retryable: false,
-      userMessage: "Request error. Please check your request parameters.",
-      internalMessage: `Client error (HTTP ${response.status})`,
-    };
-  }
-
-  // Unknown errors
-  return {
-    type: ErrorType.UNKNOWN,
-    retryable: false,
-    userMessage: "An unexpected error occurred. Please try again.",
-    internalMessage: `Unknown error: ${error.message}`,
-  };
-};
-
-/**
  * Create a new request pipeline with the specified options
- * @param options
  */
-export const createRequestPipeline = (options: PipelineOptions = {}): RequestPipeline => new RequestPipeline(options);
+export const createRequestPipeline = (options: Readonly<PipelineOptions> = {}): RequestPipeline => new RequestPipeline(options);
 
 /**
  * Default pipeline instance

@@ -18,7 +18,6 @@ const LOG_PREFIX = 'graph-index-tier';
 
 /**
  * Add a node to the graph index
- * @param input
  */
 export const addNode = async (input: GraphNodeInput): Promise<void> => {
   const database = getGraphIndexDB();
@@ -46,7 +45,6 @@ export const addNode = async (input: GraphNodeInput): Promise<void> => {
 
 /**
  * Get a node by ID
- * @param id
  */
 export const getNode = async (
   id: string
@@ -66,7 +64,6 @@ export const getNode = async (
 
 /**
  * Check if a node exists
- * @param id
  */
 export const hasNode = async (id: string): Promise<boolean> => {
   const database = getGraphIndexDB();
@@ -86,10 +83,6 @@ export const hasNode = async (id: string): Promise<boolean> => {
 /**
  * Update a node's completeness status
  * Only upgrades: stub → partial → full (never downgrades)
- * @param id
- * @param completeness
- * @param label
- * @param metadata
  */
 export const updateNodeCompleteness = async (
   id: string,
@@ -116,7 +109,7 @@ export const updateNodeCompleteness = async (
       existing.completeness,
       completeness
     );
-    if (!shouldUpgrade && !label && !metadata) {
+    if (!shouldUpgrade && (label === undefined || label === "") && !metadata) {
       return;
     }
 
@@ -128,7 +121,7 @@ export const updateNodeCompleteness = async (
       updates.completeness = completeness;
     }
 
-    if (label && label !== existing.label) {
+    if (label !== undefined && label !== "" && label !== existing.label) {
       updates.label = label;
     }
 
@@ -149,7 +142,6 @@ export const updateNodeCompleteness = async (
 
 /**
  * Mark a node as expanded (relationships have been fetched)
- * @param id
  */
 export const markNodeExpanded = async (id: string): Promise<void> => {
   const database = getGraphIndexDB();
@@ -196,7 +188,6 @@ export const getAllNodes = async (): Promise<GraphNodeRecord[]> => {
 
 /**
  * Get nodes by completeness status
- * @param status
  */
 export const getNodesByCompleteness = async (
   status: CompletenessStatus
@@ -236,7 +227,6 @@ export const getNodeCount = async (): Promise<number> => {
 
 /**
  * Delete a node
- * @param id
  */
 export const deleteNode = async (id: string): Promise<void> => {
   const database = getGraphIndexDB();
@@ -254,9 +244,8 @@ export const deleteNode = async (id: string): Promise<void> => {
 
 /**
  * Add multiple nodes in a batch
- * @param inputs
  */
-export const addNodes = async (inputs: GraphNodeInput[]): Promise<void> => {
+export const addNodes = async (inputs: readonly GraphNodeInput[]): Promise<void> => {
   const database = getGraphIndexDB();
   if (!database) {
     return;

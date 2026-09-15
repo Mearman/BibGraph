@@ -21,19 +21,17 @@ export const isWorksFilters = (value: unknown): value is WorksFilters => typeof 
  * @returns Merged filter string
  */
 export const mergeFilters = (newFilters: WorksFilters, existingFilters?: string | WorksFilters): string => {
-  // Start with new filters
-  const mergedFilters: WorksFilters = { ...newFilters };
-
-  // Merge with existing filters if present
-  if (existingFilters) {
-    if (typeof existingFilters === "string") {
-      // If existing filters are a string, append them to the new filter string
-      const newFilterString = buildFilterString(newFilters);
-      return `${newFilterString},${existingFilters}`;
-    }
-    // If existing filters are an object, merge them
-    Object.assign(mergedFilters, existingFilters, newFilters); // New filters override existing ones
+  if (existingFilters === undefined) {
+    return buildFilterString(newFilters);
   }
 
+  if (typeof existingFilters === "string") {
+    // If existing filters are a string, append them to the new filter string
+    const newFilterString = buildFilterString(newFilters);
+    return `${newFilterString},${existingFilters}`;
+  }
+
+  // If existing filters are an object, merge them (new filters override existing ones)
+  const mergedFilters: WorksFilters = { ...existingFilters, ...newFilters };
   return buildFilterString(mergedFilters);
 };

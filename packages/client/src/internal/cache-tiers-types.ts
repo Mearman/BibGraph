@@ -11,11 +11,11 @@ import type { StaticEntityType } from "./static-data-utils";
  * Each tier provides get/has/set/clear operations and statistics
  */
 export interface CacheTierInterface {
-	get(entityType: StaticEntityType, id: string): Promise<StaticDataResult>;
-	has(entityType: StaticEntityType, id: string): Promise<boolean>;
-	set?(entityType: StaticEntityType, id: string, data: unknown): Promise<void>;
-	clear?(): Promise<void>;
-	getStats(): Promise<{
+	get: (entityType: StaticEntityType, id: string) => Promise<StaticDataResult>;
+	has: (entityType: StaticEntityType, id: string) => Promise<boolean>;
+	set?: (entityType: StaticEntityType, id: string, data: unknown) => Promise<void>;
+	clear?: () => Promise<void>;
+	getStats: () => Promise<{
 		requests: number;
 		hits: number;
 		averageLoadTime: number;

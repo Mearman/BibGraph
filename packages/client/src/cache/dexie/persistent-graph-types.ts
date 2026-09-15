@@ -2,7 +2,6 @@
  * Persistent Graph Types
  *
  * Shared types and constants for the persistent graph module.
- * @module cache/dexie/persistent-graph-types
  */
 
 import type {
@@ -25,19 +24,19 @@ export const LOG_PREFIX = 'persistent-graph';
  */
 export interface GraphCache {
   /**
-  Node ID -> Node record
+  Node ID mapped to node record
    */
   nodes: Map<string, GraphNodeRecord>;
   /**
-  Edge ID -> Edge record
+  Edge ID mapped to edge record
    */
   edges: Map<string, GraphEdgeRecord>;
   /**
-  Node ID -> Set of outbound edge IDs
+  Node ID mapped to the set of outbound edge IDs
    */
   outboundEdges: Map<string, Set<string>>;
   /**
-  Node ID -> Set of inbound edge IDs
+  Node ID mapped to the set of inbound edge IDs
    */
   inboundEdges: Map<string, Set<string>>;
 }
@@ -54,7 +53,6 @@ export const createEmptyCache = (): GraphCache => ({
 
 /**
  * Clear all data from a graph cache
- * @param cache
  */
 export const clearCache = (cache: GraphCache): void => {
   cache.nodes.clear();

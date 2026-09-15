@@ -9,8 +9,8 @@ export { OpenAlexBaseClient, type ValidationSchema } from './client';
 export { CachedOpenAlexClient } from './cached-client';
 
 // Client configuration and errors
-export type { OpenAlexClientConfig, FullyConfiguredClient } from './internal/client-config';
-export { OpenAlexApiError, OpenAlexRateLimitError } from './internal/errors';
+export type { OpenAlexClientConfig, FullyConfiguredClient } from './internal';
+export { OpenAlexApiError, OpenAlexRateLimitError } from './internal';
 
 // Client instances and functions
 export { cachedOpenAlex, updateOpenAlexEmail, updateOpenAlexApiKey } from './cached-client';
@@ -23,15 +23,14 @@ export * from './utils';
 export * from './entities';
 
 // Types
-export * from './types/client-types';
+export type * from './types';
 
 // Interceptors
-export * from './interceptors/api-interceptor';
+export * from './interceptors';
 
 // Cache functionality
 export * from './cache';
 
 
+
 // Graph functionality
-export * from './cache/dexie/graph-expansion';
-export * from './cache/dexie/persistent-graph';

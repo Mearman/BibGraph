@@ -7,7 +7,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiInterceptor, type InterceptedRequest } from '../api-interceptor';
+import { ApiInterceptor } from '../api-interceptor';
 
 // Mock the logger
 vi.mock('../../internal/logger', () => ({
@@ -55,7 +55,10 @@ describe('API Interceptor Redirect Tracking', () => {
         headers: new Headers({ 'content-type': 'application/json' }),
         url: finalUrl, // This is the key - Response.url contains final URL
         clone: () => mockResponse,
-        json: () => Promise.resolve({ id: 'A5017898742', display_name: 'Test Author' }),
+        json: async () => {
+          await Promise.resolve();
+          return { id: 'A5017898742', display_name: 'Test Author' };
+        },
       } as unknown as Response;
 
       const responseData = { id: 'A5017898742', display_name: 'Test Author' };
@@ -86,7 +89,10 @@ describe('API Interceptor Redirect Tracking', () => {
         headers: new Headers({ 'content-type': 'application/json' }),
         url: url, // Same as request URL
         clone: () => mockResponse,
-        json: () => Promise.resolve({ id: 'A5017898742', display_name: 'Test Author' }),
+        json: async () => {
+          await Promise.resolve();
+          return { id: 'A5017898742', display_name: 'Test Author' };
+        },
       } as unknown as Response;
 
       const responseData = { id: 'A5017898742', display_name: 'Test Author' };
@@ -110,14 +116,17 @@ describe('API Interceptor Redirect Tracking', () => {
       const interceptedRequest = interceptor.interceptRequest(originalUrl, { method: 'GET' });
 
       // Manually set final URL (simulating what happens in interceptResponse)
-      (interceptedRequest as InterceptedRequest).finalUrl = 'https://api.openalex.org/authors/A5017898742';
+      (interceptedRequest!).finalUrl = 'https://api.openalex.org/authors/A5017898742';
 
       const mockResponse = {
         status: 200,
         headers: new Headers({ 'content-type': 'application/json' }),
         url: 'https://api.openalex.org/authors/A5017898742',
         clone: () => mockResponse,
-        json: () => Promise.resolve({ id: 'A5017898742', display_name: 'Test Author' }),
+        json: async () => {
+          await Promise.resolve();
+          return { id: 'A5017898742', display_name: 'Test Author' };
+        },
       } as unknown as Response;
 
       const responseData = { id: 'A5017898742', display_name: 'Test Author' };
@@ -143,14 +152,17 @@ describe('API Interceptor Redirect Tracking', () => {
 
       // Create request with redirect
       const interceptedRequest = interceptor.interceptRequest(originalUrl, { method: 'GET' });
-      (interceptedRequest as InterceptedRequest).finalUrl = finalUrl;
+      (interceptedRequest!).finalUrl = finalUrl;
 
       const mockResponse = {
         status: 200,
         headers: new Headers({ 'content-type': 'application/json' }),
         url: finalUrl,
         clone: () => mockResponse,
-        json: () => Promise.resolve({ id: 'A5017898742', display_name: 'Test Author' }),
+        json: async () => {
+          await Promise.resolve();
+          return { id: 'A5017898742', display_name: 'Test Author' };
+        },
       } as unknown as Response;
 
       const responseData = { id: 'A5017898742', display_name: 'Test Author' };

@@ -81,9 +81,7 @@ export const detectEntityTypeFromUrl = (url: string): string | null => {
  * @returns Type guard indicating if object has valid OpenAlex ID
  */
 export const hasValidOpenAlexId = (obj: unknown): obj is { id: string } => {
-  if (!obj || typeof obj !== "object") return false;
-  const maybeEntity = obj as Record<string, unknown>;
-  const id = maybeEntity.id;
-  if (typeof id !== "string") return false;
-  return OPENALEX_ID_PATTERN.test(id);
+  if (typeof obj !== "object" || obj === null) return false;
+  if (!("id" in obj) || typeof obj.id !== "string") return false;
+  return OPENALEX_ID_PATTERN.test(obj.id);
 };

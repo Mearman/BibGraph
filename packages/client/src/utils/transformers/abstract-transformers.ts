@@ -102,9 +102,6 @@ const STOP_WORDS = new Set([
 
 /**
  * Extract and clean words from abstract text
- * @param abstract
- * @param minLength
- * @param excludeCommon
  */
 const extractWordsFromAbstract = (abstract: string, minLength: number, excludeCommon: boolean): string[] => abstract
     .toLowerCase()
@@ -117,9 +114,8 @@ const extractWordsFromAbstract = (abstract: string, minLength: number, excludeCo
 
 /**
  * Count word frequencies
- * @param words
  */
-const countWordFrequencies = (words: string[]): Map<string, number> => {
+const countWordFrequencies = (words: readonly string[]): Map<string, number> => {
   const wordCount = new Map<string, number>();
   for (const word of words) {
     wordCount.set(word, (wordCount.get(word) ?? 0) + 1);
@@ -129,9 +125,8 @@ const countWordFrequencies = (words: string[]): Map<string, number> => {
 
 /**
  * Extract compound terms from word array
- * @param words
  */
-const extractCompoundTerms = (words: string[]): Map<string, number> => {
+const extractCompoundTerms = (words: readonly string[]): Map<string, number> => {
   const compounds = new Map<string, number>();
 
   for (let index = 0; index < words.length - 1; index++) {
@@ -284,8 +279,6 @@ export const getAbstractStats = (invertedIndex: Record<string, number[]> | null 
 
 /**
  * Check if a work has an abstract available
- * @param work - The work object from OpenAlex
- * @param work.abstract_inverted_index
  * @returns True if abstract is available and reconstructable
  * @example
  * ```typescript
@@ -321,8 +314,8 @@ export interface ExtractKeywordsOptions {
  * const keywords = extractKeywords(abstract, { minLength: 4, maxKeywords: 10 });
  * ```
  */
-export const extractKeywords = (abstract: string | null, options: ExtractKeywordsOptions = {}): string[] => {
-  if (!abstract || typeof abstract !== "string") {
+export const extractKeywords = (abstract: string | null, options: Readonly<ExtractKeywordsOptions> = {}): string[] => {
+  if (abstract === null || abstract === "" || typeof abstract !== "string") {
     return [];
   }
 

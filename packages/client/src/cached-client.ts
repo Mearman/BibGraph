@@ -3,7 +3,7 @@
  */
 
 import type { OpenAlexEntity, QueryParams } from "@bibgraph/types";
-import { isOpenAlexEntity } from "@bibgraph/types";
+import { isOpenAlexEntity, validateWithSchema } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
 
 import { OpenAlexBaseClient, type ValidationSchema } from "./client";
@@ -22,6 +22,7 @@ import {
   cacheEntityResult,
 } from "./internal/cache-operations";
 import type { OpenAlexClientConfig } from "./internal/client-config";
+import { getEndpointEntitySchema } from "./internal/entity-schemas";
 import {
   detectEntityTypeFromId,
   detectEntityTypeFromUrl,
@@ -40,7 +41,6 @@ import {
   cleanOpenAlexId,
   toStaticEntityType,
 } from "./internal/static-data-utils";
-import { validateStaticData } from "./internal/type-helpers";
 import { AutocompleteApi } from "./utils/autocomplete";
 
 export interface ClientApis {
@@ -66,15 +66,15 @@ export interface CachedClientConfig extends OpenAlexClientConfig {
 
 /**
  * Type guard to safely access properties that may exist on an extended config
- * @param obj Object to check for property
- * @param key Property name to check
+ * @param obj - Object to check for property
+ * @param key - Property name to check
  */
 const hasProperty = <K extends string>(obj: unknown, key: K): obj is Record<K, unknown> => typeof obj === "object" && obj !== null && key in obj;
 
 export class CachedOpenAlexClient extends OpenAlexBaseClient {
   client: ClientApis;
   private staticCacheEnabled: boolean;
-  private requestStats = {
+  private readonly requestStats = {
     totalRequests: 0,
     cacheHits: 0,
     apiFallbacks: 0,
@@ -85,7 +85,7 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
     super(config);
     this.staticCacheEnabled = config.staticCacheEnabled ?? true;
 
-    if (config.staticCacheGitHubPagesUrl) {
+    if (config.staticCacheGitHubPagesUrl !== undefined) {
       staticDataProvider.configure({
         gitHubPagesBaseUrl: config.staticCacheGitHubPagesUrl,
       });
@@ -112,9 +112,6 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
 
   /**
    * Try to get entity from static cache
-   * @param root0
-   * @param root0.cleanId
-   * @param root0.entityType
    */
   private async tryStaticCache({
     cleanId,
@@ -132,7 +129,7 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
 
       if (
         staticResult.found &&
-        staticResult.data &&
+        staticResult.data !== undefined &&
         isOpenAlexEntity(staticResult.data)
       ) {
         this.requestStats.cacheHits++;
@@ -155,9 +152,6 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
 
   /**
    * Try to get entity from API with caching
-   * @param root0
-   * @param root0.cleanId
-   * @param root0.entityType
    */
   private async tryApiFallback({
     cleanId,
@@ -167,12 +161,13 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
     entityType: string;
   }): Promise<unknown> {
     try {
-      const result = await this.getById({
-        endpoint: `${entityType}`,
+      const result = await this.getById<OpenAlexEntity>({
+        endpoint: entityType,
         id: cleanId,
+        schema: getEndpointEntitySchema(entityType),
       });
 
-      if (this.staticCacheEnabled && result && isOpenAlexEntity(result)) {
+      if (this.staticCacheEnabled) {
         await cacheEntityResult({
           entityType,
           id: cleanId,
@@ -200,7 +195,6 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
 
   /**
    * Get entity with static cache integration
-   * @param id
    */
   private async getEntityWithStaticCache(
     id: string,
@@ -210,7 +204,7 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
 
     const entityType = detectEntityTypeFromId(cleanId);
 
-    if (!entityType) {
+    if (entityType === null) {
       logger.warn("client", "Could not determine entity type for ID", {
         id: cleanId,
       });
@@ -232,26 +226,23 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
   }
 
   /**
-   * Try to get data from static cache for getById requests
-   * @param endpoint
-   * @param cleanId
-   * @param isFallback
+   * Try to get data from the static cache for getById requests, validating the cached blob against the caller's schema so a stale or malformed cache entry surfaces as a loud parse failure rather than an untyped value
    */
   private async tryStaticCacheForGetById<T>(
     endpoint: string,
     cleanId: string,
-    isFallback: boolean = false,
+    schema: Readonly<ValidationSchema<T>>,
+    isFallback = false,
   ): Promise<T | null> {
     if (!this.staticCacheEnabled) return null;
 
     try {
       const entityType = detectEntityTypeFromId(cleanId);
-      if (!entityType) return null;
+      if (entityType === null) return null;
 
-      const expectedEndpoint = entityType;
       if (
         !isFallback &&
-        expectedEndpoint !== endpoint.replace(/s$/, "") + "s"
+        entityType !== endpoint.replace(/s$/, "") + "s"
       ) {
         return null;
       }
@@ -262,7 +253,7 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
         cleanId,
       );
 
-      if (staticResult.found && staticResult.data) {
+      if (staticResult.found && staticResult.data !== undefined) {
         if (isFallback) {
           this.requestStats.cacheHits++;
         }
@@ -275,9 +266,7 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
             tier: staticResult.tier,
           },
         );
-        return isFallback
-          ? (staticResult.data as T)
-          : (validateStaticData(staticResult.data) as T);
+        return validateWithSchema({ data: staticResult.data, schema });
       }
     } catch (error: unknown) {
       logger.debug(
@@ -296,94 +285,26 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
 
   /**
    * Enhanced getById with static cache integration
-   * @param endpointOrParams
-   * @param id
-   * @param params
-   * @param schema
    */
-  async getById<T = unknown>(
-    endpointOrParams:
-      | string
-      | {
-          endpoint: string;
-          id: string;
-          params?: QueryParams;
-          schema?: ValidationSchema<T>;
-        },
-    id?: string,
-    params?: QueryParams,
-    schema?: ValidationSchema<T>,
-  ): Promise<T> {
-    // Handle legacy signature: getById(endpoint, id, params, schema)
-    if (typeof endpointOrParams === "string") {
-      return this.handleLegacyGetById(endpointOrParams, id, params, schema);
-    }
-
-    // Handle new signature: getById({ endpoint, id, params, schema })
-    return this.handleNewGetById(endpointOrParams);
-  }
-
-  private async handleLegacyGetById<T>(
-    endpoint: string,
-    id: string | undefined,
-    parameters?: QueryParams,
-    schema?: ValidationSchema<T>,
-  ): Promise<T> {
-    if (!id) {
-      throw new Error("ID is required for legacy getById signature");
-    }
-    const cleanId = cleanOpenAlexId(id);
-
-    if (!parameters) {
-      const staticResult = await this.tryStaticCacheForGetById<T>(
-        endpoint,
-        cleanId,
-      );
-      if (staticResult !== null) {
-        return staticResult;
-      }
-    }
-
-    try {
-      return await super.getById(endpoint, cleanId, parameters, schema);
-    } catch (apiError: unknown) {
-      logger.warn(
-        "client",
-        "API getById failed, attempting static cache fallback",
-        { endpoint, id: cleanId, error: apiError },
-      );
-
-      const fallbackResult = await this.tryStaticCacheForGetById<T>(
-        endpoint,
-        cleanId,
-        true,
-      );
-      if (fallbackResult !== null) {
-        return fallbackResult;
-      }
-
-      throw apiError;
-    }
-  }
-
-  private async handleNewGetById<T>(parameters: {
+  async getById<T = unknown>(parameters: {
     endpoint: string;
     id: string;
     params?: QueryParams;
-    schema?: ValidationSchema<T>;
+    schema: ValidationSchema<T>;
   }): Promise<T> {
     const {
       endpoint,
       id: entityId,
       params: newParameters = {},
-      schema: newSchema,
+      schema,
     } = parameters;
     const cleanId = cleanOpenAlexId(entityId);
 
-    if (!newParameters || Object.keys(newParameters).length === 0) {
+    if (Object.keys(newParameters).length === 0) {
       const staticResult = await this.tryStaticCacheForGetById<T>(
         endpoint,
         cleanId,
+        schema,
       );
       if (staticResult !== null) {
         return staticResult;
@@ -395,7 +316,7 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
         endpoint,
         id: cleanId,
         params: newParameters,
-        schema: newSchema,
+        schema,
       });
     } catch (apiError: unknown) {
       logger.warn(
@@ -407,6 +328,7 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
       const fallbackResult = await this.tryStaticCacheForGetById<T>(
         endpoint,
         cleanId,
+        schema,
         true,
       );
       if (fallbackResult !== null) {
@@ -419,9 +341,6 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
 
   /**
    * Cache entities from API response data
-   * @param root0
-   * @param root0.url
-   * @param root0.responseData
    */
   protected override async cacheResponseEntities({
     url,
@@ -434,10 +353,10 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
 
     try {
       const entityType = detectEntityTypeFromUrl(url);
-      if (!entityType) return;
+      if (entityType === null) return;
 
       if (this.isListResponse(responseData)) {
-        const results = (responseData as { results: unknown[] }).results;
+        const results = (responseData).results;
         await cacheEntitiesFromResults(results, entityType);
         await indexEntitiesInGraph(results, entityType);
       } else if (isOpenAlexEntity(responseData)) {
@@ -462,7 +381,6 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
 
   /**
    * Check if response is a list response with results array
-   * @param responseData
    */
   private isListResponse(
     responseData: unknown,
@@ -471,7 +389,7 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
       responseData !== null &&
       typeof responseData === "object" &&
       "results" in responseData &&
-      Array.isArray((responseData as { results: unknown[] }).results)
+      Array.isArray(responseData.results)
     );
   }
 
@@ -494,9 +412,9 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
       const cleanId = cleanOpenAlexId(id);
       const entityType = detectEntityTypeFromId(cleanId);
 
-      if (entityType) {
+      if (entityType !== null) {
         const staticEntityType = toStaticEntityType(entityType);
-        return staticDataProvider.hasStaticData(staticEntityType, cleanId);
+        return await staticDataProvider.hasStaticData(staticEntityType, cleanId);
       }
     } catch (error: unknown) {
       logger.debug("client", "Failed to check static entity existence", {
@@ -528,7 +446,7 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
 
   /**
    * Set the GitHub Pages base URL for static cache
-   * @param url Base URL for static cache (e.g., "https://mearman.github.io/BibGraph/data/openalex/")
+   * @param url - Base URL for static cache (e.g., "https://mearman.github.io/BibGraph/data/openalex/")
    */
   setStaticCacheGitHubPagesUrl(url: string): void {
     staticDataProvider.configure({ gitHubPagesBaseUrl: url });
@@ -608,7 +526,6 @@ export const cachedOpenAlex: CachedOpenAlexClient = new CachedOpenAlexClient({
 
 /**
  * Create a new cached client with custom configuration
- * @param config
  */
 export const createCachedOpenAlexClient = (
   config: CachedClientConfig = {},
@@ -616,7 +533,6 @@ export const createCachedOpenAlexClient = (
 
 /**
  * Update the email configuration for the global OpenAlex client
- * @param email
  */
 export const updateOpenAlexEmail = (email: string | undefined) => {
   cachedOpenAlex.updateConfig({ userEmail: email });
@@ -624,7 +540,6 @@ export const updateOpenAlexEmail = (email: string | undefined) => {
 
 /**
  * Update the API key configuration for the global OpenAlex client
- * @param apiKey
  */
 export const updateOpenAlexApiKey = (apiKey: string | undefined) => {
   cachedOpenAlex.updateConfig({ apiKey });

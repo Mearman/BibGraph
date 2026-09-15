@@ -37,31 +37,27 @@ export interface AuthorTopic {
 /**
  * Type guard for AuthorConcept
  * Validates that an unknown value conforms to the AuthorConcept interface
- * @param value
  */
 export const isAuthorConcept = (value: unknown): value is AuthorConcept => {
   if (typeof value !== "object" || value === null) {
     return false;
   }
 
-  const record = value as Record<string, unknown>;
-
   return (
-    "id" in record &&
-    "display_name" in record &&
-    "score" in record &&
-    "level" in record &&
-    typeof record.id === "string" &&
-    typeof record.display_name === "string" &&
-    typeof record.score === "number" &&
-    typeof record.level === "number"
+    "id" in value &&
+    "display_name" in value &&
+    "score" in value &&
+    "level" in value &&
+    typeof value.id === "string" &&
+    typeof value.display_name === "string" &&
+    typeof value.score === "number" &&
+    typeof value.level === "number"
   );
 };
 
 /**
  * Type guard for HierarchicalReference
  * Validates optional hierarchical references (subfield, field, domain)
- * @param value
  */
 const isHierarchicalReference = (value: unknown): value is HierarchicalReference => {
   if (value === undefined) {
@@ -72,55 +68,42 @@ const isHierarchicalReference = (value: unknown): value is HierarchicalReference
     return false;
   }
 
-  const record = value as Record<string, unknown>;
-
   return (
-    "id" in record &&
-    "display_name" in record &&
-    typeof record.id === "string" &&
-    typeof record.display_name === "string"
+    "id" in value &&
+    "display_name" in value &&
+    typeof value.id === "string" &&
+    typeof value.display_name === "string"
   );
 };
 
 /**
  * Type guard for AuthorTopic
  * Validates that an unknown value conforms to the AuthorTopic interface
- * @param value
  */
 export const isAuthorTopic = (value: unknown): value is AuthorTopic => {
   if (typeof value !== "object" || value === null) {
     return false;
   }
 
-  const record = value as Record<string, unknown>;
-
   // Check required fields
-  if (
-    !("id" in record) ||
-    !("display_name" in record) ||
-    !("count" in record)
-  ) {
-    return false;
-  }
+  if (!("id" in value)) return false;
+  if (!("display_name" in value)) return false;
+  if (!("count" in value)) return false;
 
-  if (
-    typeof record.id !== "string" ||
-    typeof record.display_name !== "string" ||
-    typeof record.count !== "number"
-  ) {
-    return false;
-  }
+  if (typeof value.id !== "string") return false;
+  if (typeof value.display_name !== "string") return false;
+  if (typeof value.count !== "number") return false;
 
   // Check optional hierarchical references
-  if ("subfield" in record && !isHierarchicalReference(record.subfield)) {
+  if ("subfield" in value && !isHierarchicalReference(value.subfield)) {
     return false;
   }
 
-  if ("field" in record && !isHierarchicalReference(record.field)) {
+  if ("field" in value && !isHierarchicalReference(value.field)) {
     return false;
   }
 
-  if ("domain" in record && !isHierarchicalReference(record.domain)) {
+  if ("domain" in value && !isHierarchicalReference(value.domain)) {
     return false;
   }
 
@@ -129,12 +112,10 @@ export const isAuthorTopic = (value: unknown): value is AuthorTopic => {
 
 /**
  * Filter and type-narrow an array of unknown concepts to AuthorConcept[]
- * @param concepts
  */
-export const filterValidConcepts = (concepts: unknown[]): AuthorConcept[] => concepts.filter(isAuthorConcept);
+export const filterValidConcepts = (concepts: readonly unknown[]): AuthorConcept[] => concepts.filter(isAuthorConcept);
 
 /**
  * Filter and type-narrow an array of unknown topics to AuthorTopic[]
- * @param topics
  */
-export const filterValidTopics = (topics: unknown[]): AuthorTopic[] => topics.filter(isAuthorTopic);
+export const filterValidTopics = (topics: readonly unknown[]): AuthorTopic[] => topics.filter(isAuthorTopic);
