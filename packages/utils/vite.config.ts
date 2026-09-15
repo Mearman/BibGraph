@@ -1,38 +1,37 @@
 /// <reference types="vitest" />
-import tsConfigPaths from "vite-tsconfig-paths";
 import dts from "vite-plugin-dts";
 import { defineConfig, type UserConfig } from "vite";
 import { resolve } from "node:path";
 
 export default defineConfig({
-  root: __dirname,
+  root: import.meta.dirname,
+  resolve: { tsconfigPaths: true },
   plugins: [
-    tsConfigPaths(),
     dts({
       include: ["src/**/*"],
       exclude: ["**/*.test.ts", "**/*.spec.ts"],
       outDirs: ["dist"],
-      tsconfigPath: resolve(__dirname, "tsconfig.json"),
+      tsconfigPath: resolve(import.meta.dirname, "tsconfig.json"),
     }),
   ],
   build: {
     lib: {
       entry: {
-        index: resolve(__dirname, "src/index.ts"),
-        logger: resolve(__dirname, "src/logger.ts"),
-        "static-data/cache-utilities": resolve(__dirname, "src/static-data/cache/index.ts"),
-        "static-data/cache": resolve(__dirname, "src/static-data/cache/index.ts"),
-        cache: resolve(__dirname, "src/cache/index.ts"),
-        "ui/filter-base": resolve(__dirname, "src/ui/filter-base.tsx"),
-        "date-helpers": resolve(__dirname, "src/date-helpers.ts"),
-        "data-helpers": resolve(__dirname, "src/data.ts"),
-        "build-info": resolve(__dirname, "src/build-info.ts"),
-        "data-evaluation": resolve(__dirname, "src/data-evaluation.ts"),
-        services: resolve(__dirname, "src/services.ts"),
-        validation: resolve(__dirname, "src/validation.ts"),
-        "normalize-route": resolve(__dirname, "src/normalize-route.ts"),
-        "storage/catalogue-db": resolve(__dirname, "src/storage/catalogue-db/index.ts"),
-        "workers/messages": resolve(__dirname, "src/workers/messages.ts"),
+        index: resolve(import.meta.dirname, "src/index.ts"),
+        logger: resolve(import.meta.dirname, "src/logger.ts"),
+        "static-data/cache-utilities": resolve(import.meta.dirname, "src/static-data/cache/index.ts"),
+        "static-data/cache": resolve(import.meta.dirname, "src/static-data/cache/index.ts"),
+        cache: resolve(import.meta.dirname, "src/cache/index.ts"),
+        "ui/filter-base": resolve(import.meta.dirname, "src/ui/filter-base.tsx"),
+        "date-helpers": resolve(import.meta.dirname, "src/date-helpers.ts"),
+        "data-helpers": resolve(import.meta.dirname, "src/data.ts"),
+        "build-info": resolve(import.meta.dirname, "src/build-info.ts"),
+        "data-evaluation": resolve(import.meta.dirname, "src/data-evaluation.ts"),
+        services: resolve(import.meta.dirname, "src/services.ts"),
+        validation: resolve(import.meta.dirname, "src/validation.ts"),
+        "normalize-route": resolve(import.meta.dirname, "src/normalize-route.ts"),
+        "storage/catalogue-db": resolve(import.meta.dirname, "src/storage/catalogue-db/index.ts"),
+        "workers/messages": resolve(import.meta.dirname, "src/workers/messages.ts"),
       },
       name: "BibGraphUtils",
       formats: ["es"],

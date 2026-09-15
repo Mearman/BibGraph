@@ -1,12 +1,12 @@
 /// <reference types='vitest' />
-import tsConfigPaths from "vite-tsconfig-paths";
 import { defineConfig, mergeConfig } from "vitest/config"
 
-import { baseVitestConfig } from "../../vitest.config.base"
+import { baseVitestConfig } from "../../vitest.config.base.ts"
 
 export default defineConfig(mergeConfig(baseVitestConfig, {
-	plugins: [tsConfigPaths()],
+	
 	resolve: {
+      tsconfigPaths: true,
 		// Use source condition to resolve workspace packages to source files
 		conditions: ["source", "import", "module", "default"],
 	},

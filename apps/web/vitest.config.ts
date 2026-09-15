@@ -1,29 +1,28 @@
 /// <reference types="vitest" />
 import * as path from "node:path";
 
-import tsConfigPaths from "vite-tsconfig-paths";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import react from "@vitejs/plugin-react";
 import { defineConfig, mergeConfig } from "vitest/config";
 
-import { baseVitestConfig } from "../../vitest.config.base";
+import { baseVitestConfig } from "../../vitest.config.base.ts";
 
 export default defineConfig(
 	mergeConfig(baseVitestConfig, {
-		root: __dirname,
+		root: import.meta.dirname,
 		cacheDir: "../../node_modules/.vite/apps/web",
 		plugins: [
-			tsConfigPaths(),
 			react(),
 			vanillaExtractPlugin(),
 		],
 
 		resolve: {
+      tsconfigPaths: true,
 			// Use source condition to resolve workspace packages to source files
 			// This works with the "source" export condition in workspace package.json files
 			conditions: ["source", "import", "module", "default"],
 			alias: {
-				"@": path.resolve(__dirname, "./src"),
+				"@": path.resolve(import.meta.dirname, "./src"),
 			},
 		},
 
@@ -51,7 +50,7 @@ export default defineConfig(
 		test: {
 			watch: false,
 			environment: "jsdom",
-			setupFiles: [path.resolve(__dirname, "src/test/setup.ts")],
+			setupFiles: [path.resolve(import.meta.dirname, "src/test/setup.ts")],
 
 			// Force vitest to bundle workspace packages through vite's resolver
 			deps: {
@@ -107,10 +106,11 @@ export default defineConfig(
 			// Note: Each project must explicitly set plugins, resolve.alias, setupFiles, and deps since projects run independently
 			projects: [
 				{
-					plugins: [tsConfigPaths(), react(), vanillaExtractPlugin()],
+					plugins: [react(), vanillaExtractPlugin()],
 					resolve: {
+						tsconfigPaths: true,
 						alias: {
-							"@": path.resolve(__dirname, "./src"),
+							"@": path.resolve(import.meta.dirname, "./src"),
 						},
 					},
 					test: {
@@ -118,7 +118,7 @@ export default defineConfig(
 						include: ["src/**/*.unit.test.{ts,tsx}"],
 						environment: "jsdom",
 						globals: true,
-						setupFiles: [path.resolve(__dirname, "src/test/setup.ts")],
+						setupFiles: [path.resolve(import.meta.dirname, "src/test/setup.ts")],
 						deps: {
 							inline: [/@bibgraph\/.*/],
 						},
@@ -130,10 +130,11 @@ export default defineConfig(
 					},
 				},
 				{
-					plugins: [tsConfigPaths(), react(), vanillaExtractPlugin()],
+					plugins: [react(), vanillaExtractPlugin()],
 					resolve: {
+						tsconfigPaths: true,
 						alias: {
-							"@": path.resolve(__dirname, "./src"),
+							"@": path.resolve(import.meta.dirname, "./src"),
 						},
 					},
 					test: {
@@ -141,7 +142,7 @@ export default defineConfig(
 						include: ["src/**/*.component.test.{ts,tsx}"],
 						environment: "jsdom",
 						globals: true,
-						setupFiles: [path.resolve(__dirname, "src/test/setup.ts")],
+						setupFiles: [path.resolve(import.meta.dirname, "src/test/setup.ts")],
 						deps: {
 							inline: [/@bibgraph\/.*/],
 						},
@@ -155,10 +156,11 @@ export default defineConfig(
 					},
 				},
 				{
-					plugins: [tsConfigPaths(), react(), vanillaExtractPlugin()],
+					plugins: [react(), vanillaExtractPlugin()],
 					resolve: {
+						tsconfigPaths: true,
 						alias: {
-							"@": path.resolve(__dirname, "./src"),
+							"@": path.resolve(import.meta.dirname, "./src"),
 						},
 					},
 					test: {
@@ -166,7 +168,7 @@ export default defineConfig(
 						include: ["src/**/*.integration.test.{ts,tsx}"],
 						environment: "jsdom",
 						globals: true,
-						setupFiles: [path.resolve(__dirname, "src/test/setup.ts")],
+						setupFiles: [path.resolve(import.meta.dirname, "src/test/setup.ts")],
 						deps: {
 							inline: [/@bibgraph\/.*/],
 						},

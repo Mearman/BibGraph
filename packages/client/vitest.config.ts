@@ -2,17 +2,17 @@
 import * as path from "node:path"
 
 import { viteStaticCopy } from "vite-plugin-static-copy";
-import tsConfigPaths from "vite-tsconfig-paths";
 import { defineConfig, mergeConfig } from "vite"
 
-import { baseVitestConfig } from "../../vitest.config.base"
+import { baseVitestConfig } from "../../vitest.config.base.ts"
 
 export default defineConfig(
   mergeConfig(baseVitestConfig, {
-    root: __dirname,
+    root: import.meta.dirname,
     cacheDir: "../../node_modules/.vite/packages/client",
-    plugins: [tsConfigPaths(), viteStaticCopy({ targets: [{ src: "*.md", dest: "." }] })],
+    plugins: [viteStaticCopy({ targets: [{ src: "*.md", dest: "." }] })],
     resolve: {
+      tsconfigPaths: true,
       // Use source condition to resolve workspace packages to source files
       conditions: ["source", "import", "module", "default"],
     },
@@ -27,7 +27,6 @@ export default defineConfig(
     },
     // Uncomment this if you are using workers.
     // worker: {
-    //  plugins: [ tsConfigPaths() ],
     // },
     test: {
       watch: false,
@@ -44,12 +43,6 @@ export default defineConfig(
           test: {
             name: "unit",
             include: ["src/**/*.unit.test.ts"],
-            // Exclude tests with workspace package resolution issues until fixed
-            // These tests were never running due to broken @nx/vitest include option
-            exclude: [
-              "src/client.unit.test.ts",
-              "src/utils/__tests__/autocomplete.unit.test.ts",
-            ],
             environment: "node",
           },
         },
@@ -57,13 +50,6 @@ export default defineConfig(
           test: {
             name: "integration",
             include: ["src/**/*.integration.test.ts"],
-            // Exclude tests with workspace package resolution issues until fixed
-            // These tests were never running due to broken @nx/vitest include option
-            exclude: [
-              "src/cache/__tests__/cache-performance.integration.test.ts",
-              "src/cache/__tests__/cache.integration.test.ts",
-              "src/utils/__tests__/autocomplete.integration.test.ts",
-            ],
             environment: "node",
             testTimeout: 30000,
           },
