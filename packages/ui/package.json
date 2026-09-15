@@ -43,9 +43,9 @@
 		"react-dom": "19.2.8"
 	},
 	"devDependencies": {
-		"@mantine/core": "9.6.0",
-		"@mantine/hooks": "9.6.0",
-		"@mantine/notifications": "9.6.0",
+		"@mantine/core": "9.6.1",
+		"@mantine/hooks": "9.6.1",
+		"@mantine/notifications": "9.6.1",
 		"@storybook/addon-docs": "10.6.0",
 		"@storybook/react-vite": "10.6.0",
 		"@testing-library/jest-dom": "7.0.1",
@@ -65,9 +65,9 @@
 		"vitest": "4.1.11"
 	},
 	"peerDependencies": {
-		"@mantine/core": "9.6.0",
-		"@mantine/hooks": "9.6.0",
-		"@mantine/notifications": "9.6.0",
+		"@mantine/core": "9.6.1",
+		"@mantine/hooks": "9.6.1",
+		"@mantine/notifications": "9.6.1",
 		"react": "19.2.8",
 		"react-dom": "19.2.8"
 	},
