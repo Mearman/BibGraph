@@ -28,12 +28,12 @@ export interface UseGraphListResult {
   /**
   Add a node to the graph list
    */
-  addNode: (parameters: AddToGraphListParams) => Promise<string>;
+  addNode: (parameters: Readonly<AddToGraphListParams>) => Promise<string>;
 
   /**
   Add multiple nodes to the graph list (batch operation)
    */
-  addNodesBatch: (parameters: AddToGraphListParams[]) => Promise<string[]>;
+  addNodesBatch: (parameters: readonly AddToGraphListParams[]) => Promise<string[]>;
 
   /**
   Remove a node from the graph list by entityId
@@ -170,12 +170,12 @@ export const useGraphList = (): UseGraphListResult => {
   }, [refresh]);
 
   // Add node with optimistic update (T030)
-  const addNode = useCallback(async (parameters: AddToGraphListParams): Promise<string> => {
+  const addNode = useCallback(async (parameters: Readonly<AddToGraphListParams>): Promise<string> => {
     setError(null);
 
     // T030: Optimistic update - add node to UI immediately
     const optimisticNode: GraphListNode = {
-      id: `temp-${Date.now()}`, // Temporary ID
+      id: `temp-${String(Date.now())}`, // Temporary ID
       entityId: parameters.entityId,
       entityType: parameters.entityType,
       label: parameters.label,
@@ -238,12 +238,12 @@ export const useGraphList = (): UseGraphListResult => {
   }, [storage, refresh]);
 
   // Add multiple nodes with batch operation (T030: optimistic for batch)
-  const addNodesBatch = useCallback(async (parameters: AddToGraphListParams[]): Promise<string[]> => {
+  const addNodesBatch = useCallback(async (parameters: readonly AddToGraphListParams[]): Promise<string[]> => {
     setError(null);
 
     // T030: Optimistic update for batch
     const optimisticNodes: GraphListNode[] = parameters.map((parameter, index) => ({
-      id: `temp-batch-${Date.now()}-${index}`,
+      id: `temp-batch-${String(Date.now())}-${String(index)}`,
       entityId: parameter.entityId,
       entityType: parameter.entityType,
       label: parameter.label,
@@ -278,7 +278,7 @@ export const useGraphList = (): UseGraphListResult => {
 
       showNotification({
         title: "Success",
-        message: `Added ${parameters.length} nodes to graph`,
+        message: `Added ${String(parameters.length)} nodes to graph`,
         category: "success",
       });
 
@@ -317,17 +317,20 @@ export const useGraphList = (): UseGraphListResult => {
   const removeNode = useCallback(async (entityId: string): Promise<void> => {
     setError(null);
 
-    // T030: Optimistic update - remove from UI immediately
-    const previousNodes = nodes;
+    // T030: Optimistic update - remove from UI immediately, capturing the pre-removal list via the updater so the rollback below always has the true previous value
     const removedNode = nodes.find(n => n.entityId === entityId);
-    setNodes(previousNodes_ => previousNodes_.filter(n => n.entityId !== entityId));
+    let rollbackNodes: GraphListNode[] = [];
+    setNodes(previousNodes_ => {
+      rollbackNodes = previousNodes_;
+      return previousNodes_.filter(n => n.entityId !== entityId);
+    });
 
     try {
       await storage.removeFromGraphList(entityId);
 
       showNotification({
         title: "Success",
-        message: `Removed ${removedNode?.label || entityId} from graph`,
+        message: `Removed ${removedNode?.label ?? entityId} from graph`,
         category: "success",
       });
 
@@ -363,7 +366,7 @@ export const useGraphList = (): UseGraphListResult => {
       setError(errorObject);
 
       // Rollback optimistic update on error
-      setNodes(previousNodes);
+      setNodes(rollbackNodes);
 
       showNotification({
         title: "Error",
@@ -383,16 +386,19 @@ export const useGraphList = (): UseGraphListResult => {
   const clearGraphList = useCallback(async (): Promise<void> => {
     setError(null);
 
-    // T030: Optimistic update - clear UI immediately
-    const previousNodes = nodes;
-    setNodes([]);
+    // T030: Optimistic update - clear UI immediately, capturing the pre-clear list via the updater so the rollback and undo action below always have the true previous value
+    let rollbackNodes: GraphListNode[] = [];
+    setNodes(previousNodes_ => {
+      rollbackNodes = previousNodes_;
+      return [];
+    });
 
     try {
       await storage.clearGraphList();
 
       showNotification({
         title: "Success",
-        message: `Cleared graph (${previousNodes.length} nodes removed)`,
+        message: `Cleared graph (${String(rollbackNodes.length)} nodes removed)`,
         category: "success",
       });
 
@@ -400,10 +406,10 @@ export const useGraphList = (): UseGraphListResult => {
       addAction({
         id: crypto.randomUUID(),
         timestamp: new Date(),
-        description: `Clear graph list (${previousNodes.length} nodes)`,
+        description: `Clear graph list (${String(rollbackNodes.length)} nodes)`,
         undo: async () => {
           // Restore all nodes to graph list
-          const restorePromises = previousNodes.map(node =>
+          const restorePromises = rollbackNodes.map(async node =>
             storage.addToGraphList({
               entityId: node.entityId,
               entityType: node.entityType,
@@ -427,7 +433,7 @@ export const useGraphList = (): UseGraphListResult => {
       setError(errorObject);
 
       // Rollback optimistic update on error
-      setNodes(previousNodes);
+      setNodes(rollbackNodes);
 
       showNotification({
         title: "Error",
@@ -440,7 +446,7 @@ export const useGraphList = (): UseGraphListResult => {
       });
       throw errorObject;
     }
-  }, [storage, nodes, addAction]);
+  }, [storage, addAction]);
 
   // Check if entity is in graph list
   const isInGraphList = useCallback(async (entityId: string): Promise<boolean> => {

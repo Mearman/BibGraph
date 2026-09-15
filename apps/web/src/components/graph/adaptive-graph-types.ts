@@ -2,7 +2,7 @@
  * Type definitions for AdaptiveGraphRenderer
  */
 
-import type { GraphEdge, GraphNode } from '@bibgraph/types';
+import type { EntityType, GraphEdge, GraphNode } from '@bibgraph/types';
 
 export interface AdaptiveGraphRendererProps {
   /**
@@ -96,7 +96,7 @@ export interface DeviceCapabilities {
 export interface ForceGraphNodeData {
   x: number;
   y: number;
-  entityType: string;
+  entityType: EntityType;
   label: string;
 }
 

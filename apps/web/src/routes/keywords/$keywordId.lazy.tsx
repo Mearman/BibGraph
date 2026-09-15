@@ -1,5 +1,4 @@
 import { cachedOpenAlex } from "@bibgraph/client";
-import { type Keyword, type KeywordField } from "@bibgraph/types";
 import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
@@ -23,35 +22,34 @@ const KeywordRoute = () => {
   const keywordId = decodeEntityId(rawKeywordId);
 
   // Parse select parameter - only send select when explicitly provided in URL
-  const selectFields = selectParameter && typeof selectParameter === 'string'
-    ? selectParameter.split(',').map(field => field.trim()) as KeywordField[]
+  const selectFields = selectParameter !== undefined && typeof selectParameter === 'string'
+    ? selectParameter.split(',').map(field => field.trim())
     : undefined;
 
   // Fetch keyword data
   const { data: keyword, isLoading, error} = useQuery({
     queryKey: ["keyword", keywordId, selectParameter, selectFields],
     queryFn: async () => {
-      if (!keywordId) {
+      if (keywordId === undefined || keywordId === "") {
         throw new Error("Keyword ID is required");
       }
-      const response = await cachedOpenAlex.client.keywords.getKeyword(
+      return await cachedOpenAlex.client.keywords.getKeyword(
         keywordId,
         selectFields ? { select: selectFields } : {}
       );
-      return response as Keyword;
     },
-    enabled: !!keywordId && keywordId !== "random",
+    enabled: keywordId !== undefined && keywordId !== "" && keywordId !== "random",
   });
 
   // Get relationship counts for summary display - MUST be called before early returns (Rules of Hooks)
   const { incomingCount, outgoingCount } = useEntityRelationshipQueries(
-    keywordId || "",
+    keywordId ?? "",
     'keywords'
   );
 
   // Handle loading state
   if (isLoading) {
-    return <LoadingState entityType="Keyword" entityId={keywordId || ''} config={ENTITY_TYPE_CONFIGS.keywords} />;
+    return <LoadingState entityType="Keyword" entityId={keywordId ?? ''} config={ENTITY_TYPE_CONFIGS.keywords} />;
   }
 
   // Handle error state
@@ -60,7 +58,7 @@ const KeywordRoute = () => {
       <ErrorState
         error={error}
         entityType="Keyword"
-        entityId={keywordId || ''}
+        entityId={keywordId ?? ''}
       />
     );
   }
@@ -70,15 +68,15 @@ const KeywordRoute = () => {
     <EntityDetailLayout
       config={ENTITY_TYPE_CONFIGS.keywords}
       entityType="keywords"
-      entityId={keywordId || ''}
+      entityId={keywordId ?? ''}
       displayName={keyword.display_name || "Keyword"}
       selectParam={typeof selectParameter === 'string' ? selectParameter : undefined}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       data={keyword}>
       <RelationshipCounts incomingCount={incomingCount} outgoingCount={outgoingCount} />
-      <IncomingRelationships entityId={keywordId || ""} entityType="keywords" />
-      <OutgoingRelationships entityId={keywordId || ""} entityType="keywords" />
+      <IncomingRelationships entityId={keywordId ?? ""} entityType="keywords" />
+      <OutgoingRelationships entityId={keywordId ?? ""} entityType="keywords" />
     </EntityDetailLayout>
   );
 };

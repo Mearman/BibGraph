@@ -4,8 +4,6 @@
  * Displays two graph visualizations side-by-side for comparison.
  * Highlights differences between nodes and edges.
  * Shows diff statistics and swap functionality.
- *
- * @module components/graph/comparison
  */
 
 import type { GraphEdge, GraphNode } from '@bibgraph/types';
@@ -99,15 +97,6 @@ interface GraphDiff {
 
 /**
  * Graph Comparison Component
- * @param root0
- * @param root0.leftNodes
- * @param root0.leftEdges
- * @param root0.rightNodes
- * @param root0.rightEdges
- * @param root0.leftName
- * @param root0.rightName
- * @param root0.layoutType
- * @param root0.onClose
  */
 export const GraphComparison: React.FC<GraphComparisonProperties> = ({
   leftNodes,
@@ -274,10 +263,10 @@ export const GraphComparison: React.FC<GraphComparisonProperties> = ({
                 _displayMode="filter"
                 enableSimulation={layoutType === 'force'}
                 nodePositions={swapped ? rightNodePositions : leftNodePositions}
-                onNodeClick={() => {}}
-                onNodeRightClick={() => {}}
-                onBackgroundClick={() => {}}
-                onGraphReady={() => {}}
+                onNodeClick={() => { /* comparison view is read-only */ }}
+                onNodeRightClick={() => { /* comparison view is read-only */ }}
+                onBackgroundClick={() => { /* comparison view is read-only */ }}
+                onGraphReady={() => { /* comparison view does not expose imperative graph controls */ }}
                 enableOptimizations={true}
                 progressiveLoading={{
                   enabled: true,
@@ -312,10 +301,10 @@ export const GraphComparison: React.FC<GraphComparisonProperties> = ({
                 _displayMode="filter"
                 enableSimulation={layoutType === 'force'}
                 nodePositions={swapped ? leftNodePositions : rightNodePositions}
-                onNodeClick={() => {}}
-                onNodeRightClick={() => {}}
-                onBackgroundClick={() => {}}
-                onGraphReady={() => {}}
+                onNodeClick={() => { /* comparison view is read-only */ }}
+                onNodeRightClick={() => { /* comparison view is read-only */ }}
+                onBackgroundClick={() => { /* comparison view is read-only */ }}
+                onGraphReady={() => { /* comparison view does not expose imperative graph controls */ }}
                 enableOptimizations={true}
                 progressiveLoading={{
                   enabled: true,

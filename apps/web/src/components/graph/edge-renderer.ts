@@ -10,40 +10,52 @@
 
 import type { GraphEdge } from "@bibgraph/types";
 
+import { RELATIONSHIP_TYPE_COLORS as TYPE_COLORS } from "../../styles/hash-colors";
 import {
   type EdgeStyleProperties,
   getEdgeFilteredStyle,
   getEdgeHoverStyle,
   getEdgeStyle,
-  TYPE_COLORS,
 } from "./edge-styles";
+
+// Fallback opacity for an edge with no explicit style opacity set.
+const DEFAULT_EDGE_OPACITY = 0.8;
+// Fallback stroke width (px) for an edge with no explicit style width set.
+const DEFAULT_STROKE_WIDTH = 2;
+
+/**
+ * Type guard for a positioned endpoint (numeric x/y coordinates)
+ */
+const hasNumericPosition = (endpoint: unknown): endpoint is { x: number; y: number } =>
+  typeof endpoint === 'object' &&
+  endpoint !== null &&
+  'x' in endpoint &&
+  typeof endpoint.x === 'number' &&
+  'y' in endpoint &&
+  typeof endpoint.y === 'number';
 
 /**
  * Canvas rendering function for react-force-graph-2d/3d edges
  * Renders an edge on a canvas with conditional styling based on direction
  * @param edge - Graph edge to render
  * @param sourceNode - Source node position
- * @param sourceNode.x
- * @param sourceNode.y
  * @param targetNode - Target node position
- * @param targetNode.x
- * @param targetNode.y
  * @param ctx - Canvas 2D rendering context
  * @param globalScale - Current zoom level (for adaptive rendering)
  */
-export const renderEdgeOnCanvas = (edge: GraphEdge, sourceNode: { x: number; y: number }, targetNode: { x: number; y: number }, ctx: CanvasRenderingContext2D, globalScale: number): void => {
+export const renderEdgeOnCanvas = (edge: GraphEdge, sourceNode: Readonly<{ x: number; y: number }>, targetNode: Readonly<{ x: number; y: number }>, ctx: CanvasRenderingContext2D, globalScale: number): void => {
   const style = getEdgeStyle(edge);
 
   // Save canvas state
   ctx.save();
 
   // Set stroke style
-  ctx.strokeStyle = style.stroke || TYPE_COLORS.RELATED_TO;
-  ctx.lineWidth = (style.strokeWidth || 2) / globalScale;
-  ctx.globalAlpha = style.strokeOpacity ?? style.opacity ?? 0.8;
+  ctx.strokeStyle = style.stroke ?? TYPE_COLORS.RELATED_TO;
+  ctx.lineWidth = (style.strokeWidth ?? DEFAULT_STROKE_WIDTH) / globalScale;
+  ctx.globalAlpha = style.strokeOpacity ?? style.opacity ?? DEFAULT_EDGE_OPACITY;
 
   // Handle dashed lines for inbound edges
-  if (style.strokeDasharray) {
+  if (style.strokeDasharray !== undefined) {
     const dashArray = style.strokeDasharray.split(',').map(Number);
     ctx.setLineDash(dashArray);
   } else {
@@ -70,16 +82,17 @@ export const getSvgEdgeAttributes = (edge: GraphEdge): Record<string, string | n
   const style = getEdgeStyle(edge);
 
   return {
-    stroke: style.stroke || TYPE_COLORS.RELATED_TO,
-    'stroke-width': style.strokeWidth || 2,
-    'stroke-dasharray': style.strokeDasharray || 'none',
-    'stroke-opacity': style.strokeOpacity ?? style.opacity ?? 0.8,
-    'marker-end': style.markerEnd ? `url(#${style.markerEnd})` : undefined,
-    ...(style['data-direction'] && { 'data-direction': style['data-direction'] }),
-    ...(style['data-relation-type'] && {
+    stroke: style.stroke ?? TYPE_COLORS.RELATED_TO,
+    'stroke-width': style.strokeWidth ?? DEFAULT_STROKE_WIDTH,
+    'stroke-dasharray': style.strokeDasharray ?? 'none',
+    'stroke-opacity': style.strokeOpacity ?? style.opacity ?? DEFAULT_EDGE_OPACITY,
+    // Only present when the edge actually has a marker; the property is genuinely absent otherwise, not an empty/placeholder string.
+    ...(style.markerEnd !== undefined && { 'marker-end': `url(#${style.markerEnd})` }),
+    ...(style['data-direction'] !== undefined && { 'data-direction': style['data-direction'] }),
+    ...(style['data-relation-type'] !== undefined && {
       'data-relation-type': style['data-relation-type'],
     }),
-  } as Record<string, string | number>;
+  };
 };
 
 /**
@@ -92,13 +105,13 @@ export const getDomEdgeStyle = (edge: GraphEdge): React.CSSProperties & Record<s
   const style = getEdgeStyle(edge);
 
   return {
-    borderColor: style.borderColor || style.stroke || TYPE_COLORS.RELATED_TO,
-    borderStyle: style.borderStyle || (style.strokeDasharray ? 'dashed' : 'solid'),
-    borderWidth: style.strokeWidth || 2,
-    opacity: style.opacity ?? 0.8,
+    borderColor: style.borderColor ?? style.stroke ?? TYPE_COLORS.RELATED_TO,
+    borderStyle: style.borderStyle ?? (style.strokeDasharray !== undefined ? 'dashed' : 'solid'),
+    borderWidth: style.strokeWidth ?? DEFAULT_STROKE_WIDTH,
+    opacity: style.opacity ?? DEFAULT_EDGE_OPACITY,
     // Data attributes for testing
-    ...(style['data-direction'] && { 'data-direction': style['data-direction'] }),
-    ...(style['data-relation-type'] && {
+    ...(style['data-direction'] !== undefined && { 'data-direction': style['data-direction'] }),
+    ...(style['data-relation-type'] !== undefined && {
       'data-relation-type': style['data-relation-type'],
     }),
   };
@@ -112,7 +125,7 @@ export const getDomEdgeStyle = (edge: GraphEdge): React.CSSProperties & Record<s
  */
 export const getEdgeColor = (edge: GraphEdge): string => {
   const style = getEdgeStyle(edge);
-  return style.stroke || TYPE_COLORS.RELATED_TO;
+  return style.stroke ?? TYPE_COLORS.RELATED_TO;
 };
 
 /**
@@ -123,7 +136,7 @@ export const getEdgeColor = (edge: GraphEdge): string => {
  */
 export const getEdgeWidth = (edge: GraphEdge): number => {
   const style = getEdgeStyle(edge);
-  return style.strokeWidth || 2;
+  return style.strokeWidth ?? DEFAULT_STROKE_WIDTH;
 };
 
 /**
@@ -133,25 +146,24 @@ export const getEdgeWidth = (edge: GraphEdge): number => {
  * This is the main integration point for react-force-graph-2d
  * @returns Function compatible with ForceGraph2D's linkCanvasObject property
  * @example
+ * ```tsx
  * <ForceGraph2D
  *   linkCanvasObject={createEdgeCanvasObjectFunction()}
  *   linkColor={(link) => getEdgeColor(link as GraphEdge)}
  *   linkWidth={(link) => getEdgeWidth(link as GraphEdge)}
  * />
+ * ```
  */
 export const createEdgeCanvasObjectFunction = () => (
     edge: GraphEdge,
     context: CanvasRenderingContext2D,
     globalScale: number
   ): void => {
-    // Get source and target node positions from edge object
-    // react-force-graph adds source/target as objects with x,y properties
-    const source = (edge as GraphEdge & { source: { x: number; y: number } }).source;
-    const target = (edge as GraphEdge & { target: { x: number; y: number } }).target;
-
-    if (!source || !target) {
+    // react-force-graph mutates the edge at runtime, replacing the source/target node-id strings GraphEdge declares with the actual positioned node objects - a shape this static type doesn't capture.
+    if (!hasNumericPosition(edge.source) || !hasNumericPosition(edge.target)) {
       return;
     }
+    const { source, target } = edge;
 
     renderEdgeOnCanvas(
       edge,
@@ -170,7 +182,7 @@ export const createEdgeCanvasObjectFunction = () => (
  */
 export const getEdgeHoverColor = (edge: GraphEdge): string => {
   const style = getEdgeHoverStyle(edge);
-  return style.stroke || TYPE_COLORS.RELATED_TO;
+  return style.stroke ?? TYPE_COLORS.RELATED_TO;
 };
 
 /**
@@ -181,7 +193,7 @@ export const getEdgeHoverColor = (edge: GraphEdge): string => {
  */
 export const getEdgeFilteredColor = (edge: GraphEdge): string => {
   const style = getEdgeFilteredStyle(edge);
-  return style.stroke || TYPE_COLORS.RELATED_TO;
+  return style.stroke ?? TYPE_COLORS.RELATED_TO;
 };
 
 /**

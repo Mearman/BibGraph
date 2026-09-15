@@ -21,8 +21,6 @@ export interface WebGLFallbackProps {
  * WebGL unavailable fallback component
  *
  * Displayed when the browser doesn't support WebGL or it's disabled.
- * @param root0
- * @param root0.reason
  */
 export const WebGLFallback = ({ reason }: WebGLFallbackProps) => (
   <Box

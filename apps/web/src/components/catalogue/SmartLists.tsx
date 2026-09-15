@@ -102,6 +102,29 @@ interface SmartListsProperties {
   onClose: () => void;
 }
 
+/**
+Duration of the simulated refresh delay in {@link handleRefresh}, standing in for a real re-run of the smart list's query.
+ */
+const SIMULATED_REFRESH_DELAY_MS = 1000;
+
+/**
+Narrows a raw Select value to a {@link SmartListCriteriaType}.
+ * @param value - The candidate string value
+ * @returns Whether `value` is one of the known smart list criteria types
+ */
+const isSmartListCriteriaType = (value: string): value is SmartListCriteriaType => {
+  switch (value) {
+    case 'entity-type':
+    case 'publication-year':
+    case 'citation-count':
+    case 'recent-bookmarks':
+    case 'tag-filter':
+      return true;
+    default:
+      return false;
+  }
+};
+
 export const SmartLists = ({ onCreateSmartList, onClose }: SmartListsProperties) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [customName, setCustomName] = useState('');
@@ -111,7 +134,7 @@ export const SmartLists = ({ onCreateSmartList, onClose }: SmartListsProperties)
   const handleRefresh = async (criteria: SmartListCriteria) => {
     setRefreshing(criteria.id);
     // Simulate refresh - in real implementation, this would re-run the query
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => { setTimeout(resolve, SIMULATED_REFRESH_DELAY_MS); });
     setRefreshing(null);
   };
 
@@ -124,7 +147,7 @@ export const SmartLists = ({ onCreateSmartList, onClose }: SmartListsProperties)
     if (!customName.trim()) return;
 
     const newCriteria: SmartListCriteria = {
-      id: `custom-${Date.now()}`,
+      id: `custom-${String(Date.now())}`,
       name: customName,
       description: `Custom ${customType} smart list`,
       type: customType,
@@ -192,7 +215,7 @@ export const SmartLists = ({ onCreateSmartList, onClose }: SmartListsProperties)
                     size="xs"
                     fullWidth
                     leftSection={<IconCheck size={14} />}
-                    onClick={() => handleCreateSmartList(criteria)}
+                    onClick={() => { handleCreateSmartList(criteria); }}
                   >
                     Create List
                   </Button>
@@ -231,7 +254,7 @@ export const SmartLists = ({ onCreateSmartList, onClose }: SmartListsProperties)
           <Button
             variant="light"
             leftSection={<IconEdit size={14} />}
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => { setShowCreateModal(true); }}
           >
             Create Custom
           </Button>
@@ -241,7 +264,7 @@ export const SmartLists = ({ onCreateSmartList, onClose }: SmartListsProperties)
       {/* Create Custom Smart List Modal */}
       <Modal
         opened={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => { setShowCreateModal(false); }}
         title="Create Custom Smart List"
         size="md"
       >
@@ -250,7 +273,7 @@ export const SmartLists = ({ onCreateSmartList, onClose }: SmartListsProperties)
             label="List Name"
             placeholder="My custom smart list"
             value={customName}
-            onChange={(e) => setCustomName(e.target.value)}
+            onChange={(e) => { setCustomName(e.target.value); }}
             required
           />
 
@@ -265,7 +288,11 @@ export const SmartLists = ({ onCreateSmartList, onClose }: SmartListsProperties)
               { value: 'tag-filter', label: 'Tag Filter' },
             ]}
             value={customType}
-            onChange={(value) => setCustomType(value as SmartListCriteriaType)}
+            onChange={(value) => {
+              if (value !== null && isSmartListCriteriaType(value)) {
+                setCustomType(value);
+              }
+            }}
             required
           />
 
@@ -279,7 +306,7 @@ export const SmartLists = ({ onCreateSmartList, onClose }: SmartListsProperties)
           <Group justify="flex-end" gap="xs">
             <Button
               variant="subtle"
-              onClick={() => setShowCreateModal(false)}
+              onClick={() => { setShowCreateModal(false); }}
             >
               Cancel
             </Button>

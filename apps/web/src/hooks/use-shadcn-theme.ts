@@ -3,6 +3,8 @@ import { useMantineColorScheme, useMantineTheme } from '@mantine/core'
 import { getAcademicEntityColors } from '@/styles/css-variable-resolver'
 import { type ShadcnPalette,shadcnPalettes } from '@/styles/shadcn-colors'
 
+const ACCENT_SHADE = 5
+
 export const useShadcnTheme = () => {
   const { colorScheme } = useMantineColorScheme()
   const mantineTheme = useMantineTheme()
@@ -13,11 +15,13 @@ export const useShadcnTheme = () => {
     : colorScheme
 
   // Get selected color palette from localStorage
+  const isShadcnPalette = (value: string): value is ShadcnPalette => value in shadcnPalettes
+
   const getColorPalette = (): ShadcnPalette => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('bibgraph-color-palette')
-      if (saved && saved in shadcnPalettes) {
-        return saved as ShadcnPalette
+      if (saved !== null && isShadcnPalette(saved)) {
+        return saved
       }
     }
     return 'blue' // default palette
@@ -34,13 +38,13 @@ export const useShadcnTheme = () => {
 
   const getEntityColorVariant = (
     entityType: keyof typeof academicEntityColors,
-    variant: number = 6
+    variant = 6
   ): string => {
     const colorKey = academicEntityColors[entityType]
     return mantineTheme.colors[colorKey][variant]
   }
 
-  const getPaletteColor = (palette: ShadcnPalette = selectedPalette, shade: number = 6): string => {
+  const getPaletteColor = (palette: ShadcnPalette = selectedPalette, shade = 6): string => {
     return shadcnPalettes[palette][shade] || shadcnPalettes.blue[shade]
   }
 
@@ -51,7 +55,7 @@ export const useShadcnTheme = () => {
       case 'secondary':
         return shadcnPalettes.zinc[6]
       case 'accent':
-        return getPaletteColor(selectedPalette, 5)
+        return getPaletteColor(selectedPalette, ACCENT_SHADE)
       case 'background':
         return resolvedColorScheme === 'dark' ? shadcnPalettes.slate[10] : shadcnPalettes.slate[0]
       case 'foreground':

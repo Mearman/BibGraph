@@ -1,6 +1,5 @@
 /**
  * Type definitions for Cache Tier components
- * @module components/catalogue/cache-tier/cache-tier-types
  */
 
 import type { CachedEntityEntry } from "@bibgraph/client/internal/static-data-provider";

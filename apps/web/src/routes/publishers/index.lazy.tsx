@@ -3,7 +3,6 @@ import { useState } from "react";
 
 import { EntityList, type EntityListColumnConfig } from "@/components/EntityList";
 import type { TableViewMode } from "@/components/TableViewModeToggle";
-import type { OpenAlexSearchParams } from "@/lib/route-schemas";
 
 const publishersColumns: EntityListColumnConfig[] = [
   { key: "id", header: "ID" },
@@ -15,7 +14,7 @@ const publishersColumns: EntityListColumnConfig[] = [
 ];
 
 const PublishersRoute = () => {
-  const search = useSearch({ from: "/publishers/" }) as OpenAlexSearchParams;
+  const search = useSearch({ from: "/publishers/" });
   const [viewMode, setViewMode] = useState<TableViewMode>("table");
 
   return (

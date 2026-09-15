@@ -85,7 +85,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
   }, []);
 
   const handleOpenExternal = useCallback(() => {
-    if (pdfUrl) {
+    if (pdfUrl !== null && pdfUrl !== undefined && pdfUrl !== "") {
       window.open(pdfUrl, "_blank", "noopener,noreferrer");
     }
     onOpenExternal?.();
@@ -114,12 +114,12 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
   }
 
   // No PDF available
-  if (!pdfUrl && !error) {
+  if ((pdfUrl === null || pdfUrl === undefined || pdfUrl === "") && (error === null || error === undefined || error === "")) {
     return null;
   }
 
   // Error state
-  if (error) {
+  if (error !== null && error !== undefined && error !== "") {
     return (
       <Paper style={{ border: BORDER_STYLE_GRAY_3 }} p="md" radius="md">
         <Alert
@@ -135,7 +135,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
   }
 
   // Iframe error state
-  if (iframeError && pdfUrl) {
+  if (iframeError && pdfUrl !== null && pdfUrl !== undefined && pdfUrl !== "") {
     return (
       <Paper style={{ border: BORDER_STYLE_GRAY_3 }} p="md" radius="md">
         <Stack gap="md">
@@ -144,7 +144,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
             <Text size="sm" fw={500}>
               PDF Document
             </Text>
-            {source && (
+            {source !== undefined && source !== "" && (
               <Text size="xs" c="dimmed">
                 via {source}
               </Text>
@@ -194,9 +194,9 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
           <Group gap="xs">
             <IconFileTypePdf size={ICON_SIZE.XL} style={{ color: "var(--mantine-color-red-6)" }} />
             <Text size="sm" fw={500}>
-              {title || "PDF Document"}
+              {title ?? "PDF Document"}
             </Text>
-            {source && (
+            {source !== undefined && source !== "" && (
               <Text size="xs" c="dimmed">
                 via {source}
               </Text>
@@ -231,7 +231,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
         </Group>
 
         {/* PDF Viewer */}
-        {isExpanded && pdfUrl && (
+        {isExpanded && pdfUrl !== null && pdfUrl !== undefined && pdfUrl !== "" && (
           <div style={{ position: "relative" }}>
             {isIframeLoading && (
               <div
@@ -258,7 +258,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
             )}
             <iframe
               src={pdfUrl}
-              title={title || "PDF Document"}
+              title={title ?? "PDF Document"}
               style={{
                 width: "100%",
                 height: "600px",
@@ -267,13 +267,13 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
               }}
               onLoad={handleIframeLoad}
               onError={handleIframeError}
-              sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+              sandbox="allow-scripts allow-popups allow-forms"
             />
           </div>
         )}
 
         {/* Collapsed state */}
-        {!isExpanded && pdfUrl && (
+        {!isExpanded && pdfUrl !== null && pdfUrl !== undefined && pdfUrl !== "" && (
           <Group gap="sm">
             <Button
               variant="light"

@@ -22,11 +22,11 @@ export interface AppNotification {
 interface NotificationContextValue {
   notifications: AppNotification[];
   unreadCount: number;
-  showNotification: (notification: {
+  showNotification: (notification: Readonly<{
     title: string;
     message: string;
     category: NotificationCategory;
-  }) => void;
+  }>) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   dismissNotification: (id: string) => void;
@@ -42,7 +42,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [appNotifications, setAppNotifications] = useState<AppNotification[]>([]);
 
   const showNotification = useCallback(
-    ({ title, message, category }: { title: string; message: string; category: NotificationCategory }) => {
+    ({ title, message, category }: Readonly<{ title: string; message: string; category: NotificationCategory }>) => {
       const id = crypto.randomUUID();
 
       // Add to persistent list

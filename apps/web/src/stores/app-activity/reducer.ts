@@ -16,11 +16,18 @@ import {
   deleteEventsFromDB,
   saveEventToDB,
 } from "./database";
-import type { AppActivityAction, AppActivityState } from "./types";
+import type { AppActivityAction, AppActivityEvent, AppActivityState } from "./types";
 
 const MAX_HISTORY_SIZE = 1000;
 const DEFAULT_TIME_RANGE_MINUTES = 30;
 const CLEAR_FILTERS_TIME_RANGE_MINUTES = 60;
+const EVENT_ID_SPLIT_LIMIT = 3;
+
+// Returning a real function-boundary type here (rather than an inline variable annotation) is necessary: TypeScript's control-flow analysis narrows a `const` declaration's usable type to its initializer's inferred type, not a wider explicit annotation, so a bare `const event: AppActivityEvent | undefined = state.events[id]` still reads as non-nullable at every subsequent use, whereas a function call's return type isn't narrowed that way by its caller.
+const getEventById = (
+  events: Record<string, AppActivityEvent>,
+  id: string,
+): AppActivityEvent | undefined => events[id];
 
 export const initialState: AppActivityState = {
   events: {},
@@ -77,8 +84,8 @@ export const appActivityReducer = (
 
     case "UPDATE_EVENT": {
       const { id, updates } = action.payload;
-      const event = state.events[id];
-      if (!event) return state;
+      const event = getEventById(state.events, id);
+      if (event === undefined) return state;
 
       const newEvents = {
         ...state.events,
@@ -116,7 +123,7 @@ export const appActivityReducer = (
       const toKeep = sorted.slice(0, state.maxHistorySize);
       const toRemove = sorted.slice(state.maxHistorySize);
       const idsToRemove = toRemove
-        .map((event) => Number.parseInt(event.id.split("_", 3)[2] || "0"))
+        .map((event) => Number.parseInt(event.id.split("_", EVENT_ID_SPLIT_LIMIT)[2] || "0"))
         .filter((id) => !Number.isNaN(id));
 
       void deleteEventsFromDB(idsToRemove);

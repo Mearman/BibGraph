@@ -7,7 +7,7 @@ import { z } from "zod";
 
 /**
  * Standard OpenAlex API query parameters
- * Based on QueryParamsSchema from @bibgraph/types
+ * Based on QueryParamsSchema from \@bibgraph/types
  *
  * Uses `.catch()` to handle invalid values gracefully instead of throwing errors
  */

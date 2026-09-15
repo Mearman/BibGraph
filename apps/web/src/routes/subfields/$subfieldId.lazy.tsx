@@ -1,4 +1,5 @@
 import { cachedOpenAlex } from "@bibgraph/client";
+import { subfieldSchema } from "@bibgraph/types";
 import { type Subfield } from "@bibgraph/types";
 import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute,useParams, useSearch  } from "@tanstack/react-router";
@@ -16,8 +17,8 @@ import { usePrettyUrl } from "@/hooks/use-pretty-url";
 import { decodeEntityId } from "@/utils/url-decoding";
 
 const SubfieldRoute = () => {
-  const { subfieldId: rawSubfieldId } = useParams({ strict: false }) as { subfieldId: string };
-  const { select: selectParameter } = useSearch({ strict: false }) as { select?: string };
+  const { subfieldId: rawSubfieldId } = useParams({ strict: false });
+  const { select: selectParameter } = useSearch({ strict: false });
   const [viewMode, setViewMode] = useState<DetailViewMode>("rich");
 
   // Decode the subfield ID in case it's URL-encoded
@@ -27,28 +28,29 @@ const SubfieldRoute = () => {
   usePrettyUrl("subfields", rawSubfieldId, subfieldId);
 
   // Parse select parameter - only send select when explicitly provided in URL
-  const selectFields = selectParameter && typeof selectParameter === 'string'
+  const selectFields = typeof selectParameter === 'string' && selectParameter !== ''
     ? selectParameter.split(',').map(field => field.trim())
     : undefined;
 
   // Construct full OpenAlex subfield URL
-  const fullSubfieldId = subfieldId ? `https://openalex.org/subfields/${subfieldId}` : '';
+  const fullSubfieldId = subfieldId !== undefined && subfieldId !== '' ? `https://openalex.org/subfields/${subfieldId}` : '';
 
   // Fetch subfield data - subfields use the subfields endpoint
   const { data: subfield, isLoading, error } = useQuery({
     queryKey: ["subfield", subfieldId, selectParameter, selectFields],
     queryFn: async () => {
-      if (!subfieldId) {
+      if (subfieldId === undefined || subfieldId === '') {
         throw new Error("Subfield ID is required");
       }
-      const response = await cachedOpenAlex.getById(
-        'subfields',
-        subfieldId,
-        selectFields ? { select: selectFields } : {}
-      );
-      return response as Subfield;
+      const response = await cachedOpenAlex.getById<Subfield>({
+        endpoint: 'subfields',
+        id: subfieldId,
+        params: selectFields ? { select: selectFields } : {},
+        schema: subfieldSchema,
+      });
+      return response;
     },
-    enabled: !!subfieldId,
+    enabled: subfieldId !== undefined && subfieldId !== '',
   });
 
   // Get relationship counts for summary display - MUST be called before early returns (Rules of Hooks)
@@ -59,7 +61,7 @@ const SubfieldRoute = () => {
 
   // Handle loading state
   if (isLoading) {
-    return <LoadingState entityType="Subfield" entityId={subfieldId || ''} config={ENTITY_TYPE_CONFIGS.subfields} />;
+    return <LoadingState entityType="Subfield" entityId={subfieldId ?? ''} config={ENTITY_TYPE_CONFIGS.subfields} />;
   }
 
   // Handle error state
@@ -68,7 +70,7 @@ const SubfieldRoute = () => {
       <ErrorState
         error={error}
         entityType="Subfield"
-        entityId={subfieldId || ''}
+        entityId={subfieldId ?? ''}
       />
     );
   }

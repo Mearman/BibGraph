@@ -37,16 +37,17 @@ export class StorageTestHelper {
 		await this.page.evaluate(async () => {
 			const databases = await window.indexedDB.databases();
 			await Promise.all(
-				databases.map((database) => {
-					if (database.name) {
-						return new Promise<void>((resolve, reject) => {
-							const request = window.indexedDB.deleteDatabase(database.name!);
-							request.onsuccess = () => resolve();
-							request.onerror = () => reject(request.error);
-							request.onblocked = () => reject(new Error('Database deletion blocked'));
-						});
+				databases.map(async (database) => {
+					const { name } = database;
+					if (name === undefined) {
+						return;
 					}
-					return Promise.resolve();
+					await new Promise<void>((resolve, reject) => {
+						const request = window.indexedDB.deleteDatabase(name);
+						request.onsuccess = () => { resolve(); };
+						request.onerror = () => { reject(request.error instanceof Error ? request.error : new Error('Database deletion failed')); };
+						request.onblocked = () => { reject(new Error('Database deletion blocked')); };
+					});
 				})
 			);
 		});
@@ -72,8 +73,6 @@ export class StorageTestHelper {
 
 	/**
 	 * Set a localStorage item
-	 * @param key
-	 * @param value
 	 */
 	async setLocalStorageItem(key: string, value: string): Promise<void> {
 		await this.page.evaluate(
@@ -86,7 +85,6 @@ export class StorageTestHelper {
 
 	/**
 	 * Get a localStorage item
-	 * @param key
 	 */
 	async getLocalStorageItem(key: string): Promise<string | null> {
 		return await this.page.evaluate(
@@ -99,7 +97,6 @@ export class StorageTestHelper {
 
 	/**
 	 * Seed localStorage with test data (JSON stringified)
-	 * @param data
 	 */
 	async seedTestData(data: Record<string, unknown>): Promise<void> {
 		await this.page.evaluate(
@@ -137,7 +134,6 @@ export class StorageTestHelper {
 
 /**
  * Factory function to create StorageTestHelper instance
- * @param page
  */
 export const storageTestHelper = (page: Page): StorageTestHelper => {
 	return new StorageTestHelper(page);

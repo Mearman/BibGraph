@@ -18,7 +18,6 @@ const LOG_CONTEXT = 'entity-type-filter';
 /**
  * Check if a node is from the graph list source (should bypass filters)
  * T040: Graph list nodes bypass entity type filters
- * @param node
  */
 export const isGraphListNode = (node: GraphNode): boolean => {
   // Check sourceId first (most reliable)
@@ -27,7 +26,7 @@ export const isGraphListNode = (node: GraphNode): boolean => {
   }
 
   // Also check for provenance metadata (nodes can have provenance even from other sources)
-  if (node.entityData?._graphListProvenance) {
+  if (node.entityData?._graphListProvenance !== undefined) {
     return true;
   }
 
@@ -43,13 +42,13 @@ export const isGraphListNode = (node: GraphNode): boolean => {
  * @param selectedTypes - Array of selected entity types (empty = show all)
  * @returns Filtered nodes following the union formula
  */
-export const applyEntityTypeFilter = (nodes: GraphNode[], selectedTypes: EntityType[] | null | undefined): GraphNode[] => {
+export const applyEntityTypeFilter = (nodes: readonly GraphNode[], selectedTypes: readonly EntityType[] | null | undefined): GraphNode[] => {
   // Handle null/undefined as "show all"
   if (!selectedTypes || selectedTypes.length === 0) {
     logger.debug(LOG_CONTEXT, 'No filters selected, showing all nodes', {
       nodeCount: nodes.length,
     });
-    return nodes;
+    return [...nodes];
   }
 
   const filteredNodes = nodes.filter((node) => {
@@ -59,7 +58,7 @@ export const applyEntityTypeFilter = (nodes: GraphNode[], selectedTypes: EntityT
     }
 
     // T039: Collection nodes must match entity type filter
-    return selectedTypes.includes(node.entityType as EntityType);
+    return selectedTypes.includes(node.entityType);
   });
 
   logger.debug(LOG_CONTEXT, 'Applied entity type filter', {
@@ -75,9 +74,8 @@ export const applyEntityTypeFilter = (nodes: GraphNode[], selectedTypes: EntityT
 /**
  * Hook for managing entity type filter state
  * Provides filter state management and application logic
- * @param allNodes
  */
-export const useEntityTypeFilter = (allNodes: GraphNode[]) => {
+export const useEntityTypeFilter = (allNodes: readonly GraphNode[]) => {
   const [selectedTypes, setSelectedTypes] = useState<EntityType[]>([]);
 
   // Apply filter whenever nodes or selected types change

@@ -49,22 +49,27 @@ interface YearStats {
 }
 
 /**
+Multiplier converting a fraction into a percentage (also doubles as the percentage cap, since 100% is the maximum any bar visualization should render).
+ */
+const PERCENTAGE_MULTIPLIER = 100;
+
+/**
  * Calculate entity type distribution
  * @param entities - The entities to analyze
  * @returns Array of entity statistics with type, count, and percentage
  */
-const calculateEntityTypeDistribution = (entities: CatalogueEntity[]): EntityStats[] => {
+const calculateEntityTypeDistribution = (entities: readonly CatalogueEntity[]): EntityStats[] => {
   const typeCounts = new Map<string, number>();
 
   for (const entity of entities) {
-    typeCounts.set(entity.entityType, (typeCounts.get(entity.entityType) || 0) + 1);
+    typeCounts.set(entity.entityType, (typeCounts.get(entity.entityType) ?? 0) + 1);
   }
 
   const total = entities.length;
   const stats: EntityStats[] = Array.from(typeCounts, ([entityType, count]) => ({
       entityType,
       count,
-      percentage: total > 0 ? (count / total) * 100 : 0,
+      percentage: total > 0 ? (count / total) * PERCENTAGE_MULTIPLIER : 0,
     }));
 
   return stats.sort((a, b) => b.count - a.count);
@@ -76,14 +81,14 @@ const calculateEntityTypeDistribution = (entities: CatalogueEntity[]): EntitySta
  * @param entities - The entities to analyze
  * @returns Array of year statistics with year and count
  */
-const calculateYearDistribution = (entities: CatalogueEntity[]): YearStats[] => {
+const calculateYearDistribution = (entities: readonly CatalogueEntity[]): YearStats[] => {
   const yearCounts = new Map<number, number>();
 
   for (const entity of entities) {
     // Try to extract year from entityId (works have year in their metadata in production)
     // For now, we'll use a placeholder year based on addedAt
     const year = entity.addedAt.getFullYear();
-    yearCounts.set(year, (yearCounts.get(year) || 0) + 1);
+    yearCounts.set(year, (yearCounts.get(year) ?? 0) + 1);
   }
 
   const stats: YearStats[] = Array.from(yearCounts, ([year, count]) => ({ year, count }));
@@ -98,8 +103,8 @@ const calculateYearDistribution = (entities: CatalogueEntity[]): YearStats[] => 
  * @returns CSV string formatted for export
  */
 const generateAnalyticsCSV = (
-  entityTypeStats: EntityStats[],
-  yearStats: YearStats[]
+  entityTypeStats: readonly EntityStats[],
+  yearStats: readonly YearStats[]
 ): string => {
   const lines: string[] = [];
 
@@ -107,7 +112,7 @@ const generateAnalyticsCSV = (
   lines.push('Entity Type Distribution');
   lines.push('Type,Count,Percentage');
   for (const stat of entityTypeStats) {
-    lines.push(`${stat.entityType},${stat.count},${stat.percentage.toFixed(2)}%`);
+    lines.push(`${stat.entityType},${String(stat.count)},${stat.percentage.toFixed(2)}%`);
   }
   lines.push('');
 
@@ -115,7 +120,7 @@ const generateAnalyticsCSV = (
   lines.push('Year Distribution');
   lines.push('Year,Count');
   for (const stat of yearStats) {
-    lines.push(`${stat.year},${stat.count}`);
+    lines.push(`${String(stat.year)},${String(stat.count)}`);
   }
 
   return lines.join('\n');
@@ -130,6 +135,8 @@ export const ListAnalytics = ({ list, entities, onClose }: ListAnalyticsProperti
 
   const totalEntities = entities.length;
   const uniqueEntityTypes = entityTypeStats.length;
+  // The ternary (rather than a bare index access) is what makes this type honestly `EntityStats | undefined`: entityTypeStats is empty whenever the list itself has no entities, and this project's tsconfig doesn't enable noUncheckedIndexedAccess to infer that from a bare `[0]` on its own.
+  const topEntityType = entityTypeStats.length > 0 ? entityTypeStats[0] : undefined;
 
   // Handle export
   const handleExportCSV = () => {
@@ -244,11 +251,11 @@ export const ListAnalytics = ({ list, entities, onClose }: ListAnalyticsProperti
                   Most Common Type
                 </Text>
                 <Text size="xl" fw={700} tt="capitalize">
-                  {entityTypeStats[0]?.entityType || 'N/A'}
+                  {topEntityType?.entityType ?? 'N/A'}
                 </Text>
-                {entityTypeStats[0] && (
+                {topEntityType && (
                   <Badge size="xs" color="green" variant="light">
-                    {entityTypeStats[0].percentage.toFixed(1)}%
+                    {topEntityType.percentage.toFixed(1)}%
                   </Badge>
                 )}
               </Stack>
@@ -286,7 +293,7 @@ export const ListAnalytics = ({ list, entities, onClose }: ListAnalyticsProperti
                       h="100%"
                       bg="blue"
                       style={{
-                        width: `${stat.percentage}%`,
+                        width: `${String(stat.percentage)}%`,
                         borderRadius: '4px',
                       }}
                     />
@@ -328,7 +335,7 @@ export const ListAnalytics = ({ list, entities, onClose }: ListAnalyticsProperti
                         h="100%"
                         bg="orange"
                         style={{
-                          width: `${Math.min((stat.count / Math.max(...yearStats.map(s => s.count))) * 100, 100)}%`,
+                          width: `${String(Math.min((stat.count / Math.max(...yearStats.map(s => s.count))) * PERCENTAGE_MULTIPLIER, PERCENTAGE_MULTIPLIER))}%`,
                           borderRadius: '4px',
                         }}
                       />

@@ -74,7 +74,7 @@ describe('Multi-Source Graph Deduplication (T041)', () => {
 
 			const deduplicated = deduplicateEntities(entities);
 
-			expect(deduplicated).toHaveLength(3);
+			expect(deduplicated).toHaveLength(entities.length);
 			expect(deduplicated.map((e) => e.entityId).sort()).toEqual(['A1', 'W1', 'W2']);
 		});
 	});
@@ -107,7 +107,7 @@ describe('Multi-Source Graph Deduplication (T041)', () => {
 
 			expect(deduplicated).toHaveLength(1);
 			expect(deduplicated[0].sourceId).toBe('catalogue:graph-list');
-			expect(deduplicated[0].entityData?._graphListProvenance).toBe('user');
+			expect(deduplicated[0].entityData._graphListProvenance).toBe('user');
 			expect(deduplicated[0].label).toBe('Graph List Work');
 		});
 
@@ -138,7 +138,7 @@ describe('Multi-Source Graph Deduplication (T041)', () => {
 
 			expect(deduplicated).toHaveLength(1);
 			expect(deduplicated[0].sourceId).toBe('catalogue:graph-list');
-			expect(deduplicated[0].entityData?._graphListProvenance).toBe('expansion');
+			expect(deduplicated[0].entityData._graphListProvenance).toBe('expansion');
 		});
 
 		it('should prioritize graph list node when it appears first', () => {
@@ -229,7 +229,7 @@ describe('Multi-Source Graph Deduplication (T041)', () => {
 			const deduplicated = deduplicateEntities(entities);
 
 			expect(deduplicated).toHaveLength(1);
-			expect(deduplicated[0].entityData?._graphListProvenance).toBe('user');
+			expect(deduplicated[0].entityData._graphListProvenance).toBe('user');
 			expect(deduplicated[0].label).toBe('Provenance Institution');
 		});
 	});
@@ -278,7 +278,7 @@ describe('Multi-Source Graph Deduplication (T041)', () => {
 
 			expect(deduplicated).toHaveLength(1);
 			expect(deduplicated[0].sourceId).toBe('catalogue:graph-list');
-			expect(deduplicated[0].entityData?._graphListProvenance).toBe('user');
+			expect(deduplicated[0].entityData._graphListProvenance).toBe('user');
 		});
 
 		it('should keep first collection node when no graph list version exists', () => {
@@ -341,10 +341,10 @@ describe('Multi-Source Graph Deduplication (T041)', () => {
 			const deduplicated = deduplicateEntities(entities);
 
 			expect(deduplicated).toHaveLength(1);
-			expect(deduplicated[0].entityData?._graphListProvenance).toBe('user');
-			expect(deduplicated[0].entityData?._graphListAddedAt).toBe('2024-01-02');
+			expect(deduplicated[0].entityData._graphListProvenance).toBe('user');
+			expect(deduplicated[0].entityData._graphListAddedAt).toBe('2024-01-02');
 			// Bookmark metadata should not be preserved
-			expect(deduplicated[0].entityData?._catalogueNotes).toBeUndefined();
+			expect(deduplicated[0].entityData._catalogueNotes).toBeUndefined();
 		});
 
 		it('should preserve relationships from deduplicated node', () => {

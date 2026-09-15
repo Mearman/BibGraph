@@ -10,6 +10,16 @@ import { type OpenAlexSearchParams as OpenAlexSearchParameters } from "./route-s
 // Re-export the type for use in other modules
 
 /**
+Default page number used when pagination parameters are absent
+ */
+const DEFAULT_PAGE = 1;
+
+/**
+Default page size used when pagination parameters are absent
+ */
+const DEFAULT_PER_PAGE = 50;
+
+/**
  * Pagination parameters that should be excluded from query bookmark identification
  * These parameters affect pagination state, not the underlying query semantics
  */
@@ -43,7 +53,7 @@ export const extractQueryParameters = (searchParams: OpenAlexSearchParameters): 
 
   for (const [key, value] of Object.entries(searchParams)) {
     if (value !== undefined && value !== null && !PAGINATION_PARAMETERS.has(key)) {
-      queryParameters[key as keyof OpenAlexSearchParameters] = value;
+      queryParameters[key] = value;
     }
   }
 
@@ -60,7 +70,7 @@ export const extractPaginationParameters = (searchParams: OpenAlexSearchParamete
 
   for (const [key, value] of Object.entries(searchParams)) {
     if (value !== undefined && value !== null && PAGINATION_PARAMETERS.has(key)) {
-      paginationParameters[key as keyof OpenAlexSearchParameters] = value;
+      paginationParameters[key] = value;
     }
   }
 
@@ -83,9 +93,12 @@ export const generateQueryId = (entityType: string, searchParams: OpenAlexSearch
   const sortedKeys = Object.keys(queryParameters).sort();
 
   for (const key of sortedKeys) {
-    const value = queryParameters[key as keyof OpenAlexSearchParameters];
+    const value: unknown = queryParameters[key];
     if (value !== undefined && value !== null) {
-      queryParts.push(`${key}=${String(value)}`);
+      const valueString = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+        ? String(value)
+        : JSON.stringify(value);
+      queryParts.push(`${key}=${valueString}`);
     }
   }
 
@@ -106,7 +119,7 @@ export const createQueryBookmarkRequest = (entityType: string, entityId: string 
   // Determine the internal path
   let internalPath: string;
 
-  if (entityId) {
+  if (entityId !== undefined && entityId !== "") {
     // Specific entity query (e.g., /authors/A5017898742?select=id,display_name)
     internalPath = `/${entityType}/${entityId}`;
   } else {
@@ -143,8 +156,8 @@ export const areQueriesEquivalent = (query1: OpenAlexSearchParameters, query2: O
       return false;
     }
 
-    const value1 = parameters1[key as keyof OpenAlexSearchParameters];
-    const value2 = parameters2[key as keyof OpenAlexSearchParameters];
+    const value1: unknown = parameters1[key];
+    const value2: unknown = parameters2[key];
 
     if (String(value1) !== String(value2)) {
       return false;
@@ -168,11 +181,11 @@ export const generateQueryTitle = (entityType: string, searchParams: OpenAlexSea
   const entityTypeName = entityType.charAt(0).toUpperCase() + entityType.slice(1);
 
   // Add key query characteristics
-  if (queryParameters.search) {
+  if (queryParameters.search !== undefined && queryParameters.search !== "") {
     parts.push(`"${queryParameters.search}"`);
   }
 
-  if (queryParameters.filter) {
+  if (queryParameters.filter !== undefined && queryParameters.filter !== "") {
     // Extract key filter information (simplified)
     const filterString = queryParameters.filter;
     if (filterString.includes('author.id:')) {
@@ -188,11 +201,11 @@ export const generateQueryTitle = (entityType: string, searchParams: OpenAlexSea
     }
   }
 
-  if (queryParameters.sort) {
+  if (queryParameters.sort !== undefined && queryParameters.sort !== "") {
     parts.push(`sorted ${queryParameters.sort.replace('.desc', ' (desc)').replace('.asc', ' (asc)')}`);
   }
 
-  if (queryParameters.group_by) {
+  if (queryParameters.group_by !== undefined && queryParameters.group_by !== "") {
     parts.push(`grouped by ${queryParameters.group_by}`);
   }
 
@@ -223,15 +236,17 @@ export const getPaginationInfo = (searchParams: OpenAlexSearchParameters): {
   cursor?: string;
   hasPagination: boolean;
 } => {
-  const page = Number(searchParams.page) || 1;
-  const perPage = Number(searchParams.per_page) || 50;
+  const page = Number(searchParams.page) || DEFAULT_PAGE;
+  const perPage = Number(searchParams.per_page) || DEFAULT_PER_PAGE;
   const cursor = searchParams.cursor;
 
   return {
     page,
     perPage,
     cursor,
-    hasPagination: !!(searchParams.page || searchParams.per_page || searchParams.cursor)
+    hasPagination: searchParams.page !== undefined
+      || searchParams.per_page !== undefined
+      || (searchParams.cursor !== undefined && searchParams.cursor !== "")
   };
 };
 
@@ -243,13 +258,13 @@ export const getPaginationInfo = (searchParams: OpenAlexSearchParameters): {
  */
 export const mergeQueryAndPagination = (queryParams: Partial<OpenAlexSearchParameters>, paginationParams?: Partial<OpenAlexSearchParameters>): OpenAlexSearchParameters => {
   const defaults: Partial<OpenAlexSearchParameters> = {
-    page: 1,
-    per_page: 50
+    page: DEFAULT_PAGE,
+    per_page: DEFAULT_PER_PAGE
   };
 
   return {
     ...queryParams,
     ...defaults,
     ...paginationParams
-  } as OpenAlexSearchParameters;
+  };
 };

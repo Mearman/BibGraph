@@ -38,6 +38,7 @@ interface CreateListModalProperties {
 }
 
 // Validation constants
+const MIN_TITLE_LENGTH = 3;
 const MAX_TITLE_LENGTH = 100;
 const MAX_DESCRIPTION_LENGTH = 500;
 const MAX_TAGS_COUNT = 10;
@@ -50,10 +51,10 @@ export const CreateListModal = ({
   initialType,
   initialTags
 }: CreateListModalProperties) => {
-  const [title, setTitle] = useState(initialTitle || "");
-  const [description, setDescription] = useState(initialDescription || "");
-  const [type, setType] = useState<ListType>(initialType || "list");
-  const [tags, setTags] = useState<string[]>(initialTags || []);
+  const [title, setTitle] = useState(initialTitle ?? "");
+  const [description, setDescription] = useState(initialDescription ?? "");
+  const [type, setType] = useState<ListType>(initialType ?? "list");
+  const [tags, setTags] = useState<string[]>(initialTags ?? []);
   const [isPublic, setIsPublic] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -72,34 +73,34 @@ export const CreateListModal = ({
   const titleError = useMemo(() => {
     if (!titleTouched) return null;
     if (!trimmedTitle) return "Title is required";
-    if (trimmedTitle.length < 3) return "Title must be at least 3 characters";
-    if (trimmedTitle.length > MAX_TITLE_LENGTH) return `Title cannot exceed ${MAX_TITLE_LENGTH} characters`;
+    if (trimmedTitle.length < MIN_TITLE_LENGTH) return `Title must be at least ${String(MIN_TITLE_LENGTH)} characters`;
+    if (trimmedTitle.length > MAX_TITLE_LENGTH) return `Title cannot exceed ${String(MAX_TITLE_LENGTH)} characters`;
     return null;
   }, [trimmedTitle, titleTouched]);
 
   const descriptionError = useMemo(() => {
     if (!descriptionTouched) return null;
     if (trimmedDescription.length > MAX_DESCRIPTION_LENGTH) {
-      return `Description cannot exceed ${MAX_DESCRIPTION_LENGTH} characters`;
+      return `Description cannot exceed ${String(MAX_DESCRIPTION_LENGTH)} characters`;
     }
     return null;
   }, [trimmedDescription, descriptionTouched]);
 
   const tagsError = useMemo(() => {
     if (filteredTags.length > MAX_TAGS_COUNT) {
-      return `Cannot add more than ${MAX_TAGS_COUNT} tags`;
+      return `Cannot add more than ${String(MAX_TAGS_COUNT)} tags`;
     }
     return null;
   }, [filteredTags]);
 
   const isFormValid = useMemo(() => {
-    return trimmedTitle.length >= 3 &&
+    return trimmedTitle.length >= MIN_TITLE_LENGTH &&
            trimmedTitle.length <= MAX_TITLE_LENGTH &&
            trimmedDescription.length <= MAX_DESCRIPTION_LENGTH &&
            filteredTags.length <= MAX_TAGS_COUNT &&
-           !titleError &&
-           !descriptionError &&
-           !tagsError;
+           titleError === null &&
+           descriptionError === null &&
+           tagsError === null;
   }, [trimmedTitle, trimmedDescription, filteredTags, titleError, descriptionError, tagsError]);
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
@@ -165,10 +166,10 @@ export const CreateListModal = ({
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit} noValidate>
+    <Box component="form" onSubmit={(e) => { void handleSubmit(e); }} noValidate>
       <Stack gap="md">
         {/* Error Alert */}
-        {submitError && (
+        {submitError !== null && submitError !== "" && (
           <Alert
             icon={<IconAlertCircle size={16} />}
             title="Creation Failed"
@@ -187,15 +188,15 @@ export const CreateListModal = ({
           label="Title"
           placeholder="Enter list name"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={() => setTitleTouched(true)}
+          onChange={(e) => { setTitle(e.target.value); }}
+          onBlur={() => { setTitleTouched(true); }}
           required
           maxLength={MAX_TITLE_LENGTH}
           error={titleError}
-          description={`Enter a descriptive title for your ${type}. Min 3 characters, max ${MAX_TITLE_LENGTH}.`}
+          description={`Enter a descriptive title for your ${type}. Min ${String(MIN_TITLE_LENGTH)} characters, max ${String(MAX_TITLE_LENGTH)}.`}
           rightSection={
             title.length > 0 && (
-              <Tooltip label={`${title.length}/${MAX_TITLE_LENGTH} characters`}>
+              <Tooltip label={`${String(title.length)}/${String(MAX_TITLE_LENGTH)} characters`}>
                 <MantineText
                   size="xs"
                   c={title.length > MAX_TITLE_LENGTH ? "red" : "dimmed"}
@@ -206,8 +207,8 @@ export const CreateListModal = ({
               </Tooltip>
             )
           }
-          aria-describedby={titleError ? "title-error" : "title-description"}
-          aria-invalid={!!titleError}
+          aria-describedby={titleError !== null ? "title-error" : "title-description"}
+          aria-invalid={titleError !== null}
         />
 
         {/* Description Textarea */}
@@ -216,15 +217,15 @@ export const CreateListModal = ({
           label="Description"
           placeholder="Optional description of your list"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          onBlur={() => setDescriptionTouched(true)}
+          onChange={(e) => { setDescription(e.target.value); }}
+          onBlur={() => { setDescriptionTouched(true); }}
           minRows={3}
           maxLength={MAX_DESCRIPTION_LENGTH}
           error={descriptionError}
-          description={`Optional description to help others understand the purpose of this list. Max ${MAX_DESCRIPTION_LENGTH} characters.`}
+          description={`Optional description to help others understand the purpose of this list. Max ${String(MAX_DESCRIPTION_LENGTH)} characters.`}
           rightSection={
             description.length > 0 && (
-              <Tooltip label={`${description.length}/${MAX_DESCRIPTION_LENGTH} characters`}>
+              <Tooltip label={`${String(description.length)}/${String(MAX_DESCRIPTION_LENGTH)} characters`}>
                 <MantineText
                   size="xs"
                   c={description.length > MAX_DESCRIPTION_LENGTH ? "red" : "dimmed"}
@@ -235,15 +236,15 @@ export const CreateListModal = ({
               </Tooltip>
             )
           }
-          aria-describedby={descriptionError ? "description-error" : "description-description"}
-          aria-invalid={!!descriptionError}
+          aria-describedby={descriptionError !== null ? "description-error" : "description-description"}
+          aria-invalid={descriptionError !== null}
         />
 
         {/* Type Selection */}
         <Radio.Group
           label="Type"
           value={type}
-          onChange={(value) => setType(value as ListType)}
+          onChange={(value) => { setType(value); }}
           required
           aria-describedby="list-type-description"
         >
@@ -278,17 +279,17 @@ export const CreateListModal = ({
           value={tags}
           onChange={setTags}
           error={tagsError}
-          description={`Add up to ${MAX_TAGS_COUNT} tags to help organize and find your lists.`}
+          description={`Add up to ${String(MAX_TAGS_COUNT)} tags to help organize and find your lists.`}
           maxTags={MAX_TAGS_COUNT}
-          aria-describedby={tagsError ? "tags-error" : "tags-description"}
-          aria-invalid={!!tagsError}
+          aria-describedby={tagsError !== null ? "tags-error" : "tags-description"}
+          aria-invalid={tagsError !== null}
         />
 
         {/* Public Sharing Checkbox */}
         <Checkbox
           id="is-public"
           checked={isPublic}
-          onChange={(e) => setIsPublic(e.target.checked)}
+          onChange={(e) => { setIsPublic(e.target.checked); }}
           label="Make this list publicly shareable"
           aria-describedby="public-description"
         />

@@ -22,10 +22,13 @@ interface RandomWork {
   type: string;
 }
 
+const RANDOM_PAGE_COUNT = 1000;
+const RANDOM_PAGE_OFFSET = 1;
+
 const fetchRandomWork = async (): Promise<RandomWork> => {
   try {
     // Use a random page to get different results each time
-    const randomPage = Math.floor(Math.random() * 1000) + 1;
+    const randomPage = Math.floor(Math.random() * RANDOM_PAGE_COUNT) + RANDOM_PAGE_OFFSET;
     const results = await cachedOpenAlex.client.works.searchWorks('', {
       // Random filters to get variety
       filters: {
@@ -46,7 +49,7 @@ const fetchRandomWork = async (): Promise<RandomWork> => {
 
     return {
       id: work.id,
-      title: work.title || 'Untitled',
+      title: work.title ?? 'Untitled',
       type: 'work',
     };
   } catch (error) {
@@ -71,7 +74,7 @@ export const RandomExplorer: React.FC = () => {
     try {
       const result = await refetch();
       if (result.data) {
-        navigate({
+        await navigate({
           to: `/works/${result.data.id.replace('https://openalex.org/', '')}`,
         });
       }
@@ -117,7 +120,7 @@ export const RandomExplorer: React.FC = () => {
         <Group gap="md">
           <Button
             leftSection={<IconSparkles size={ICON_SIZE.SM} />}
-            onClick={handleSurpriseMe}
+            onClick={() => { void handleSurpriseMe(); }}
             loading={isFetching}
             size="lg"
             variant="gradient"
@@ -128,7 +131,7 @@ export const RandomExplorer: React.FC = () => {
 
           <Button
             leftSection={<IconRefresh size={ICON_SIZE.SM} />}
-            onClick={handleRefreshRandom}
+            onClick={() => { void handleRefreshRandom(); }}
             loading={isFetching}
             variant="light"
           >

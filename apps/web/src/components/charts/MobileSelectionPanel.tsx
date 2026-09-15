@@ -7,6 +7,9 @@
 
 import type { ReactNode } from "react";
 
+// Converts a 0-1 ratio (zoom level, precision, recall, F1 score) to a percentage for display.
+const PERCENTAGE_MULTIPLIER = 100;
+
 interface MobileSelectionPanelProperties {
   /**
   Content to display in the panel
@@ -16,8 +19,6 @@ interface MobileSelectionPanelProperties {
 
 /**
  * Panel component for displaying selection details on mobile
- * @param root0
- * @param root0.children
  */
 export const MobileSelectionPanel = ({ children }: MobileSelectionPanelProperties) => (
   <div
@@ -49,9 +50,6 @@ interface PerformanceChartHintsProperties {
 
 /**
  * Mobile interaction hints for performance bar chart
- * @param root0
- * @param root0.datasetName
- * @param root0.zoomLevel
  */
 export const PerformanceChartHints = ({
   datasetName,
@@ -70,7 +68,7 @@ export const PerformanceChartHints = ({
       <div>Tap bars to hear values</div>
       <div>Swipe to scroll horizontally</div>
       <div>Double-tap to zoom in/out</div>
-      <div>Pinch to zoom (scale: {Math.round(zoomLevel * 100)}%)</div>
+      <div>Pinch to zoom (scale: {Math.round(zoomLevel * PERCENTAGE_MULTIPLIER)}%)</div>
     </div>
   </MobileSelectionPanel>
 );
@@ -96,11 +94,6 @@ interface ScatterPlotDetailsProperties {
 
 /**
  * Mobile selection details for scatter plot
- * @param root0
- * @param root0.datasetName
- * @param root0.precision
- * @param root0.recall
- * @param root0.f1Score
  */
 export const ScatterPlotDetails = ({
   datasetName,
@@ -111,10 +104,10 @@ export const ScatterPlotDetails = ({
   <MobileSelectionPanel>
     <strong>{datasetName}</strong>
     <br />
-    Precision: {(precision * 100).toFixed(1)}%
+    Precision: {(precision * PERCENTAGE_MULTIPLIER).toFixed(1)}%
     <br />
-    Recall: {(recall * 100).toFixed(1)}%
+    Recall: {(recall * PERCENTAGE_MULTIPLIER).toFixed(1)}%
     <br />
-    F1-Score: {(f1Score * 100).toFixed(1)}%
+    F1-Score: {(f1Score * PERCENTAGE_MULTIPLIER).toFixed(1)}%
   </MobileSelectionPanel>
 );

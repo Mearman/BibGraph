@@ -71,7 +71,7 @@ if (typeof document !== 'undefined') {
   `;
   style.replaceSync(cssText);
   // adoptedStyleSheets may not be iterable in test environments (JSDOM)
-  if (document.adoptedStyleSheets && Symbol.iterator in new Object(document.adoptedStyleSheets)) {
+  if (Symbol.iterator in new Object(document.adoptedStyleSheets)) {
     document.adoptedStyleSheets = [...document.adoptedStyleSheets, style];
   } else {
     // Fallback for test environments: initialize with single stylesheet
@@ -135,7 +135,7 @@ export const interactiveStates = {
     cursor: 'pointer',
     transition: 'all 0.2s ease',
   },
-};
+} as const;
 
 /**
  * Dynamic color schemes that adapt to current theme
@@ -161,7 +161,6 @@ export const colorSchemes = {
 
 /**
  * Component library-specific spacing values
- * @param library
  */
 export const createDynamicSpacing = (library: ComponentLibrary) => {
   const spacingScales = {
@@ -170,12 +169,11 @@ export const createDynamicSpacing = (library: ComponentLibrary) => {
     radix: { xs: '2px', sm: '4px', md: '8px', lg: '16px' },
   };
 
-  return spacingScales[library] || spacingScales.mantine;
+  return spacingScales[library];
 };
 
 /**
  * Dynamic border radius that adapts to component library
- * @param library
  */
 export const createDynamicBorderRadius = (library: ComponentLibrary) => {
   const radiusScales = {
@@ -184,15 +182,13 @@ export const createDynamicBorderRadius = (library: ComponentLibrary) => {
     radix: { xs: '1px', sm: '2px', md: '4px', lg: '6px' },
   };
 
-  return radiusScales[library] || radiusScales.mantine;
+  return radiusScales[library];
 };
 
 /**
  * Dynamic card styles that adapt to component library
- * @param library
- * @param elevated
  */
-export const createCardStyles = (library: ComponentLibrary, elevated: boolean = false) => {
+export const createCardStyles = (library: ComponentLibrary, elevated = false) => {
   const baseStyle = {
     padding: 'var(--spacing-md)',
     borderRadius: 'var(--border-radius-lg)',
@@ -220,14 +216,11 @@ export const createCardStyles = (library: ComponentLibrary, elevated: boolean = 
     },
   };
 
-  return libraryStyles[library] || libraryStyles.mantine;
+  return libraryStyles[library];
 };
 
 /**
  * Dynamic button styles that adapt to component library
- * @param library
- * @param variant
- * @param size
  */
 export const createButtonStyles = (
   library: ComponentLibrary,
@@ -280,14 +273,12 @@ export const createButtonStyles = (
 
 /**
  * Apply dynamic theme to an element
- * @param element
- * @param theme
  */
 export const applyDynamicTheme = (element: HTMLElement, theme: DynamicThemeConfig) => {
   const variables = {
-    [dynamicThemeVars.colors.primary]: theme.colors?.primary || 'var(--mantine-color-blue-6)',
-    [dynamicThemeVars.spacing.md]: theme.spacing?.md || '16px',
-    [dynamicThemeVars.borderRadius.md]: theme.borderRadius?.md || '8px',
+    [dynamicThemeVars.colors.primary]: theme.colors?.primary ?? 'var(--mantine-color-blue-6)',
+    [dynamicThemeVars.spacing.md]: theme.spacing?.md ?? '16px',
+    [dynamicThemeVars.borderRadius.md]: theme.borderRadius?.md ?? '8px',
   };
 
   setElementVars(element, variables);
@@ -295,8 +286,6 @@ export const applyDynamicTheme = (element: HTMLElement, theme: DynamicThemeConfi
 
 /**
  * Apply color mode theme (light/dark) to an element
- * @param element
- * @param colorMode
  */
 export const applyColorModeTheme = (element: HTMLElement, colorMode: 'light' | 'dark') => {
   const schemeClass = colorMode === 'light' ? 'light' : 'dark';
@@ -305,26 +294,21 @@ export const applyColorModeTheme = (element: HTMLElement, colorMode: 'light' | '
 
 /**
  * Apply interactive properties to an element
- * @param element
- * @param options
- * @param options.disabled
- * @param options.selected
- * @param options.hoverable
  */
 export const applyInteractiveProperties = (
   element: HTMLElement,
-  options: { disabled?: boolean; selected?: boolean; hoverable?: boolean }
+  options: Readonly<{ disabled?: boolean; selected?: boolean; hoverable?: boolean }>
 ) => {
-  const styles: Record<string, string> = {};
+  let styles: Record<string, string> = {};
 
   if (options.hoverable !== false) {
-    Object.assign(styles, interactiveStates.hoverable);
+    styles = { ...styles, ...interactiveStates.hoverable };
   }
-  if (options.disabled) {
-    Object.assign(styles, interactiveStates.disabled);
+  if (options.disabled === true) {
+    styles = { ...styles, ...interactiveStates.disabled };
   }
-  if (options.selected) {
-    Object.assign(styles, interactiveStates.selected);
+  if (options.selected === true) {
+    styles = { ...styles, ...interactiveStates.selected };
   }
 
   // Apply styles directly to the element
@@ -347,7 +331,6 @@ export const initializeRuntimeTheme = () => {
 
 /**
  * Update runtime theme
- * @param colorMode
  */
 export const updateRuntimeTheme = (colorMode: 'light' | 'dark') => {
   const root = document.documentElement;
@@ -364,8 +347,6 @@ export const getCurrentRuntimeTheme = (): 'light' | 'dark' => {
 
 /**
  * Create theme value for CSS variables
- * @param key
- * @param value
  */
 export const createThemeValue = (key: string, value: string) => {
   return `var(--${key}, ${value})`;
@@ -374,7 +355,6 @@ export const createThemeValue = (key: string, value: string) => {
 /**
  * Get component library theme configuration
  * Uses CSS variables for proper theme/dark mode support
- * @param library
  */
 export const getComponentLibraryTheme = (library: ComponentLibrary) => {
   const themes = {
@@ -398,5 +378,5 @@ export const getComponentLibraryTheme = (library: ComponentLibrary) => {
     },
   };
 
-  return themes[library] || themes.mantine;
+  return themes[library];
 };

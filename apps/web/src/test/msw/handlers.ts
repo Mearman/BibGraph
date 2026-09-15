@@ -5,10 +5,22 @@
  * In E2E tests: Check filesystem cache first, then fall back to API or mocks
  */
 
-import type { Author, Authorship,Institution, Work } from "@bibgraph/types";
+import type { Author, InstitutionEntity, Work } from "@bibgraph/types";
 import { http, HttpResponse } from "msw";
 
 const API_BASE = "https://api.openalex.org";
+
+const MOCK_REFERENCED_WORK_ID_OFFSET_1 = 1000;
+const MOCK_REFERENCED_WORK_ID_OFFSET_2 = 2000;
+const MOCK_RELATED_WORK_ID_OFFSET_1 = 3000;
+const MOCK_RELATED_WORK_ID_OFFSET_2 = 4000;
+const MOCK_ABSTRACT_WORD_POSITION_MOCK = 3;
+const MOCK_ABSTRACT_WORD_POSITION_ABSTRACT = 4;
+const MOCK_ABSTRACT_WORD_POSITION_FOR = 5;
+const MOCK_ABSTRACT_WORD_POSITION_TESTING = 6;
+const DEFAULT_PAGE_SIZE = 25;
+const MAX_MOCK_LIST_RESULTS = 10;
+const MOCK_ENTITY_ID_BASE = 1_000_000_000;
 
 /**
  * Filesystem cache utilities interface (injected in E2E mode)
@@ -20,7 +32,6 @@ interface FilesystemCacheUtilities {
 
 /**
  * Mock data factories for OpenAlex entities
- * @param id
  */
 const createMockWork = (id: string): Work => {
   const mockWork: Work = {
@@ -63,11 +74,7 @@ const createMockWork = (id: string): Work => {
           type: "education",
         },
       ],
-      countries: ["US"],
-      is_corresponding: true,
-      raw_author_name: `Mock Author for ${id}`,
-      raw_affiliation_strings: [`Mock Institution for ${id}`],
-    } as Authorship,
+    },
   ],
   countries_distinct_count: 1,
   institutions_distinct_count: 1,
@@ -142,21 +149,21 @@ const createMockWork = (id: string): Work => {
   versions: [],
   referenced_works_count: 2,
   referenced_works: [
-    `https://openalex.org/W${(Number.parseInt(id.slice(1)) + 1000).toString()}`,
-    `https://openalex.org/W${(Number.parseInt(id.slice(1)) + 2000).toString()}`,
+    `https://openalex.org/W${(Number.parseInt(id.slice(1)) + MOCK_REFERENCED_WORK_ID_OFFSET_1).toString()}`,
+    `https://openalex.org/W${(Number.parseInt(id.slice(1)) + MOCK_REFERENCED_WORK_ID_OFFSET_2).toString()}`,
   ],
   related_works: [
-    `https://openalex.org/W${(Number.parseInt(id.slice(1)) + 3000).toString()}`,
-    `https://openalex.org/W${(Number.parseInt(id.slice(1)) + 4000).toString()}`,
+    `https://openalex.org/W${(Number.parseInt(id.slice(1)) + MOCK_RELATED_WORK_ID_OFFSET_1).toString()}`,
+    `https://openalex.org/W${(Number.parseInt(id.slice(1)) + MOCK_RELATED_WORK_ID_OFFSET_2).toString()}`,
   ],
   abstract_inverted_index: {
     This: [0],
     is: [1],
     a: [2],
-    mock: [3],
-    abstract: [4],
-    for: [5],
-    testing: [6],
+    mock: [MOCK_ABSTRACT_WORD_POSITION_MOCK],
+    abstract: [MOCK_ABSTRACT_WORD_POSITION_ABSTRACT],
+    for: [MOCK_ABSTRACT_WORD_POSITION_FOR],
+    testing: [MOCK_ABSTRACT_WORD_POSITION_TESTING],
   },
   cited_by_api_url: `https://api.openalex.org/works?filter=cites:${id}`,
   counts_by_year: [
@@ -206,26 +213,35 @@ const createMockAuthor = (id: string): Author => ({
   counts_by_year: [],
 });
 
-const createMockInstitution = (id: string): Institution => ({
+const createMockInstitution = (id: string): InstitutionEntity => ({
   id: `https://openalex.org/${id}`,
   ror: undefined,
   display_name: `Mock Institution ${id}`,
   country_code: "US",
   type: "education",
   lineage: [],
+  cited_by_count: 0,
+  counts_by_year: [],
+  updated_date: "2023-01-01",
+  created_date: "2023-01-01",
+  works_count: 0,
+  geo: {
+    country_code: "US",
+    country: "United States",
+  },
+  international: {
+    display_name: {},
+  },
 });
 
 /**
  * Create filesystem cache helper functions with injected utilities
- * @param cacheUtils
  */
 const createCacheHelpers = (cacheUtils?: FilesystemCacheUtilities) => {
   /**
    * Attempt to read from filesystem cache (E2E only)
-   * @param entityType
-   * @param id
    */
-  const tryFilesystemCache = async (entityType: string, id: string): Promise<unknown | null> => {
+  const tryFilesystemCache = async (entityType: string, id: string): Promise<unknown> => {
     if (!cacheUtils) return null;
 
     try {
@@ -244,9 +260,6 @@ const createCacheHelpers = (cacheUtils?: FilesystemCacheUtilities) => {
 
   /**
    * Write to filesystem cache (E2E only)
-   * @param entityType
-   * @param id
-   * @param data
    */
   const writeToCache = async (entityType: string, id: string, data: unknown): Promise<void> => {
     if (!cacheUtils) return;
@@ -264,14 +277,13 @@ const createCacheHelpers = (cacheUtils?: FilesystemCacheUtilities) => {
 
 /**
  * Create MSW handlers with optional filesystem cache support
- * @param cacheUtils
  */
 export const createOpenalexHandlers = (cacheUtils?: FilesystemCacheUtilities) => {
   const { isE2EMode } = createCacheHelpers(cacheUtils);
 
   return [
   // Get single work by ID
-  http.get(`${API_BASE}/works/:id`, async ({ params }) => {
+  http.get(`${API_BASE}/works/:id`, ({ params }) => {
     const { id } = params;
 
     if (typeof id !== "string") {
@@ -313,7 +325,7 @@ export const createOpenalexHandlers = (cacheUtils?: FilesystemCacheUtilities) =>
   }),
 
   // Get single author by ID
-  http.get(`${API_BASE}/authors/:id`, async ({ params }) => {
+  http.get(`${API_BASE}/authors/:id`, ({ params }) => {
     const { id } = params;
 
     if (typeof id !== "string") {
@@ -340,7 +352,7 @@ export const createOpenalexHandlers = (cacheUtils?: FilesystemCacheUtilities) =>
   }),
 
   // Get single institution by ID
-  http.get(`${API_BASE}/institutions/:id`, async ({ params }) => {
+  http.get(`${API_BASE}/institutions/:id`, ({ params }) => {
     const { id } = params;
 
     if (typeof id !== "string") {
@@ -369,10 +381,10 @@ export const createOpenalexHandlers = (cacheUtils?: FilesystemCacheUtilities) =>
   // List works endpoint
   http.get(`${API_BASE}/works`, ({ request }) => {
     const url = new URL(request.url);
-    const perPage = Number(url.searchParams.get("per_page")) || 25;
+    const perPage = Number(url.searchParams.get("per_page")) || DEFAULT_PAGE_SIZE;
 
-    const works = Array.from({ length: Math.min(perPage, 10) }, (_, index) =>
-      createMockWork(`W${(1_000_000_000 + index).toString()}`),
+    const works = Array.from({ length: Math.min(perPage, MAX_MOCK_LIST_RESULTS) }, (_, index) =>
+      createMockWork(`W${(MOCK_ENTITY_ID_BASE + index).toString()}`),
     );
 
     return HttpResponse.json(
@@ -389,7 +401,7 @@ export const createOpenalexHandlers = (cacheUtils?: FilesystemCacheUtilities) =>
       {
         headers: {
           "x-powered-by": "msw",
-          "x-msw-request-id": `mock-works-list-${perPage}`,
+          "x-msw-request-id": `mock-works-list-${String(perPage)}`,
         },
       },
     );
@@ -398,10 +410,10 @@ export const createOpenalexHandlers = (cacheUtils?: FilesystemCacheUtilities) =>
   // List authors endpoint
   http.get(`${API_BASE}/authors`, ({ request }) => {
     const url = new URL(request.url);
-    const perPage = Number(url.searchParams.get("per_page")) || 25;
+    const perPage = Number(url.searchParams.get("per_page")) || DEFAULT_PAGE_SIZE;
 
-    const authors = Array.from({ length: Math.min(perPage, 10) }, (_, index) =>
-      createMockAuthor(`A${(1_000_000_000 + index).toString()}`),
+    const authors = Array.from({ length: Math.min(perPage, MAX_MOCK_LIST_RESULTS) }, (_, index) =>
+      createMockAuthor(`A${(MOCK_ENTITY_ID_BASE + index).toString()}`),
     );
 
     return HttpResponse.json(
@@ -418,7 +430,7 @@ export const createOpenalexHandlers = (cacheUtils?: FilesystemCacheUtilities) =>
       {
         headers: {
           "x-powered-by": "msw",
-          "x-msw-request-id": `mock-authors-list-${perPage}`,
+          "x-msw-request-id": `mock-authors-list-${String(perPage)}`,
         },
       },
     );
@@ -427,10 +439,10 @@ export const createOpenalexHandlers = (cacheUtils?: FilesystemCacheUtilities) =>
   // List institutions endpoint
   http.get(`${API_BASE}/institutions`, ({ request }) => {
     const url = new URL(request.url);
-    const perPage = Number(url.searchParams.get("per_page")) || 25;
+    const perPage = Number(url.searchParams.get("per_page")) || DEFAULT_PAGE_SIZE;
 
-    const institutions = Array.from({ length: Math.min(perPage, 10) }, (_, index) =>
-      createMockInstitution(`I${(1_000_000_000 + index).toString()}`),
+    const institutions = Array.from({ length: Math.min(perPage, MAX_MOCK_LIST_RESULTS) }, (_, index) =>
+      createMockInstitution(`I${(MOCK_ENTITY_ID_BASE + index).toString()}`),
     );
 
     return HttpResponse.json(
@@ -447,42 +459,52 @@ export const createOpenalexHandlers = (cacheUtils?: FilesystemCacheUtilities) =>
       {
         headers: {
           "x-powered-by": "msw",
-          "x-msw-request-id": `mock-institutions-list-${perPage}`,
+          "x-msw-request-id": `mock-institutions-list-${String(perPage)}`,
         },
       },
     );
   }),
 
   // Catch-all for other entity types (sources, topics, publishers, funders, concepts)
-  http.get(`${API_BASE}/sources/:id`, async ({ params }) => {
+  http.get(`${API_BASE}/sources/:id`, ({ params }) => {
     const { id } = params;
     if (typeof id !== "string") return HttpResponse.json({ error: "Invalid ID" }, { status: 400 });
 
-    return HttpResponse.json({ id: `https://openalex.org/${id}`, display_name: `Mock Source ${id}`, type: "journal" });
+    return HttpResponse.json({
+      id: `https://openalex.org/${id}`,
+      display_name: `Mock Source ${id}`,
+      type: "journal",
+      cited_by_count: 0,
+      counts_by_year: [],
+      updated_date: "2023-01-01",
+      created_date: "2023-01-01",
+      works_count: 0,
+      works_api_url: `https://api.openalex.org/works?filter=primary_location.source.id:${id}`,
+    });
   }),
 
-  http.get(`${API_BASE}/topics/:id`, async ({ params }) => {
+  http.get(`${API_BASE}/topics/:id`, ({ params }) => {
     const { id } = params;
     if (typeof id !== "string") return HttpResponse.json({ error: "Invalid ID" }, { status: 400 });
 
     return HttpResponse.json({ id: `https://openalex.org/${id}`, display_name: `Mock Topic ${id}` });
   }),
 
-  http.get(`${API_BASE}/publishers/:id`, async ({ params }) => {
+  http.get(`${API_BASE}/publishers/:id`, ({ params }) => {
     const { id } = params;
     if (typeof id !== "string") return HttpResponse.json({ error: "Invalid ID" }, { status: 400 });
 
     return HttpResponse.json({ id: `https://openalex.org/${id}`, display_name: `Mock Publisher ${id}` });
   }),
 
-  http.get(`${API_BASE}/funders/:id`, async ({ params }) => {
+  http.get(`${API_BASE}/funders/:id`, ({ params }) => {
     const { id } = params;
     if (typeof id !== "string") return HttpResponse.json({ error: "Invalid ID" }, { status: 400 });
 
     return HttpResponse.json({ id: `https://openalex.org/${id}`, display_name: `Mock Funder ${id}` });
   }),
 
-  http.get(`${API_BASE}/concepts/:id`, async ({ params }) => {
+  http.get(`${API_BASE}/concepts/:id`, ({ params }) => {
     const { id } = params;
     if (typeof id !== "string") return HttpResponse.json({ error: "Invalid ID" }, { status: 400 });
 

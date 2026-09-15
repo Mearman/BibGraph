@@ -1,4 +1,5 @@
 import { cachedOpenAlex } from "@bibgraph/client";
+import { domainSchema } from "@bibgraph/types";
 import { type Domain } from "@bibgraph/types";
 import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute,useParams, useSearch  } from "@tanstack/react-router";
@@ -16,8 +17,8 @@ import { usePrettyUrl } from "@/hooks/use-pretty-url";
 import { decodeEntityId } from "@/utils/url-decoding";
 
 const DomainRoute = () => {
-  const { domainId: rawDomainId } = useParams({ strict: false }) as { domainId: string };
-  const { select: selectParameter } = useSearch({ strict: false }) as { select?: string };
+  const { domainId: rawDomainId } = useParams({ strict: false });
+  const { select: selectParameter } = useSearch({ strict: false });
   const [viewMode, setViewMode] = useState<DetailViewMode>("rich");
 
   // Decode the domain ID in case it's URL-encoded
@@ -27,28 +28,29 @@ const DomainRoute = () => {
   usePrettyUrl("domains", rawDomainId, domainId);
 
   // Parse select parameter - only send select when explicitly provided in URL
-  const selectFields = selectParameter && typeof selectParameter === 'string'
+  const selectFields = typeof selectParameter === 'string' && selectParameter !== ''
     ? selectParameter.split(',').map(field => field.trim())
     : undefined;
 
   // Construct full OpenAlex domain URL
-  const fullDomainId = domainId ? `https://openalex.org/domains/${domainId}` : '';
+  const fullDomainId = domainId !== undefined && domainId !== '' ? `https://openalex.org/domains/${domainId}` : '';
 
   // Fetch domain data - domains use the domains endpoint
   const { data: domain, isLoading, error } = useQuery({
     queryKey: ["domain", domainId, selectParameter, selectFields],
     queryFn: async () => {
-      if (!domainId) {
+      if (domainId === undefined || domainId === '') {
         throw new Error("Domain ID is required");
       }
-      const response = await cachedOpenAlex.getById(
-        'domains',
-        domainId,
-        selectFields ? { select: selectFields } : {}
-      );
-      return response as Domain;
+      const response = await cachedOpenAlex.getById<Domain>({
+        endpoint: 'domains',
+        id: domainId,
+        params: selectFields ? { select: selectFields } : {},
+        schema: domainSchema,
+      });
+      return response;
     },
-    enabled: !!domainId,
+    enabled: domainId !== undefined && domainId !== '',
   });
 
   // Get relationship counts for summary display
@@ -59,7 +61,7 @@ const DomainRoute = () => {
 
   // Handle loading state
   if (isLoading) {
-    return <LoadingState entityType="Domain" entityId={domainId || ''} config={ENTITY_TYPE_CONFIGS.domains} />;
+    return <LoadingState entityType="Domain" entityId={domainId ?? ''} config={ENTITY_TYPE_CONFIGS.domains} />;
   }
 
   // Handle error state
@@ -68,7 +70,7 @@ const DomainRoute = () => {
       <ErrorState
         error={error}
         entityType="Domain"
-        entityId={domainId || ''}
+        entityId={domainId ?? ''}
       />
     );
   }

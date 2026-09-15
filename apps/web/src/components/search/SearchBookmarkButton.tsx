@@ -34,9 +34,8 @@ export const SearchBookmarkButton = ({
           autoClose: TIME_MS.BOOKMARK_FEEDBACK_DURATION,
         });
       } else {
-        const title = searchQuery;
         await userInteractions.bookmarkSearch({
-          title,
+          title: searchQuery,
           searchQuery: searchQuery,
         });
         notifications.show({
@@ -71,7 +70,9 @@ export const SearchBookmarkButton = ({
         color={userInteractions.isBookmarked ? "yellow" : "gray"}
         size="sm"
         disabled={loading}
-        onClick={handleToggleBookmark}
+        onClick={() => {
+          void handleToggleBookmark();
+        }}
         leftSection={
           userInteractions.isBookmarked ? (
             <IconBookmark size={ICON_SIZE.MD} fill="currentColor" />

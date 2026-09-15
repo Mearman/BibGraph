@@ -18,115 +18,120 @@ export interface EntityGridItem {
   worksCount?: number
   citedByCount?: number
   description?: string
-  tags?: Array<{ label: string; color?: string }>
+  tags?: { label: string; color?: string }[]
 }
 
 // EntityListItem type alias for EntityGridItem
 export type EntityListItem = EntityGridItem
 
+// Every entity type that can be rendered as a grid/list item. Kept as a single union (rather than a generic type parameter) so entityMappers below can share one function signature and be indexed/called without a type assertion.
+type MappableEntity = Work | Author | InstitutionEntity | Source | Publisher | Funder | Topic | Concept
+
 /**
  * Base entity mapper that provides common transformation logic
- * @param entity
- * @param entityType
  */
-export const createBaseEntityMapper = <T extends Work | Author | InstitutionEntity | Source | Publisher | Funder | Topic | Concept>(entity: T, entityType: EntityType): EntityGridItem => {
-  const baseItem = {
+export const createBaseEntityMapper = (entity: Readonly<MappableEntity>, entityType: EntityType): EntityGridItem => {
+  // Some entities (e.g. Concept) don't carry a works_count field at all
+  const worksCount = 'works_count' in entity && typeof entity.works_count === 'number' ? entity.works_count : undefined
+
+  return {
     id: entity.id.replace("https://openalex.org/", ""),
     displayName: entity.display_name,
     entityType,
-    worksCount: (entity as { works_count?: number }).works_count, // Some entities like Concept don't have works_count
+    worksCount,
     citedByCount: entity.cited_by_count,
   }
-
-  return baseItem
 };
 
 /**
  * Specialized entity mappers for each type
  */
-export const entityMappers = {
-  works: (entity: Work): EntityGridItem => {
+export const entityMappers: Record<Extract<EntityType, "works" | "authors" | "institutions" | "sources" | "publishers" | "funders" | "topics" | "concepts">, (entity: Readonly<MappableEntity>) => EntityGridItem> = {
+  works: (entity) => {
     const base = createBaseEntityMapper(entity, "works")
+    const hasAbstract = 'abstract_inverted_index' in entity && entity.abstract_inverted_index !== undefined
     return {
       ...base,
-      description: entity.abstract_inverted_index ? "Abstract available" : undefined,
+      description: hasAbstract ? "Abstract available" : undefined,
     }
   },
 
-  authors: (entity: Author): EntityGridItem => {
+  authors: (entity) => {
     const base = createBaseEntityMapper(entity, "authors")
+    const orcid = 'orcid' in entity ? entity.orcid : undefined
+    if (orcid === undefined || orcid === '') {
+      return base
+    }
     return {
       ...base,
-      description: entity.orcid ? `ORCID: ${entity.orcid}` : undefined,
-      tags: entity.orcid ? [{ label: "ORCID", color: "green" }] : undefined,
+      description: `ORCID: ${orcid}`,
+      tags: [{ label: "ORCID", color: "green" }],
     }
   },
 
-  institutions: (entity: InstitutionEntity): EntityGridItem => {
+  institutions: (entity) => {
     return createBaseEntityMapper(entity, "institutions")
   },
 
-  sources: (entity: Source): EntityGridItem => {
+  sources: (entity) => {
     const base = createBaseEntityMapper(entity, "sources")
-    const tags: Array<{ label: string; color?: string }> = []
+    const tags: { label: string; color?: string }[] = []
 
-    if (entity.is_oa) {
+    if ('is_oa' in entity && entity.is_oa) {
       tags.push({ label: "Open Access", color: "green" })
     }
-    if (entity.type) {
-      tags.push({ label: entity.type, color: "gray" })
+    const sourceType = 'type' in entity ? entity.type : undefined
+    if (sourceType !== undefined && sourceType !== '') {
+      tags.push({ label: sourceType, color: "gray" })
     }
+    const publisher = 'publisher' in entity ? entity.publisher : undefined
 
     return {
       ...base,
-      description: entity.publisher ? `Publisher: ${entity.publisher}` : undefined,
+      description: publisher !== undefined && publisher !== '' ? `Publisher: ${publisher}` : undefined,
       tags: tags.length > 0 ? tags : undefined,
     }
   },
 
-  publishers: (entity: Publisher): EntityGridItem => {
+  publishers: (entity) => {
     return createBaseEntityMapper(entity, "publishers")
   },
 
-  funders: (entity: Funder): EntityGridItem => {
+  funders: (entity) => {
     return createBaseEntityMapper(entity, "funders")
   },
 
-  topics: (entity: Topic): EntityGridItem => {
+  topics: (entity) => {
     return createBaseEntityMapper(entity, "topics")
   },
 
-  concepts: (entity: Concept): EntityGridItem => {
+  concepts: (entity) => {
     return createBaseEntityMapper(entity, "concepts")
   },
-} as const
+}
+
+const isMappableEntityType = (entityType: EntityType): entityType is keyof typeof entityMappers => entityType in entityMappers
 
 /**
  * Generic entity transformation function
- * @param entity
- * @param entityType
  */
-export const transformEntityToGridItem = <T extends Work | Author | InstitutionEntity | Source | Publisher | Funder | Topic | Concept>(entity: T, entityType: EntityType): EntityGridItem => {
-  const mapper = entityMappers[entityType as keyof typeof entityMappers]
-  if (!mapper) {
+export const transformEntityToGridItem = (entity: Readonly<MappableEntity>, entityType: EntityType): EntityGridItem => {
+  if (!isMappableEntityType(entityType)) {
     throw new Error(`Unsupported entity type: ${entityType}`)
   }
-  // Use type assertion with `any` as intermediate to avoid type mismatch
-  // The mapper functions are properly typed but TypeScript can't narrow the union type
-  return mapper(entity as never)
+  const mapper = entityMappers[entityType]
+  return mapper(entity)
 };
 
 /**
  * Transform entity to list item (currently same as grid item)
- * @param entity
- * @param entityType
  */
-export const transformEntityToListItem = <T extends Work | Author | InstitutionEntity | Source | Publisher | Funder | Topic | Concept>(entity: T, entityType: EntityType): EntityListItem => transformEntityToGridItem(entity, entityType);
+export const transformEntityToListItem = (entity: Readonly<MappableEntity>, entityType: EntityType): EntityListItem => transformEntityToGridItem(entity, entityType);
 
 /**
  * Map from singular entity_type (autocomplete) to plural EntityType
  */
-const singularToPluralEntityType: Record<string, EntityType> = {
+const singularToPluralEntityType: Record<AutocompleteResult["entity_type"], EntityType> = {
   work: "works",
   author: "authors",
   source: "sources",
@@ -143,16 +148,14 @@ const singularToPluralEntityType: Record<string, EntityType> = {
 
 /**
  * Transform AutocompleteResult to EntityGridItem for use in grid/list views
- * @param result
  */
-export const transformAutocompleteResultToGridItem = (result: AutocompleteResult): EntityGridItem => {
-  const entityType = singularToPluralEntityType[result.entity_type] || (result.entity_type as EntityType)
+export const transformAutocompleteResultToGridItem = (result: Readonly<AutocompleteResult>): EntityGridItem => {
+  const entityType = singularToPluralEntityType[result.entity_type]
 
   // Extract ID from OpenAlex URL, removing the base URL
   let id = result.id.replace("https://openalex.org/", "")
 
-  // For entity types where the ID includes the type prefix (e.g., "keywords/machine-learning"),
-  // strip it since EntityCard will add it back via entityType
+  // For entity types where the ID includes the type prefix (e.g., "keywords/machine-learning"), strip it since EntityCard will add it back via entityType
   if (id.includes("/")) {
     const parts = id.split("/")
     // Check if first part matches a known entity type plural

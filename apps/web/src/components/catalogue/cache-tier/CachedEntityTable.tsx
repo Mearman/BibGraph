@@ -1,6 +1,5 @@
 /**
  * Cached Entity Table component for displaying entity lists in cache tiers
- * @module components/catalogue/cache-tier/CachedEntityTable
  */
 
 import type { CachedEntityEntry } from "@bibgraph/client/internal/static-data-provider";
@@ -30,11 +29,6 @@ interface CachedEntityTableProperties {
 
 /**
  * Displays a table of cached entities with type, ID, timestamps, and navigation
- * @param root0
- * @param root0.entities
- * @param root0.showSize
- * @param root0.showAccessedAt
- * @param root0.sortByAccessedAt
  */
 export const CachedEntityTable = ({
   entities,
@@ -66,7 +60,7 @@ export const CachedEntityTable = ({
         </Table.Thead>
         <Table.Tbody>
           {sortedEntities.map((entity, index) => (
-            <Table.Tr key={`${entity.entityType}-${entity.entityId}-${index}`}>
+            <Table.Tr key={`${entity.entityType}-${entity.entityId}-${String(index)}`}>
               <Table.Td>
                 <EntityTypeBadge
                   entityType={entity.entityType}
@@ -95,7 +89,7 @@ export const CachedEntityTable = ({
                   <ActionIcon
                     variant="subtle"
                     size="xs"
-                    onClick={() => handleEntityClick(entity)}
+                    onClick={() => { handleEntityClick(entity); }}
                     aria-label={`View ${entity.entityType} ${entity.entityId}`}
                   >
                     <IconExternalLink size={ICON_SIZE.XS} />

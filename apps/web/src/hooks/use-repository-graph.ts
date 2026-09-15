@@ -3,7 +3,6 @@
  *
  * Bridges the catalogue storage (bookmarks) to graph visualization components.
  * Converts CatalogueEntity[] to GraphNode[] and extracts relationships as GraphEdge[].
- * @module hooks/use-repository-graph
  */
 
 import {
@@ -23,15 +22,15 @@ import { useCallback, useEffect, useRef,useState } from 'react';
 
 import { useStorageProvider } from '@/contexts/storage-provider-context';
 
+import { isPlainObject } from './extractors/unknown-helpers';
+
 /**
- * Normalize an OpenAlex ID by extracting the short ID from a URL if needed.
- * e.g., "https://openalex.org/A5048491430" -> "A5048491430"
- * @param id
+ * Normalize an OpenAlex ID by extracting the short ID from a URL if needed. e.g., "https://openalex.org/A5048491430" becomes "A5048491430"
  */
 const normalizeOpenAlexId = (id: string): string => {
   if (!id) return id;
   // If it's a URL, extract just the ID part
-  const urlMatch = id.match(/openalex\.org\/([ACDFIKPQSTW]\d+)$/i);
+  const urlMatch = /openalex\.org\/([ACDFIKPQSTW]\d+)$/i.exec(id);
   if (urlMatch) {
     return urlMatch[1].toUpperCase();
   }
@@ -40,21 +39,41 @@ const normalizeOpenAlexId = (id: string): string => {
 };
 
 /**
+ * Extract relationships to bookmarked topics from an entity's `topics` field, which the OpenAlex client types as `any[]` (the full TopicItem schema isn't modelled), so each item is narrowed to a plain object with a string `id` before use
+ */
+const extractTopicRelationships = (
+  topics: unknown,
+  relationType: RelationType,
+): { targetId: string; targetType: EntityType; relationType: RelationType }[] => {
+  const result: { targetId: string; targetType: EntityType; relationType: RelationType }[] = [];
+  if (!Array.isArray(topics)) return result;
+  for (const topic of topics) {
+    if (isPlainObject(topic) && typeof topic.id === 'string') {
+      result.push({
+        targetId: normalizeOpenAlexId(topic.id),
+        targetType: 'topics',
+        relationType,
+      });
+    }
+  }
+  return result;
+};
+
+/**
  * Result of fetching a bookmark's entity data and extracting relationships
  */
 interface BookmarkFetchResult {
   label: string;
   entityData: Record<string, unknown>;
-  relationships: Array<{
+  relationships: {
     targetId: string;
     targetType: EntityType;
     relationType: RelationType;
-  }>;
+  }[];
 }
 
 /**
  * Fetch entity data and extract relationships for a Work bookmark
- * @param entityId
  */
 const fetchWorkBookmark = async (entityId: string): Promise<BookmarkFetchResult | null> => {
   try {
@@ -63,7 +82,7 @@ const fetchWorkBookmark = async (entityId: string): Promise<BookmarkFetchResult 
 
     // Authorships -> Authors
     for (const auth of work.authorships ?? []) {
-      if (auth.author?.id) {
+      if (auth.author.id !== undefined) {
         relationships.push({
           targetId: normalizeOpenAlexId(auth.author.id),
           targetType: 'authors',
@@ -72,13 +91,17 @@ const fetchWorkBookmark = async (entityId: string): Promise<BookmarkFetchResult 
       }
     }
 
-    // Primary location -> Source
-    if (work.primary_location?.source?.id) {
-      relationships.push({
-        targetId: normalizeOpenAlexId(work.primary_location.source.id),
-        targetType: 'sources',
-        relationType: RelationType.PUBLICATION,
-      });
+    // Primary location -> Source (typed `any` by the OpenAlex client, so narrow before use)
+    const primaryLocation: unknown = work.primary_location;
+    if (isPlainObject(primaryLocation)) {
+      const source = primaryLocation.source;
+      if (isPlainObject(source) && typeof source.id === 'string') {
+        relationships.push({
+          targetId: normalizeOpenAlexId(source.id),
+          targetType: 'sources',
+          relationType: RelationType.PUBLICATION,
+        });
+      }
     }
 
     // Referenced works
@@ -91,19 +114,11 @@ const fetchWorkBookmark = async (entityId: string): Promise<BookmarkFetchResult 
     }
 
     // Topics
-    for (const topic of work.topics ?? []) {
-      if (topic.id) {
-        relationships.push({
-          targetId: normalizeOpenAlexId(topic.id),
-          targetType: 'topics',
-          relationType: RelationType.TOPIC,
-        });
-      }
-    }
+    relationships.push(...extractTopicRelationships(work.topics, RelationType.TOPIC));
 
     // Grants -> Funders
     for (const grant of work.grants ?? []) {
-      if (grant.funder) {
+      if (grant.funder !== undefined && grant.funder !== '') {
         relationships.push({
           targetId: normalizeOpenAlexId(grant.funder),
           targetType: 'funders',
@@ -113,7 +128,7 @@ const fetchWorkBookmark = async (entityId: string): Promise<BookmarkFetchResult 
     }
 
     return {
-      label: work.title ?? work.display_name ?? entityId,
+      label: work.title ?? work.display_name,
       entityData: work,
       relationships,
     };
@@ -125,18 +140,18 @@ const fetchWorkBookmark = async (entityId: string): Promise<BookmarkFetchResult 
 
 /**
  * Fetch entity data and extract relationships for an Author bookmark
- * @param entityId
  */
 const fetchAuthorBookmark = async (entityId: string): Promise<BookmarkFetchResult | null> => {
   try {
     const author = await getAuthorById(entityId);
     const relationships: BookmarkFetchResult['relationships'] = [];
 
-    // Affiliations -> Institutions
+    // Affiliations -> Institutions (institution is typed `any` by the OpenAlex client)
     for (const aff of author.affiliations ?? []) {
-      if (aff.institution?.id) {
+      const institution: unknown = aff.institution;
+      if (isPlainObject(institution) && typeof institution.id === 'string') {
         relationships.push({
-          targetId: normalizeOpenAlexId(aff.institution.id),
+          targetId: normalizeOpenAlexId(institution.id),
           targetType: 'institutions',
           relationType: RelationType.AFFILIATION,
         });
@@ -144,18 +159,10 @@ const fetchAuthorBookmark = async (entityId: string): Promise<BookmarkFetchResul
     }
 
     // Topics
-    for (const topic of author.topics ?? []) {
-      if (topic.id) {
-        relationships.push({
-          targetId: normalizeOpenAlexId(topic.id),
-          targetType: 'topics',
-          relationType: RelationType.AUTHOR_RESEARCHES,
-        });
-      }
-    }
+    relationships.push(...extractTopicRelationships(author.topics, RelationType.AUTHOR_RESEARCHES));
 
     return {
-      label: author.display_name ?? entityId,
+      label: author.display_name,
       entityData: author,
       relationships,
     };
@@ -167,7 +174,6 @@ const fetchAuthorBookmark = async (entityId: string): Promise<BookmarkFetchResul
 
 /**
  * Fetch entity data and extract relationships for an Institution bookmark
- * @param entityId
  */
 const fetchInstitutionBookmark = async (entityId: string): Promise<BookmarkFetchResult | null> => {
   try {
@@ -175,15 +181,7 @@ const fetchInstitutionBookmark = async (entityId: string): Promise<BookmarkFetch
     const relationships: BookmarkFetchResult['relationships'] = [];
 
     // Topics
-    for (const topic of institution.topics ?? []) {
-      if (topic.id) {
-        relationships.push({
-          targetId: normalizeOpenAlexId(topic.id),
-          targetType: 'topics',
-          relationType: RelationType.TOPIC,
-        });
-      }
-    }
+    relationships.push(...extractTopicRelationships(institution.topics, RelationType.TOPIC));
 
     // Lineage -> Parent institutions
     for (const parentId of institution.lineage ?? []) {
@@ -197,7 +195,7 @@ const fetchInstitutionBookmark = async (entityId: string): Promise<BookmarkFetch
     }
 
     return {
-      label: institution.display_name ?? entityId,
+      label: institution.display_name,
       entityData: institution,
       relationships,
     };
@@ -209,7 +207,6 @@ const fetchInstitutionBookmark = async (entityId: string): Promise<BookmarkFetch
 
 /**
  * Fetch entity data and extract relationships for a Source bookmark
- * @param entityId
  */
 const fetchSourceBookmark = async (entityId: string): Promise<BookmarkFetchResult | null> => {
   try {
@@ -217,7 +214,7 @@ const fetchSourceBookmark = async (entityId: string): Promise<BookmarkFetchResul
     const relationships: BookmarkFetchResult['relationships'] = [];
 
     // Host organization -> Publisher
-    if (source.host_organization) {
+    if (source.host_organization !== undefined && source.host_organization !== '') {
       relationships.push({
         targetId: normalizeOpenAlexId(source.host_organization),
         targetType: 'publishers',
@@ -226,18 +223,10 @@ const fetchSourceBookmark = async (entityId: string): Promise<BookmarkFetchResul
     }
 
     // Topics
-    for (const topic of source.topics ?? []) {
-      if (topic.id) {
-        relationships.push({
-          targetId: normalizeOpenAlexId(topic.id),
-          targetType: 'topics',
-          relationType: RelationType.TOPIC,
-        });
-      }
-    }
+    relationships.push(...extractTopicRelationships(source.topics, RelationType.TOPIC));
 
     return {
-      label: source.display_name ?? entityId,
+      label: source.display_name,
       entityData: source,
       relationships,
     };
@@ -249,7 +238,6 @@ const fetchSourceBookmark = async (entityId: string): Promise<BookmarkFetchResul
 
 /**
  * Fetch entity data and extract relationships for a Topic bookmark
- * @param entityId
  */
 const fetchTopicBookmark = async (entityId: string): Promise<BookmarkFetchResult | null> => {
   try {
@@ -257,7 +245,7 @@ const fetchTopicBookmark = async (entityId: string): Promise<BookmarkFetchResult
     const relationships: BookmarkFetchResult['relationships'] = [];
 
     // Field
-    if (topic.field?.id) {
+    if (topic.field.id) {
       relationships.push({
         targetId: normalizeOpenAlexId(topic.field.id),
         targetType: 'fields',
@@ -266,7 +254,7 @@ const fetchTopicBookmark = async (entityId: string): Promise<BookmarkFetchResult
     }
 
     // Domain
-    if (topic.domain?.id) {
+    if (topic.domain.id) {
       relationships.push({
         targetId: normalizeOpenAlexId(topic.domain.id),
         targetType: 'domains',
@@ -275,7 +263,7 @@ const fetchTopicBookmark = async (entityId: string): Promise<BookmarkFetchResult
     }
 
     return {
-      label: topic.display_name ?? entityId,
+      label: topic.display_name,
       entityData: topic,
       relationships,
     };
@@ -287,13 +275,12 @@ const fetchTopicBookmark = async (entityId: string): Promise<BookmarkFetchResult
 
 /**
  * Fetch entity data for a Funder bookmark (no relationships extracted)
- * @param entityId
  */
 const fetchFunderBookmark = async (entityId: string): Promise<BookmarkFetchResult | null> => {
   try {
     const funder = await getFunderById(entityId);
     return {
-      label: funder.display_name ?? entityId,
+      label: funder.display_name,
       entityData: funder,
       relationships: [],
     };
@@ -305,13 +292,12 @@ const fetchFunderBookmark = async (entityId: string): Promise<BookmarkFetchResul
 
 /**
  * Fetch entity data for a Publisher bookmark (no relationships extracted)
- * @param entityId
  */
 const fetchPublisherBookmark = async (entityId: string): Promise<BookmarkFetchResult | null> => {
   try {
     const publisher = await getPublisherById(entityId);
     return {
-      label: publisher.display_name ?? entityId,
+      label: publisher.display_name,
       entityData: publisher,
       relationships: [],
     };
@@ -323,7 +309,6 @@ const fetchPublisherBookmark = async (entityId: string): Promise<BookmarkFetchRe
 
 /**
  * Fetch entity data and relationships for a bookmark based on entity type
- * @param bookmark
  */
 const fetchBookmarkData = async (bookmark: CatalogueEntity): Promise<BookmarkFetchResult | null> => {
   switch (bookmark.entityType) {
@@ -341,6 +326,11 @@ const fetchBookmarkData = async (bookmark: CatalogueEntity): Promise<BookmarkFet
       return fetchFunderBookmark(bookmark.entityId);
     case 'publishers':
       return fetchPublisherBookmark(bookmark.entityId);
+    case 'concepts':
+    case 'keywords':
+    case 'domains':
+    case 'fields':
+    case 'subfields':
     default:
       return null;
   }
@@ -386,18 +376,21 @@ export interface UseRepositoryGraphResult {
   refresh: () => Promise<void>;
 }
 
+const INITIAL_NODE_X_RANGE = 800;
+const INITIAL_NODE_X_OFFSET = 400;
+const INITIAL_NODE_Y_RANGE = 600;
+const INITIAL_NODE_Y_OFFSET = 300;
+
 /**
  * Convert a CatalogueEntity (bookmark) to a GraphNode for visualization
- * @param entity
- * @param fetchResult
  */
 const catalogueEntityToGraphNode = (entity: CatalogueEntity, fetchResult: BookmarkFetchResult | null): GraphNode => ({
     id: entity.entityId,
     entityType: entity.entityType,
     entityId: entity.entityId,
     label: fetchResult?.label ?? entity.entityId,
-    x: Math.random() * 800 - 400,
-    y: Math.random() * 600 - 300,
+    x: Math.random() * INITIAL_NODE_X_RANGE - INITIAL_NODE_X_OFFSET,
+    y: Math.random() * INITIAL_NODE_Y_RANGE - INITIAL_NODE_Y_OFFSET,
     externalIds: [],
     entityData: {
       notes: entity.notes,
@@ -456,7 +449,7 @@ export const useRepositoryGraph = (): UseRepositoryGraphResult => {
       if (bookmarks.length !== previousNodeCountReference.current) {
         // Fetch entity data and relationships for all bookmarks in parallel
         const fetchResults = await Promise.all(
-          bookmarks.map((bookmark) => fetchBookmarkData(bookmark))
+          bookmarks.map(async (bookmark) => fetchBookmarkData(bookmark))
         );
 
         // Create a map of bookmarked entity IDs for quick lookup

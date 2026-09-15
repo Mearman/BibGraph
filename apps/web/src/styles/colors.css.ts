@@ -1,6 +1,9 @@
 import { componentLibraries } from "./component-libraries.css";
 import { type ShadcnPalette,shadcnPalettes } from './shadcn-colors';
-import type { ColorMode, ColorScheme } from "./theme-contracts";
+import type { ColorScheme } from "./theme-contracts";
+
+// Both palette dictionaries below only ever hold resolved light/dark values - "auto" is a UI-facing preference that callers must resolve to one of these before reaching this module.
+type ResolvedColorMode = 'light' | 'dark'
 
 // Helper function to create color scheme from shadcn palette
 const createColorScheme = (palette: ShadcnPalette) => ({
@@ -63,10 +66,10 @@ const colorSchemes = {
 } as const;
 
 // Export color scheme function to get colors by scheme and mode
-export const getColorScheme = (scheme: ColorScheme, mode: ColorMode) => colorSchemes[scheme][mode];
+export const getColorScheme = (scheme: ColorScheme, mode: ResolvedColorMode) => colorSchemes[scheme][mode];
 
 // Helper function to get colors by scheme and mode
-export const getColorThemeTokens = (scheme: ColorScheme, mode: ColorMode) => {
+export const getColorThemeTokens = (scheme: ColorScheme, mode: ResolvedColorMode) => {
   const colors = getColorScheme(scheme, mode);
   const mantineTokens = componentLibraries.mantine; // Use mantine tokens for spacing/borders/shadows
 

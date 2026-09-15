@@ -2,27 +2,29 @@ import { globalStyle, style } from '@vanilla-extract/css'
 
 import { createCSSVariableString } from './css-variable-resolver'
 
+const SHADCN_VARIABLE_LINE_PATTERN = /--shadcn-([^:]+):\s*([^;\s][^;]*);/
+
 // Root CSS variables for light mode
 export const shadcnLightTheme = style({
   ':root': {
-    ...createCSSVariableString('light').split('\n').reduce((accumulator, line) => {
-      const match = line.match(/--shadcn-([^:]+):\s*([^;\s][^;]*);/)
+    ...createCSSVariableString('light').split('\n').reduce<Record<string, string>>((accumulator, line) => {
+      const match = SHADCN_VARIABLE_LINE_PATTERN.exec(line)
       if (match) {
         accumulator[`--shadcn-${match[1]}`] = match[2]
       }
       return accumulator
-    }, {} as Record<string, string>)
+    }, {})
   }
 })
 
 // Dark mode CSS variables using globalStyle
-export const shadcnDarkThemeVariables = createCSSVariableString('dark').split('\n').reduce((accumulator, line) => {
-  const match = line.match(/--shadcn-([^:]+):\s*([^;\s][^;]*);/)
+export const shadcnDarkThemeVariables = createCSSVariableString('dark').split('\n').reduce<Record<string, string>>((accumulator, line) => {
+  const match = SHADCN_VARIABLE_LINE_PATTERN.exec(line)
   if (match) {
     accumulator[`--shadcn-${match[1]}`] = match[2]
   }
   return accumulator
-}, {} as Record<string, string>)
+}, {})
 
 // Apply dark mode variables globally
 globalStyle('[data-mantine-color-scheme="dark"]', shadcnDarkThemeVariables)

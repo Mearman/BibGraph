@@ -31,7 +31,7 @@ export interface EntityGridItem {
   worksCount?: number;
   citedByCount?: number;
   description?: string;
-  tags?: Array<{ label: string; color?: string }>;
+  tags?: { label: string; color?: string }[];
   bookmarked?: boolean;
   lastUpdated?: string;
 }
@@ -82,12 +82,12 @@ export const EntityGrid = ({
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (item) =>
-          item.displayName.toLowerCase().includes(query) ||
-          item.description?.toLowerCase().includes(query) ||
-          item.tags?.some((tag) => tag.label.toLowerCase().includes(query))
-      );
+      result = result.filter((item) => {
+        const matchesName = item.displayName.toLowerCase().includes(query);
+        const matchesDescription = item.description?.toLowerCase().includes(query) ?? false;
+        const matchesTag = item.tags?.some((tag) => tag.label.toLowerCase().includes(query)) ?? false;
+        return matchesName || matchesDescription || matchesTag;
+      });
     }
 
     // Type filter
@@ -143,7 +143,8 @@ export const EntityGrid = ({
                 {showViewToggle && (
                   <SegmentedControl
                     value={viewMode}
-                    onChange={() => {}}
+                    // Loading skeleton is disabled, so the control never fires onChange; a stub keeps SegmentedControl controlled.
+                    onChange={() => { /* disabled control never fires */ }}
                     disabled
                     data={[
                       { value: 'grid', label: <IconLayoutGrid size={16} /> },
@@ -170,7 +171,7 @@ export const EntityGrid = ({
   }
 
   // Enhanced controls section
-  const hasControls = searchable || filterable || showViewToggle || onRefresh;
+  const hasControls = searchable || filterable || showViewToggle || onRefresh !== undefined;
 
   return (
     <Stack gap="md" style={{ maxHeight, overflow: 'auto' }}>
@@ -183,7 +184,7 @@ export const EntityGrid = ({
                   placeholder="Search entities..."
                   leftSection={<IconSearch size={16} />}
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.currentTarget.value)}
+                  onChange={(e) => { setSearchQuery(e.currentTarget.value); }}
                   style={{ flex: 1, minWidth: 200 }}
                 />
               )}
@@ -194,7 +195,7 @@ export const EntityGrid = ({
                       key={type}
                       variant={selectedTypes.includes(type) ? "filled" : "light"}
                       style={{ cursor: 'pointer' }}
-                                      onClick={() => toggleTypeFilter(type)}
+                                      onClick={() => { toggleTypeFilter(type); }}
                     >
                       {type}
                     </Badge>
@@ -216,7 +217,7 @@ export const EntityGrid = ({
               {showViewToggle && (
                 <SegmentedControl
                   value={viewMode}
-                  onChange={(value) => setViewMode(value as "grid" | "list")}
+                  onChange={(value) => { setViewMode(value); }}
                   data={[
                     { value: 'grid', label: <IconLayoutGrid size={16} /> },
                     { value: 'list', label: <IconList size={16} /> }

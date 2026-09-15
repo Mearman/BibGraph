@@ -30,7 +30,7 @@ export const EntityBrowser = () => {
 
   const handleEntityClick = (entityType: string) => {
     // Navigate to the entity index page
-    navigate({ to: `/${entityType}` });
+    void navigate({ to: `/${entityType}` });
   };
 
   return (
@@ -51,7 +51,7 @@ export const EntityBrowser = () => {
             withBorder
             h="100%"
             component="button"
-            onClick={() => handleEntityClick(entity.key)}
+            onClick={() => { handleEntityClick(entity.key); }}
             style={{ cursor: 'pointer', textAlign: 'left' }}
             data-testid="entity-type-card"
             data-entity-type={entity.key}

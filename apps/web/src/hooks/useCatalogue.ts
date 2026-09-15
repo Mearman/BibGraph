@@ -54,28 +54,28 @@ export interface UseCatalogueReturn {
 	selectList: (listId: string | null) => void;
 
 	// Entity Management
-	addEntityToList: (parameters: {
+	addEntityToList: (parameters: Readonly<{
 		listId: string;
 		entityType: EntityType;
 		entityId: string;
 		notes?: string;
-	}) => Promise<string>;
-	addEntitiesToList: (listId: string, entities: Array<{
+	}>) => Promise<string>;
+	addEntitiesToList: (listId: string, entities: readonly {
 		entityType: EntityType;
 		entityId: string;
 		notes?: string;
-	}>) => Promise<{ success: number; failed: number }>;
+	}[]) => Promise<{ success: number; failed: number }>;
 	removeEntityFromList: (listId: string, entityRecordId: string) => Promise<void>;
-	reorderEntities: (listId: string, entityIds: string[]) => Promise<void>;
+	reorderEntities: (listId: string, entityIds: readonly string[]) => Promise<void>;
 	updateEntityNotes: (entityRecordId: string, notes: string) => Promise<void>;
-	bulkRemoveEntities: (listId: string, entityIds: string[]) => Promise<void>;
-	bulkMoveEntities: (sourceListId: string, targetListId: string, entityIds: string[]) => Promise<void>;
-	mergeLists: (sourceListIds: string[], mergeStrategy: 'union' | 'intersection' | 'combine', newListName: string, deduplicate: boolean) => Promise<string>;
+	bulkRemoveEntities: (listId: string, entityIds: readonly string[]) => Promise<void>;
+	bulkMoveEntities: (sourceListId: string, targetListId: string, entityIds: readonly string[]) => Promise<void>;
+	mergeLists: (sourceListIds: readonly string[], mergeStrategy: 'union' | 'intersection' | 'combine', newListName: string, deduplicate: boolean) => Promise<string>;
 
 	// Search and Filter
 	searchLists: (query: string) => Promise<CatalogueList[]>;
 	searchEntities: (query: string) => CatalogueEntity[];
-	filterByType: (types: EntityType[]) => CatalogueEntity[];
+	filterByType: (types: readonly EntityType[]) => CatalogueEntity[];
 
 	// Sharing
 	generateShareUrl: (listId: string) => Promise<string>;
@@ -105,7 +105,7 @@ export interface UseCatalogueReturn {
 	// Import Methods
 	importList: (data: ExportFormat) => Promise<string>;
 	importListCompressed: (compressed: string) => Promise<string>;
-	importListFromFile: (file: File) => Promise<string>;
+	importListFromFile: (file: Readonly<File>) => Promise<string>;
 	validateImportData: (data: unknown) => { valid: boolean; errors: string[]; warnings?: string[] };
 	previewImport: (data: ExportFormat) => Promise<{
 		listTitle: string;
@@ -116,7 +116,7 @@ export interface UseCatalogueReturn {
 	}>;
 }
 
-export const useCatalogue = (options: UseCatalogueOptions = {}): UseCatalogueReturn => {
+export const useCatalogue = (options: Readonly<UseCatalogueOptions> = {}): UseCatalogueReturn => {
 	const storageProvider = useStorageProvider();
 
 	// Mutation loading states
@@ -212,7 +212,9 @@ export const useCatalogue = (options: UseCatalogueOptions = {}): UseCatalogueRet
 		createList: crud.createList,
 		updateList: crud.updateList,
 		deleteList: crud.deleteList,
-		selectList: (id) => core.selectList(core.lists.find(l => l.id === id) || null),
+		selectList: (id) => {
+			core.selectList(core.lists.find(l => l.id === id) ?? null);
+		},
 
 		// Entity Management
 		addEntityToList: crud.addEntityToList,

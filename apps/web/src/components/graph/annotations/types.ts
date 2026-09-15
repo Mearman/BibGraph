@@ -5,8 +5,6 @@
  * - Text labels (sticky notes)
  * - Shapes (rectangles, circles)
  * - Freehand drawings
- *
- * @module components/graph/annotations/types
  */
 
 /**
@@ -132,7 +130,7 @@ export interface DrawingAnnotation extends GraphAnnotation {
   /**
   Array of points in the drawing path
    */
-  points: Array<{ x: number; y: number }>;
+  points: { x: number; y: number }[];
   /**
   Stroke color
    */
@@ -157,16 +155,22 @@ export type AnyAnnotation =
   | DrawingAnnotation;
 
 /**
+ * Distributive variant of the built-in `Omit`.
+ *
+ * The built-in `Omit` is not distributive over union types: applied to a discriminated union it collapses to only the properties common across every member, discarding each variant's own fields. Distributing the `Omit` over each union member individually preserves the discriminated union shape.
+ */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+/**
  * Annotation for serialization (JSON-compatible)
  */
-export type SerializableAnnotation = Omit<AnyAnnotation, 'createdAt' | 'updatedAt'> & {
+export type SerializableAnnotation = DistributiveOmit<AnyAnnotation, 'createdAt' | 'updatedAt'> & {
   createdAt: string;
   updatedAt: string;
 };
 
 /**
  * Convert annotation to serializable format
- * @param annotation
  */
 export const serializeAnnotation = (annotation: AnyAnnotation): SerializableAnnotation => ({
     ...annotation,
@@ -176,24 +180,22 @@ export const serializeAnnotation = (annotation: AnyAnnotation): SerializableAnno
 
 /**
  * Convert serializable annotation back to annotation
- * @param serializable
  */
 export const deserializeAnnotation = (serializable: SerializableAnnotation): AnyAnnotation => {
-  const base = {
-    ...serializable,
-    createdAt: new Date(serializable.createdAt),
-    updatedAt: new Date(serializable.updatedAt),
-  };
+  const createdAt = new Date(serializable.createdAt);
+  const updatedAt = new Date(serializable.updatedAt);
 
   // Return type-specific annotation based on type field
   switch (serializable.type) {
     case 'text':
-      return base as TextAnnotation;
+      return { ...serializable, createdAt, updatedAt };
     case 'rectangle':
-      return base as RectangleAnnotation;
+      return { ...serializable, createdAt, updatedAt };
     case 'circle':
-      return base as CircleAnnotation;
+      return { ...serializable, createdAt, updatedAt };
     case 'drawing':
-      return base as DrawingAnnotation;
+      return { ...serializable, createdAt, updatedAt };
+    default:
+      return serializable satisfies never;
   }
 };

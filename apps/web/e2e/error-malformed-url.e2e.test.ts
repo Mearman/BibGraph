@@ -4,13 +4,21 @@
  * Tests handling of invalid entity IDs, malformed DOIs, and broken URL formats.
  * Ensures the application gracefully handles malformed URLs without crashes,
  * blank pages, or security vulnerabilities (XSS).
- * @module error-malformed-url.e2e
  * @see spec-020 Phase 5: Error scenario coverage
  */
 
 import { expect,test } from '@playwright/test';
 
 import { waitForAppReady } from '@/test/helpers/app-ready';
+
+declare global {
+	interface Window {
+		// Set by the XSS-probe tests below if an injected `<script>` payload ever executes.
+		__alertShown?: boolean;
+	}
+}
+
+const EXTREMELY_LONG_ID_DIGIT_COUNT = 1000;
 
 test.describe('@error Malformed URL Errors', () => {
 	test('should handle invalid work ID format', async ({ page }) => {
@@ -160,7 +168,7 @@ test.describe('@error Malformed URL Errors', () => {
 		// Should not execute script
 		const alertShown = await page.evaluate(() => {
 			// Check if any alert was triggered
-			return (window as any).__alertShown || false;
+			return window.__alertShown ?? false;
 		});
 		expect(alertShown).toBe(false);
 
@@ -180,7 +188,7 @@ test.describe('@error Malformed URL Errors', () => {
 
 		// Should not execute script
 		const alertShown = await page.evaluate(() => {
-			return (window as any).__alertShown || false;
+			return window.__alertShown ?? false;
 		});
 		expect(alertShown).toBe(false);
 
@@ -195,7 +203,7 @@ test.describe('@error Malformed URL Errors', () => {
 
 	test('should handle extremely long entity IDs', async ({ page }) => {
 		// Very long ID that exceeds normal limits
-		const longId = 'W' + '9'.repeat(1000);
+		const longId = 'W' + '9'.repeat(EXTREMELY_LONG_ID_DIGIT_COUNT);
 		await page.goto(`/works/${longId}`);
 		await waitForAppReady(page);
 

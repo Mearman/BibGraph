@@ -4,6 +4,29 @@
 
 import { expect, type Page,test } from "@playwright/test";
 
+/**
+ * Shape of the test-only catalogue service the app exposes on `window` in the test environment, used to clear catalogue data without going through the UI.
+ */
+interface TestCatalogueService {
+  getAllLists: () => Promise<{ id: string }[]>;
+  deleteList: (id: string) => Promise<void>;
+}
+
+// Helper function to create a test list
+const createTestList = async (page: Page, listName: string): Promise<void> => {
+  await page.locator('button:has-text("Create New List")').click();
+  await expect(page.locator('[role="dialog"]')).toBeVisible();
+
+  await page.locator('input:below(:text("Title"))').fill(listName);
+  await page.locator('textarea:below(:text("Description"))').fill(`Test description for ${listName}`);
+
+  await page.locator('button:has-text("Create List")').click();
+  await expect(page.locator('[role="dialog"]')).toBeHidden();
+
+  // Wait for the list to appear in the selected list details section
+  await expect(page.locator('[data-testid="selected-list-title"]:has-text("' + listName + '")')).toBeVisible({ timeout: 10_000 });
+};
+
 test.describe("Catalogue Basic Functionality", () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to catalogue page
@@ -21,7 +44,7 @@ test.describe("Catalogue Basic Functionality", () => {
     await expect(page.locator('button:has-text("Catalogue")')).toBeVisible();
 
     // Navigate to catalogue via navigation
-    await page.click('button:has-text("Catalogue")');
+    await page.locator('button:has-text("Catalogue")').click();
     await page.waitForLoadState("networkidle");
 
     // Verify URL contains catalogue
@@ -36,9 +59,9 @@ test.describe("Catalogue Basic Functionality", () => {
     // Try to clear existing catalogue data, but don't fail if we can't
     await page.evaluate(async () => {
       try {
-        // @ts-expect-error accessing global test service exposed in test environment
-        const { catalogueService } = window;
-        if (catalogueService) {
+        const globalWindow = window as unknown as { catalogueService?: TestCatalogueService };
+        const { catalogueService } = globalWindow;
+        if (catalogueService !== undefined) {
           const lists = await catalogueService.getAllLists();
           for (const list of lists) {
             await catalogueService.deleteList(list.id);
@@ -71,24 +94,24 @@ test.describe("Catalogue Basic Functionality", () => {
 
   test("should create a new list successfully", async ({ page }) => {
     // Click create new list button
-    await page.click('button:has-text("Create New List")');
+    await page.locator('button:has-text("Create New List")').click();
 
     // Wait for modal to appear
     await expect(page.locator('[role="dialog"]')).toBeVisible();
     await expect(page.locator('h2:has-text("Create New List")')).toBeVisible();
 
     // Fill in list details - use label-based selectors
-    await page.fill('input:below(:text("Title"))', 'Test List for E2E');
-    await page.fill('textarea:below(:text("Description"))', 'This is a test list created by e2e tests');
+    await page.locator('input:below(:text("Title"))').fill('Test List for E2E');
+    await page.locator('textarea:below(:text("Description"))').fill('This is a test list created by e2e tests');
 
     // Select list type
-    await page.click('input[value="list"], label:has-text("List")');
+    await page.locator('input[value="list"], label:has-text("List")').click();
 
     // Add tags
-    await page.fill('#list-tags, input[placeholder*="tags"]', 'test,e2e,demo');
+    await page.locator('#list-tags, input[placeholder*="tags"]').fill('test,e2e,demo');
 
     // Create the list
-    await page.click('button:has-text("Create List")');
+    await page.locator('button:has-text("Create List")').click();
 
     // Wait for modal to close and list to appear
     await expect(page.locator('[role="dialog"]')).toBeHidden();
@@ -101,25 +124,25 @@ test.describe("Catalogue Basic Functionality", () => {
 
   test("should create a new bibliography successfully", async ({ page }) => {
     // Click create new list button
-    await page.click('button:has-text("Create New List")');
+    await page.locator('button:has-text("Create New List")').click();
 
     // Wait for modal to appear
     await expect(page.locator('[role="dialog"]')).toBeVisible();
 
     // Fill in bibliography details - use label-based selectors
-    await page.fill('input:below(:text("Title"))', 'Test Bibliography for E2E');
-    await page.fill('textarea:below(:text("Description"))', 'This is a test bibliography created by e2e tests');
+    await page.locator('input:below(:text("Title"))').fill('Test Bibliography for E2E');
+    await page.locator('textarea:below(:text("Description"))').fill('This is a test bibliography created by e2e tests');
 
     // Select bibliography type
-    await page.click('input[value="bibliography"], label:has-text("Bibliography")');
+    await page.locator('input[value="bibliography"], label:has-text("Bibliography")').click();
 
     // Create the bibliography - button text changes based on type
-    await page.click('button:has-text("Create Bibliography")');
+    await page.locator('button:has-text("Create Bibliography")').click();
 
     // Wait for modal to close and bibliography to appear
     await expect(page.locator('[role="dialog"]')).toBeHidden();
     // Switch to Bibliographies tab to verify
-    await page.click('button:has-text("Bibliographies")');
+    await page.locator('button:has-text("Bibliographies")').click();
     await expect(page.locator('[id*="panel-bibliographies"]:has-text("Test Bibliography for E2E")')).toBeVisible({ timeout: 10_000 });
   });
 
@@ -133,7 +156,7 @@ test.describe("Catalogue Basic Functionality", () => {
 
     // Get the list ID from the card
     const cardTestId = await listCard.getAttribute('data-testid');
-    const listId = cardTestId?.replace('list-card-', '') || '';
+    const listId = cardTestId?.replace('list-card-', '') ?? '';
 
     // Click the edit button on the list card
     const editButton = page.locator(`[data-testid="edit-list-${listId}"]`);
@@ -148,7 +171,7 @@ test.describe("Catalogue Basic Functionality", () => {
     await page.locator('#list-title').fill('Updated Test List');
 
     // Save changes
-    await page.click('button:has-text("Save Changes")');
+    await page.locator('button:has-text("Save Changes")').click();
 
     // Verify changes are saved
     await expect(page.locator('[role="dialog"]')).toBeHidden();
@@ -173,7 +196,7 @@ test.describe("Catalogue Basic Functionality", () => {
 
     // Get the list ID from the card's data-testid attribute
     const cardTestId = await deleteableCard.getAttribute('data-testid');
-    const listId = cardTestId?.replace('list-card-', '') || '';
+    const listId = cardTestId?.replace('list-card-', '') ?? '';
 
     // Click the delete button for this specific list
     const deleteButton = page.locator(`[data-testid="delete-list-${listId}"]`);
@@ -241,13 +264,13 @@ test.describe("Catalogue Basic Functionality", () => {
     await expect(page.locator('button:has-text("Bibliographies")')).toBeVisible();
 
     // Click on Bibliographies tab
-    await page.click('button:has-text("Bibliographies")');
+    await page.locator('button:has-text("Bibliographies")').click();
 
     // Verify tab is active
     await expect(page.locator('button:has-text("Bibliographies")[aria-selected="true"]')).toBeVisible();
 
     // Click back to Lists tab
-    await page.click('button:has-text("Lists")');
+    await page.locator('button:has-text("Lists")').click();
 
     // Verify tab is active
     await expect(page.locator('button:has-text("Lists")[aria-selected="true"]')).toBeVisible();
@@ -267,18 +290,3 @@ test.describe("Catalogue Basic Functionality", () => {
     await expect(page.locator('[data-testid="selected-list-title"]:has-text("Statistics Test List")')).toBeVisible();
   });
 });
-
-// Helper function to create a test list
-const createTestList = async (page: Page, listName: string): Promise<void> => {
-  await page.click('button:has-text("Create New List")');
-  await expect(page.locator('[role="dialog"]')).toBeVisible();
-
-  await page.fill('input:below(:text("Title"))', listName);
-  await page.fill('textarea:below(:text("Description"))', `Test description for ${listName}`);
-
-  await page.click('button:has-text("Create List")');
-  await expect(page.locator('[role="dialog"]')).toBeHidden();
-
-  // Wait for the list to appear in the selected list details section
-  await expect(page.locator('[data-testid="selected-list-title"]:has-text("' + listName + '")')).toBeVisible({ timeout: 10_000 });
-};

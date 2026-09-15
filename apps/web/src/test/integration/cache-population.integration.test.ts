@@ -1,15 +1,13 @@
-/**
- * @vitest-environment node
- */
+// @vitest-environment node
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+// The `config/` tree is shared tooling, not a pnpm workspace package (see pnpm-workspace.yaml), so it has no resolvable package name or tsconfig path alias -- a relative import is the only way to reach it from here. NOTE: import-x/no-relative-packages flags this import. The rule's suggested `bibgraph/config/...` fix does not resolve (no such path/package alias exists) -- see eslint.config.base.ts / tsconfig.base.json `paths` to add one before removing this relative import.
+import { openalexCachePlugin } from "@config/vite-plugins/openalex-cache";
 import { createServer, defineConfig } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// eslint-disable-next-line import-x/no-relative-packages -- the workspace config tree is not a resolvable package for tsc
-import { openalexCachePlugin } from "../../../../../config/vite-plugins/openalex-cache";
 import testUrls from "../data/openalex-test-urls.json";
 
 interface TestUrlData {
@@ -18,18 +16,33 @@ interface TestUrlData {
   urls: string[];
 }
 
-interface CacheIndex {
-  files: Record<
-    string,
-    {
-      url: string;
-      $ref: string;
-      lastRetrieved: string;
-      contentHash: string;
-    }
-  >;
-  directories: Record<string, any>;
+interface CacheIndexEntry {
+  url: string;
+  $ref: string;
+  lastRetrieved: string;
+  contentHash: string;
 }
+
+interface CacheIndex {
+  files: Record<string, CacheIndexEntry>;
+  directories: Record<string, unknown>;
+}
+
+const isCacheIndexEntry = (value: unknown): value is CacheIndexEntry => {
+  if (typeof value !== "object" || value === null) return false;
+  if (!("url" in value) || typeof value.url !== "string") return false;
+  if (!("$ref" in value) || typeof value.$ref !== "string") return false;
+  if (!("lastRetrieved" in value) || typeof value.lastRetrieved !== "string") return false;
+  if (!("contentHash" in value) || typeof value.contentHash !== "string") return false;
+  return true;
+};
+
+const isCacheIndex = (value: unknown): value is CacheIndex => {
+  if (typeof value !== "object" || value === null) return false;
+  if (!("files" in value) || typeof value.files !== "object" || value.files === null) return false;
+  if (!("directories" in value) || typeof value.directories !== "object" || value.directories === null) return false;
+  return Object.values(value.files).every(isCacheIndexEntry);
+};
 
 /**
  * Check if a URL is already cached by reading the cache index (currently unused)
@@ -47,19 +60,23 @@ interface CacheIndex {
 //  }
 // }
 
+const SERVER_STARTUP_DELAY_MS = 500;
+const SERVER_READY_DELAY_MS = 2000;
+const CACHE_MIDDLEWARE_TEST_TIMEOUT_MS = 30_000;
+
 describe("Cache Population Integration Tests", () => {
   const DEV_SERVER_PORT = 5174;
-  const BASE_URL = `http://localhost:${DEV_SERVER_PORT}`;
+  const BASE_URL = `http://localhost:${String(DEV_SERVER_PORT)}`;
 
   let urlData: TestUrlData;
-  let server: Awaited<ReturnType<typeof createServer>>;
+  let server: Awaited<ReturnType<typeof createServer>> | undefined;
 
   beforeAll(async () => {
     // Start Vite dev server for cache middleware testing
-    console.log(`🚀 Starting Vite dev server on port ${DEV_SERVER_PORT}...`);
+    console.log(`🚀 Starting Vite dev server on port ${String(DEV_SERVER_PORT)}...`);
 
     // Wait a bit for the system to be ready
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => { setTimeout(resolve, SERVER_STARTUP_DELAY_MS); });
 
     const testViteConfig = defineConfig({
       plugins: [
@@ -78,7 +95,7 @@ describe("Cache Population Integration Tests", () => {
     await server.listen(DEV_SERVER_PORT);
 
     // Wait for server to be fully ready
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await new Promise((resolve) => { setTimeout(resolve, SERVER_READY_DELAY_MS); });
 
     console.log(`✅ Dev server started at ${BASE_URL}`);
     console.log("🔄 Cache middleware is now active for testing");
@@ -144,19 +161,19 @@ describe("Cache Population Integration Tests", () => {
     });
 
     console.log(
-      `📊 Loaded ${urlData.totalUrls} documented URLs (extracted ${urlData.extractedAt}):`,
+      `📊 Loaded ${String(urlData.totalUrls)} documented URLs (extracted ${urlData.extractedAt}):`,
     );
     console.log(
-      `  - ${entityUrls.length} valid entity URLs (${knownBadUrls.size} filtered out)`,
+      `  - ${String(entityUrls.length)} valid entity URLs (${String(knownBadUrls.size)} filtered out)`,
     );
-    console.log(`  - ${collectionUrls.length} collection URLs`);
+    console.log(`  - ${String(collectionUrls.length)} collection URLs`);
     console.log(
-      `  - ${urlData.urls.length - entityUrls.length - collectionUrls.length - knownBadUrls.size} other URLs`,
+      `  - ${String(urlData.urls.length - entityUrls.length - collectionUrls.length - knownBadUrls.size)} other URLs`,
     );
   });
 
   describe("URL Cache Population", () => {
-    it("should verify cache middleware is properly configured", async () => {
+    it("should verify cache middleware is properly configured", () => {
       // Test that the cache middleware is set up correctly without depending on cache data
       const staticDataDir = "./apps/web/public/data/openalex";
       const indexPath = join(staticDataDir, "index.json");
@@ -167,7 +184,10 @@ describe("Cache Population Integration Tests", () => {
       let cacheIndex: CacheIndex | null = null;
       try {
         const indexContent = readFileSync(indexPath, "utf-8");
-        cacheIndex = JSON.parse(indexContent);
+        const parsedIndex: unknown = JSON.parse(indexContent);
+        if (isCacheIndex(parsedIndex)) {
+          cacheIndex = parsedIndex;
+        }
         console.log("✅ Cache index found and loaded successfully");
       } catch {
         console.log("ℹ️  Cache index not found (expected on fresh checkout)");
@@ -179,7 +199,7 @@ describe("Cache Population Integration Tests", () => {
         expect(typeof cacheIndex.files).toBe("object");
 
         const cacheEntries = Object.values(cacheIndex.files);
-        console.log(`📊 Cache contains ${cacheEntries.length} cached files`);
+        console.log(`📊 Cache contains ${String(cacheEntries.length)} cached files`);
 
         // If cache has entries, verify structure
         if (cacheEntries.length > 0) {
@@ -195,7 +215,7 @@ describe("Cache Population Integration Tests", () => {
           const cachedFilePath = join(staticDataDir, entry.$ref);
           try {
             const cachedContent = readFileSync(cachedFilePath, "utf-8");
-            const parsedContent = JSON.parse(cachedContent);
+            const parsedContent: unknown = JSON.parse(cachedContent);
             expect(parsedContent).toBeDefined();
             console.log("✅ Cached files are accessible and contain valid JSON");
           } catch {
@@ -209,12 +229,12 @@ describe("Cache Population Integration Tests", () => {
       console.log("✅ Dev server started with cache plugin configured");
 
       // Verify the server is listening
-      const serverInfo = server.httpServer?.address();
+      const serverInfo = server?.httpServer?.address();
       expect(serverInfo).toBeDefined();
-      console.log(`✅ Server listening on port ${DEV_SERVER_PORT}`);
+      console.log(`✅ Server listening on port ${String(DEV_SERVER_PORT)}`);
 
       console.log("✅ Cache middleware configuration verified");
-    }, 30_000); // 30 second timeout
+    }, CACHE_MIDDLEWARE_TEST_TIMEOUT_MS);
   });
 
   // Note: Cache hit verification test removed due to middleware registration issues

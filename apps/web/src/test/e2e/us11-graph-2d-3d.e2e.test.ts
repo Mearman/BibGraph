@@ -14,10 +14,13 @@ import { expect, test } from '@playwright/test';
 
 import { waitForAppReady } from '@/test/helpers/app-ready';
 
-test.describe('@utility US-11 2D/3D Graph Toggle', () => {
-	test.setTimeout(60_000);
+const TEST_SUITE_TIMEOUT_MS = 60_000;
+const STATE_UPDATE_WAIT_MS = 500;
 
-	test.beforeEach(async ({ page }) => {
+test.describe('@utility US-11 2D/3D Graph Toggle', () => {
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS);
+
+	test.beforeEach(({ page }) => {
 		page.on('console', (message) => {
 			if (message.type() === 'error') {
 				console.error('Browser console error:', message.text());
@@ -104,9 +107,10 @@ test.describe('@utility US-11 2D/3D Graph Toggle', () => {
 			const has3DButton = await segment3D.isVisible().catch(() => false);
 
 			if (has3DButton) {
-				await segment3D.click().catch(() => {});
+				// The click may throw if the 3D canvas isn't interactive; that's fine, we only care that the page keeps functioning afterwards, checked below.
+				await segment3D.click().catch(() => { /* deliberately ignored */ });
 				// Allow time for any state update
-				await page.waitForTimeout(500);
+				await page.waitForTimeout(STATE_UPDATE_WAIT_MS);
 			}
 
 			// Page should remain functional regardless of WebGL availability

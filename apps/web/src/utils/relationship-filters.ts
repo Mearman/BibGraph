@@ -1,15 +1,27 @@
 /**
- * Utility functions for filtering relationship sections
- * Used by entity detail pages to filter displayed relationships
- * @module relationship-filters
+ * Utility functions for filtering relationship sections Used by entity detail pages to filter displayed relationships
  * @see specs/016-entity-relationship-viz/spec.md (User Story 3)
  */
 
-import { RelationType } from '@bibgraph/types';
+import type { RelationType } from '@bibgraph/types';
 
 import type { RelationshipSection } from '@/types/relationship';
 
 export type EdgeDirectionFilter = 'outbound' | 'inbound' | 'both';
+
+/**
+ * Options for {@link filterRelationshipSections}
+ */
+export interface RelationshipSectionFilterOptions {
+  /**
+   * Allowed relationship types (empty array/undefined = show all)
+   */
+  types?: readonly RelationType[];
+  /**
+   * Direction filter ('inbound', 'outbound', or 'both')
+   */
+  direction?: EdgeDirectionFilter;
+}
 
 /**
  * Filter relationship sections by relationship type
@@ -17,7 +29,7 @@ export type EdgeDirectionFilter = 'outbound' | 'inbound' | 'both';
  * @param types - Allowed relationship types (empty array = show all)
  * @returns Filtered sections containing only specified types
  */
-export const filterByType = (sections: RelationshipSection[], types: RelationType[]): RelationshipSection[] => {
+export const filterByType = (sections: readonly RelationshipSection[], types: readonly RelationType[]): readonly RelationshipSection[] => {
   // Empty array means show all types
   if (types.length === 0) {
     return sections;
@@ -33,7 +45,7 @@ export const filterByType = (sections: RelationshipSection[], types: RelationTyp
  * @param direction - Direction filter ('inbound', 'outbound', or 'both')
  * @returns Filtered sections matching the specified direction
  */
-export const filterByDirection = (sections: RelationshipSection[], direction: EdgeDirectionFilter): RelationshipSection[] => {
+export const filterByDirection = (sections: readonly RelationshipSection[], direction: EdgeDirectionFilter): readonly RelationshipSection[] => {
   if (direction === 'both') {
     return sections;
   }
@@ -46,14 +58,9 @@ export const filterByDirection = (sections: RelationshipSection[], direction: Ed
  * Applies both type and direction filters
  * @param sections - All relationship sections
  * @param options - Filter options
- * @param options.types
- * @param options.direction
  * @returns Filtered sections
  */
-export const filterRelationshipSections = (sections: RelationshipSection[], options: {
-    types?: RelationType[];
-    direction?: EdgeDirectionFilter;
-  }): RelationshipSection[] => {
+export const filterRelationshipSections = (sections: readonly RelationshipSection[], options: Readonly<RelationshipSectionFilterOptions>): readonly RelationshipSection[] => {
   let filtered = sections;
 
   if (options.types && options.types.length > 0) {

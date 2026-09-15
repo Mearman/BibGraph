@@ -1,10 +1,7 @@
 /**
  * Graph Annotations Component
  *
- * Main component for managing graph annotations.
- * Provides drawing tools, renders annotations, handles user interactions.
- *
- * @module components/graph/annotations/GraphAnnotations
+ * Main component for managing graph annotations. Provides drawing tools, renders annotations, handles user interactions.
  */
 
 import type { GraphAnnotationStorage } from '@bibgraph/utils';
@@ -24,6 +21,11 @@ const ANNOTATION_COLORS = {
   circle: { border: '#00ff00', fill: 'rgba(0, 255, 0, 0.1)' },
   drawing: { stroke: '#0000ff' },
 } as const;
+
+/**
+ * Minimum size, in pixels, a drawn rectangle/circle/radius must reach before it is committed as an annotation.
+ */
+const MIN_SHAPE_DIMENSION_PX = 5;
 
 interface GraphAnnotationsProperties {
   /**
@@ -47,12 +49,6 @@ interface GraphAnnotationsProperties {
 
 /**
  * Main graph annotations component
- * @param root0
- * @param root0.width
- * @param root0.height
- * @param root0.annotations
- * @param root0.onAddAnnotation
- * @param root0.onClearAnnotations
  */
 export const GraphAnnotations: React.FC<GraphAnnotationsProperties> = ({
   width,
@@ -63,19 +59,19 @@ export const GraphAnnotations: React.FC<GraphAnnotationsProperties> = ({
 }) => {
   const [activeTool, setActiveTool] = useState<DrawingTool>('select');
   const [isDrawing, setIsDrawing] = useState(false);
-  const [drawingPoints, setDrawingPoints] = useState<Array<{ x: number; y: number }>>([]);
+  const [drawingPoints, setDrawingPoints] = useState<{ x: number; y: number }[]>([]);
 
   const [showTextPopover, setShowTextPopover] = useState(false);
   const [textPosition, setTextPosition] = useState({ x: 0, y: 0 });
 
-  const canvasReference = useRef<HTMLDivElement>(null);
-  const startPointReference = useRef<{ x: number; y: number } | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const startPointRef = useRef<{ x: number; y: number } | null>(null);
 
   /**
    * Get mouse position relative to canvas
    */
   const getMousePosition = useCallback((event: MouseEvent) => {
-    const canvas = canvasReference.current;
+    const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
@@ -88,11 +84,11 @@ export const GraphAnnotations: React.FC<GraphAnnotationsProperties> = ({
   /**
    * Handle mouse down - start drawing
    */
-  const handleMouseDown = useCallback(async (event: MouseEvent) => {
+  const handleMouseDown = useCallback((event: MouseEvent) => {
     if (activeTool === 'select' || activeTool === 'erase') return;
 
     const pos = getMousePosition(event);
-    startPointReference.current = pos;
+    startPointRef.current = pos;
     setIsDrawing(true);
 
     if (activeTool === 'text') {
@@ -111,7 +107,7 @@ export const GraphAnnotations: React.FC<GraphAnnotationsProperties> = ({
    * Handle mouse move - update drawing preview
    */
   const handleMouseMove = useCallback((event: MouseEvent) => {
-    if (!isDrawing || !startPointReference.current) return;
+    if (!isDrawing || !startPointRef.current) return;
 
     const pos = getMousePosition(event);
 
@@ -124,25 +120,30 @@ export const GraphAnnotations: React.FC<GraphAnnotationsProperties> = ({
    * Handle mouse up - finish drawing and create annotation
    */
   const handleMouseUp = useCallback(async () => {
-    if (!isDrawing || !startPointReference.current) return;
+    if (!isDrawing || !startPointRef.current) return;
 
-    const start = startPointReference.current;
+    const start = startPointRef.current;
 
     try {
       switch (activeTool) {
+        case 'select':
+        case 'text':
+        case 'erase':
+          break;
+
         case 'rectangle': {
           const currentPos = drawingPoints[drawingPoints.length - 1] ?? start;
-          const width = Math.abs(currentPos.x - start.x);
-          const height = Math.abs(currentPos.y - start.y);
+          const rectWidth = Math.abs(currentPos.x - start.x);
+          const rectHeight = Math.abs(currentPos.y - start.y);
 
-          if (width > 5 && height > 5) {
+          if (rectWidth > MIN_SHAPE_DIMENSION_PX && rectHeight > MIN_SHAPE_DIMENSION_PX) {
             await onAddAnnotation({
               type: 'rectangle',
               visible: true,
               x: Math.min(start.x, currentPos.x),
               y: Math.min(start.y, currentPos.y),
-              width,
-              height,
+              width: rectWidth,
+              height: rectHeight,
               borderColor: ANNOTATION_COLORS.rectangle.border,
               fillColor: ANNOTATION_COLORS.rectangle.fill,
               borderWidth: 2,
@@ -158,7 +159,7 @@ export const GraphAnnotations: React.FC<GraphAnnotationsProperties> = ({
             Math.pow(currentPos.y - start.y, 2)
           );
 
-          if (radius > 5) {
+          if (radius > MIN_SHAPE_DIMENSION_PX) {
             await onAddAnnotation({
               type: 'circle',
               visible: true,
@@ -192,7 +193,7 @@ export const GraphAnnotations: React.FC<GraphAnnotationsProperties> = ({
       console.error('Failed to create annotation:', error);
     } finally {
       setIsDrawing(false);
-      startPointReference.current = null;
+      startPointRef.current = null;
       setDrawingPoints([]);
     }
   }, [isDrawing, activeTool, drawingPoints, onAddAnnotation]);
@@ -235,12 +236,12 @@ export const GraphAnnotations: React.FC<GraphAnnotationsProperties> = ({
         activeTool={activeTool}
         onToolChange={setActiveTool}
         annotationCount={annotations.length}
-        onClearAll={handleClearAll}
+        onClearAll={() => { void handleClearAll(); }}
       />
 
       {/* Annotation canvas */}
       <Box
-        ref={canvasReference}
+        ref={canvasRef}
         style={{
           position: 'absolute',
           top: 0,
@@ -254,9 +255,9 @@ export const GraphAnnotations: React.FC<GraphAnnotationsProperties> = ({
             handleMouseDown(e.nativeEvent);
           }
         }}
-        onMouseMove={(e) => handleMouseMove(e.nativeEvent)}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onMouseMove={(e) => { handleMouseMove(e.nativeEvent); }}
+        onMouseUp={() => { void handleMouseUp(); }}
+        onMouseLeave={() => { void handleMouseUp(); }}
       >
         {/* Render existing annotations */}
         <GraphAnnotationLayer
@@ -266,7 +267,7 @@ export const GraphAnnotations: React.FC<GraphAnnotationsProperties> = ({
         />
 
         {/* Drawing preview for shapes */}
-        {isDrawing && startPointReference.current && drawingPoints.length > 0 && (
+        {isDrawing && startPointRef.current && drawingPoints.length > 0 && (
           <svg
             width={width}
             height={height}
@@ -279,10 +280,10 @@ export const GraphAnnotations: React.FC<GraphAnnotationsProperties> = ({
           >
             {activeTool === 'rectangle' && (
               <rect
-                x={Math.min(startPointReference.current.x, drawingPoints[drawingPoints.length - 1]?.x ?? 0)}
-                y={Math.min(startPointReference.current.y, drawingPoints[drawingPoints.length - 1]?.y ?? 0)}
-                width={Math.abs((drawingPoints[drawingPoints.length - 1]?.x ?? 0) - startPointReference.current.x)}
-                height={Math.abs((drawingPoints[drawingPoints.length - 1]?.y ?? 0) - startPointReference.current.y)}
+                x={Math.min(startPointRef.current.x, drawingPoints[drawingPoints.length - 1]?.x ?? 0)}
+                y={Math.min(startPointRef.current.y, drawingPoints[drawingPoints.length - 1]?.y ?? 0)}
+                width={Math.abs((drawingPoints[drawingPoints.length - 1]?.x ?? 0) - startPointRef.current.x)}
+                height={Math.abs((drawingPoints[drawingPoints.length - 1]?.y ?? 0) - startPointRef.current.y)}
                 fill="none"
                 stroke="#ff0000"
                 strokeWidth={2}
@@ -290,13 +291,13 @@ export const GraphAnnotations: React.FC<GraphAnnotationsProperties> = ({
               />
             )}
 
-            {activeTool === 'circle' && startPointReference.current && (
+            {activeTool === 'circle' && (
               <circle
-                cx={startPointReference.current.x}
-                cy={startPointReference.current.y}
+                cx={startPointRef.current.x}
+                cy={startPointRef.current.y}
                 r={Math.sqrt(
-                  Math.pow((drawingPoints[drawingPoints.length - 1]?.x ?? 0) - startPointReference.current.x, 2) +
-                  Math.pow((drawingPoints[drawingPoints.length - 1]?.y ?? 0) - startPointReference.current.y, 2)
+                  Math.pow((drawingPoints[drawingPoints.length - 1]?.x ?? 0) - startPointRef.current.x, 2) +
+                  Math.pow((drawingPoints[drawingPoints.length - 1]?.y ?? 0) - startPointRef.current.y, 2)
                 )}
                 fill="none"
                 stroke="#00ff00"
@@ -307,7 +308,7 @@ export const GraphAnnotations: React.FC<GraphAnnotationsProperties> = ({
 
             {activeTool === 'drawing' && drawingPoints.length > 1 && (
               <path
-                d={`M ${drawingPoints.map(p => `${p.x} ${p.y}`).join(' L ')}`}
+                d={`M ${drawingPoints.map(p => `${String(p.x)} ${String(p.y)}`).join(' L ')}`}
                 fill="none"
                 stroke="#0000ff"
                 strokeWidth={2}
@@ -322,8 +323,8 @@ export const GraphAnnotations: React.FC<GraphAnnotationsProperties> = ({
       {/* Text annotation popover */}
       <TextAnnotationPopover
         opened={showTextPopover}
-        onClose={() => setShowTextPopover(false)}
-        onSubmit={handleTextSubmit}
+        onClose={() => { setShowTextPopover(false); }}
+        onSubmit={(text) => { void handleTextSubmit(text); }}
         position={textPosition}
       />
     </Stack>

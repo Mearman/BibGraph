@@ -2,8 +2,6 @@
  * Related Entities Section Component
  *
  * Shows related works, authors, venues for an entity with bulk actions.
- *
- * @module components/entity-detail
  */
 
 import { type EntityType } from '@bibgraph/types';
@@ -33,6 +31,11 @@ import { type RelationshipSection } from '@/types/relationship';
 import { ENTITY_TYPE_CONFIGS, getMantineColor } from './EntityTypeConfig';
 
 const MAX_ENTITIES_PER_TYPE = 20;
+
+/**
+ * Returns the first element of an array, or `undefined` for an empty array. Exists because plain index access (`array[0]`) is typed as always-defined under this project's `noUncheckedIndexedAccess: false` tsconfig, which would hide the genuine possibility of an empty array at this call site.
+ */
+const firstOrUndefined = <T,>(array: readonly T[]): T | undefined => array[0];
 
 interface RelatedEntitiesSectionProperties {
   /**
@@ -73,11 +76,11 @@ interface GroupedEntities {
   /**
   Related entities
    */
-  items: Array<{
+  items: {
     id: string;
     displayName: string;
     targetId: string;
-  }>;
+  }[];
   /**
   Total count (including those not shown)
    */
@@ -86,11 +89,6 @@ interface GroupedEntities {
 
 /**
  * Related Entities Section Component
- * @param root0
- * @param root0.incomingSections
- * @param root0.outgoingSections
- * @param root0.entityId
- * @param root0.entityType
  */
 export const RelatedEntitiesSection: React.FC<RelatedEntitiesSectionProperties> = ({
   incomingSections,
@@ -102,7 +100,7 @@ export const RelatedEntitiesSection: React.FC<RelatedEntitiesSectionProperties> 
   const { lists, addEntitiesToList } = useCatalogue();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string | null>(null);
-  const [selectedEntities, setSelectedEntities] = useState<Set<string>>(new Set());
+  const [selectedEntities, setSelectedEntities] = useState<Set<string>>(() => new Set());
   const [isAddingToGraph, setIsAddingToGraph] = useState(false);
 
   // Group entities by relationship type and target entity type
@@ -111,8 +109,8 @@ export const RelatedEntitiesSection: React.FC<RelatedEntitiesSectionProperties> 
 
     const processSection = (section: RelationshipSection, direction: 'inbound' | 'outbound') => {
       // Get target entity type from items
-      const firstItem = section.items[0];
-      if (!firstItem) return;
+      const firstItem = firstOrUndefined(section.items);
+      if (firstItem === undefined) return;
 
       const targetEntityType = direction === 'outbound' ? firstItem.targetType : firstItem.sourceType;
 
@@ -152,11 +150,11 @@ export const RelatedEntitiesSection: React.FC<RelatedEntitiesSectionProperties> 
   const filteredGroups = useMemo(() => {
     let groups = groupedEntities;
 
-    if (selectedTypeFilter) {
+    if (selectedTypeFilter !== null) {
       groups = groups.filter((group) => group.type === selectedTypeFilter);
     }
 
-    if (searchQuery.trim()) {
+    if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase();
       groups = groups.map((group) => ({
         ...group,
@@ -258,7 +256,7 @@ export const RelatedEntitiesSection: React.FC<RelatedEntitiesSectionProperties> 
       await addNodesBatch(entities);
       notifications.show({
         title: 'Added to Graph',
-        message: `${selectedEntities.size} entities added to graph for analysis`,
+        message: `${String(selectedEntities.size)} entities added to graph for analysis`,
         color: 'green',
       });
       clearSelection();
@@ -284,7 +282,7 @@ export const RelatedEntitiesSection: React.FC<RelatedEntitiesSectionProperties> 
         await addEntitiesToList(listId, entities);
         notifications.show({
           title: 'Added to List',
-          message: `${selectedEntities.size} entities added to list`,
+          message: `${String(selectedEntities.size)} entities added to list`,
           color: 'green',
         });
         clearSelection();
@@ -325,7 +323,7 @@ export const RelatedEntitiesSection: React.FC<RelatedEntitiesSectionProperties> 
                 variant="light"
                 color="grape"
                 leftSection={<IconPhoto size={ICON_SIZE.SM} />}
-                onClick={handleAddToGraph}
+                onClick={() => { void handleAddToGraph(); }}
                 loading={isAddingToGraph}
               >
                 Add to Graph
@@ -350,7 +348,7 @@ export const RelatedEntitiesSection: React.FC<RelatedEntitiesSectionProperties> 
                     lists.filter((list): list is typeof list & { id: string } => list.id !== undefined).map((list) => (
                       <Menu.Item
                         key={list.id}
-                        onClick={() => handleAddToList(list.id)}
+                        onClick={() => { void handleAddToList(list.id); }}
                       >
                         {list.title}
                       </Menu.Item>
@@ -375,7 +373,7 @@ export const RelatedEntitiesSection: React.FC<RelatedEntitiesSectionProperties> 
           <TextInput
             placeholder="Search related entities..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.currentTarget.value)}
+            onChange={(e) => { setSearchQuery(e.currentTarget.value); }}
             style={{ flex: 1 }}
             size="sm"
           />
@@ -386,18 +384,18 @@ export const RelatedEntitiesSection: React.FC<RelatedEntitiesSectionProperties> 
               variant={selectedTypeFilter === type ? 'filled' : 'light'}
               color={selectedTypeFilter === type ? 'blue' : 'gray'}
               style={{ cursor: 'pointer' }}
-              onClick={() => setSelectedTypeFilter(selectedTypeFilter === type ? null : type)}
+              onClick={() => { setSelectedTypeFilter(selectedTypeFilter === type ? null : type); }}
             >
               {type}
             </Badge>
           ))}
 
-          {selectedTypeFilter && (
+          {selectedTypeFilter !== null && (
             <ActionIcon
               size="sm"
               variant="subtle"
               color="gray"
-              onClick={() => setSelectedTypeFilter(null)}
+              onClick={() => { setSelectedTypeFilter(null); }}
             >
               <IconX size={ICON_SIZE.SM} />
             </ActionIcon>
@@ -460,11 +458,11 @@ export const RelatedEntitiesSection: React.FC<RelatedEntitiesSectionProperties> 
                               backgroundColor: isSelected ? 'var(--mantine-color-blue-0)' : undefined,
                               cursor: 'pointer',
                             }}
-                            onClick={() => toggleEntitySelection(item.targetId)}
+                            onClick={() => { toggleEntitySelection(item.targetId); }}
                           >
                             <Checkbox
                               checked={isSelected}
-                              onChange={() => toggleEntitySelection(item.targetId)}
+                              onChange={() => { toggleEntitySelection(item.targetId); }}
                               size="xs"
                             />
                             <Text size="sm" style={{ flex: 1 }} lineClamp={1}>

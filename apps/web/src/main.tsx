@@ -164,10 +164,14 @@ if (typeof window !== "undefined") {
   };
 
   // Run immediately and then periodically for the first few seconds
-  setTimeout(fixUrlDisplay, 100);
-  setTimeout(fixUrlDisplay, 500);
-  setTimeout(fixUrlDisplay, 1000);
-  setTimeout(fixUrlDisplay, 2000);
+  const URL_FIX_RETRY_DELAY_MS_1 = 100;
+  const URL_FIX_RETRY_DELAY_MS_2 = 500;
+  const URL_FIX_RETRY_DELAY_MS_3 = 1000;
+  const URL_FIX_RETRY_DELAY_MS_4 = 2000;
+  setTimeout(fixUrlDisplay, URL_FIX_RETRY_DELAY_MS_1);
+  setTimeout(fixUrlDisplay, URL_FIX_RETRY_DELAY_MS_2);
+  setTimeout(fixUrlDisplay, URL_FIX_RETRY_DELAY_MS_3);
+  setTimeout(fixUrlDisplay, URL_FIX_RETRY_DELAY_MS_4);
 }
 
 // Import Mantine core styles
@@ -181,7 +185,7 @@ import "@mantine/dates/styles.css";
 // Initialize global error handling, network monitoring, and performance tracking
 setupGlobalErrorHandling(logger);
 initializeNetworkMonitoring();
-initWebVitals();
+void initWebVitals();
 
 // Configure static cache URL for deployed environments
 // Works for both GitHub Pages (mearman.github.io) and custom domain (bibgraph.com)
@@ -210,12 +214,17 @@ if (isProduction) {
 }
 
 // Create QueryClient for TanStack Query
+const QUERY_RETRY_COUNT = 1;
+const MS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+const STALE_TIME_MINUTES = 5;
+const GC_TIME_MINUTES = 30;
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 30, // 30 minutes (was cacheTime)
+      retry: QUERY_RETRY_COUNT,
+      staleTime: MS_PER_SECOND * SECONDS_PER_MINUTE * STALE_TIME_MINUTES,
+      gcTime: MS_PER_SECOND * SECONDS_PER_MINUTE * GC_TIME_MINUTES,
     },
   },
 });
@@ -251,24 +260,24 @@ declare module "@tanstack/react-router" {
 const storageProvider = new DexieStorageProvider(logger);
 
 // Initialize special system lists (Bookmarks, History) before app starts
-storageProvider.initializeSpecialLists().catch((error) => {
+storageProvider.initializeSpecialLists().catch((error: unknown) => {
   logger.error("main", "Failed to initialize special lists", { error });
 });
 
 // Initialize OpenAlex client with settings from storage
-(async () => {
+void (async () => {
   try {
-    const { settingsStoreInstance } = await import("@/stores/settings-store");
+    const { settingsStore } = await import("@/stores/settings-store");
     const { updateOpenAlexEmail, updateOpenAlexApiKey } = await import("@bibgraph/client");
 
-    const settings = await settingsStoreInstance.getSettings();
+    const settings = await settingsStore.getSettings();
 
     if (settings.politePoolEmail) {
       updateOpenAlexEmail(settings.politePoolEmail);
       logger.debug("main", "Initialized OpenAlex client with email from settings");
     }
 
-    if (settings.apiKey) {
+    if (settings.apiKey !== undefined && settings.apiKey !== "") {
       updateOpenAlexApiKey(settings.apiKey);
       logger.debug("main", "Initialized OpenAlex client with API key from settings");
     }
@@ -281,7 +290,6 @@ const rootElementOrNull = document.querySelector("#root");
 if (!rootElementOrNull || !(rootElementOrNull instanceof HTMLElement)) {
   throw new TypeError("Root element not found or is not an HTMLElement");
 }
-const rootElement = rootElementOrNull;
 
 /**
  * React 19 error handlers for PostHog error tracking
@@ -289,7 +297,7 @@ const rootElement = rootElementOrNull;
  */
 const reactErrorHandlers = {
   // Callback for errors not caught by an ErrorBoundary
-  onUncaughtError: (error: unknown, errorInfo: { componentStack?: string }) => {
+  onUncaughtError: (error: unknown, errorInfo: Readonly<{ componentStack?: string }>) => {
     logger.error("react", "Uncaught error in React component", {
       error,
       componentStack: errorInfo.componentStack,
@@ -305,7 +313,7 @@ const reactErrorHandlers = {
   },
 
   // Callback for errors caught by an ErrorBoundary
-  onCaughtError: (error: unknown, errorInfo: { componentStack?: string }) => {
+  onCaughtError: (error: unknown, errorInfo: Readonly<{ componentStack?: string }>) => {
     logger.warn("react", "Error caught by ErrorBoundary", {
       error,
       componentStack: errorInfo.componentStack,
@@ -321,7 +329,7 @@ const reactErrorHandlers = {
   },
 
   // Callback for errors React automatically recovers from
-  onRecoverableError: (error: unknown, errorInfo: { componentStack?: string }) => {
+  onRecoverableError: (error: unknown, errorInfo: Readonly<{ componentStack?: string }>) => {
     logger.debug("react", "Recoverable React error", {
       error,
       componentStack: errorInfo.componentStack,
@@ -337,7 +345,7 @@ const reactErrorHandlers = {
   },
 };
 
-createRoot(rootElement, reactErrorHandlers).render(
+createRoot(rootElementOrNull, reactErrorHandlers).render(
   <QueryClientProvider client={queryClient}>
     <PostHogProvider>
       <ThemeProvider>
@@ -356,7 +364,7 @@ createRoot(rootElement, reactErrorHandlers).render(
                       errorId,
                       error: error.message,
                       stack: error.stack,
-                      componentStack: errorInfo?.componentStack,
+                      componentStack: errorInfo.componentStack,
                     });
                   }}
                 >

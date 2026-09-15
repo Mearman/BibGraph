@@ -7,7 +7,9 @@
 
 import { expect,test } from '@playwright/test';
 
-const BASE_URL = process.env.BASE_URL || (process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173');
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = process.env.BASE_URL ?? (IS_CI ? 'http://localhost:4173' : 'http://localhost:5173');
+const HTTP_STATUS_FORBIDDEN = 403;
 
 // Test queries for each entity type
 const TEST_QUERIES = {
@@ -34,10 +36,12 @@ const ENTITY_TYPES = [
   'concepts',
 ] as const;
 
-test.describe('Autocomplete API Integration', () => {
-  test.setTimeout(120_000); // 2 minutes total
+const TEST_SUITE_TIMEOUT_MS = 120_000;
 
-  test.beforeEach(async ({ page }) => {
+test.describe('Autocomplete API Integration', () => {
+  test.setTimeout(TEST_SUITE_TIMEOUT_MS); // 2 minutes total
+
+  test.beforeEach(({ page }) => {
     // Set up console error listener
     page.on('console', (message) => {
       if (message.type() === 'error') {
@@ -94,7 +98,7 @@ test.describe('Autocomplete API Integration', () => {
       } else {
         // Page loaded but no obvious content - this is acceptable for empty results
         // Just verify the page loaded without parameter errors
-        const pageText = await page.textContent('body');
+        const pageText = await page.locator('body').textContent();
         expect(pageText).not.toContain('per_page is not a valid parameter');
         expect(pageText).not.toContain('format is not a valid parameter');
       }
@@ -200,9 +204,9 @@ test.describe('Autocomplete API Integration', () => {
 
       // Header search should be populated with the query
       const headerSearch = page.locator('input[aria-label="Global search input"]');
-      const value = headerSearch;
+      
 
-      await expect(value).toHaveValue(query);
+      await expect(headerSearch).toHaveValue(query);
     });
 
     test('should clear header search when navigating away from autocomplete', async ({ page }) => {
@@ -241,7 +245,7 @@ test.describe('Autocomplete API Integration', () => {
       await page.waitForLoadState('networkidle', { timeout: 15_000 });
 
       // Should not have any 403 responses
-      const forbidden = responses.filter(status => status === 403);
+      const forbidden = responses.filter(status => status === HTTP_STATUS_FORBIDDEN);
       expect(forbidden).toHaveLength(0);
     });
 

@@ -10,6 +10,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { settingsStoreInstance } from "@/stores/settings-store";
 
+import { MS_PER_DAY, MS_PER_HOUR } from "./time-constants";
+
+/**
+ * Narrows a nullable/optional string to a non-empty string
+ */
+const hasValue = (value: string | null | undefined): value is string =>
+  value !== null && value !== undefined && value !== "";
+
 export interface PdfUrlResult {
   /**
   The PDF URL if available
@@ -62,7 +70,6 @@ interface WorkData {
 
 /**
  * Extract PDF URL from OpenAlex work data
- * @param work
  */
 const extractOpenAlexPdfUrl = (work: WorkData): {
   pdfUrl: string | null;
@@ -70,7 +77,7 @@ const extractOpenAlexPdfUrl = (work: WorkData): {
   oaStatus: string | null;
 } => {
   // Try best_oa_location first (best quality OA version)
-  if (work.best_oa_location?.pdf_url) {
+  if (hasValue(work.best_oa_location?.pdf_url)) {
     return {
       pdfUrl: work.best_oa_location.pdf_url,
       landingPageUrl: work.best_oa_location.landing_page_url ?? null,
@@ -79,7 +86,7 @@ const extractOpenAlexPdfUrl = (work: WorkData): {
   }
 
   // Try primary_location
-  if (work.primary_location?.pdf_url) {
+  if (hasValue(work.primary_location?.pdf_url)) {
     return {
       pdfUrl: work.primary_location.pdf_url,
       landingPageUrl: work.primary_location.landing_page_url ?? null,
@@ -88,7 +95,7 @@ const extractOpenAlexPdfUrl = (work: WorkData): {
   }
 
   // Try open_access.oa_url
-  if (work.open_access?.oa_url) {
+  if (hasValue(work.open_access?.oa_url)) {
     // Check if it looks like a PDF URL
     const oaUrl = work.open_access.oa_url;
     if (oaUrl.toLowerCase().endsWith('.pdf') || oaUrl.includes('/pdf/')) {
@@ -103,7 +110,7 @@ const extractOpenAlexPdfUrl = (work: WorkData): {
   // Search through all locations
   if (work.locations && Array.isArray(work.locations)) {
     for (const location of work.locations) {
-      if (location.pdf_url) {
+      if (hasValue(location.pdf_url)) {
         return {
           pdfUrl: location.pdf_url,
           landingPageUrl: location.landing_page_url ?? null,
@@ -126,23 +133,23 @@ const extractOpenAlexPdfUrl = (work: WorkData): {
   };
 };
 
+export interface UsePdfUrlOptions {
+  /**
+  Whether to enable Unpaywall fallback (default: true)
+   */
+  enableUnpaywallFallback?: boolean;
+  /**
+  Whether to skip the lookup entirely
+   */
+  skip?: boolean;
+}
+
 /**
  * Hook to get PDF URL for a work
  * @param work - Work data from OpenAlex
  * @param options - Configuration options
- * @param options.enableUnpaywallFallback
- * @param options.skip
  */
-export const usePdfUrl = (work: WorkData | null | undefined, options: {
-    /**
-    Whether to enable Unpaywall fallback (default: true)
-     */
-    enableUnpaywallFallback?: boolean;
-    /**
-    Whether to skip the lookup entirely
-     */
-    skip?: boolean;
-  } = {}): PdfUrlResult => {
+export const usePdfUrl = (work: WorkData | null | undefined, options: Readonly<UsePdfUrlOptions> = {}): PdfUrlResult => {
   const { enableUnpaywallFallback = true, skip = false } = options;
 
   // State for email from settings
@@ -164,12 +171,12 @@ export const usePdfUrl = (work: WorkData | null | undefined, options: {
 
   // Create/update Unpaywall client when email changes
   useEffect(() => {
-    unpaywallClientReference.current = email ? createUnpaywallClient(email) : null;
+    unpaywallClientReference.current = hasValue(email) ? createUnpaywallClient(email) : null;
   }, [email]);
 
   // Extract DOI from work
   const doi = useMemo(() => {
-    if (!work?.doi) return null;
+    if (!hasValue(work?.doi)) return null;
     // Normalize DOI
     let normalized = work.doi.trim();
     normalized = normalized.replace(/^https?:\/\/doi\.org\//i, '');
@@ -187,12 +194,12 @@ export const usePdfUrl = (work: WorkData | null | undefined, options: {
 
   // Determine if we need to fetch from Unpaywall
   const shouldFetchUnpaywall = useMemo(() => {
-    return Boolean(
+    return (
       !skip &&
       enableUnpaywallFallback &&
-      !openAlexResult.pdfUrl &&
-      doi &&
-      email
+      !hasValue(openAlexResult.pdfUrl) &&
+      hasValue(doi) &&
+      hasValue(email)
     );
   }, [skip, enableUnpaywallFallback, openAlexResult.pdfUrl, doi, email]);
 
@@ -207,7 +214,7 @@ export const usePdfUrl = (work: WorkData | null | undefined, options: {
   const unpaywallQuery = useQuery<UnpaywallResult | null>({
     queryKey: ["unpaywall-pdf", doi, unpaywallClientReference.current],
     queryFn: async (): Promise<UnpaywallResult | null> => {
-      if (!doi || !unpaywallClientReference.current) {
+      if (!hasValue(doi) || unpaywallClientReference.current === null) {
         return null;
       }
 
@@ -223,7 +230,7 @@ export const usePdfUrl = (work: WorkData | null | undefined, options: {
         const pdfUrl =
           data.best_oa_location?.url_for_pdf ??
           data.first_oa_location?.url_for_pdf ??
-          data.oa_locations.find(loc => loc.url_for_pdf)?.url_for_pdf ??
+          data.oa_locations.find(loc => hasValue(loc.url_for_pdf))?.url_for_pdf ??
           null;
 
         const landingPageUrl =
@@ -245,8 +252,8 @@ export const usePdfUrl = (work: WorkData | null | undefined, options: {
       }
     },
     enabled: shouldFetchUnpaywall,
-    staleTime: 1000 * 60 * 60, // Cache for 1 hour
-    gcTime: 1000 * 60 * 60 * 24, // Keep in cache for 24 hours
+    staleTime: MS_PER_HOUR,
+    gcTime: MS_PER_DAY,
     retry: 1,
   });
 
@@ -265,7 +272,7 @@ export const usePdfUrl = (work: WorkData | null | undefined, options: {
     }
 
     // OpenAlex has PDF
-    if (openAlexResult.pdfUrl) {
+    if (hasValue(openAlexResult.pdfUrl)) {
       return {
         pdfUrl: openAlexResult.pdfUrl,
         source: "OpenAlex",
@@ -289,7 +296,7 @@ export const usePdfUrl = (work: WorkData | null | undefined, options: {
     }
 
     // Unpaywall success
-    if (unpaywallQuery.data?.pdfUrl) {
+    if (hasValue(unpaywallQuery.data?.pdfUrl)) {
       return {
         pdfUrl: unpaywallQuery.data.pdfUrl,
         source: "Unpaywall",
@@ -314,7 +321,7 @@ export const usePdfUrl = (work: WorkData | null | undefined, options: {
     }
 
     // No PDF available but no email configured
-    if (enableUnpaywallFallback && doi && !email) {
+    if (enableUnpaywallFallback && hasValue(doi) && !hasValue(email)) {
       return {
         pdfUrl: null,
         source: null,

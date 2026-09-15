@@ -60,10 +60,10 @@ export const SettingsSection: React.FC = () => {
   const [dataVersion, setDataVersion] = React.useState<'1' | '2' | undefined>();
 
   // Local state for API key
-  const [apiKey, setApiKeyState] = React.useState<string | undefined>();
+  const [storedApiKey, setStoredApiKey] = React.useState<string | undefined>();
 
   // Local state for background strategy
-  const [backgroundStrategy, setBackgroundStrategyState] = React.useState<BackgroundStrategy>('idle');
+  const [backgroundStrategy, setBackgroundStrategy] = React.useState<BackgroundStrategy>('idle');
 
   // Load settings from store on mount
   React.useEffect(() => {
@@ -71,35 +71,35 @@ export const SettingsSection: React.FC = () => {
       const settings = await settingsStoreInstance.getSettings();
       setIncludeXpac(settings.includeXpac);
       setDataVersion(settings.dataVersion);
-      setApiKeyState(settings.apiKey);
-      setBackgroundStrategyState(settings.backgroundStrategy);
+      setStoredApiKey(settings.apiKey);
+      setBackgroundStrategy(settings.backgroundStrategy);
     };
     void loadSettings();
   }, []);
 
   // Local state for email editing
   const [localEmail, setLocalEmail] = React.useState(politePoolEmail || "");
+  const [previousPolitePoolEmail, setPreviousPolitePoolEmail] = React.useState(politePoolEmail);
   const [isEditingEmail, setIsEditingEmail] = React.useState(false);
   const [showEmailValidation, setShowEmailValidation] = React.useState(false);
 
   // Local state for API key editing
-  const [localApiKey, setLocalApiKey] = React.useState<string>(apiKey || "");
+  const [localApiKey, setLocalApiKey] = React.useState<string>(storedApiKey ?? "");
+  const [previousStoredApiKey, setPreviousStoredApiKey] = React.useState(storedApiKey);
   const [isEditingApiKey, setIsEditingApiKey] = React.useState(false);
 
   const queryClient = useQueryClient();
 
-  // Derived state synced with store - replaces useEffect pattern
-  const syncedLocalEmail = React.useMemo(() => politePoolEmail || "", [politePoolEmail]);
-  const syncedLocalApiKey = React.useMemo(() => apiKey || "", [apiKey]);
+  // Adjust local state during render when the store value changes, avoiding a useEffect-driven extra render (see https://react.dev/learn/you-might-not-need-an-effect).
+  if (politePoolEmail !== previousPolitePoolEmail) {
+    setPreviousPolitePoolEmail(politePoolEmail);
+    setLocalEmail(politePoolEmail || "");
+  }
 
-  // Update local state when store values change
-  React.useEffect(() => {
-    setLocalEmail(syncedLocalEmail);
-  }, [syncedLocalEmail]);
-
-  React.useEffect(() => {
-    setLocalApiKey(syncedLocalApiKey);
-  }, [syncedLocalApiKey]);
+  if (storedApiKey !== previousStoredApiKey) {
+    setPreviousStoredApiKey(storedApiKey);
+    setLocalApiKey(storedApiKey ?? "");
+  }
 
   const handleEmailChange = React.useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -172,7 +172,7 @@ export const SettingsSection: React.FC = () => {
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        handleEmailSave();
+        void handleEmailSave();
       } else if (event.key === "Escape") {
         event.preventDefault();
         handleEmailCancel();
@@ -200,7 +200,7 @@ export const SettingsSection: React.FC = () => {
       hasApiKey: apiKeyValue !== undefined,
     });
 
-    const message = apiKeyValue
+    const message = apiKeyValue !== undefined
       ? "OpenAlex API key has been configured."
       : "OpenAlex API key has been cleared.";
 
@@ -213,16 +213,16 @@ export const SettingsSection: React.FC = () => {
   }, [localApiKey, setApiKey]);
 
   const handleApiKeyCancel = React.useCallback(() => {
-    setLocalApiKey(apiKey || "");
+    setLocalApiKey(storedApiKey ?? "");
     setIsEditingApiKey(false);
     logger.debug("settings", "API key edit cancelled");
-  }, [apiKey]);
+  }, [storedApiKey]);
 
   const handleApiKeyKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        handleApiKeySave();
+        void handleApiKeySave();
       } else if (event.key === "Escape") {
         event.preventDefault();
         handleApiKeyCancel();
@@ -261,7 +261,7 @@ export const SettingsSection: React.FC = () => {
   }, []);
 
   const handleBackgroundStrategyChange = React.useCallback(async (value: BackgroundStrategy) => {
-    setBackgroundStrategyState(value);
+    setBackgroundStrategy(value);
     await settingsStoreInstance.setBackgroundStrategy(value);
     logger.debug("settings", "Background strategy setting updated", { backgroundStrategy: value });
 
@@ -458,7 +458,7 @@ export const SettingsSection: React.FC = () => {
 
   const isEmailValid = showEmailValidation ? isValidEmail(localEmail) : true;
   const hasStoredEmail =
-    politePoolEmail && politePoolEmail.length > 0 && isValidEmail(politePoolEmail);
+    politePoolEmail.length > 0 && isValidEmail(politePoolEmail);
 
   return (
     <Stack gap="md">
@@ -522,7 +522,9 @@ export const SettingsSection: React.FC = () => {
               <Button
                 variant="light"
                 size="xs"
-                onClick={handleEmailSave}
+                onClick={() => {
+                  void handleEmailSave();
+                }}
                 disabled={showEmailValidation && !isEmailValid}
                 leftSection={<IconCheck size={ICON_SIZE.SM} />}
               >
@@ -598,7 +600,9 @@ export const SettingsSection: React.FC = () => {
               <Button
                 variant="light"
                 size="xs"
-                onClick={handleApiKeySave}
+                onClick={() => {
+                  void handleApiKeySave();
+                }}
                 leftSection={<IconCheck size={ICON_SIZE.SM} />}
               >
                 Save
@@ -615,8 +619,8 @@ export const SettingsSection: React.FC = () => {
           </Stack>
         ) : (
           <Group gap="sm">
-            <Text size="sm" {...(apiKey ? {} : { c: "dimmed" })}>
-              {apiKey ? "••••••••••••••••" : "No API key configured"}
+            <Text size="sm" {...(storedApiKey !== undefined && storedApiKey !== "" ? {} : { c: "dimmed" })}>
+              {storedApiKey !== undefined && storedApiKey !== "" ? "••••••••••••••••" : "No API key configured"}
             </Text>
             <Button
               variant="subtle"
@@ -625,7 +629,7 @@ export const SettingsSection: React.FC = () => {
                 setIsEditingApiKey(true);
               }}
             >
-              {apiKey ? "Edit" : "Configure"}
+              {storedApiKey !== undefined && storedApiKey !== "" ? "Edit" : "Configure"}
             </Button>
           </Group>
         )}
@@ -641,7 +645,9 @@ export const SettingsSection: React.FC = () => {
       {/* Xpac Toggle */}
       <XpacToggle
         value={includeXpac}
-        onChange={handleXpacToggle}
+        onChange={(value: boolean) => {
+          void handleXpacToggle(value);
+        }}
         showDescription={true}
       />
 
@@ -650,7 +656,9 @@ export const SettingsSection: React.FC = () => {
       {/* Background Strategy Selector */}
       <BackgroundStrategySelector
         value={backgroundStrategy}
-        onChange={handleBackgroundStrategyChange}
+        onChange={(value: BackgroundStrategy) => {
+          void handleBackgroundStrategyChange(value);
+        }}
         showDescription={true}
       />
 
@@ -660,7 +668,9 @@ export const SettingsSection: React.FC = () => {
           <Divider />
           <DataVersionSelector
             value={dataVersion}
-            onChange={handleDataVersionChange}
+            onChange={(value: '1' | '2' | undefined) => {
+              void handleDataVersionChange(value);
+            }}
             showDescription={true}
           />
         </>

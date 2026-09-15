@@ -17,6 +17,8 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect,test } from '@playwright/test';
 
+const MAX_REASONABLE_SCROLL_Y_PX = 2000;
+
 test.describe('Author Verification Indicators', () => {
   test('should show indicator for unverified authors without Author IDs', async ({ page }) => {
     // Navigate to a work that has mix of verified and unverified authors
@@ -31,7 +33,7 @@ test.describe('Author Verification Indicators', () => {
     await page.locator('[data-testid="rich-entity-display-title"]').waitFor({
       timeout: 10_000,
       state: 'visible',
-    }).catch(async () => {
+    }).catch(() => {
       // If title doesn't appear, it may be due to test environment delays
       // Continue testing with unverified indicators anyway
       console.log('⚠️ Title selector not found, continuing with indicator tests');
@@ -44,15 +46,15 @@ test.describe('Author Verification Indicators', () => {
     const indicatorCount = await unverifiedIndicators.count();
 
     if (indicatorCount > 0) {
-      console.log(`✅ Found ${indicatorCount} unverified author indicator(s)`);
+      console.log(`✅ Found ${String(indicatorCount)} unverified author indicator(s)`);
 
       // Verify at least one indicator is visible
       await expect(unverifiedIndicators.first()).toBeVisible();
 
       // Verify indicator has tooltip attribute
       const firstIndicator = unverifiedIndicators.first();
-      const titleAttribute = firstIndicator;
-      await expect(titleAttribute).toHaveAttribute('title', 'Unverified author (no Author ID)');
+      
+      await expect(firstIndicator).toHaveAttribute('title', 'Unverified author (no Author ID)');
 
       console.log('✅ Unverified author indicator has correct tooltip');
     } else {
@@ -75,10 +77,10 @@ test.describe('Author Verification Indicators', () => {
       // Check each indicator has the correct tooltip
       for (let index = 0; index < indicatorCount; index++) {
         const indicator = unverifiedIndicators.nth(index);
-        const tooltip = indicator;
+        
 
-        await expect(tooltip).toHaveAttribute('title', 'Unverified author (no Author ID)');
-        console.log(`✅ Indicator ${index + 1} has correct tooltip text`);
+        await expect(indicator).toHaveAttribute('title', 'Unverified author (no Author ID)');
+        console.log(`✅ Indicator ${String(index + 1)} has correct tooltip text`);
       }
     } else {
       console.log('ℹ️ No unverified authors to test tooltip on');
@@ -104,7 +106,7 @@ test.describe('Author Verification Indicators', () => {
       expect(boundingBox!.width).toBeGreaterThan(0);
       expect(boundingBox!.height).toBeGreaterThan(0);
 
-      console.log(`✅ Unverified author indicator rendered with dimensions: ${boundingBox!.width}x${boundingBox!.height}px`);
+      console.log(`✅ Unverified author indicator rendered with dimensions: ${String(boundingBox!.width)}x${String(boundingBox!.height)}px`);
     } else {
       console.log('ℹ️ No unverified author indicators to test dimensions');
     }
@@ -125,7 +127,7 @@ test.describe('Author Verification Indicators', () => {
     });
 
     const authorCount = await authorAnchors.count();
-    console.log(`Found ${authorCount} author anchors on page`);
+    console.log(`Found ${String(authorCount)} author anchors on page`);
 
     if (authorCount > 0) {
       // Count total unverified indicators
@@ -134,8 +136,8 @@ test.describe('Author Verification Indicators', () => {
 
       // If we have authors and some/all are verified,
       // verified authors should NOT have indicators next to them
-      console.log(`Unverified authors: ${unverifiedCount}`);
-      console.log(`Total authors displayed: ${authorCount}`);
+      console.log(`Unverified authors: ${String(unverifiedCount)}`);
+      console.log(`Total authors displayed: ${String(authorCount)}`);
 
       // The count of unverified indicators should be less than or equal to author count
       expect(unverifiedCount).toBeLessThanOrEqual(authorCount);
@@ -168,7 +170,7 @@ test.describe('Author Verification Indicators', () => {
         expect(boundingBox!.y).toBeGreaterThanOrEqual(0);
         expect(boundingBox!.x).toBeGreaterThanOrEqual(0);
 
-        console.log(`✅ Indicator ${index + 1} positioned at (${boundingBox!.x}, ${boundingBox!.y})`);
+        console.log(`✅ Indicator ${String(index + 1)} positioned at (${String(boundingBox!.x)}, ${String(boundingBox!.y)})`);
       }
     } else {
       console.log('ℹ️ No unverified author indicators to test positioning');
@@ -193,8 +195,8 @@ test.describe('Author Verification Indicators', () => {
 
       // The component uses color="orange" variant="light" for unverified indicators
       // We can verify it's styled by checking it has dimensions and is visible
-      const isVisible = firstIndicator;
-      await expect(isVisible).toBeVisible();
+      
+      await expect(firstIndicator).toBeVisible();
 
       console.log('✅ Unverified author indicator has semantic styling');
     } else {
@@ -216,10 +218,10 @@ test.describe('Author Verification Indicators', () => {
       // Verify each indicator has title attribute for tooltip
       for (let index = 0; index < indicatorCount; index++) {
         const indicator = unverifiedIndicators.nth(index);
-        const titleAttribute = indicator;
+        
 
-        await expect(titleAttribute).toHaveAttribute('title', );
-        expect(titleAttribute).toBe('Unverified author (no Author ID)');
+        await expect(indicator).toHaveAttribute('title', );
+        expect(indicator).toBe('Unverified author (no Author ID)');
       }
 
       // Run accessibility scan on the first indicator
@@ -246,7 +248,7 @@ test.describe('Author Verification Indicators', () => {
       const unverifiedIndicators = page.locator('[data-testid="unverified-author-indicator"]');
       const indicatorCount = await unverifiedIndicators.count();
 
-      console.log(`Work ${workId}: ${indicatorCount} unverified author(s)`);
+      console.log(`Work ${workId}: ${String(indicatorCount)} unverified author(s)`);
 
       if (indicatorCount > 0) {
         // Verify all indicators are properly rendered
@@ -254,7 +256,7 @@ test.describe('Author Verification Indicators', () => {
           const indicator = unverifiedIndicators.nth(index);
           await expect(indicator).toBeVisible();
         }
-        console.log(`✅ All ${indicatorCount} indicator(s) properly rendered for ${workId}`);
+        console.log(`✅ All ${String(indicatorCount)} indicator(s) properly rendered for ${workId}`);
       }
     }
   });
@@ -278,7 +280,7 @@ test.describe('Author Verification Indicators', () => {
 
       expect(boundingBox).toBeTruthy();
       expect(boundingBox!.y).toBeGreaterThanOrEqual(0);
-      expect(boundingBox!.y).toBeLessThan(2000); // Within reasonable scroll range
+      expect(boundingBox!.y).toBeLessThan(MAX_REASONABLE_SCROLL_Y_PX); // Within reasonable scroll range
 
       console.log('✅ Unverified author indicators positioned within layout bounds');
     } else {

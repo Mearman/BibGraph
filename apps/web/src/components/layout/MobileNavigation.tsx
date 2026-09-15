@@ -38,6 +38,18 @@ interface SwipeGesture {
   direction: "left" | "right" | null;
 }
 
+// Swipe-gesture tuning constants
+const SWIPE_MAX_VERTICAL_DEVIATION_PX = 50;
+const SWIPE_DIRECTION_THRESHOLD_PX = 20;
+const SWIPE_MIN_HORIZONTAL_DISTANCE_PX = 50;
+const SWIPE_MIN_VELOCITY_PX_PER_MS = 0.3;
+const EDGE_ZONE_WIDTH_PX = 100;
+const SWIPE_HINT_SHOW_DELAY_MS = 2000;
+const SWIPE_HINT_HIDE_DELAY_MS = 5000;
+const SWIPE_INDICATOR_DIMMED_OPACITY = 0.3;
+const MAX_DISPLAYED_BADGE_COUNT = 99;
+const DRAWER_WIDTH_PX = 280;
+
 export const MobileNavigation = ({
   onSidebarToggle,
   onMobileSearchOpen,
@@ -49,7 +61,7 @@ export const MobileNavigation = ({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [swipeGesture, setSwipeGesture] = useState<SwipeGesture | null>(null);
   const [showSwipeHint, setShowSwipeHint] = useState(false);
-  const containerReference = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Swipe detection for sidebar control
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -62,33 +74,41 @@ export const MobileNavigation = ({
     });
   }, []);
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+  // Shared swipe-move logic, driven by whichever real pointer/clientX+Y the caller has - touch and pointer events carry these coordinates natively, so neither needs to be coerced into the other's event shape.
+  const processSwipeMove = useCallback((clientX: number, clientY: number) => {
     if (!swipeGesture) return;
 
-    const touch = e.touches[0];
-    const deltaX = touch.clientX - swipeGesture.startX;
-    const deltaY = Math.abs(touch.clientY - swipeGesture.startY);
+    const deltaX = clientX - swipeGesture.startX;
+    const deltaY = Math.abs(clientY - swipeGesture.startY);
 
     // Only consider horizontal swipes
-    if (deltaY > 50) return;
+    if (deltaY > SWIPE_MAX_VERTICAL_DEVIATION_PX) return;
 
     // Determine swipe direction
-    if (Math.abs(deltaX) > 20) {
+    if (Math.abs(deltaX) > SWIPE_DIRECTION_THRESHOLD_PX) {
       const direction = deltaX > 0 ? "right" : "left";
       setSwipeGesture(previous => previous ? { ...previous, direction } : null);
     }
   }, [swipeGesture]);
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    processSwipeMove(touch.clientX, touch.clientY);
+  }, [processSwipeMove]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    processSwipeMove(e.clientX, e.clientY);
+  }, [processSwipeMove]);
+
+  const processSwipeEnd = useCallback((clientX: number) => {
     if (!swipeGesture) return;
 
-    const touch = e.changedTouches[0];
-    const deltaX = touch.clientX - swipeGesture.startX;
+    const deltaX = clientX - swipeGesture.startX;
     const deltaTime = Date.now() - swipeGesture.startTime;
     const velocity = Math.abs(deltaX) / deltaTime;
 
     // Swipe must be fast enough and long enough
-    if (Math.abs(deltaX) > 50 && velocity > 0.3) {
+    if (Math.abs(deltaX) > SWIPE_MIN_HORIZONTAL_DISTANCE_PX && velocity > SWIPE_MIN_VELOCITY_PX_PER_MS) {
       const direction = deltaX > 0 ? "right" : "left";
 
       if (direction === "right" && !leftSidebarOpen) {
@@ -100,11 +120,11 @@ export const MobileNavigation = ({
       } else if (direction === "left" && !rightSidebarOpen) {
         // Swipe left from right edge to open right sidebar
         const windowWidth = window.innerWidth;
-        if (swipeGesture.startX > windowWidth - 100) {
+        if (swipeGesture.startX > windowWidth - EDGE_ZONE_WIDTH_PX) {
           onSidebarToggle("right");
         }
       } else if (direction === "right" && rightSidebarOpen && // Swipe right to close right sidebar
-        swipeGesture.startX < 100) {
+        swipeGesture.startX < EDGE_ZONE_WIDTH_PX) {
           onSidebarToggle("right");
         }
     }
@@ -112,21 +132,35 @@ export const MobileNavigation = ({
     setSwipeGesture(null);
   }, [swipeGesture, leftSidebarOpen, rightSidebarOpen, onSidebarToggle]);
 
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const touch = e.changedTouches[0];
+    processSwipeEnd(touch.clientX);
+  }, [processSwipeEnd]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    processSwipeEnd(e.clientX);
+  }, [processSwipeEnd]);
+
   // Show swipe hints on mobile
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const showTimer = setTimeout(() => {
       setShowSwipeHint(true);
-      setTimeout(() => setShowSwipeHint(false), 5000); // Hide after 5 seconds
-    }, 2000);
+    }, SWIPE_HINT_SHOW_DELAY_MS);
+    const hideTimer = setTimeout(() => {
+      setShowSwipeHint(false);
+    }, SWIPE_HINT_SHOW_DELAY_MS + SWIPE_HINT_HIDE_DELAY_MS);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
   }, []);
 
   // Handle sidebar swipe indicators
   const getSwipeIndicator = useCallback((side: "left" | "right") => {
     const isOpen = side === "left" ? leftSidebarOpen : rightSidebarOpen;
     return {
-      opacity: swipeGesture?.direction === side || isOpen ? 1 : 0.3,
+      opacity: swipeGesture?.direction === side || isOpen ? 1 : SWIPE_INDICATOR_DIMMED_OPACITY,
       transform: swipeGesture?.direction === side
         ? "translateX(4px)"
         : "translateX(0)",
@@ -166,7 +200,7 @@ export const MobileNavigation = ({
     <>
       {/* Touch gesture detection area */}
       <Box
-        ref={containerReference}
+        ref={containerRef}
         pos="fixed"
         top={0}
         left={0}
@@ -176,14 +210,8 @@ export const MobileNavigation = ({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onPointerMove={(e) => {
-          const touchEvent = e as unknown as React.TouchEvent;
-          handleTouchMove(touchEvent);
-        }}
-        onPointerUp={(e) => {
-          const touchEvent = e as unknown as React.TouchEvent;
-          handleTouchEnd(touchEvent);
-        }}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
       />
 
       {/* Left swipe indicator */}
@@ -276,41 +304,61 @@ export const MobileNavigation = ({
       <Affix position={{ bottom: 20, left: 20, right: 20 }}>
         <Box bg="white" style={{ borderRadius: "16px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
           <Group gap="xs" p="xs">
-            {navigationItems.map((item) => (
-              <Button
-                key={item.label}
-                variant="subtle"
-                size="lg"
-                p="md"
-                style={{ flex: 1 }}
-                onClick={item.onClick}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                component={item.onClick ? "button" : (Link as any)}
-                to={item.to}
-                leftSection={
-                  <Box pos="relative">
-                    <item.icon size={20} />
-                    {item.badge && (
-                      <Badge
-                        size="xs"
-                        color="red"
-                        style={{
-                          position: "absolute",
-                          top: "-4px",
-                          right: "-4px",
-                        }}
-                      >
-                        {item.badge > 99 ? "99+" : item.badge}
-                      </Badge>
-                    )}
-                  </Box>
-                }
-              >
+            {navigationItems.map((item) => {
+              const leftSection = (
+                <Box pos="relative">
+                  <item.icon size={20} />
+                  {item.badge !== null && (
+                    <Badge
+                      size="xs"
+                      color="red"
+                      style={{
+                        position: "absolute",
+                        top: "-4px",
+                        right: "-4px",
+                      }}
+                    >
+                      {item.badge > MAX_DISPLAYED_BADGE_COUNT ? "99+" : item.badge}
+                    </Badge>
+                  )}
+                </Box>
+              );
+              const label = (
                 <Text size="xs" fw={500}>
                   {item.label}
                 </Text>
-              </Button>
-            ))}
+              );
+
+              if (item.onClick !== undefined) {
+                return (
+                  <Button
+                    key={item.label}
+                    variant="subtle"
+                    size="lg"
+                    p="md"
+                    style={{ flex: 1 }}
+                    onClick={item.onClick}
+                    leftSection={leftSection}
+                  >
+                    {label}
+                  </Button>
+                );
+              }
+              return (
+                <Button
+                  key={item.label}
+                  component={Link}
+                  to={item.to}
+                  variant="subtle"
+                  size="lg"
+                  p="md"
+                  style={{ flex: 1 }}
+                  leftSection={leftSection}
+                >
+                  {label}
+                </Button>
+              );
+            })}
           </Group>
         </Box>
       </Affix>
@@ -321,7 +369,7 @@ export const MobileNavigation = ({
           variant="light"
           size="sm"
           leftSection={<IconMenu2 size={16} />}
-          onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+          onClick={() => { setIsDrawerOpen(!isDrawerOpen); }}
         >
           Menu
         </Button>
@@ -341,7 +389,7 @@ export const MobileNavigation = ({
             left={0}
             bottom={0}
             bg="white"
-            style={{ ...style, width: 280, zIndex: 10001 }}
+            style={{ ...style, width: DRAWER_WIDTH_PX, zIndex: 10001 }}
             p="md"
           >
             <Stack gap="lg">
@@ -351,39 +399,57 @@ export const MobileNavigation = ({
                 </Text>
                 <ActionIcon
                   variant="subtle"
-                  onClick={() => setIsDrawerOpen(false)}
+                  onClick={() => { setIsDrawerOpen(false); }}
                 >
                   <IconX size={20} />
                 </ActionIcon>
               </Group>
 
               <Stack gap="sm">
-                {navigationItems.map((item) => (
-                  <Button
-                    key={item.label}
-                    variant="subtle"
-                    fullWidth
-                    size="md"
-                    p="sm"
-                    onClick={() => {
-                      item.onClick?.();
-                      setIsDrawerOpen(false);
-                    }}
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    component={item.onClick ? "button" : (Link as any)}
-                    to={item.to}
-                    leftSection={<item.icon size={18} />}
-                    rightSection={
-                      item.badge && (
-                        <Badge size="sm" color="red">
-                          {item.badge > 99 ? "99+" : item.badge}
-                        </Badge>
-                      )
-                    }
-                  >
-                    {item.label}
-                  </Button>
-                ))}
+                {navigationItems.map((item) => {
+                  const handleItemClick = () => {
+                    item.onClick?.();
+                    setIsDrawerOpen(false);
+                  };
+                  const rightSection = item.badge !== null && (
+                    <Badge size="sm" color="red">
+                      {item.badge > MAX_DISPLAYED_BADGE_COUNT ? "99+" : item.badge}
+                    </Badge>
+                  );
+
+                  if (item.onClick !== undefined) {
+                    return (
+                      <Button
+                        key={item.label}
+                        variant="subtle"
+                        fullWidth
+                        size="md"
+                        p="sm"
+                        onClick={handleItemClick}
+                        leftSection={<item.icon size={18} />}
+                        rightSection={rightSection}
+                      >
+                        {item.label}
+                      </Button>
+                    );
+                  }
+                  return (
+                    <Button
+                      key={item.label}
+                      component={Link}
+                      to={item.to}
+                      variant="subtle"
+                      fullWidth
+                      size="md"
+                      p="sm"
+                      onClick={handleItemClick}
+                      leftSection={<item.icon size={18} />}
+                      rightSection={rightSection}
+                    >
+                      {item.label}
+                    </Button>
+                  );
+                })}
               </Stack>
 
               <Box mt="auto" pt="md">

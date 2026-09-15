@@ -22,10 +22,15 @@ import {
 const TEST_WORK_ID = 'W2741809807'; // Work with author and institution relationships
 const TEST_AUTHOR_ID = 'A5017898742'; // Author with affiliations and works
 
-test.describe('@workflow Graph List Filter Bypass', () => {
-	test.setTimeout(60_000); // 60 seconds for graph operations
+const TEST_SUITE_TIMEOUT_MS = 60_000;
+const FILTER_APPLY_WAIT_MS = 500;
+const FILTER_SETTLE_WAIT_MS = 1000;
+const EXPANSION_LOAD_WAIT_MS = 2000;
 
-	test.beforeEach(async ({ page }) => {
+test.describe('@workflow Graph List Filter Bypass', () => {
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS); // 60 seconds for graph operations
+
+	test.beforeEach(({ page }) => {
 		// Console error listener
 		page.on('console', (message) => {
 			if (message.type() === 'error') {
@@ -51,7 +56,7 @@ test.describe('@workflow Graph List Filter Bypass', () => {
 		// Get initial node count
 		const initialNodes = page.locator('svg g.nodes circle, svg g.nodes rect');
 		const initialNodeCount = await initialNodes.count();
-		console.log(`Initial nodes: ${initialNodeCount}`);
+		console.log(`Initial nodes: ${String(initialNodeCount)}`);
 		expect(initialNodeCount).toBeGreaterThan(0);
 
 		// Look for entity type filter controls (may be checkboxes or select)
@@ -102,7 +107,7 @@ test.describe('@workflow Graph List Filter Bypass', () => {
 				const isChecked = await worksFilter.isChecked().catch(() => true);
 				if (!isChecked) {
 					await worksFilter.click();
-					await page.waitForTimeout(500); // Allow filter to apply
+					await page.waitForTimeout(FILTER_APPLY_WAIT_MS); // Allow filter to apply
 				}
 
 				// Uncheck other entity types if present
@@ -128,10 +133,10 @@ test.describe('@workflow Graph List Filter Bypass', () => {
 			}
 
 			// Get node count after filtering
-			await page.waitForTimeout(1000); // Allow filter to fully apply
+			await page.waitForTimeout(FILTER_SETTLE_WAIT_MS); // Allow filter to fully apply
 			const filteredNodes = page.locator('svg g.nodes circle, svg g.nodes rect');
 			const filteredNodeCount = await filteredNodes.count();
-			console.log(`Nodes after filter: ${filteredNodeCount}`);
+			console.log(`Nodes after filter: ${String(filteredNodeCount)}`);
 
 			// Look for expandable nodes (nodes with + icon or expand button)
 			const expandableNodeSelectors = [
@@ -155,12 +160,12 @@ test.describe('@workflow Graph List Filter Bypass', () => {
 			if (expandableNode) {
 				// Expand the node
 				await expandableNode.click();
-				await page.waitForTimeout(2000); // Allow expansion and new nodes to load
+				await page.waitForTimeout(EXPANSION_LOAD_WAIT_MS); // Allow expansion and new nodes to load
 
 				// Get node count after expansion
 				const expandedNodes = page.locator('svg g.nodes circle, svg g.nodes rect');
 				const expandedNodeCount = await expandedNodes.count();
-				console.log(`Nodes after expansion: ${expandedNodeCount}`);
+				console.log(`Nodes after expansion: ${String(expandedNodeCount)}`);
 
 				// Key assertion: Graph list nodes from expansion should be visible
 				// despite entity type filters
@@ -168,15 +173,15 @@ test.describe('@workflow Graph List Filter Bypass', () => {
 				expect(expandedNodeCount).toBeGreaterThanOrEqual(filteredNodeCount);
 
 				if (expandedNodeCount > filteredNodeCount) {
-					console.log(`✅ Graph list bypass verified: ${expandedNodeCount - filteredNodeCount} nodes added despite filters`);
+					console.log(`✅ Graph list bypass verified: ${String(expandedNodeCount - filteredNodeCount)} nodes added despite filters`);
 				} else {
 					console.log('⚠️  No new nodes added (may be expected if all relationships match filter)');
 				}
 
 				// Verify no errors during expansion
 				const errorMessages = page.locator('[role="alert"]');
-				const errorCount = errorMessages;
-				await expect(errorCount).toHaveCount(0);
+				
+				await expect(errorMessages).toHaveCount(0);
 			} else {
 				console.log('⚠️  No expandable nodes found - skipping expansion test');
 				// Not a failure - graph may not have expandable nodes
@@ -204,7 +209,7 @@ test.describe('@workflow Graph List Filter Bypass', () => {
 		// Get all visible nodes initially (no filters)
 		const allNodes = page.locator('svg g.nodes circle, svg g.nodes rect');
 		const allNodeCount = await allNodes.count();
-		console.log(`All nodes (no filters): ${allNodeCount}`);
+		console.log(`All nodes (no filters): ${String(allNodeCount)}`);
 		expect(allNodeCount).toBeGreaterThan(0);
 
 		// Look for entity type filter checkboxes
@@ -212,38 +217,38 @@ test.describe('@workflow Graph List Filter Bypass', () => {
 		const checkboxCount = await filterCheckboxes.count();
 
 		if (checkboxCount > 0) {
-			console.log(`Found ${checkboxCount} entity type filter checkboxes`);
+			console.log(`Found ${String(checkboxCount)} entity type filter checkboxes`);
 
 			// Click first checkbox to apply a filter
 			const firstCheckbox = filterCheckboxes.first();
 			const checkboxLabel = await firstCheckbox.textContent();
-			console.log(`Applying filter: ${checkboxLabel}`);
+			console.log(`Applying filter: ${String(checkboxLabel)}`);
 
 			await firstCheckbox.click();
-			await page.waitForTimeout(1000); // Allow filter to apply
+			await page.waitForTimeout(FILTER_SETTLE_WAIT_MS); // Allow filter to apply
 
 			// Get node count with filter applied
 			const filteredNodes = page.locator('svg g.nodes circle, svg g.nodes rect');
 			const filteredNodeCount = await filteredNodes.count();
-			console.log(`Nodes with filter applied: ${filteredNodeCount}`);
+			console.log(`Nodes with filter applied: ${String(filteredNodeCount)}`);
 
 			// Toggle filter back off
 			await firstCheckbox.click();
-			await page.waitForTimeout(1000); // Allow filter to clear
+			await page.waitForTimeout(FILTER_SETTLE_WAIT_MS); // Allow filter to clear
 
 			// Get node count after removing filter
 			const restoredNodes = page.locator('svg g.nodes circle, svg g.nodes rect');
-			const restoredNodeCount = restoredNodes;
-			console.log(`Nodes after filter removed: ${restoredNodeCount}`);
+			
+			console.log(`Nodes after filter removed: ${String(restoredNodes)}`);
 
 			// Graph list nodes should always be visible, so count should be consistent
 			// when toggling filters (only collection nodes should be affected)
-			await expect(restoredNodeCount).toHaveCount(allNodeCount);
+			await expect(restoredNodes).toHaveCount(allNodeCount);
 
 			// Verify no errors during filter toggling
 			const errorMessages = page.locator('[role="alert"]');
-			const errorCount = errorMessages;
-			await expect(errorCount).toHaveCount(0);
+			
+			await expect(errorMessages).toHaveCount(0);
 
 			console.log('✅ Graph list nodes maintained visibility during filter toggle');
 		} else {
@@ -260,7 +265,7 @@ test.describe('@workflow Graph List Filter Bypass', () => {
 		});
 
 		await waitForAppReady(page);
-		await page.waitForTimeout(2000); // Allow bookmarks to load
+		await page.waitForTimeout(EXPANSION_LOAD_WAIT_MS); // Allow bookmarks to load
 
 		// Check if bookmarks page has a graph view
 		const svgContainer = page.locator('svg').first();
@@ -272,7 +277,7 @@ test.describe('@workflow Graph List Filter Bypass', () => {
 			// Get initial node count (all bookmarks)
 			const allBookmarkNodes = page.locator('svg g.nodes circle, svg g.nodes rect');
 			const allBookmarkCount = await allBookmarkNodes.count();
-			console.log(`All bookmark nodes: ${allBookmarkCount}`);
+			console.log(`All bookmark nodes: ${String(allBookmarkCount)}`);
 
 			if (allBookmarkCount > 0) {
 				// Look for entity type filters
@@ -291,27 +296,27 @@ test.describe('@workflow Graph List Filter Bypass', () => {
 						}
 					}
 
-					await page.waitForTimeout(1000); // Allow filters to apply
+					await page.waitForTimeout(FILTER_SETTLE_WAIT_MS); // Allow filters to apply
 
 					// Get filtered node count
 					const filteredBookmarkNodes = page.locator('svg g.nodes circle, svg g.nodes rect');
 					const filteredBookmarkCount = await filteredBookmarkNodes.count();
-					console.log(`Filtered bookmark nodes: ${filteredBookmarkCount}`);
+					console.log(`Filtered bookmark nodes: ${String(filteredBookmarkCount)}`);
 
 					// Collection nodes SHOULD be filtered (unlike graph list nodes)
 					// Count should be less than or equal to original count
 					expect(filteredBookmarkCount).toBeLessThanOrEqual(allBookmarkCount);
 
 					if (filteredBookmarkCount < allBookmarkCount) {
-						console.log(`✅ Collection nodes correctly filtered: ${allBookmarkCount - filteredBookmarkCount} nodes hidden`);
+						console.log(`✅ Collection nodes correctly filtered: ${String(allBookmarkCount - filteredBookmarkCount)} nodes hidden`);
 					} else {
 						console.log('⚠️  All bookmarks match filter (expected if only one entity type)');
 					}
 
 					// Verify no errors
 					const errorMessages = page.locator('[role="alert"]');
-					const errorCount = errorMessages;
-					await expect(errorCount).toHaveCount(0);
+					
+					await expect(errorMessages).toHaveCount(0);
 				} else {
 					console.log('⚠️  Insufficient filters to test collection filtering');
 				}

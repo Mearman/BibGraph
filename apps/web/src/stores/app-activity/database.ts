@@ -27,9 +27,7 @@ class AppActivityDB extends Dexie {
 let databaseInstance: AppActivityDB | null = null;
 
 export const getDB = (): AppActivityDB => {
-  if (!databaseInstance) {
-    databaseInstance = new AppActivityDB();
-  }
+  databaseInstance ??= new AppActivityDB();
   return databaseInstance;
 };
 
@@ -48,10 +46,10 @@ export const saveEventToDB = async (event: AppActivityEvent): Promise<void> => {
   }
 };
 
-export const deleteEventsFromDB = async (ids: number[]): Promise<void> => {
+export const deleteEventsFromDB = async (ids: readonly number[]): Promise<void> => {
   if (ids.length === 0) return;
   try {
-    await getDB().appActivityEvents.bulkDelete(ids);
+    await getDB().appActivityEvents.bulkDelete([...ids]);
   } catch (error) {
     logger.error("ui", "Failed to delete old events from Dexie", {
       error,

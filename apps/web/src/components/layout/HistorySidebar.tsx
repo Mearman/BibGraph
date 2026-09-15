@@ -36,6 +36,13 @@ interface HistorySidebarProperties {
   onClose?: () => void;
 }
 
+// Time-unit conversion constants
+const MS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const DAYS_PER_WEEK = 7;
+
 export const HistorySidebar = ({ onClose }: HistorySidebarProperties) => {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -47,7 +54,7 @@ export const HistorySidebar = ({ onClose }: HistorySidebarProperties) => {
     (entry) =>
       searchQuery === "" ||
       entry.entityId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (entry.notes && entry.notes.toLowerCase().includes(searchQuery.toLowerCase())),
+      (entry.notes?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false),
   );
 
   const handleClearHistory = () => {
@@ -61,42 +68,44 @@ export const HistorySidebar = ({ onClose }: HistorySidebarProperties) => {
       ),
       labels: { confirm: "Clear All", cancel: "Cancel" },
       confirmProps: { color: "red" },
-      onConfirm: async () => {
-        try {
-          await clearHistory();
-          setSearchQuery("");
-        } catch (error) {
-          logError(logger, "Failed to clear history", error, "HistorySidebar");
-        }
+      onConfirm: () => {
+        void (async () => {
+          try {
+            await clearHistory();
+            setSearchQuery("");
+          } catch (error) {
+            logError(logger, "Failed to clear history", error, "HistorySidebar");
+          }
+        })();
       },
     });
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Readonly<Date>) => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffMs / (MS_PER_SECOND * SECONDS_PER_MINUTE * MINUTES_PER_HOUR));
+    const diffDays = Math.floor(diffMs / (MS_PER_SECOND * SECONDS_PER_MINUTE * MINUTES_PER_HOUR * HOURS_PER_DAY));
 
     if (diffHours < 1) {
       return "Just now";
     }
-    if (diffHours < 24) {
-      return `${diffHours}h ago`;
+    if (diffHours < HOURS_PER_DAY) {
+      return `${String(diffHours)}h ago`;
     }
-    if (diffDays < 7) {
-      return `${diffDays}d ago`;
+    if (diffDays < DAYS_PER_WEEK) {
+      return `${String(diffDays)}d ago`;
     }
     return date.toLocaleDateString();
   };
 
-  const diffDays = (date: Date) => {
+  const diffDaysFromNow = (date: Readonly<Date>) => {
     const now = new Date();
-    return Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.floor((now.getTime() - date.getTime()) / (MS_PER_SECOND * SECONDS_PER_MINUTE * MINUTES_PER_HOUR * HOURS_PER_DAY));
   };
 
-  const groupEntriesByDate = (entries: Array<CatalogueEntity>) => {
-    const groups: { [key: string]: Array<CatalogueEntity> } = {};
+  const groupEntriesByDate = (entries: readonly CatalogueEntity[]) => {
+    const groups: Record<string, CatalogueEntity[]> = {};
 
     for (const entry of entries) {
       const date = new Date(entry.addedAt);
@@ -109,13 +118,13 @@ export const HistorySidebar = ({ onClose }: HistorySidebarProperties) => {
         groupKey = "Today";
       } else if (date.toDateString() === yesterday.toDateString()) {
         groupKey = "Yesterday";
-      } else if (diffDays(date) < 7) {
+      } else if (diffDaysFromNow(date) < DAYS_PER_WEEK) {
         groupKey = "This week";
       } else {
         groupKey = date.toLocaleDateString();
       }
 
-      if (!groups[groupKey]) {
+      if (!(groupKey in groups)) {
         groups[groupKey] = [];
       }
       groups[groupKey].push(entry);
@@ -161,7 +170,7 @@ export const HistorySidebar = ({ onClose }: HistorySidebarProperties) => {
           aria-label="Search navigation history"
           label="Search history"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => { setSearchQuery(e.target.value); }}
           leftSection={<IconSearch size={ICON_SIZE.SM} />}
           size="sm"
           style={{ flex: 1 }}
@@ -215,7 +224,7 @@ export const HistorySidebar = ({ onClose }: HistorySidebarProperties) => {
                 </div>
 {entries.map((entry) => (
                   <HistoryCard
-                    key={`${entry.entityId}-${entry.addedAt.getTime()}`}
+                    key={`${entry.entityId}-${String(entry.addedAt.getTime())}`}
                     entry={entry}
                     onClose={onClose}
                     formatDate={formatDate}

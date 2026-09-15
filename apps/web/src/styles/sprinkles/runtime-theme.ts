@@ -3,6 +3,7 @@
  * Provides functions to apply and manage theme changes at runtime
  */
 
+import { shadcnPaletteNames } from '../shadcn-colors';
 import type { BorderRadius,ColorMode, ColorScheme, ComponentLibrary } from '../theme-contracts';
 import { themeVars as themeVariables } from '../theme-vars.css';
 
@@ -15,6 +16,26 @@ export interface RuntimeThemeConfig {
   colorMode: ColorMode;
   borderRadius: BorderRadius;
 }
+
+const COMPONENT_LIBRARIES: readonly string[] = ['mantine', 'shadcn', 'radix'] satisfies readonly ComponentLibrary[];
+const COLOR_MODES: readonly string[] = ['light', 'dark', 'auto'] satisfies readonly ColorMode[];
+const BORDER_RADII: readonly string[] = ['xs', 'sm', 'md', 'lg', 'xl'] satisfies readonly BorderRadius[];
+
+/**
+ * Type guard validating that an unknown value parsed from storage matches the RuntimeThemeConfig shape.
+ */
+const isRuntimeThemeConfig = (value: unknown): value is RuntimeThemeConfig => {
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('componentLibrary' in value) || !('colorScheme' in value) || !('colorMode' in value) || !('borderRadius' in value)) {
+    return false;
+  }
+  return (
+    typeof value.componentLibrary === 'string' && COMPONENT_LIBRARIES.includes(value.componentLibrary) &&
+    typeof value.colorScheme === 'string' && shadcnPaletteNames.some((name) => name === value.colorScheme) &&
+    typeof value.colorMode === 'string' && COLOR_MODES.includes(value.colorMode) &&
+    typeof value.borderRadius === 'string' && BORDER_RADII.includes(value.borderRadius)
+  );
+};
 
 /**
  * Component library-specific theme values
@@ -99,9 +120,8 @@ const borderRadiusValues = {
 /**
  * Apply runtime theme based on configuration
  * This updates CSS custom properties dynamically
- * @param config
  */
-export const applyRuntimeTheme = (config: RuntimeThemeConfig) => {
+export const applyRuntimeTheme = (config: Readonly<RuntimeThemeConfig>) => {
   const theme = componentLibraryThemes[config.componentLibrary];
 
   // Apply theme variables to the document root directly
@@ -150,7 +170,6 @@ export const applyRuntimeTheme = (config: RuntimeThemeConfig) => {
 /**
  * Apply color mode (light/dark) theme
  * This handles the light/dark mode switching
- * @param colorMode
  */
 export const applyColorModeTheme = (colorMode: ColorMode) => {
   const root = document.documentElement;
@@ -186,9 +205,8 @@ export const applyInteractiveProperties = () => {
 /**
  * Initialize runtime theme system
  * Call this once when the application starts
- * @param config
  */
-export const initializeRuntimeTheme = (config: RuntimeThemeConfig) => {
+export const initializeRuntimeTheme = (config: Readonly<RuntimeThemeConfig>) => {
   // Apply the main theme
   applyRuntimeTheme(config);
 
@@ -216,9 +234,8 @@ export const initializeRuntimeTheme = (config: RuntimeThemeConfig) => {
 /**
  * Update theme at runtime
  * Use this when the user changes theme settings
- * @param newConfig
  */
-export const updateRuntimeTheme = (newConfig: Partial<RuntimeThemeConfig>) => {
+export const updateRuntimeTheme = (newConfig: Readonly<Partial<RuntimeThemeConfig>>) => {
   // Get current theme from localStorage or use defaults
   const currentConfig: RuntimeThemeConfig = {
     componentLibrary: 'mantine',
@@ -259,8 +276,11 @@ export const getCurrentRuntimeTheme = (): RuntimeThemeConfig => {
 
   try {
     const saved = localStorage.getItem('theme-config');
-    if (saved) {
-      return JSON.parse(saved);
+    if (saved !== null) {
+      const parsed: unknown = JSON.parse(saved);
+      if (isRuntimeThemeConfig(parsed)) {
+        return parsed;
+      }
     }
   } catch (error) {
     console.warn('Failed to parse theme config from localStorage:', error);
@@ -277,17 +297,14 @@ export const getCurrentRuntimeTheme = (): RuntimeThemeConfig => {
 /**
  * Utility to create theme-aware CSS values
  * This helps components use the correct theme variables
- * @param property
- * @param fallback
  */
 export const createThemeValue = (property: keyof typeof themeVariables, fallback?: string) => {
   const cssVariable = `var(${themeVariables[property]})`;
-  return cssVariable === 'var(undefined)' && fallback ? fallback : cssVariable;
+  return cssVariable === 'var(undefined)' && fallback !== undefined ? fallback : cssVariable;
 };
 
 /**
  * Get theme value for a specific component library
- * @param library
  */
 export const getComponentLibraryTheme = (library: ComponentLibrary) => {
   return componentLibraryThemes[library];

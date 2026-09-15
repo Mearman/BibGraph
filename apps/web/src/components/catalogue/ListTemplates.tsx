@@ -149,7 +149,7 @@ export const ListTemplates = ({ onUseTemplate, onClose }: ListTemplatesPropertie
               cursor: 'pointer',
               borderColor: template.color,
             }}
-            onClick={() => handlePreviewTemplate(template)}
+            onClick={() => { handlePreviewTemplate(template); }}
           >
             <Stack gap="sm">
               {/* Icon and Name */}
@@ -237,7 +237,7 @@ export const ListTemplates = ({ onUseTemplate, onClose }: ListTemplatesPropertie
       {/* Template Preview Modal */}
       <Modal
         opened={showPreview}
-        onClose={() => setShowPreview(false)}
+        onClose={() => { setShowPreview(false); }}
         title={selectedTemplate?.name}
         size="md"
       >

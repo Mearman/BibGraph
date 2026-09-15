@@ -8,6 +8,8 @@ import React from "react";
 import { BORDER_DEFAULT } from "@/constants/styles";
 import type { ComparisonRun } from "@/types/comparison";
 
+const DISABLED_BUTTON_OPACITY = 0.6;
+
 interface DatasetRunCardProperties {
   dataset: STARDataset;
   run: ComparisonRun | undefined;
@@ -88,7 +90,7 @@ export const DatasetRunCard: React.FC<DatasetRunCardProperties> = ({
           fontSize: "14px",
           fontWeight: "500",
           cursor: isRunningComparison || isRunning ? "not-allowed" : "pointer",
-          opacity: isRunningComparison || isRunning ? 0.6 : 1,
+          opacity: isRunningComparison || isRunning ? DISABLED_BUTTON_OPACITY : 1,
         }}
       >
         {getButtonText()}

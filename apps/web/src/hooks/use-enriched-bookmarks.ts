@@ -4,9 +4,18 @@
  */
 
 import { cachedOpenAlex } from "@bibgraph/client";
-import type { Bookmark, EntityType, OpenAlexEntity } from "@bibgraph/types";
+import type { Bookmark, EntityType } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
 import { useQueries } from "@tanstack/react-query";
+import { z } from "zod";
+
+import { MS_PER_DAY, MS_PER_HOUR } from "./time-constants";
+
+/**
+ * A display-name fetch selects only id and display_name, so it validates against exactly those fields
+ */
+const displayNameStubSchema = z.object({ id: z.string(), display_name: z.string() });
+
 
 /**
 Regex to detect entity IDs used as titles (e.g., A5017898742, W123456789)
@@ -42,14 +51,15 @@ const fetchDisplayName = async (
   entityId: string
 ): Promise<string | null> => {
   try {
-    const result = await cachedOpenAlex.getById<OpenAlexEntity>({
+    const result = await cachedOpenAlex.getById({
       endpoint: entityType,
       id: entityId,
       params: {
         select: ["id", "display_name"],
       },
+      schema: displayNameStubSchema,
     });
-    return result?.display_name ?? null;
+    return result.display_name;
   } catch (error) {
     logger.error(
       "bookmarks",
@@ -67,7 +77,7 @@ const fetchDisplayName = async (
  * @param bookmarks - Array of bookmarks to enrich
  */
 export const useEnrichedBookmarks = (
-  bookmarks: Bookmark[]
+  bookmarks: readonly Bookmark[]
 ): UseEnrichedBookmarksResult => {
   // Identify bookmarks that need display name fetching
   const bookmarksNeedingFetch = bookmarks.filter((bookmark) => {
@@ -82,9 +92,9 @@ export const useEnrichedBookmarks = (
   const queries = useQueries({
     queries: bookmarksNeedingFetch.map((bookmark) => ({
       queryKey: ["entity-display-name", bookmark.entityType, bookmark.entityId] as const,
-      queryFn: () => fetchDisplayName(bookmark.entityType, bookmark.entityId),
-      staleTime: 1000 * 60 * 60, // 1 hour
-      gcTime: 1000 * 60 * 60 * 24, // 24 hours
+      queryFn: async () => fetchDisplayName(bookmark.entityType, bookmark.entityId),
+      staleTime: MS_PER_HOUR,
+      gcTime: MS_PER_DAY,
       retry: 1,
     })),
   });
@@ -93,7 +103,7 @@ export const useEnrichedBookmarks = (
   const displayNameMap = new Map<string, string>();
   for (const [index, bookmark] of bookmarksNeedingFetch.entries()) {
     const queryResult = queries[index];
-    if (queryResult?.data) {
+    if (queryResult.data !== null && queryResult.data !== undefined && queryResult.data !== "") {
       displayNameMap.set(bookmark.entityId, queryResult.data);
     }
   }
@@ -101,7 +111,7 @@ export const useEnrichedBookmarks = (
   // Create enriched bookmarks with proper display names
   const enrichedBookmarks = bookmarks.map((bookmark): Bookmark => {
     const fetchedDisplayName = displayNameMap.get(bookmark.entityId);
-    if (fetchedDisplayName) {
+    if (fetchedDisplayName !== undefined && fetchedDisplayName !== "") {
       return {
         ...bookmark,
         metadata: {

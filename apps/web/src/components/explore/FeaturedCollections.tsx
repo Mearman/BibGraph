@@ -90,7 +90,7 @@ export const FeaturedCollections: React.FC = () => {
   const theme = useMantineTheme();
 
   const handleExploreCollection = (query: string) => {
-    navigate({
+    void navigate({
       to: '/search',
       search: { q: query, filter: undefined, search: undefined },
     });
@@ -132,7 +132,7 @@ export const FeaturedCollections: React.FC = () => {
                 <Button
                   variant="light"
                   color={collection.color}
-                  onClick={() => handleExploreCollection(collection.query)}
+                  onClick={() => { handleExploreCollection(collection.query); }}
                   fullWidth
                 >
                   Explore

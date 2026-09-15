@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 
 import { AutocompletePage } from "@/components/AutocompletePage";
@@ -11,7 +11,7 @@ const searchSchema = z.object({
 });
 
 const AutocompleteInstitutionsRoute = () => {
-  const urlSearch = Route.useSearch();
+  const urlSearch = useSearch({ from: "/autocomplete/institutions/" });
 
   const { query, handleSearch, results, isLoading, error, filter } = useEntityAutocomplete({
     entityType: "institutions",

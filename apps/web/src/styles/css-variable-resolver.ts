@@ -1,19 +1,46 @@
 import type { ShadcnPalette, ShadcnShade } from './shadcn-colors'
 import { shadcnPalettes, shadcnSemanticColors } from './shadcn-colors'
 
-export interface ThemeColors {
-  [key: string]: string
-}
+export type ThemeColors = Record<string, string>
 
-export interface CSSVariableMapping {
-  [palette: string]: {
-    [shade: number]: string
-  }
-}
+export type CSSVariableMapping = Record<string, Record<number, string>>
+
+type ShadcnSemanticKey = keyof typeof shadcnSemanticColors.light
+
+// Hex-alpha suffix maths: the maximum single-byte channel value and the hexadecimal radix used to encode it.
+const RGB_CHANNEL_MAX = 255
+const HEX_RADIX = 16
+const HEX_BYTE_STRING_LENGTH = 2
+const HEX_BYTE_PAD_CHAR = '0'
+
+// Each shadcn CSS variable step corresponds to fifty tailwind-style shade units (50, 100, 150, ...).
+const SHADE_VARIABLE_STEP = 50
+
+// 1-based shade indices used to pick a representative shade for each semantic variant.
+const FILLED_SHADE_NEUTRAL = 8
+const FILLED_SHADE_LIGHT_TEXT_PALETTE = 4
+const FILLED_SHADE_HIGH_CONTRAST_PALETTE = 6
+const FILLED_SHADE_DEFAULT = 5
+const FILLED_HOVER_ALPHA = 0.9
+
+const LIGHT_BASE_SHADE = 4
+const LIGHT_ALPHA_DARK_MODE = 0.15
+const LIGHT_ALPHA_LIGHT_MODE = 0.1
+const LIGHT_HOVER_ALPHA_FACTOR = 0.8
+const LIGHT_COLOR_SHADE_DARK_MODE = 3
+const LIGHT_COLOR_SHADE_LIGHT_MODE = 6
+
+const OUTLINE_SHADE_NEUTRAL = 8
+const OUTLINE_SHADE_HIGH_CONTRAST_PALETTE = 6
+const OUTLINE_SHADE_DEFAULT = 5
+
+const CONTRAST_SHADE_YELLOW = 6
+const CONTRAST_SHADE_GREEN_DARK_MODE = 9
+const CONTRAST_SHADE_DEFAULT = 0
 
 // Helper function to create alpha-blended colors
 const alpha = (color: string, alphaValue: number): string => {
-  return `${color}${Math.round(alphaValue * 255).toString(16).padStart(2, '0')}`
+  return `${color}${Math.round(alphaValue * RGB_CHANNEL_MAX).toString(HEX_RADIX).padStart(HEX_BYTE_STRING_LENGTH, HEX_BYTE_PAD_CHAR)}`
 }
 
 // Helper to detect neutral colors
@@ -21,15 +48,23 @@ const isNeutralColor = (palette: string): boolean => {
   return ["zinc", "slate", "gray", "neutral", "stone"].includes(palette)
 }
 
+const isShadcnPalette = (value: string): value is ShadcnPalette => value in shadcnPalettes
+
+const isValidShadeIndex = (palette: ShadcnPalette, value: number): value is ShadcnShade =>
+  Number.isInteger(value) && value >= 0 && value < shadcnPalettes[palette].length
+
 export const resolveSemanticColor = (
-  semanticKey: string,
+  semanticKey: ShadcnSemanticKey,
   mode: 'light' | 'dark'
 ): string => {
-  const colorKey = shadcnSemanticColors[mode][semanticKey as keyof typeof shadcnSemanticColors.light]
-  if (!colorKey) return ''
+  const colorKey = shadcnSemanticColors[mode][semanticKey]
+  const [palette, shadeText] = colorKey.split('.', 2)
+  if (!isShadcnPalette(palette)) return ''
 
-  const [palette, shade] = colorKey.split('.', 2)
-  return shadcnPalettes[palette as ShadcnPalette][Number.parseInt(shade) as ShadcnShade]
+  const shadeIndex = Number.parseInt(shadeText)
+  if (!isValidShadeIndex(palette, shadeIndex)) return ''
+
+  return shadcnPalettes[palette][shadeIndex]
 }
 
 export const generateCSSVariables = (mode: 'light' | 'dark'): ThemeColors => {
@@ -38,51 +73,54 @@ export const generateCSSVariables = (mode: 'light' | 'dark'): ThemeColors => {
   // Generate base palette variables
   for (const [paletteName, shades] of Object.entries(shadcnPalettes)) {
     for (const [shadeIndex, color] of shades.entries()) {
-      colors[`--shadcn-${paletteName}-${shadeIndex * 50 + 50}`] = color
+      colors[`--shadcn-${paletteName}-${String((shadeIndex + 1) * SHADE_VARIABLE_STEP)}`] = color
     }
   }
 
   // Generate semantic variables
   for (const [semanticKey, colorValue] of Object.entries(shadcnSemanticColors[mode])) {
-    const [palette, shade] = colorValue.split('.', 2)
-    const color = shadcnPalettes[palette as ShadcnPalette][Number.parseInt(shade) as ShadcnShade]
-    colors[`--shadcn-${semanticKey}`] = color
+    const [palette, shadeText] = colorValue.split('.', 2)
+    if (!isShadcnPalette(palette)) continue
+
+    const shadeIndex = Number.parseInt(shadeText)
+    if (!isValidShadeIndex(palette, shadeIndex)) continue
+
+    colors[`--shadcn-${semanticKey}`] = shadcnPalettes[palette][shadeIndex]
   }
 
   // Generate variant variables (filled, light, outline, contrast) with hover states
   for (const [paletteName, shades] of Object.entries(shadcnPalettes)) {
     // Filled variants
-    const filledShade = isNeutralColor(paletteName) ? 8 :
-                        ["yellow", "lime"].includes(paletteName) ? 4 :
-                        ["green", "blue"].includes(paletteName) ? 6 : 5
+    const filledShade = isNeutralColor(paletteName) ? FILLED_SHADE_NEUTRAL :
+                        ["yellow", "lime"].includes(paletteName) ? FILLED_SHADE_LIGHT_TEXT_PALETTE :
+                        ["green", "blue"].includes(paletteName) ? FILLED_SHADE_HIGH_CONTRAST_PALETTE : FILLED_SHADE_DEFAULT
 
     colors[`--shadcn-${paletteName}-filled`] = shades[filledShade - 1]
-    colors[`--shadcn-${paletteName}-filled-hover`] = alpha(shades[filledShade - 1], 0.9)
+    colors[`--shadcn-${paletteName}-filled-hover`] = alpha(shades[filledShade - 1], FILLED_HOVER_ALPHA)
 
     // Light variants with alpha blending
-    const lightBaseShade = 4
-    const lightAlpha = mode === 'dark' ? 0.15 : 0.1
-    colors[`--shadcn-${paletteName}-light`] = alpha(shades[lightBaseShade - 1], lightAlpha)
-    colors[`--shadcn-${paletteName}-light-hover`] = alpha(shades[lightBaseShade - 1], lightAlpha * 0.8)
+    const lightAlpha = mode === 'dark' ? LIGHT_ALPHA_DARK_MODE : LIGHT_ALPHA_LIGHT_MODE
+    colors[`--shadcn-${paletteName}-light`] = alpha(shades[LIGHT_BASE_SHADE - 1], lightAlpha)
+    colors[`--shadcn-${paletteName}-light-hover`] = alpha(shades[LIGHT_BASE_SHADE - 1], lightAlpha * LIGHT_HOVER_ALPHA_FACTOR)
 
-    const lightColorShade = mode === 'dark' ? 3 : 6
+    const lightColorShade = mode === 'dark' ? LIGHT_COLOR_SHADE_DARK_MODE : LIGHT_COLOR_SHADE_LIGHT_MODE
     colors[`--shadcn-${paletteName}-light-color`] = shades[lightColorShade - 1]
 
     // Outline variants
-    const outlineShade = isNeutralColor(paletteName) ? 8 :
+    const outlineShade = isNeutralColor(paletteName) ? OUTLINE_SHADE_NEUTRAL :
                         mode === 'dark' ?
-                          (["orange", "indigo", "violet", "purple", "fuchsia", "pink"].includes(paletteName) ? 6 : 5) :
-                          (["green", "blue"].includes(paletteName) ? 6 : 5)
+                          (["orange", "indigo", "violet", "purple", "fuchsia", "pink"].includes(paletteName) ? OUTLINE_SHADE_HIGH_CONTRAST_PALETTE : OUTLINE_SHADE_DEFAULT) :
+                          (["green", "blue"].includes(paletteName) ? OUTLINE_SHADE_HIGH_CONTRAST_PALETTE : OUTLINE_SHADE_DEFAULT)
 
     colors[`--shadcn-${paletteName}-outline`] = shades[outlineShade - 1]
-    colors[`--shadcn-${paletteName}-outline-hover`] = alpha(shades[lightBaseShade - 1], mode === 'dark' ? 0.15 : 0.1)
+    colors[`--shadcn-${paletteName}-outline-hover`] = alpha(shades[LIGHT_BASE_SHADE - 1], mode === 'dark' ? LIGHT_ALPHA_DARK_MODE : LIGHT_ALPHA_LIGHT_MODE)
 
     // Contrast variants
     const contrastMap: Record<string, number> = {
-      zinc: 0, slate: 0, gray: 0, neutral: 0, stone: 0,
-      red: 0, rose: 0,
-      orange: 0, amber: 0, lime: 0, emerald: 0, teal: 0, cyan: 0, sky: 0, indigo: 0, fuchsia: 0, purple: 0, pink: 0,
-      yellow: 6, green: mode === 'light' ? 0 : 9, blue: 0
+      zinc: CONTRAST_SHADE_DEFAULT, slate: CONTRAST_SHADE_DEFAULT, gray: CONTRAST_SHADE_DEFAULT, neutral: CONTRAST_SHADE_DEFAULT, stone: CONTRAST_SHADE_DEFAULT,
+      red: CONTRAST_SHADE_DEFAULT, rose: CONTRAST_SHADE_DEFAULT,
+      orange: CONTRAST_SHADE_DEFAULT, amber: CONTRAST_SHADE_DEFAULT, lime: CONTRAST_SHADE_DEFAULT, emerald: CONTRAST_SHADE_DEFAULT, teal: CONTRAST_SHADE_DEFAULT, cyan: CONTRAST_SHADE_DEFAULT, sky: CONTRAST_SHADE_DEFAULT, indigo: CONTRAST_SHADE_DEFAULT, fuchsia: CONTRAST_SHADE_DEFAULT, purple: CONTRAST_SHADE_DEFAULT, pink: CONTRAST_SHADE_DEFAULT,
+      yellow: CONTRAST_SHADE_YELLOW, green: mode === 'light' ? CONTRAST_SHADE_DEFAULT : CONTRAST_SHADE_GREEN_DARK_MODE, blue: CONTRAST_SHADE_DEFAULT
     }
 
     colors[`--shadcn-${paletteName}-contrast`] = shades[contrastMap[paletteName] || 0]
@@ -104,7 +142,7 @@ export const resolveThemeVariable = (
   palette: ShadcnPalette,
   shade: ShadcnShade
 ): string => {
-  return `var(--shadcn-${palette}-${shade * 50 + 50})`
+  return `var(--shadcn-${palette}-${String((shade + 1) * SHADE_VARIABLE_STEP)})`
 }
 
 export const resolveCSSVariable = (variableName: string): string => {
@@ -117,7 +155,7 @@ export const resolveVariantVariable = (
   variant: 'filled' | 'light' | 'outline' | 'contrast',
   hover?: boolean
 ): string => {
-  const hoverSuffix = hover ? '-hover' : ''
+  const hoverSuffix = hover === true ? '-hover' : ''
   return `var(--shadcn-${palette}-${variant}${hoverSuffix})`
 }
 

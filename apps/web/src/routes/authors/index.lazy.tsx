@@ -1,12 +1,23 @@
-import type { Author } from "@bibgraph/types";
 import { createLazyFileRoute, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { EntityListWithQueryBookmarking } from "@/components/EntityListWithQueryBookmarking";
 import type { TableViewMode } from "@/components/TableViewModeToggle";
 import type { ColumnConfig } from "@/components/types";
-import type { OpenAlexSearchParams } from "@/lib/route-schemas";
 
+const hasLastKnownInstitutions = (
+  value: unknown,
+): value is { last_known_institutions: { display_name: string }[] } => {
+  if (typeof value !== "object" || value === null) return false;
+  if (!("last_known_institutions" in value) || !Array.isArray(value.last_known_institutions)) return false;
+  return value.last_known_institutions.every(
+    (institution: unknown) =>
+      typeof institution === "object" &&
+      institution !== null &&
+      "display_name" in institution &&
+      typeof institution.display_name === "string",
+  );
+};
 
 const authorsColumns: ColumnConfig[] = [
   { key: "display_name", header: "Name" },
@@ -17,14 +28,14 @@ const authorsColumns: ColumnConfig[] = [
     key: "last_known_institutions",
     header: "Institution",
     render: (_value: unknown, row: unknown) => {
-      const author = row as Author;
-      return author.last_known_institutions?.[0]?.display_name || "Unknown";
+      if (!hasLastKnownInstitutions(row) || row.last_known_institutions.length === 0) return "Unknown";
+      return row.last_known_institutions[0]?.display_name ?? "Unknown";
     },
   },
 ];
 
 const AuthorsListRoute = () => {
-  const search = useSearch({ from: "/authors/" }) as OpenAlexSearchParams;
+  const search = useSearch({ from: "/authors/" });
   const [viewMode, setViewMode] = useState<TableViewMode>("table");
 
   return (

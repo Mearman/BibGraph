@@ -65,7 +65,7 @@ export const useQueryBookmarking = ({
 }: UseQueryBookmarkingOptions): UseQueryBookmarkingReturn => {
 
   // Get current route search parameters
-  const searchParameters = useSearch({ strict: false }) as OpenAlexSearchParams;
+  const searchParameters = useSearch({ strict: false });
   const location = useLocation();
 
   // Extract semantic query parameters (excluding pagination)
@@ -105,7 +105,7 @@ export const useQueryBookmarking = ({
         if (urlMatch) {
           const bookmarkUrl = urlMatch[1];
           // Simple check - this will need to be improved for proper query parameter matching
-          return bookmarkUrl.includes(searchParameters.toString());
+          return bookmarkUrl.includes(serializeSearch(searchParameters));
         }
         return false;
       } catch (error) {
@@ -138,17 +138,17 @@ export const useQueryBookmarking = ({
       const queryUrl = createQueryBookmarkRequest(entityType, entityId, searchParameters);
 
       // Generate title if not provided
-      const bookmarkTitle = title || generateQueryTitle(entityType, searchParameters);
+      const bookmarkTitle = title ?? generateQueryTitle(entityType, searchParameters);
 
       // Generate default notes if not provided
-      const bookmarkNotes = notes || `Query bookmark for ${entityType}`;
+      const bookmarkNotes = notes ?? `Query bookmark for ${entityType}`;
 
       // Use bookmarkList function since we're bookmarking a URL-based query
       await userInteractions.bookmarkList({
         title: bookmarkTitle,
         url: queryUrl.cacheKey,
         notes: bookmarkNotes,
-        tags: tags || [`${entityType}-query`, "query"]
+        tags: tags ?? [`${entityType}-query`, "query"]
       });
 
       logger.info(
@@ -191,7 +191,7 @@ export const useQueryBookmarking = ({
           const urlMatch = bookmark.notes?.match(/URL: ([^\n]+)/);
           if (urlMatch) {
             const bookmarkUrl = urlMatch[1];
-            return bookmarkUrl.includes(searchParameters.toString());
+            return bookmarkUrl.includes(serializeSearch(searchParameters));
           }
           return false;
         } catch {
@@ -199,7 +199,7 @@ export const useQueryBookmarking = ({
         }
       });
 
-      if (matchingBookmark?.id) {
+      if (matchingBookmark?.id !== undefined) {
         await userInteractions.unbookmarkList();
 
         logger.info(

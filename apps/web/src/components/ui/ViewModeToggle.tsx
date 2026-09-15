@@ -118,7 +118,7 @@ export const ViewModeToggle = ({
         if (value_ === '3D' && is3DDisabled) {
           return;
         }
-        onChange(value_ as ViewMode);
+        onChange(value_);
       }}
       data={data}
       disabled={disabled}

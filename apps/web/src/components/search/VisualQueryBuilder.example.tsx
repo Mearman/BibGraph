@@ -41,25 +41,25 @@ export const VisualQueryBuilderExample = () => {
       <Group mb="lg">
         <Button
           variant={entityType === "works" ? "filled" : "outline"}
-          onClick={() => switchEntityType("works")}
+          onClick={() => { switchEntityType("works"); }}
         >
           Works
         </Button>
         <Button
           variant={entityType === "authors" ? "filled" : "outline"}
-          onClick={() => switchEntityType("authors")}
+          onClick={() => { switchEntityType("authors"); }}
         >
           Authors
         </Button>
         <Button
           variant={entityType === "sources" ? "filled" : "outline"}
-          onClick={() => switchEntityType("sources")}
+          onClick={() => { switchEntityType("sources"); }}
         >
           Sources
         </Button>
         <Button
           variant={entityType === "institutions" ? "filled" : "outline"}
-          onClick={() => switchEntityType("institutions")}
+          onClick={() => { switchEntityType("institutions"); }}
         >
           Institutions
         </Button>

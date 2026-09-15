@@ -1,7 +1,7 @@
 /**
  * E2E tests for Multi-Tier Caching (US-25)
  *
- * Tests the multi-tier cache system: Memory > localStorage > IndexedDB > Static JSON > API.
+ * Tests the multi-tier cache system: Memory \> localStorage \> IndexedDB \> Static JSON \> API.
  * Verifies cache hits, fallthrough behaviour, bandwidth savings, and graceful misses.
  */
 
@@ -13,7 +13,8 @@ import { StorageTestHelper } from '@/test/helpers/StorageTestHelper';
 import { BaseSPAPageObject } from '@/test/page-objects/BaseSPAPageObject';
 
 test.describe('@utility US-25 Multi-Tier Caching', () => {
-	const BASE_URL = process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173';
+	const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+	const BASE_URL = IS_CI ? 'http://localhost:4173' : 'http://localhost:5173';
 
 	const TEST_ENTITY = { type: 'works', id: 'W2741809807' };
 	// Match both direct API requests (api.openalex.org) and proxied requests

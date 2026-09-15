@@ -1,6 +1,4 @@
-/**
- * @vitest-environment jsdom
- */
+// @vitest-environment jsdom
 
 /**
  * Unit tests for expansion settings store
@@ -55,10 +53,10 @@ describe("Expansion Settings Store - Standalone API", () => {
       const worksSettings = getSettings("works");
 
       expect(worksSettings).toMatchObject({
-        enabled: expect.any(Boolean),
-        limit: expect.any(Number),
-        sorts: expect.any(Array),
-        filters: expect.any(Array),
+        enabled: expect.any(Boolean) as unknown,
+        limit: expect.any(Number) as unknown,
+        sorts: expect.any(Array) as unknown,
+        filters: expect.any(Array) as unknown,
       });
 
       expect(worksSettings.limit).toBeGreaterThanOrEqual(0);

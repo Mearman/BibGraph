@@ -12,7 +12,16 @@ import { expect,test } from '@playwright/test';
  * 5. Special focus on bioplastics URL pattern
  */
 
-const BASE_URL = process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173';
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = IS_CI ? 'http://localhost:4173' : 'http://localhost:5173';
+
+const APP_INIT_WAIT_MS = 1000;
+const ENTITY_LOAD_WAIT_MS = 2000;
+const SEARCH_QUERY_WAIT_MS = 3000;
+const URL_PREVIEW_LENGTH_SHORT = 50;
+const URL_PREVIEW_LENGTH_LONG = 60;
+const MIN_SUCCESS_RATE = 0.8;
+const PERCENTAGE_MULTIPLIER = 100;
 
 // Representative URL patterns from the test data
 const URL_PATTERNS = {
@@ -71,18 +80,18 @@ test.describe('Bookmarking URL Pattern Tests', () => {
     // Wait for app to be ready
     await page.goto(BASE_URL);
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000); // Allow app to initialize
+    await page.waitForTimeout(APP_INIT_WAIT_MS); // Allow app to initialize
   });
 
   test.describe('Basic Entity URL Bookmarking', () => {
     for (const url of URL_PATTERNS.basicEntity) {
-      test(`should bookmark basic entity URL: ${url.split('/').pop()}`, async ({ page }) => {
+      test(`should bookmark basic entity URL: ${String(url.split('/').pop())}`, async ({ page }) => {
         console.log(`Testing basic entity URL: ${url}`);
 
         // Navigate to the URL through hash routing
         await page.goto(`${BASE_URL}/#/${url}`);
         await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(2000); // Allow for redirection and data loading
+        await page.waitForTimeout(ENTITY_LOAD_WAIT_MS); // Allow for redirection and data loading
 
         // Check if we're on an entity page (look for bookmark button)
         const bookmarkButton = page.locator('button[aria-label*="bookmark" i], button[data-testid*="bookmark" i], .mantine-ActionIcon-root').first();
@@ -92,7 +101,7 @@ test.describe('Bookmarking URL Pattern Tests', () => {
 
         // Check if page loaded successfully (not an error page)
         const pageTitle = await page.title();
-        const hasContent = await page.locator('body').textContent() || '';
+        const hasContent = await page.locator('body').textContent() ?? '';
 
         expect(pageTitle).not.toContain('404');
         expect(hasContent).not.toContain('Page not found');
@@ -128,12 +137,12 @@ test.describe('Bookmarking URL Pattern Tests', () => {
 
   test.describe('Search Parameter URL Bookmarking', () => {
     for (const url of URL_PATTERNS.searchParams) {
-      test(`should handle search parameter URL: ${url.split('?', 2)[1]?.slice(0, 50)}...`, async ({ page }) => {
+      test(`should handle search parameter URL: ${url.split('?', 2)[1]?.slice(0, URL_PREVIEW_LENGTH_SHORT)}...`, async ({ page }) => {
         console.log(`Testing search parameter URL: ${url}`);
 
         await page.goto(`${BASE_URL}/#/${url}`);
         await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(3000); // Search pages may take longer
+        await page.waitForTimeout(SEARCH_QUERY_WAIT_MS); // Search pages may take longer
 
         // Check if page loaded successfully
         const pageTitle = await page.title();
@@ -157,7 +166,7 @@ test.describe('Bookmarking URL Pattern Tests', () => {
 
   test.describe('External ID URL Bookmarking', () => {
     for (const url of URL_PATTERNS.externalIds) {
-      test(`should handle external ID URL: ${url.split('/').pop()}`, async ({ page }) => {
+      test(`should handle external ID URL: ${String(url.split('/').pop())}`, async ({ page }) => {
         console.log(`Testing external ID URL: ${url}`);
 
         await page.goto(`${BASE_URL}/#/${url}`);
@@ -186,19 +195,19 @@ test.describe('Bookmarking URL Pattern Tests', () => {
 
   test.describe('Complex Parameter URL Bookmarking', () => {
     for (const url of URL_PATTERNS.complexParams) {
-      test(`should handle complex parameter URL: ${url.split('?', 2)[1]?.slice(0, 60)}...`, async ({ page }) => {
+      test(`should handle complex parameter URL: ${url.split('?', 2)[1]?.slice(0, URL_PREVIEW_LENGTH_LONG)}...`, async ({ page }) => {
         console.log(`Testing complex parameter URL: ${url}`);
 
         await page.goto(`${BASE_URL}/#/${url}`);
         await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(3000); // Complex queries may take longer
+        await page.waitForTimeout(SEARCH_QUERY_WAIT_MS); // Complex queries may take longer
 
         // Check if page loaded without errors
         const pageTitle = await page.title();
         expect(pageTitle).not.toContain('404');
 
         // Look for content or loading states
-        const pageContent = await page.locator('body').textContent() || '';
+        const pageContent = await page.locator('body').textContent() ?? '';
         const hasValidContent = !pageContent.includes('Page not found') && !pageContent.includes('Error');
 
         if (hasValidContent) {
@@ -224,7 +233,7 @@ test.describe('Bookmarking URL Pattern Tests', () => {
 
       // Check page content
       const pageTitle = await page.title();
-      const pageContent = await page.locator('body').textContent() || '';
+      const pageContent = await page.locator('body').textContent() ?? '';
 
       expect(pageTitle).not.toContain('404');
       expect(pageContent).not.toContain('Page not found');
@@ -244,7 +253,7 @@ test.describe('Bookmarking URL Pattern Tests', () => {
       const resultsCount = await resultsCards.count();
 
       if (resultsCount > 0) {
-        console.log(`✓ Found ${resultsCount} result cards for bioplastics search`);
+        console.log(`✓ Found ${String(resultsCount)} result cards for bioplastics search`);
       } else {
         console.log(`ℹ No result cards found for bioplastics search`);
       }
@@ -347,35 +356,35 @@ test.describe('Bookmarking URL Pattern Tests', () => {
             if (hasError) {
               testResults.failed++;
               testResults.patterns[category].failed++;
-              console.log(`❌ ${category}: ${url.split('/').pop()} - ${pageTitle}`);
+              console.log(`❌ ${category}: ${String(url.split('/').pop())} - ${pageTitle}`);
             } else {
               testResults.successful++;
               testResults.patterns[category].successful++;
-              console.log(`✓ ${category}: ${url.split('/').pop()}`);
+              console.log(`✓ ${category}: ${String(url.split('/').pop())}`);
             }
           } catch (error) {
             testResults.failed++;
             testResults.patterns[category].failed++;
-            console.log(`❌ ${category}: ${url.split('/').pop()} - ${error}`);
+            console.log(`❌ ${category}: ${String(url.split('/').pop())} - ${String(error)}`);
           }
         }
       }
 
       console.log('\n📊 URL Pattern Analysis Results:');
-      console.log(`Total URLs tested: ${testResults.total}`);
-      console.log(`Successful: ${testResults.successful}`);
-      console.log(`Failed: ${testResults.failed}`);
-      console.log(`Success rate: ${((testResults.successful / testResults.total) * 100).toFixed(1)}%`);
+      console.log(`Total URLs tested: ${String(testResults.total)}`);
+      console.log(`Successful: ${String(testResults.successful)}`);
+      console.log(`Failed: ${String(testResults.failed)}`);
+      console.log(`Success rate: ${((testResults.successful / testResults.total) * PERCENTAGE_MULTIPLIER).toFixed(1)}%`);
 
       console.log('\nBy category:');
       for (const [category, results] of Object.entries(testResults.patterns)) {
-        const rate = ((results.successful / results.total) * 100).toFixed(1);
-        console.log(`  ${category}: ${results.successful}/${results.total} (${rate}%)`);
+        const rate = ((results.successful / results.total) * PERCENTAGE_MULTIPLIER).toFixed(1);
+        console.log(`  ${category}: ${String(results.successful)}/${String(results.total)} (${rate}%)`);
       }
 
       // Ensure at least 80% success rate
       const successRate = testResults.successful / testResults.total;
-      expect(successRate).toBeGreaterThan(0.8);
+      expect(successRate).toBeGreaterThan(MIN_SUCCESS_RATE);
     });
   });
 });

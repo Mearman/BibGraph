@@ -22,7 +22,7 @@ import { ICON_SIZE } from '@/config/style-constants';
 import { useCatalogue } from "@/hooks/useCatalogue";
 
 // Set of special list IDs that shouldn't be shown in the add-to-list modal
-const SPECIAL_LIST_ID_SET: Set<string> = new Set(Object.values(SPECIAL_LIST_IDS));
+const SPECIAL_LIST_ID_SET = new Set<string>(Object.values(SPECIAL_LIST_IDS));
 
 
 interface AddToListModalProperties {
@@ -43,12 +43,13 @@ export const AddToListModal = ({
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Filter lists based on entity type and exclude special system lists
-  // Bibliographies can only contain works
-  // Special lists (History, Graph, Bookmarks) should not appear in add-to-list modal
+  // Falls back to the raw entity ID whenever no display name was provided, or an empty one was.
+  const displayName = entityDisplayName !== undefined && entityDisplayName !== "" ? entityDisplayName : entityId;
+
+  // Filter lists based on entity type and exclude special system lists Bibliographies can only contain works Special lists (History, Graph, Bookmarks) should not appear in add-to-list modal
   const availableLists = lists.filter(list => {
     // Exclude special system lists
-    if (list.id && SPECIAL_LIST_ID_SET.has(list.id)) {
+    if (list.id !== undefined && SPECIAL_LIST_ID_SET.has(list.id)) {
       return false;
     }
     if (list.type === "bibliography") {
@@ -60,7 +61,7 @@ export const AddToListModal = ({
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
 
-    if (!selectedListId) return;
+    if (selectedListId === null) return;
 
     setIsSubmitting(true);
     try {
@@ -72,9 +73,11 @@ export const AddToListModal = ({
       });
 
       const selectedList = lists.find(l => l.id === selectedListId);
+      // Falls back to the list ID if the list was removed from `lists` between selection and submission.
+      const selectedListTitle = selectedList?.title ?? selectedListId;
       logger.debug("catalogue-ui", "Entity added to list from modal", {
         listId: selectedListId,
-        listTitle: selectedList?.title,
+        listTitle: selectedListTitle,
         entityType,
         entityId,
         hasNotes: !!notes.trim()
@@ -83,7 +86,7 @@ export const AddToListModal = ({
       // Show notification first (it will persist after modal closes)
       notifications.show({
         title: "Added to List",
-        message: `${entityDisplayName || entityId} added to "${selectedList?.title}"`,
+        message: `${displayName} added to "${selectedListTitle}"`,
         color: "green",
         icon: <IconCheck size={ICON_SIZE.MD} />,
       });
@@ -136,10 +139,10 @@ export const AddToListModal = ({
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={(e) => { void handleSubmit(e); }}>
       <Stack gap="md">
         <Text size="sm" c="dimmed">
-          Add {entityDisplayName || entityId} to a catalogue list
+          Add {displayName} to a catalogue list
         </Text>
 
         <Select
@@ -149,7 +152,7 @@ export const AddToListModal = ({
           value={selectedListId}
           onChange={setSelectedListId}
           data={availableLists
-            .filter((list): list is typeof list & { id: string } => !!list.id)
+            .filter((list): list is typeof list & { id: string } => list.id !== undefined)
             .map(list => ({
               value: list.id,
               label: `${list.title} (${list.type})`,
@@ -165,7 +168,7 @@ export const AddToListModal = ({
           label="Notes (Optional)"
           placeholder="Add notes about this entity..."
           value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+          onChange={(e) => { setNotes(e.target.value); }}
           minRows={3}
           data-testid="add-to-list-notes"
         />
@@ -181,7 +184,7 @@ export const AddToListModal = ({
           <Button
             type="submit"
             loading={isSubmitting}
-            disabled={!selectedListId}
+            disabled={selectedListId === null}
             data-testid="add-to-list-submit"
           >
             Add to List

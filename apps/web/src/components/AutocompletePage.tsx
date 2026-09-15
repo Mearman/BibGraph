@@ -72,8 +72,6 @@ export interface AutocompletePageProps {
 
 /**
  * Extract error message for display
- * @param error
- * @param entityType
  */
 const formatErrorMessage = (error: Error, entityType: EntityType): string => {
   const metadata = ENTITY_METADATA[entityType];
@@ -83,17 +81,59 @@ const formatErrorMessage = (error: Error, entityType: EntityType): string => {
 };
 
 /**
+ * Individual result card component
+ */
+interface AutocompleteResultCardProperties {
+  result: AutocompleteResult;
+  entityType: EntityType;
+}
+
+const AutocompleteResultCard = ({ result, entityType }: AutocompleteResultCardProperties) => {
+  const metadata = ENTITY_METADATA[entityType];
+  const cleanId = result.id.replace("https://openalex.org/", "");
+  const href = `#${metadata.routePath}/${cleanId}`;
+
+  return (
+    <Card style={{ border: BORDER_STYLE_GRAY_3 }} padding="md" shadow="sm">
+      <Stack gap="xs">
+        <Group justify="space-between" wrap="nowrap">
+          <Anchor href={href} fw={500} size="md">
+            {decodeHtmlEntities(result.display_name)}
+          </Anchor>
+          <Badge size="sm" variant="light" color={metadata.color}>
+            {metadata.displayName}
+          </Badge>
+        </Group>
+
+        {result.hint !== undefined && result.hint !== "" && (
+          <Text size="sm" c="dimmed" lineClamp={2}>
+            {decodeHtmlEntities(result.hint)}
+          </Text>
+        )}
+
+        <Group gap="md">
+          {result.cited_by_count !== undefined && (
+            <Text size="xs" c="dimmed">
+              Citations: {result.cited_by_count.toLocaleString()}
+            </Text>
+          )}
+          {result.works_count !== undefined && (
+            <Text size="xs" c="dimmed">
+              Works: {result.works_count.toLocaleString()}
+            </Text>
+          )}
+        </Group>
+
+        <Text size="xs" c="dimmed" style={{ fontFamily: "monospace" }}>
+          {result.id}
+        </Text>
+      </Stack>
+    </Card>
+  );
+};
+
+/**
  * Shared autocomplete page component
- * @param root0
- * @param root0.entityType
- * @param root0.query
- * @param root0.onSearch
- * @param root0.results
- * @param root0.isLoading
- * @param root0.error
- * @param root0.filter
- * @param root0.placeholder
- * @param root0.description
  */
 export const AutocompletePage = ({
   entityType,
@@ -118,15 +158,15 @@ export const AutocompletePage = ({
         <div>
           <Title order={1}>Autocomplete {metadata.plural}</Title>
           <Text c="dimmed" size="sm" mt="xs">
-            {description || defaultDescription}
+            {description !== undefined && description !== "" ? description : defaultDescription}
           </Text>
         </div>
 
         {/* Search Input */}
         <TextInput
-          placeholder={placeholder || defaultPlaceholder}
+          placeholder={placeholder !== undefined && placeholder !== "" ? placeholder : defaultPlaceholder}
           value={query}
-          onChange={(event) => onSearch(event.currentTarget.value)}
+          onChange={(event) => { onSearch(event.currentTarget.value); }}
           leftSection={<IconSearch size={16} />}
           size="md"
         />
@@ -139,7 +179,7 @@ export const AutocompletePage = ({
         />
 
         {/* Active Filter Alert */}
-        {filter && (
+        {filter !== undefined && filter !== "" && (
           <Alert icon={<IconInfoCircle />} title="Active Filters" color="blue">
             <Text size="sm">Filter: {filter}</Text>
           </Alert>
@@ -213,57 +253,5 @@ export const AutocompletePage = ({
         )}
       </Stack>
     </Container>
-  );
-};
-
-/**
- * Individual result card component
- */
-interface AutocompleteResultCardProperties {
-  result: AutocompleteResult;
-  entityType: EntityType;
-}
-
-const AutocompleteResultCard = ({ result, entityType }: AutocompleteResultCardProperties) => {
-  const metadata = ENTITY_METADATA[entityType];
-  const cleanId = result.id.replace("https://openalex.org/", "");
-  const href = `#${metadata.routePath}/${cleanId}`;
-
-  return (
-    <Card style={{ border: BORDER_STYLE_GRAY_3 }} padding="md" shadow="sm">
-      <Stack gap="xs">
-        <Group justify="space-between" wrap="nowrap">
-          <Anchor href={href} fw={500} size="md">
-            {decodeHtmlEntities(result.display_name ?? "")}
-          </Anchor>
-          <Badge size="sm" variant="light" color={metadata.color}>
-            {metadata.displayName}
-          </Badge>
-        </Group>
-
-        {result.hint && (
-          <Text size="sm" c="dimmed" lineClamp={2}>
-            {decodeHtmlEntities(result.hint)}
-          </Text>
-        )}
-
-        <Group gap="md">
-          {result.cited_by_count !== undefined && result.cited_by_count !== null && (
-            <Text size="xs" c="dimmed">
-              Citations: {result.cited_by_count.toLocaleString()}
-            </Text>
-          )}
-          {result.works_count !== undefined && result.works_count !== null && (
-            <Text size="xs" c="dimmed">
-              Works: {result.works_count.toLocaleString()}
-            </Text>
-          )}
-        </Group>
-
-        <Text size="xs" c="dimmed" style={{ fontFamily: "monospace" }}>
-          {result.id}
-        </Text>
-      </Stack>
-    </Card>
   );
 };

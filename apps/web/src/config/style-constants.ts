@@ -5,7 +5,6 @@
  * This file eliminates duplicated inline styles across components,
  * ensuring consistent visual appearance and making styling values
  * discoverable and maintainable.
- * @module config/style-constants
  */
 
 import type { CSSProperties } from "react";
@@ -38,7 +37,7 @@ export const BORDER_STYLE_DEFAULT = "1px solid var(--mantine-color-default-borde
 
 /**
  * Standard card border style object
- * Use with Mantine's style prop: style={CARD_BORDER_STYLE}
+ * Use with Mantine's `style` prop: `style={CARD_BORDER_STYLE}`
  */
 export const CARD_BORDER_STYLE: CSSProperties = {
 	border: BORDER_STYLE_GRAY_3,
@@ -46,7 +45,7 @@ export const CARD_BORDER_STYLE: CSSProperties = {
 
 /**
  * Standard paper border style object
- * Use with Mantine's style prop: style={PAPER_BORDER_STYLE}
+ * Use with Mantine's `style` prop: `style={PAPER_BORDER_STYLE}`
  */
 export const PAPER_BORDER_STYLE: CSSProperties = {
 	border: BORDER_STYLE_GRAY_3,
@@ -167,43 +166,51 @@ export type IconSize = (typeof ICON_SIZE)[keyof typeof ICON_SIZE];
 // TIME CONSTANTS
 // =============================================================================
 
+const MS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const HALF_HOUR_MINUTES = 30;
+const TWO_HOURS_COUNT = 2;
+const SEARCH_STALE_MINUTES = 5;
+const BOOKMARK_FEEDBACK_SECONDS = 2;
+
 /**
- * Time duration constants in milliseconds
- * Used for timestamps, intervals, and duration calculations
+ * Time duration constants in milliseconds Used for timestamps, intervals, and duration calculations
  */
 export const TIME_MS = {
 	/**
 	1 second in milliseconds
 	 */
-	SECOND: 1000,
+	SECOND: MS_PER_SECOND,
 	/**
 	1 minute in milliseconds
 	 */
-	MINUTE: 60 * 1000,
+	MINUTE: SECONDS_PER_MINUTE * MS_PER_SECOND,
 	/**
 	30 minutes in milliseconds
 	 */
-	MINUTES_30: 30 * 60 * 1000,
+	MINUTES_30: HALF_HOUR_MINUTES * SECONDS_PER_MINUTE * MS_PER_SECOND,
 	/**
 	1 hour in milliseconds
 	 */
-	HOUR: 60 * 60 * 1000,
+	HOUR: MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND,
 	/**
 	2 hours in milliseconds
 	 */
-	HOURS_2: 2 * 60 * 60 * 1000,
+	HOURS_2: TWO_HOURS_COUNT * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND,
 	/**
 	24 hours (1 day) in milliseconds
 	 */
-	DAY: 24 * 60 * 60 * 1000,
+	DAY: HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND,
 	/**
 	Search cache stale time (5 minutes)
 	 */
-	SEARCH_STALE_TIME: 5 * 60 * 1000,
+	SEARCH_STALE_TIME: SEARCH_STALE_MINUTES * SECONDS_PER_MINUTE * MS_PER_SECOND,
 	/**
 	Bookmark feedback toast duration (2 seconds)
 	 */
-	BOOKMARK_FEEDBACK_DURATION: 2 * 1000,
+	BOOKMARK_FEEDBACK_DURATION: BOOKMARK_FEEDBACK_SECONDS * MS_PER_SECOND,
 } as const;
 
 // =============================================================================
@@ -232,6 +239,9 @@ export const LAYOUT = {
 // ALGORITHM CONSTANTS
 // =============================================================================
 
+const DEFAULT_NODE_RANGE_MIN = 50;
+const DEFAULT_NODE_RANGE_MAX = 100;
+
 /**
  * Algorithm configuration constants for UI controls and limits
  */
@@ -255,7 +265,7 @@ export const ALGORITHM = {
 	/**
 	Default node range for random graph generation
 	 */
-	DEFAULT_NODE_RANGE: [50, 100],
+	DEFAULT_NODE_RANGE: [DEFAULT_NODE_RANGE_MIN, DEFAULT_NODE_RANGE_MAX],
 } as const;
 
 // =============================================================================

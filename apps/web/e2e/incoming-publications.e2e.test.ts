@@ -1,6 +1,5 @@
 /**
  * E2E tests for incoming publication relationships on source detail pages
- * @module incoming-publications.e2e
  * @see specs/016-entity-relationship-viz/spec.md (User Story 1)
  */
 

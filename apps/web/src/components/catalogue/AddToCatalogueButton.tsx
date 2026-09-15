@@ -31,6 +31,11 @@ import React, { useMemo, useState } from "react";
 import { ICON_SIZE } from '@/config/style-constants';
 import { useCatalogue } from "@/hooks/useCatalogue";
 
+/**
+List entries beyond this count are collapsed into a "... and N more" item in the compatible-lists dropdown.
+ */
+const MAX_VISIBLE_LISTS = 5;
+
 interface AddToCatalogueButtonProperties {
   /**
   Entity type (works, authors, etc.)
@@ -159,7 +164,7 @@ const CreateAndAddModal = ({
           label="List Title"
           placeholder="Enter list title"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => { setTitle(e.target.value); }}
           required
           aria-required="true"
         />
@@ -169,7 +174,7 @@ const CreateAndAddModal = ({
           label="Description"
           placeholder="Optional description"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={(e) => { setDescription(e.target.value); }}
           minRows={3}
         />
 
@@ -177,7 +182,7 @@ const CreateAndAddModal = ({
           <Checkbox
             id="is-public-checkbox"
             checked={isPublic}
-            onChange={(e) => setIsPublic(e.target.checked)}
+            onChange={(e) => { setIsPublic(e.target.checked); }}
             label="Make this list publicly shareable"
             size="sm"
           />
@@ -188,7 +193,7 @@ const CreateAndAddModal = ({
             Cancel
           </Button>
           <Button
-            onClick={handleSubmit}
+            onClick={() => { void handleSubmit(); }}
             loading={isSubmitting}
             disabled={!title.trim()}
           >
@@ -298,8 +303,8 @@ export const AddToCatalogueButton = ({
           <Menu.Dropdown>
             {compatibleLists.length > 0 ? (
               <>
-                {compatibleLists.slice(0, 5).map((list) => {
-                  if (!list.id) return null;
+                {compatibleLists.slice(0, MAX_VISIBLE_LISTS).map((list) => {
+                  if (list.id === undefined) return null;
                   const listId = list.id;
                   const listTitle = list.title;
                   return (
@@ -312,15 +317,15 @@ export const AddToCatalogueButton = ({
                           <IconList size={ICON_SIZE.SM} />
                         )
                       }
-                      onClick={() => handleAddToList(listId, listTitle)}
+                      onClick={() => { void handleAddToList(listId, listTitle); }}
                     >
                       {listTitle}
                     </Menu.Item>
                   );
                 })}
-                {compatibleLists.length > 5 && (
+                {compatibleLists.length > MAX_VISIBLE_LISTS && (
                   <Menu.Item disabled>
-                    ... and {compatibleLists.length - 5} more
+                    ... and {compatibleLists.length - MAX_VISIBLE_LISTS} more
                   </Menu.Item>
                 )}
                 <Menu.Divider />
@@ -341,11 +346,11 @@ export const AddToCatalogueButton = ({
 
         <CreateAndAddModal
           opened={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
+          onClose={() => { setShowCreateModal(false); }}
           entityType={entityType}
           entityId={entityId}
           entityTitle={entityTitle}
-          onSuccess={() => {}}
+          onSuccess={() => { /* No-op: `lists` is a live query from useCatalogue, so the dropdown refreshes on its own once the new list is created; the modal's own onClose already handles dismissal. */ }}
         />
       </>
     );
@@ -369,8 +374,8 @@ export const AddToCatalogueButton = ({
         <Menu.Dropdown>
           {compatibleLists.length > 0 ? (
             <>
-              {compatibleLists.slice(0, 5).map((list) => {
-                if (!list.id) return null;
+              {compatibleLists.slice(0, MAX_VISIBLE_LISTS).map((list) => {
+                if (list.id === undefined) return null;
                 const listId = list.id;
                 const listTitle = list.title;
                 return (
@@ -383,15 +388,15 @@ export const AddToCatalogueButton = ({
                         <IconList size={ICON_SIZE.SM} />
                       )
                     }
-                    onClick={() => handleAddToList(listId, listTitle)}
+                    onClick={() => { void handleAddToList(listId, listTitle); }}
                   >
                     {listTitle}
                   </Menu.Item>
                 );
               })}
-              {compatibleLists.length > 5 && (
+              {compatibleLists.length > MAX_VISIBLE_LISTS && (
                 <Menu.Item disabled>
-                  ... and {compatibleLists.length - 5} more
+                  ... and {compatibleLists.length - MAX_VISIBLE_LISTS} more
                 </Menu.Item>
               )}
               <Menu.Divider />
@@ -412,11 +417,11 @@ export const AddToCatalogueButton = ({
 
       <CreateAndAddModal
         opened={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => { setShowCreateModal(false); }}
         entityType={entityType}
         entityId={entityId}
         entityTitle={entityTitle}
-        onSuccess={() => {}}
+        onSuccess={() => { /* No-op: `lists` is a live query from useCatalogue, so the dropdown refreshes on its own once the new list is created; the modal's own onClose already handles dismissal. */ }}
       />
     </>
   );

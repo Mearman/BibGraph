@@ -1,5 +1,5 @@
 import { cachedOpenAlex } from "@bibgraph/client";
-import { type Publisher, type PublisherField } from "@bibgraph/types";
+import { type PublisherField } from "@bibgraph/types";
 import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute,useParams, useSearch  } from "@tanstack/react-router";
 import { useState } from "react";
@@ -13,6 +13,28 @@ import { useEntityRelationshipQueries } from '@/hooks/use-entity-relationship-qu
 import { usePrettyUrl } from "@/hooks/use-pretty-url";
 import { decodeEntityId } from "@/utils/url-decoding";
 
+// Mirrors PUBLISHER_FIELDS from @bibgraph/types (packages/types/src/entities/entities.ts), which is not re-exported from the package's public entry point.
+const PUBLISHER_FIELD_SET: ReadonlySet<string> = new Set([
+  "id",
+  "display_name",
+  "cited_by_count",
+  "counts_by_year",
+  "updated_date",
+  "created_date",
+  "works_count",
+  "works_api_url",
+  "alternate_titles",
+  "country_codes",
+  "hierarchy_level",
+  "parent_publisher",
+  "lineage",
+  "sources_count",
+  "ids",
+  "sources_api_url",
+]);
+
+const isPublisherField = (value: string): value is PublisherField => PUBLISHER_FIELD_SET.has(value);
+
 const PublisherRoute = () => {
   const { publisherId: rawPublisherId } = useParams({ strict: false });
   const { select: selectParameter } = useSearch({ strict: false });
@@ -25,13 +47,14 @@ const PublisherRoute = () => {
   usePrettyUrl("publishers", rawPublisherId, publisherId);
 
   // Parse select parameter - only send select when explicitly provided in URL
-  const selectFields = selectParameter && typeof selectParameter === 'string'
-    ? selectParameter.split(',').map(field => field.trim()) as PublisherField[]
+  const selectParameterString = typeof selectParameter === 'string' ? selectParameter : undefined;
+  const selectFields = selectParameterString !== undefined
+    ? selectParameterString.split(',').map(field => field.trim()).filter(isPublisherField)
     : undefined;
 
   // Get relationship counts
   const { incomingCount, outgoingCount } = useEntityRelationshipQueries(
-    publisherId || "",
+    publisherId ?? "",
     'publishers'
   );
 
@@ -39,30 +62,30 @@ const PublisherRoute = () => {
   const { data: publisher, isLoading, error } = useQuery({
     queryKey: ["publisher", publisherId, selectParameter, selectFields],
     queryFn: async () => {
-      if (!publisherId) {
+      if (publisherId === undefined || publisherId === "") {
         throw new Error("Publisher ID is required");
       }
       const response = await cachedOpenAlex.client.publishers.get(
         publisherId,
         selectFields ? { select: selectFields } : {}
       );
-      return response as Publisher;
+      return response;
     },
-    enabled: !!publisherId && publisherId !== "random",
+    enabled: publisherId !== undefined && publisherId !== "" && publisherId !== "random",
   });
 
   // Loading state
   if (isLoading) {
-    return <LoadingState entityType="Publisher" entityId={publisherId || ''} config={config} />;
+    return <LoadingState entityType="Publisher" entityId={publisherId ?? ''} config={config} />;
   }
 
   // Error state
   if (error) {
-    return <ErrorState entityType="Publisher" entityId={publisherId || ''} error={error} />;
+    return <ErrorState entityType="Publisher" entityId={publisherId ?? ''} error={error} />;
   }
 
   // Null check
-  if (!publisher || !publisherId) {
+  if (!publisher || publisherId === undefined || publisherId === "") {
     return null;
   }
 
@@ -72,10 +95,10 @@ const PublisherRoute = () => {
       entityType="publishers"
       entityId={publisherId}
       displayName={publisher.display_name || "Publisher"}
-      selectParam={(selectParameter as string) || ''}
+      selectParam={selectParameterString ?? ''}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
-      data={publisher as Record<string, unknown>}
+      data={publisher}
     >
       <RelationshipCounts incomingCount={incomingCount} outgoingCount={outgoingCount} />
       <IncomingRelationships entityId={publisherId} entityType="publishers" />

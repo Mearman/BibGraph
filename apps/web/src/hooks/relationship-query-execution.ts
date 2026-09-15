@@ -1,7 +1,5 @@
 /**
- * API query execution for entity relationship queries
- * Handles fetching related entities from the OpenAlex API
- * @module relationship-query-execution
+ * API query execution for entity relationship queries Handles fetching related entities from the OpenAlex API
  */
 
 import {
@@ -23,9 +21,12 @@ import { DEFAULT_PAGE_SIZE } from '@/types/relationship';
 import type { RelationshipQueryResult } from './relationship-query-types';
 
 /**
- * Parse a filter string like "key:value" into an object { key: value }
- * Used to convert filter strings for API functions that expect filter objects
- * @param filterString
+ * Maximum number of entities to resolve in a single batch-fetch request
+ */
+const MAX_RESOLUTION_BATCH_SIZE = 100;
+
+/**
+ * Parse a filter string like "key:value" into a plain object mapping key to value Used to convert filter strings for API functions that expect filter objects
  */
 const parseFilterStringToObject = (filterString: string): Record<string, string> => {
   const colonIndex = filterString.indexOf(':');
@@ -37,10 +38,6 @@ const parseFilterStringToObject = (filterString: string): Record<string, string>
 
 /**
  * Execute API-based relationship query
- * @param entityId
- * @param config
- * @param page
- * @param customPageSize
  */
 const executeApiQuery = async (
   entityId: string,
@@ -51,7 +48,14 @@ const executeApiQuery = async (
   const filter = config.buildFilter(entityId);
   const pageSize = customPageSize ?? config.pageSize ?? DEFAULT_PAGE_SIZE;
 
-  let response;
+  let response:
+    | Awaited<ReturnType<typeof getWorks>>
+    | Awaited<ReturnType<typeof getAuthors>>
+    | Awaited<ReturnType<typeof getSources>>
+    | Awaited<ReturnType<typeof getInstitutions>>
+    | Awaited<ReturnType<typeof getTopics>>
+    | Awaited<ReturnType<typeof getPublishers>>
+    | Awaited<ReturnType<typeof getFunders>>;
   switch (config.targetType) {
     case 'works':
       response = await getWorks({
@@ -109,6 +113,11 @@ const executeApiQuery = async (
         ...(config.select && { select: config.select }),
       });
       break;
+    case 'concepts':
+    case 'keywords':
+    case 'domains':
+    case 'fields':
+    case 'subfields':
     default:
       throw new Error(`Unsupported target type: ${config.targetType}`);
   }
@@ -116,15 +125,13 @@ const executeApiQuery = async (
   return {
     results: response.results,
     totalCount: response.meta.count,
-    page: response.meta.page || page,
+    page: response.meta.page,
     perPage: response.meta.per_page,
   };
 };
 
 /**
  * Fetch entity data for embedded extraction
- * @param entityId
- * @param entityType
  */
 const fetchEntityForEmbedded = async (
   entityId: string,
@@ -140,7 +147,7 @@ const fetchEntityForEmbedded = async (
       if (response.results.length === 0) {
         throw new Error(`Entity not found: ${entityId}`);
       }
-      return response.results[0] as Record<string, unknown>;
+      return response.results[0];
     }
     case 'authors': {
       const response = await getAuthors({
@@ -151,7 +158,7 @@ const fetchEntityForEmbedded = async (
       if (response.results.length === 0) {
         throw new Error(`Entity not found: ${entityId}`);
       }
-      return response.results[0] as Record<string, unknown>;
+      return response.results[0];
     }
     case 'sources': {
       const response = await getSources({
@@ -162,7 +169,7 @@ const fetchEntityForEmbedded = async (
       if (response.results.length === 0) {
         throw new Error(`Entity not found: ${entityId}`);
       }
-      return response.results[0] as Record<string, unknown>;
+      return response.results[0];
     }
     case 'institutions': {
       const response = await getInstitutions({
@@ -173,20 +180,25 @@ const fetchEntityForEmbedded = async (
       if (response.results.length === 0) {
         throw new Error(`Entity not found: ${entityId}`);
       }
-      return response.results[0] as Record<string, unknown>;
+      return response.results[0];
     }
     case 'topics': {
       const topic = await getTopicById(entityId);
-      return topic as Record<string, unknown>;
+      return topic;
     }
     case 'publishers': {
       const publisher = await getPublisherById(entityId);
-      return publisher as Record<string, unknown>;
+      return publisher;
     }
     case 'funders': {
       const funder = await getFunderById(entityId);
-      return funder as Record<string, unknown>;
+      return funder;
     }
+    case 'concepts':
+    case 'keywords':
+    case 'domains':
+    case 'fields':
+    case 'subfields':
     default:
       throw new Error(`Unsupported entity type for embedded extraction: ${entityType}`);
   }
@@ -194,9 +206,6 @@ const fetchEntityForEmbedded = async (
 
 /**
  * Execute embedded data extraction query
- * @param entityId
- * @param entityType
- * @param config
  */
 const executeEmbeddedQuery = async (
   entityId: string,
@@ -222,9 +231,6 @@ const executeEmbeddedQuery = async (
 
 /**
  * Execute embedded data with resolution query (IDs only, need to fetch display names)
- * @param entityId
- * @param entityType
- * @param config
  */
 const executeEmbeddedWithResolutionQuery = async (
   entityId: string,
@@ -244,9 +250,20 @@ const executeEmbeddedWithResolutionQuery = async (
       if (response.results.length === 0) {
         throw new Error(`Entity not found: ${entityId}`);
       }
-      entityData = response.results[0] as Record<string, unknown>;
+      entityData = response.results[0];
       break;
     }
+    case 'works':
+    case 'authors':
+    case 'sources':
+    case 'topics':
+    case 'concepts':
+    case 'publishers':
+    case 'funders':
+    case 'keywords':
+    case 'domains':
+    case 'fields':
+    case 'subfields':
     default:
       throw new Error(`Unsupported entity type for embedded-with-resolution: ${entityType}`);
   }
@@ -267,39 +284,48 @@ const executeEmbeddedWithResolutionQuery = async (
   const idsToFetch = itemsNeedingResolution.map((item) => item.id);
   const idFilter = idsToFetch.join('|');
 
-  let resolvedEntities: Array<Record<string, unknown>> = [];
+  let resolvedEntities: Record<string, unknown>[] = [];
 
   switch (config.targetType) {
     case 'institutions': {
       const response = await getInstitutions({
         filters: { id: idFilter },
-        per_page: Math.min(idsToFetch.length, 100),
+        per_page: Math.min(idsToFetch.length, MAX_RESOLUTION_BATCH_SIZE),
         page: 1,
         ...(config.resolutionSelect && { select: config.resolutionSelect }),
       });
-      resolvedEntities = response.results as Array<Record<string, unknown>>;
+      resolvedEntities = response.results;
       break;
     }
     case 'works': {
       const response = await getWorks({
         filter: `id:${idFilter}`,
-        per_page: Math.min(idsToFetch.length, 100),
+        per_page: Math.min(idsToFetch.length, MAX_RESOLUTION_BATCH_SIZE),
         page: 1,
         ...(config.resolutionSelect && { select: config.resolutionSelect }),
       });
-      resolvedEntities = response.results as Array<Record<string, unknown>>;
+      resolvedEntities = response.results;
       break;
     }
     case 'authors': {
       const response = await getAuthors({
         filter: `id:${idFilter}`,
-        per_page: Math.min(idsToFetch.length, 100),
+        per_page: Math.min(idsToFetch.length, MAX_RESOLUTION_BATCH_SIZE),
         page: 1,
         ...(config.resolutionSelect && { select: config.resolutionSelect }),
       });
-      resolvedEntities = response.results as Array<Record<string, unknown>>;
+      resolvedEntities = response.results;
       break;
     }
+    case 'sources':
+    case 'topics':
+    case 'concepts':
+    case 'publishers':
+    case 'funders':
+    case 'keywords':
+    case 'domains':
+    case 'fields':
+    case 'subfields':
     default:
       throw new Error(`Unsupported target type for resolution: ${config.targetType}`);
   }
@@ -307,8 +333,10 @@ const executeEmbeddedWithResolutionQuery = async (
   // Create a map of ID -> resolved entity for efficient lookup
   const resolvedMap = new Map<string, Record<string, unknown>>();
   for (const entity of resolvedEntities) {
-    const id = entity.id as string;
-    resolvedMap.set(id, entity);
+    if (typeof entity.id !== 'string') {
+      continue;
+    }
+    resolvedMap.set(entity.id, entity);
   }
 
   // Merge extracted metadata with resolved display names
@@ -332,17 +360,12 @@ const executeEmbeddedWithResolutionQuery = async (
 
 /**
  * Execute a single relationship query using the OpenAlex API or embedded data extraction
- * @param entityId
- * @param entityType
- * @param config
- * @param page
- * @param customPageSize
  */
 export const executeRelationshipQuery = async (
   entityId: string,
   entityType: EntityType,
   config: RelationshipQueryConfig,
-  page: number = 1,
+  page = 1,
   customPageSize?: number,
 ): Promise<RelationshipQueryResult> => {
   if (config.source === 'api') {
@@ -353,9 +376,5 @@ export const executeRelationshipQuery = async (
     return executeEmbeddedQuery(entityId, entityType, config);
   }
 
-  if (config.source === 'embedded-with-resolution') {
-    return executeEmbeddedWithResolutionQuery(entityId, entityType, config);
-  }
-
-  throw new Error('Invalid relationship query configuration: missing source property');
+  return executeEmbeddedWithResolutionQuery(entityId, entityType, config);
 };

@@ -1,7 +1,6 @@
 /**
  * E2E tests for Browse Workflow
  * Tests the complete browse workflow: browse → select entity type → view index → select entity → view detail
- * @module browse-workflow.e2e
  * @see BrowsePage page object
  * @see spec-020 Phase 2: Browse page E2E tests
  */
@@ -11,6 +10,18 @@ import { expect,test } from '@playwright/test';
 
 import { waitForAppReady, waitForEntityData } from '@/test/helpers/app-ready';
 import { BrowsePage } from '@/test/page-objects/BrowsePage';
+
+const SAMPLE_LINK_TEXT_CHECK_COUNT = 5;
+const MIN_ENTITY_TYPES_DISPLAYED = 10; // BibGraph has 12 entity types
+const MIN_VISIBLE_DESKTOP_CARDS = 10;
+const MIN_DESKTOP_GRID_WIDTH_PX = 1200;
+const MIN_CARD_WIDTH_PX = 150;
+const MAX_CARD_WIDTH_PX = 500;
+const MIN_CARD_HEIGHT_PX = 100;
+const MIN_CARD_SPACING_PX = 10;
+const MIN_VISIBLE_DESKTOP_WORK_LINKS = 5;
+const MIN_DESKTOP_LIST_WIDTH_PX = 800;
+const MAX_GRID_WIDTH_DRIFT_PX = 50;
 
 test.describe('@workflow Browse Workflow', () => {
 	test('should pass accessibility checks (WCAG 2.1 AA)', async ({ page }) => {
@@ -53,8 +64,8 @@ test.describe('@workflow Browse Workflow', () => {
 		const firstWorkLink = page.locator('a[href*="/works/W"]').first();
 		await expect(firstWorkLink).toBeVisible();
 
-		const workTitle = firstWorkLink;
-		await expect(workTitle).toHaveText(/.+/);
+		
+		await expect(firstWorkLink).toHaveText(/.+/);
 
 		await firstWorkLink.click();
 
@@ -68,8 +79,8 @@ test.describe('@workflow Browse Workflow', () => {
 		await expect(entityTitle).toBeVisible();
 
 		// Verify work title is displayed
-		const displayedTitle = entityTitle;
-		await expect(displayedTitle).toHaveText(/.+/);
+		
+		await expect(entityTitle).toHaveText(/.+/);
 	});
 
 	test('should complete full workflow: browse → authors index → author detail', async ({ page }) => {
@@ -99,8 +110,8 @@ test.describe('@workflow Browse Workflow', () => {
 		const firstAuthorLink = page.locator('a[href*="/authors/A"]').first();
 		await expect(firstAuthorLink).toBeVisible();
 
-		const authorName = firstAuthorLink;
-		await expect(authorName).toHaveText(/.+/);
+		
+		await expect(firstAuthorLink).toHaveText(/.+/);
 
 		await firstAuthorLink.click();
 
@@ -114,8 +125,8 @@ test.describe('@workflow Browse Workflow', () => {
 		await expect(entityTitle).toBeVisible();
 
 		// Verify author name is displayed
-		const displayedName = entityTitle;
-		await expect(displayedName).toHaveText(/.+/);
+		
+		await expect(entityTitle).toHaveText(/.+/);
 	});
 
 	test('should complete full workflow: browse → institutions index → institution detail', async ({ page }) => {
@@ -145,8 +156,8 @@ test.describe('@workflow Browse Workflow', () => {
 		const firstInstitutionLink = page.locator('a[href*="/institutions/I"]').first();
 		await expect(firstInstitutionLink).toBeVisible();
 
-		const institutionName = firstInstitutionLink;
-		await expect(institutionName).toHaveText(/.+/);
+		
+		await expect(firstInstitutionLink).toHaveText(/.+/);
 
 		await firstInstitutionLink.click();
 
@@ -160,8 +171,8 @@ test.describe('@workflow Browse Workflow', () => {
 		await expect(entityTitle).toBeVisible();
 
 		// Verify institution name is displayed
-		const displayedName = entityTitle;
-		await expect(displayedName).toHaveText(/.+/);
+		
+		await expect(entityTitle).toHaveText(/.+/);
 	});
 
 	test('should support browser back navigation from detail to index', async ({ page }) => {
@@ -302,7 +313,7 @@ test.describe('@workflow Browse Workflow', () => {
 		expect(workCount).toBeGreaterThan(0);
 
 		// Verify each link has text content
-		for (let index = 0; index < Math.min(5, workCount); index++) {
+		for (let index = 0; index < Math.min(SAMPLE_LINK_TEXT_CHECK_COUNT, workCount); index++) {
 			const linkLocator = workLinks.nth(index);
 			await expect(linkLocator).toHaveText(/.+/);
 		}
@@ -332,7 +343,7 @@ test.describe('@workflow Browse Workflow', () => {
 		await expect(page.locator('[data-testid="browse-grid"]')).toBeVisible();
 
 		// Verify minimum number of entity types are displayed
-		await browsePage.expectMinimumEntityTypes(10); // BibGraph has 12 entity types
+		await browsePage.expectMinimumEntityTypes(MIN_ENTITY_TYPES_DISPLAYED);
 	});
 });
 
@@ -359,14 +370,14 @@ test.describe('@workflow @desktop Browse Workflow - Desktop Viewport', () => {
 		);
 
 		// On 1920x1080, should see multiple cards per row (at least 3-4)
-		expect(visibleCards.length).toBeGreaterThanOrEqual(10);
+		expect(visibleCards.length).toBeGreaterThanOrEqual(MIN_VISIBLE_DESKTOP_CARDS);
 
 		// Verify grid layout uses appropriate spacing for desktop
 		const gridBox = await browseGrid.boundingBox();
 		expect(gridBox).not.toBeNull();
 		if (gridBox) {
 			// Grid should utilize significant horizontal space on desktop
-			expect(gridBox.width).toBeGreaterThan(1200);
+			expect(gridBox.width).toBeGreaterThan(MIN_DESKTOP_GRID_WIDTH_PX);
 		}
 	});
 
@@ -390,9 +401,9 @@ test.describe('@workflow @desktop Browse Workflow - Desktop Viewport', () => {
 		expect(worksBox).not.toBeNull();
 		if (worksBox) {
 			// Cards should be substantial but not too wide on desktop
-			expect(worksBox.width).toBeGreaterThan(150);
-			expect(worksBox.width).toBeLessThan(500);
-			expect(worksBox.height).toBeGreaterThan(100);
+			expect(worksBox.width).toBeGreaterThan(MIN_CARD_WIDTH_PX);
+			expect(worksBox.width).toBeLessThan(MAX_CARD_WIDTH_PX);
+			expect(worksBox.height).toBeGreaterThan(MIN_CARD_HEIGHT_PX);
 		}
 
 		// Verify cards have adequate spacing between them
@@ -405,7 +416,7 @@ test.describe('@workflow @desktop Browse Workflow - Desktop Viewport', () => {
 			const verticalGap = Math.abs(authorsPosition.y - (worksPosition.y + worksPosition.height));
 
 			// Should have at least some spacing (either horizontal or vertical)
-			const hasProperSpacing = horizontalGap > 10 || verticalGap > 10;
+			const hasProperSpacing = horizontalGap > MIN_CARD_SPACING_PX || verticalGap > MIN_CARD_SPACING_PX;
 			expect(hasProperSpacing).toBe(true);
 		}
 	});
@@ -440,14 +451,14 @@ test.describe('@workflow @desktop Browse Workflow - Desktop Viewport', () => {
 		);
 
 		// Desktop should show more items in viewport than mobile
-		expect(visibleWorkLinks.length).toBeGreaterThanOrEqual(5);
+		expect(visibleWorkLinks.length).toBeGreaterThanOrEqual(MIN_VISIBLE_DESKTOP_WORK_LINKS);
 
 		// Verify page uses horizontal space effectively
 		const listBox = await entityList.boundingBox();
 		expect(listBox).not.toBeNull();
 		if (listBox) {
 			// List should utilize desktop width
-			expect(listBox.width).toBeGreaterThan(800);
+			expect(listBox.width).toBeGreaterThan(MIN_DESKTOP_LIST_WIDTH_PX);
 		}
 	});
 
@@ -466,7 +477,7 @@ test.describe('@workflow @desktop Browse Workflow - Desktop Viewport', () => {
 		expect(browseGridBox).not.toBeNull();
 		if (browseGridBox) {
 			// Verify desktop-sized grid
-			expect(browseGridBox.width).toBeGreaterThan(1200);
+			expect(browseGridBox.width).toBeGreaterThan(MIN_DESKTOP_GRID_WIDTH_PX);
 		}
 
 		// Step 2: Navigate to authors index
@@ -507,7 +518,7 @@ test.describe('@workflow @desktop Browse Workflow - Desktop Viewport', () => {
 		expect(finalBrowseGridBox).not.toBeNull();
 		if (finalBrowseGridBox && browseGridBox) {
 			// Grid dimensions should be consistent
-			expect(Math.abs(finalBrowseGridBox.width - browseGridBox.width)).toBeLessThan(50);
+			expect(Math.abs(finalBrowseGridBox.width - browseGridBox.width)).toBeLessThan(MAX_GRID_WIDTH_DRIFT_PX);
 		}
 	});
 });

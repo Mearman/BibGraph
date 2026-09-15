@@ -17,7 +17,7 @@ import {
 } from "@bibgraph/utils";
 import { logError, logger } from "@bibgraph/utils/logger";
 import { createFileRoute } from "@tanstack/react-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 
 import { getExecutionTime, getResultMetrics } from "@/components/evaluation/comparison-utils";
 import { DatasetRunControls } from "@/components/evaluation/DatasetRunControls";
@@ -65,10 +65,9 @@ const MOCK_RESULTS: LegacyResult[] = [
 
 /**
  * Calculate average metrics across completed comparison runs
- * @param results
  */
 const calculateAverageMetrics = (
-  results: Array<ComparisonRun | LegacyResult>,
+  results: readonly (ComparisonRun | LegacyResult)[],
 ): AverageMetrics | null => {
   if (results.length === 0) return null;
 
@@ -101,7 +100,6 @@ const calculateAverageMetrics = (
 
 /**
  * Perform BibGraph search using OpenAlex API
- * @param dataset
  */
 const performBibGraphSearch = (dataset: STARDataset): WorkReference[] => {
   try {
@@ -131,20 +129,66 @@ const performBibGraphSearch = (dataset: STARDataset): WorkReference[] => {
   }
 };
 
+/**
+ * Load previously saved STAR datasets from localStorage, validating their shape
+ * @returns The saved datasets, or an empty array if none exist or the saved data is invalid
+ */
+const loadStarDatasetsFromStorage = (): STARDataset[] => {
+  try {
+    const savedDatasets = localStorage.getItem("star-datasets");
+    if (savedDatasets === null) {
+      return [];
+    }
+    const parsedDatasets: unknown = JSON.parse(savedDatasets);
+    return isSTARDatasetArray(parsedDatasets) ? parsedDatasets : [];
+  } catch (error) {
+    logError(
+      logger,
+      "Failed to load STAR datasets:",
+      error,
+      "ComparisonResults",
+      "routing",
+    );
+    return [];
+  }
+};
+
+/**
+ * Build a "ready" comparison run entry for each of the given datasets
+ * @param datasets - STAR datasets to build comparison runs for
+ * @returns One ready-to-run ComparisonRun per dataset
+ */
+const buildInitialComparisonRuns = (
+  datasets: readonly STARDataset[],
+): ComparisonRun[] =>
+  datasets.map((dataset) => ({
+    id: `run_${dataset.id}`,
+    datasetName: dataset.name,
+    runDate: new Date(),
+    status: "ready",
+    searchCriteria: {
+      query: dataset.reviewTopic,
+      entityTypes: ["works"],
+    },
+  }));
+
 const ComparisonResults: React.FC = () => {
-  const [starDatasets, setStarDatasets] = useState<STARDataset[]>([]);
-  const [comparisonRuns, setComparisonRuns] = useState<ComparisonRun[]>([]);
+  // Loaded once on mount; nothing in this component ever mutates it after that
+  const starDatasets = useMemo(loadStarDatasetsFromStorage, []);
+  const [comparisonRuns, setComparisonRuns] = useState<ComparisonRun[]>(() =>
+    buildInitialComparisonRuns(loadStarDatasetsFromStorage()),
+  );
   const [isRunningComparison, setIsRunningComparison] = useState(false);
   const [activeVisualizationTab, setActiveVisualizationTab] =
     useState<VisualizationTabKey>("performance");
-  const [, setMissingPaperResults] = useState<{
-    [datasetId: string]: MissingPaperDetectionResults;
-  }>({});
+  const [_missingPaperResults, setMissingPaperResults] = useState<
+    Record<string, MissingPaperDetectionResults>
+  >({});
   const [selectedDatasetForMissingPapers, setSelectedDatasetForMissingPapers] =
     useState<string | null>(null);
 
   const updateComparisonProgress = useCallback(
-    (datasetId: string, progressData: ComparisonProgress) => {
+    (datasetId: string, progressData: Readonly<ComparisonProgress>) => {
       setComparisonRuns((previous) =>
         previous.map((run) =>
           run.id === `run_${datasetId}` ? { ...run, progress: progressData } : run,
@@ -153,40 +197,6 @@ const ComparisonResults: React.FC = () => {
     },
     [],
   );
-
-  // Load STAR datasets from localStorage on component mount
-  useEffect(() => {
-    try {
-      const savedDatasets = localStorage.getItem("star-datasets");
-      if (savedDatasets) {
-        const parsedDatasets: unknown = JSON.parse(savedDatasets);
-        if (isSTARDatasetArray(parsedDatasets)) {
-          setStarDatasets(parsedDatasets);
-
-          // Initialize comparison runs for each dataset
-          const runs: ComparisonRun[] = parsedDatasets.map((dataset) => ({
-            id: `run_${dataset.id}`,
-            datasetName: dataset.name,
-            runDate: new Date(),
-            status: "ready",
-            searchCriteria: {
-              query: dataset.reviewTopic,
-              entityTypes: ["works"],
-            },
-          }));
-          setComparisonRuns(runs);
-        }
-      }
-    } catch (error) {
-      logError(
-        logger,
-        "Failed to load STAR datasets:",
-        error,
-        "ComparisonResults",
-        "routing",
-      );
-    }
-  }, []);
 
   // Run comparison for a specific dataset
   const runComparison = useCallback(
@@ -216,7 +226,9 @@ const ComparisonResults: React.FC = () => {
           academicExplorerResults,
           dataset,
           DEFAULT_MATCHING_CONFIG,
-          (progress) => updateComparisonProgress(datasetId, progress),
+          (progress) => {
+            updateComparisonProgress(datasetId, progress);
+          },
         );
 
         const executionTime = performance.now() - startTime;
@@ -273,9 +285,9 @@ const ComparisonResults: React.FC = () => {
   // Extract completed comparison results for visualizations
   const completedComparisonResults = useMemo(() => {
     return comparisonRuns
-      .filter((run) => run.status === "completed" && run.comparisonResults)
+      .filter((run) => run.status === "completed" && run.comparisonResults !== undefined)
       .map((run) => {
-        if (!run.comparisonResults) {
+        if (run.comparisonResults === undefined) {
           throw new Error("Comparison results missing for completed run");
         }
         return run.comparisonResults;

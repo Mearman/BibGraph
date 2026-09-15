@@ -7,40 +7,46 @@ import {
   useParams,
   useSearch,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { ICON_SIZE } from "@/config/style-constants";
 
+const buildQueryString = (parameters: Readonly<Record<string, string>>): string => {
+  return Object.entries(parameters)
+    .map(([key, value]) => `${key}=${value}`)
+    .join("&");
+};
+
+const updateUrlWithSearchParameters = (preservedSearchParameters: Readonly<Record<string, string>>): void => {
+  // After navigation completes, update the URL with unencoded query parameters
+  if (Object.keys(preservedSearchParameters).length > 0) {
+    const queryString = buildQueryString(preservedSearchParameters);
+    const fullUrl = `${window.location.pathname}${window.location.hash.split("?", 1)[0]}?${queryString}`;
+    window.history.replaceState(null, "", fullUrl);
+  }
+};
+
+const isPrettyUrlUpdateState = (value: unknown): value is { __prettyUrlUpdate: true } => {
+  if (typeof value !== "object" || value === null) return false;
+  return "__prettyUrlUpdate" in value && value.__prettyUrlUpdate === true;
+};
+
 const ExternalIdRoute = () => {
   const { _splat: splat } = useParams({ from: "/$_" });
-  const externalId = splat || "";
+  const externalId = splat ?? "";
   const routeSearch = useSearch({ from: "/$_" });
   const navigate = useNavigate();
   // Serialize routeSearch to avoid infinite loop from object reference changes
   const routeSearchKey = JSON.stringify(routeSearch);
-
-  const buildQueryString = (parameters: Record<string, string>): string => {
-    return Object.entries(parameters)
-      .map(([key, value]) => `${key}=${value}`)
-      .join("&");
-  };
-
-  const updateUrlWithSearchParameters = (preservedSearchParameters: Record<string, string>) => {
-    // After navigation completes, update the URL with unencoded query parameters
-    if (Object.keys(preservedSearchParameters).length > 0) {
-      const queryString = buildQueryString(preservedSearchParameters);
-      const fullUrl = `${window.location.pathname}${window.location.hash.split("?", 1)[0]}?${queryString}`;
-      window.history.replaceState(null, "", fullUrl);
-    }
-    return void 0;
-  };
+  // Keep a stable ref to the latest routeSearch so the effect below can read fresh data without needing routeSearch itself (whose object identity changes every render) in its own dependency array -- refs are exempt from exhaustive-deps.
+  const routeSearchRef = useRef(routeSearch);
+  routeSearchRef.current = routeSearch;
 
   useEffect(() => {
-    const resolveExternalId = async () => {
+    const resolveExternalId = () => {
       try {
-        // Check if this is a pretty URL update from usePrettyUrl hook
-        // If so, skip processing as the URL is already correctly routed
-        if (window.history.state?.__prettyUrlUpdate) {
+        // Check if this is a pretty URL update from usePrettyUrl hook If so, skip processing as the URL is already correctly routed
+        if (isPrettyUrlUpdateState(window.history.state)) {
           logger.debug(
             "routing",
             "Skipping external ID resolution - this is a display-only pretty URL update",
@@ -74,13 +80,13 @@ const ExternalIdRoute = () => {
         // Check if this is a full OpenAlex API URL that should be redirected
         // e.g., https://api.openalex.org/autocomplete/works?filter=...
         const openAlexApiPattern = /^https?:\/\/api\.openalex\.org\/(.+)$/i;
-        const apiMatch = decodedId.match(openAlexApiPattern);
+        const apiMatch = openAlexApiPattern.exec(decodedId);
         if (apiMatch) {
           const cleanPath = apiMatch[1];
 
           // Check if this path contains external IDs (like ror:, orcid:, etc.)
           // If so, let it fall through to entity detection logic instead of doing simple redirect
-          const hasExternalId = /:/.test(cleanPath);
+          const hasExternalId = cleanPath.includes(':');
 
           if (hasExternalId) {
             // This URL contains external IDs (like ror:), let it fall through to entity detection
@@ -100,9 +106,9 @@ const ExternalIdRoute = () => {
 
             // Preserve query params from routeSearch
             const queryParameters =
-              routeSearch && typeof routeSearch === "object"
-                ? Object.entries(routeSearch)
-                    .map(([key, value]) => `${key}=${value}`)
+              typeof routeSearchRef.current === "object"
+                ? Object.entries(routeSearchRef.current)
+                    .map(([key, value]) => `${key}=${String(value)}`)
                     .join("&")
                 : "";
 
@@ -181,7 +187,7 @@ const ExternalIdRoute = () => {
         logger.debug(
           "routing",
           `ExternalIdRoute: Processing external ID: ${decodedId}`,
-          { decodedId, routeSearch },
+          { decodedId, routeSearch: routeSearchRef.current },
           "ExternalIdRoute",
         );
 
@@ -191,8 +197,8 @@ const ExternalIdRoute = () => {
 
         // First, check if there are search params in the route itself (from TanStack Router)
         // This handles cases like /#/https://api.openalex.org/authors/A5023888391?select=id
-        if (routeSearch && typeof routeSearch === "object") {
-          preservedSearchParameters = { ...routeSearch } as Record<string, string>;
+        if (typeof routeSearchRef.current === "object") {
+          preservedSearchParameters = { ...routeSearchRef.current };
         }
 
         // Check if the decodedId contains query parameters
@@ -252,9 +258,7 @@ const ExternalIdRoute = () => {
         // Clean up OpenAlex API URLs to match detection patterns
         // Convert: https://api.openalex.org/authors/A5023888391 -> https://api.openalex.org/A5023888391
         // The API uses REST-style paths but the entity detection expects the ID directly after openalex.org
-        const apiPathMatch = idForDetection.match(
-          /^(https?:\/\/(?:api\.)?openalex\.org)\/(?:authors|concepts|funders|institutions|publishers|sources|topics|works)\/([ACFIKPQSTW]\d+)$/i,
-        );
+        const apiPathMatch = /^(https?:\/\/(?:api\.)?openalex\.org)\/(?:authors|concepts|funders|institutions|publishers|sources|topics|works)\/([ACFIKPQSTW]\d+)$/i.exec(idForDetection);
         if (apiPathMatch) {
           idForDetection = `${apiPathMatch[1]}/${apiPathMatch[2]}`;
           logger.debug(
@@ -267,9 +271,7 @@ const ExternalIdRoute = () => {
 
         // Clean up OpenAlex API URLs with external IDs (ROR, ORCID, etc.)
         // Convert: https://api.openalex.org/institutions/ror:02y3ad647 -> ror:02y3ad647
-        const externalIdApiPathMatch = idForDetection.match(
-          /^https?:\/\/(?:api\.)?openalex\.org\/(?:authors|concepts|funders|institutions|publishers|sources|topics|works)\/(.+)$/i,
-        );
+        const externalIdApiPathMatch = /^https?:\/\/(?:api\.)?openalex\.org\/(?:authors|concepts|funders|institutions|publishers|sources|topics|works)\/(.+)$/i.exec(idForDetection);
         if (externalIdApiPathMatch) {
           idForDetection = externalIdApiPathMatch[1];
           logger.debug(
@@ -301,7 +303,7 @@ const ExternalIdRoute = () => {
             case "ROR": {
               // Extract raw ROR ID from normalized URL for the route
               // normalizedId is like "https://ror.org/02y3ad647" but route expects "02y3ad647"
-              const rorIdMatch = detection.normalizedId.match(/ror\.org\/([0-9a-z]{9})$/i);
+              const rorIdMatch = /ror\.org\/([0-9a-z]{9})$/i.exec(detection.normalizedId);
               const rorIdForRoute = rorIdMatch ? rorIdMatch[1] : detection.normalizedId;
               specificRoute = `/institutions/ror/${rorIdForRoute}`;
               break;
@@ -319,7 +321,7 @@ const ExternalIdRoute = () => {
           void navigate({
             to: specificRoute,
             replace: true,
-          }).then(() => updateUrlWithSearchParameters(preservedSearchParameters));
+          }).then(() => { updateUrlWithSearchParameters(preservedSearchParameters); return undefined; });
         } else if (
           detection?.entityType &&
           (detection.detectionMethod === "OpenAlex ID" ||
@@ -333,7 +335,7 @@ const ExternalIdRoute = () => {
           void navigate({
             to: entityRoute,
             replace: true,
-          }).then(() => updateUrlWithSearchParameters(preservedSearchParameters));
+          }).then(() => { updateUrlWithSearchParameters(preservedSearchParameters); return undefined; });
         } else {
           // Instead of throwing, immediately redirect to search
           logger.warn(
@@ -361,7 +363,7 @@ const ExternalIdRoute = () => {
         );
 
         // Fallback to search
-        navigate({
+        void navigate({
           to: "/search",
           search: { q: externalId, filter: undefined, search: undefined },
           replace: true,
@@ -369,7 +371,7 @@ const ExternalIdRoute = () => {
       }
     };
 
-    void resolveExternalId();
+    resolveExternalId();
   }, [externalId, routeSearchKey, navigate]);
 
   return (

@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const DomainRoute = lazy(() =>
+const DomainRoute = lazy(async () =>
   import("./$domainId.lazy").then((m) => ({ default: m.default })),
 );
 

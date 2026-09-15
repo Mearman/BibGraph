@@ -7,6 +7,10 @@ import * as fs from "node:fs";
 
 import { defineConfig, devices } from "@playwright/test";
 
+const IS_CI = process.env.CI !== undefined;
+const CI_WORKER_COUNT = 3;
+const LOCAL_WORKER_COUNT = 4;
+
 export default defineConfig({
   // Test directory - using src and e2e for all tests
   testDir: "./",
@@ -14,17 +18,17 @@ export default defineConfig({
   // Test files pattern for E2E tests - run all tests except manual ones in CI
   testMatch: ["**/*.e2e.test.ts", "**/e2e/**/*.e2e.test.ts"],
   // Exclude manual tests from CI runs (they're too slow and comprehensive)
-  testIgnore: process.env.CI ? ["**/manual/**"] : [],
+  testIgnore: IS_CI ? ["**/manual/**"] : [],
 
   // Run test files in parallel but tests within each file sequentially
   fullyParallel: false,
-  workers: process.env.CI ? 3 : 4,
+  workers: IS_CI ? CI_WORKER_COUNT : LOCAL_WORKER_COUNT,
 
   // Fail the build on CI if you accidentally left test.only in the source code
-  forbidOnly: !!process.env.CI,
+  forbidOnly: IS_CI,
 
   // Retry on CI only
-  retries: process.env.CI ? 2 : 0,
+  retries: IS_CI ? 2 : 0,
 
   // Reporter configuration
   reporter: [
@@ -32,7 +36,7 @@ export default defineConfig({
     ["html", { open: "never", outputFolder: "test-results/playwright-report" }],
     // Force consistent JSON output path that matches CI expectations
     ["json", {
-      outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_FILE || 'test-results/results.json'
+      outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_FILE ?? 'test-results/results.json'
     }],
   ],
 
@@ -40,7 +44,7 @@ export default defineConfig({
   use: {
     // Base URL for tests - configurable for production testing
     // In CI, use preview server port (4173), in dev use dev server port (5173)
-    baseURL: process.env.E2E_BASE_URL ?? (process.env.CI ? "http://localhost:4173" : "http://localhost:5173"),
+    baseURL: process.env.E2E_BASE_URL ?? (IS_CI ? "http://localhost:4173" : "http://localhost:5173"),
 
     // Collect trace when retrying the failed test
     trace: "on-first-retry",
@@ -93,7 +97,7 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
         // Reuse storage state for faster tests (cached cookies, localStorage, IndexedDB)
         // Disabled in CI to prevent stale state with preview server caching
-        storageState: process.env.CI ? undefined : (fs.existsSync("./test-results/storage-state/state.json") ? "./test-results/storage-state/state.json" : undefined),
+        storageState: IS_CI ? undefined : (fs.existsSync("./test-results/storage-state/state.json") ? "./test-results/storage-state/state.json" : undefined),
       },
     },
 
@@ -123,7 +127,7 @@ export default defineConfig({
   outputDir: "test-results/playwright-artifacts",
 
   // Web server configuration for E2E tests
-  webServer: process.env.CI ? undefined : {
+  webServer: IS_CI ? undefined : {
     // In dev, use serve command for modern Vite setup
     // In CI, no webServer - expect external server to be running
     // Commands run from apps/web directory (set by Nx e2e target)

@@ -27,56 +27,6 @@ Maximum height for legend scroll container
  */
 const LEGEND_MAX_HEIGHT = 200;
 
-/**
- * Legend component showing dataset names with selection state
- * @param root0
- * @param root0.plotData
- * @param root0.isMobile
- * @param root0.selectedPoint
- */
-export const ScatterPlotLegend = ({
-  plotData,
-  isMobile,
-  selectedPoint,
-}: ScatterPlotLegendProperties) => (
-  <div
-    style={{
-      display: "flex",
-      flexDirection: "column",
-      gap: "8px",
-      maxWidth: isMobile ? "150px" : "200px",
-      flexShrink: 0,
-    }}
-  >
-    <h4
-      style={{
-        fontSize: isMobile ? "12px" : "14px",
-        fontWeight: "600",
-        color: "var(--mantine-color-text)",
-        marginBottom: "8px",
-      }}
-    >
-      Datasets
-    </h4>
-    <div
-      style={{
-        maxHeight: `${LEGEND_MAX_HEIGHT}px`,
-        overflowY: "auto",
-        WebkitOverflowScrolling: "touch",
-      }}
-    >
-      {plotData.map((point) => (
-        <LegendItem
-          key={point.datasetName || `point-${point.id}`}
-          datasetName={point.datasetName}
-          isMobile={isMobile}
-          isSelected={selectedPoint === point.id}
-        />
-      ))}
-    </div>
-  </div>
-);
-
 interface LegendItemProperties {
   datasetName: string;
   isMobile: boolean;
@@ -117,5 +67,51 @@ const LegendItem = ({ datasetName, isMobile, isSelected }: LegendItemProperties)
     >
       {datasetName}
     </span>
+  </div>
+);
+
+/**
+ * Legend component showing dataset names with selection state
+ */
+export const ScatterPlotLegend = ({
+  plotData,
+  isMobile,
+  selectedPoint,
+}: ScatterPlotLegendProperties) => (
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      gap: "8px",
+      maxWidth: isMobile ? "150px" : "200px",
+      flexShrink: 0,
+    }}
+  >
+    <h4
+      style={{
+        fontSize: isMobile ? "12px" : "14px",
+        fontWeight: "600",
+        color: "var(--mantine-color-text)",
+        marginBottom: "8px",
+      }}
+    >
+      Datasets
+    </h4>
+    <div
+      style={{
+        maxHeight: `${String(LEGEND_MAX_HEIGHT)}px`,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
+      {plotData.map((point) => (
+        <LegendItem
+          key={point.datasetName || `point-${String(point.id)}`}
+          datasetName={point.datasetName}
+          isMobile={isMobile}
+          isSelected={selectedPoint === point.id}
+        />
+      ))}
+    </div>
   </div>
 );

@@ -8,7 +8,6 @@
  * @see spec-020 Phase 2: Browse page E2E tests
  */
 
-import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
 import { BaseSPAPageObject } from "./BaseSPAPageObject";
@@ -21,10 +20,6 @@ export class BrowsePage extends BaseSPAPageObject {
 		entityTypeLink: "[data-testid='entity-type-link']",
 		pageTitle: "[data-testid='page-title']",
 	};
-
-	constructor(page: Page) {
-		super(page);
-	}
 
 	/**
 	 * Navigate to /browse page
@@ -44,7 +39,7 @@ export class BrowsePage extends BaseSPAPageObject {
 		const entityTypes: string[] = [];
 		for (let index = 0; index < count; index++) {
 			const text = await cards.nth(index).textContent();
-			if (text) {
+			if (text !== null) {
 				entityTypes.push(text.trim());
 			}
 		}
@@ -54,7 +49,6 @@ export class BrowsePage extends BaseSPAPageObject {
 
 	/**
 	 * Click an entity type card by entity type name
-	 * @param entityType
 	 */
 	async clickEntityType(entityType: string): Promise<void> {
 		const card = this.page
@@ -84,7 +78,6 @@ export class BrowsePage extends BaseSPAPageObject {
 
 	/**
 	 * Check if entity type card is visible
-	 * @param entityType
 	 */
 	async isEntityTypeVisible(entityType: string): Promise<boolean> {
 		const card = this.page
@@ -112,7 +105,6 @@ export class BrowsePage extends BaseSPAPageObject {
 
 	/**
 	 * Assert page title contains expected text
-	 * @param expectedTitle
 	 */
 	async expectPageTitle(expectedTitle: string): Promise<void> {
 		const title = await this.getPageTitle();
@@ -121,7 +113,6 @@ export class BrowsePage extends BaseSPAPageObject {
 
 	/**
 	 * Assert specific entity type card is visible
-	 * @param entityType
 	 */
 	async expectEntityTypeVisible(entityType: string): Promise<void> {
 		const card = this.page
@@ -132,7 +123,6 @@ export class BrowsePage extends BaseSPAPageObject {
 
 	/**
 	 * Assert minimum number of entity type cards are displayed
-	 * @param minCount
 	 */
 	async expectMinimumEntityTypes(minCount: number): Promise<void> {
 		const count = await this.getEntityTypeCount();

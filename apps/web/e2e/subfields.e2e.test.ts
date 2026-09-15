@@ -6,7 +6,6 @@
  * - Parent field and domain navigation
  * - Related topics section
  * - Page loading and error handling
- * @module subfields.e2e
  * @see spec-020 Phase 6: E2E test coverage for Subfields entity
  */
 

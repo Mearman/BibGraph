@@ -9,7 +9,6 @@
  * 5. Verify entity appears in bookmarks list
  * 6. Remove bookmark
  * 7. Verify entity removed from bookmarks
- * @module bookmark-workflow.e2e
  */
 
 import AxeBuilder from '@axe-core/playwright';
@@ -46,17 +45,15 @@ test.describe('@workflow Bookmark Workflow', () => {
 		await page.evaluate(() => {
 			localStorage.clear();
 			// Clear all IndexedDB databases
-			if (window.indexedDB && window.indexedDB.databases) {
-				void window.indexedDB.databases().then((dbs) => {
-					for (const database of dbs) {
-						if (database.name) {
-							window.indexedDB.deleteDatabase(database.name);
-						}
+			void window.indexedDB.databases().then((dbs) => {
+				for (const database of dbs) {
+					if (database.name !== undefined) {
+						window.indexedDB.deleteDatabase(database.name);
 					}
-				}).catch(() => {
-					// Ignore errors during cleanup
-				});
-			}
+				}
+			}).catch(() => {
+				// Ignore errors during cleanup
+			});
 		});
 	});
 
@@ -80,16 +77,16 @@ test.describe('@workflow Bookmark Workflow', () => {
 
 		// Get the actual entity title for verification
 		const entityTitle = page.locator('h1').first();
-		const titleText = entityTitle;
-		await expect(titleText).toHaveText(/.+/);
+		
+		await expect(entityTitle).toHaveText(/.+/);
 
 		// 2. Verify bookmark button is not bookmarked initially
 		const bookmarkButton = page.locator('[data-testid="entity-bookmark-button"]');
 		await expect(bookmarkButton).toBeVisible();
 
 		// Check initial state - button should not be in "filled" variant
-		const initialVariant = bookmarkButton;
-		await expect(initialVariant).not.toHaveAttribute('data-variant', 'filled');
+		
+		await expect(bookmarkButton).not.toHaveAttribute('data-variant', 'filled');
 
 		// 3. Click bookmark button to bookmark entity
 		await bookmarkButton.click();
@@ -154,8 +151,8 @@ test.describe('@workflow Bookmark Workflow', () => {
 
 		// Get entity title
 		const entityTitle = page.locator('h1').first();
-		const titleText = entityTitle;
-		await expect(titleText).toHaveText(/.+/);
+		
+		await expect(entityTitle).toHaveText(/.+/);
 
 		// Click bookmark button
 		const bookmarkButton = page.locator('[data-testid="entity-bookmark-button"]');

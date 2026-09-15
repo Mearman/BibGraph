@@ -37,7 +37,7 @@ export interface AutocompleteEntityFilterProps {
    * Callback when selection changes (used on general page for state updates)
    * On entity-specific routes, this is optional as navigation handles changes
    */
-  onSelectionChange?: (types: EntityType[]) => void;
+  onSelectionChange?: (types: readonly EntityType[]) => void;
 
   /**
   Show as inline badges instead of checkboxes (default: false)
@@ -70,13 +70,6 @@ const ENTITY_AUTOCOMPLETE_ROUTES = new Set<EntityType>([
 
 /**
  * Autocomplete entity filter with integrated navigation
- * @param root0
- * @param root0.query
- * @param root0.selectedTypes
- * @param root0.onSelectionChange
- * @param root0.inline
- * @param root0.title
- * @param root0.showButtons
  */
 export const AutocompleteEntityFilter = ({
   query,
@@ -87,7 +80,7 @@ export const AutocompleteEntityFilter = ({
   showButtons = true,
 }: AutocompleteEntityFilterProps) => {
   const handleChange = useCallback(
-    (types: EntityType[]) => {
+    (types: readonly EntityType[]) => {
       // If all types selected, go to general autocomplete (default view)
       if (types.length === AUTOCOMPLETE_ENTITY_TYPES.length) {
         if (onSelectionChange) {

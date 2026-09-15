@@ -23,8 +23,6 @@ const UndoRedoContext = createContext<UndoRedoContextValue | null>(null);
 
 /**
  * Provider component that wraps the application with undo/redo functionality
- * @param root0
- * @param root0.children
  */
 export const UndoRedoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const undoRedo = useUndoRedo({

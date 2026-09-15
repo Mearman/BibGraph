@@ -10,9 +10,7 @@ export interface IndexEntry {
 }
 
 // Unified index: keys can be queries, entities, or URLs in various formats
-export interface UnifiedIndex {
-  [key: string]: ExtendedIndexEntry;
-}
+export type UnifiedIndex = Record<string, ExtendedIndexEntry>;
 
 // Extended index entry with metadata for build plugin
 export interface ExtendedIndexEntry {
@@ -133,7 +131,6 @@ const ENTITY_PREFIX_MAP: Record<string, string> = {
 
 /**
  * Get the OpenAlex ID prefix for a given entity type
- * @param entityType
  */
 export const getEntityPrefix = (entityType: string): string => {
   return ENTITY_PREFIX_MAP[entityType] ?? "";
@@ -141,7 +138,6 @@ export const getEntityPrefix = (entityType: string): string => {
 
 /**
  * Infer entity type from OpenAlex ID prefix
- * @param id
  */
 export const inferEntityTypeFromId = (id: string): string => {
   if (id.startsWith("W")) return "works";
@@ -159,10 +155,10 @@ export const inferEntityTypeFromId = (id: string): string => {
 
 /**
  * Helper function to convert IndexEntry to ExtendedIndexEntry
- * @param indexEntry
- * @param _$ref
+ * @param indexEntry - the source entry to convert
+ * @param _$ref - unused; retained for call-site symmetry with the `$ref`-bearing overloads
  */
-export const indexEntryToUnified = (indexEntry: IndexEntry, _$ref?: string): ExtendedIndexEntry => {
+export const indexEntryToUnified = (indexEntry: Readonly<IndexEntry>, _$ref?: string): ExtendedIndexEntry => {
   return {
     lastModified: indexEntry.lastModified,
     contentHash: indexEntry.contentHash,

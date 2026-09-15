@@ -38,30 +38,30 @@ export interface SimulationNode {
  */
 export interface GraphMethods {
 	// Core methods (2D and 3D)
-	zoomToFit(duration?: number, padding?: number, nodeFilter?: (node: FilterNode) => boolean): void;
-	centerAt?(x: number, y: number, duration?: number): void;
-	graphData?(): { nodes: SimulationNode[]; links: unknown[] };
-	zoom?(scale?: number, duration?: number): number | void;
+	zoomToFit: (duration?: number, padding?: number, nodeFilter?: (node: Readonly<FilterNode>) => boolean) => void;
+	centerAt?: (x: number, y: number, duration?: number) => void;
+	graphData?: () => { nodes: SimulationNode[]; links: unknown[] };
+	zoom?: (scale?: number, duration?: number) => number | undefined;
 
 	// 2D-specific methods for viewport dimensions
-	screen2GraphCoords?(x: number, y: number): { x: number; y: number };
-	graph2ScreenCoords?(x: number, y: number): { x: number; y: number };
+	screen2GraphCoords?: (x: number, y: number) => { x: number; y: number };
+	graph2ScreenCoords?: (x: number, y: number) => { x: number; y: number };
 
 	// 3D-specific methods
-	cameraPosition?(
+	cameraPosition?: (
 		position?: { x: number; y: number; z: number },
 		lookAt?: { x: number; y: number; z: number },
 		transitionDuration?: number
-	): void | { x: number; y: number; z: number };
-	camera?(): {
+	) => { x: number; y: number; z: number } | undefined;
+	camera?: () => {
 		position: { x: number; y: number; z: number; set?: (x: number, y: number, z: number) => void };
 		lookAt?: (x: number, y: number, z: number) => void;
 	} | null;
-	controls?(): {
+	controls?: () => {
 		target: { x: number; y: number; z: number; set?: (x: number, y: number, z: number) => void };
 		update?: () => void;
 	} | null;
-	renderer?(): {
+	renderer?: () => {
 		domElement?: { clientWidth?: number; clientHeight?: number };
 	} | null;
 }
@@ -94,22 +94,24 @@ export interface UseFitToViewReturn {
 	fitToViewSelected: () => void;
 }
 
+const DEFAULT_MIN_CAMERA_DISTANCE = 100;
+const MIN_BOUNDING_DIMENSION = 50;
+
 /**
  * Calculate camera distance based on bounding box dimensions and FOV.
  * @param maxDimension - Largest dimension of the bounding box
  * @param minDistance - Minimum camera distance (default: 100)
  */
-const calculateCameraDistance = (maxDimension: number, minDistance: number = 100): number => {
+const calculateCameraDistance = (maxDimension: number, minDistance = DEFAULT_MIN_CAMERA_DISTANCE): number => {
 	// FOV factor approximates 1 / tan(37.5 degrees) with padding
 	const FOV_FACTOR = 1.5;
-	return Math.max(maxDimension, 50) * FOV_FACTOR + minDistance;
+	return Math.max(maxDimension, MIN_BOUNDING_DIMENSION) * FOV_FACTOR + minDistance;
 };
 
 /**
  * Calculate 3D bounding box from node positions.
- * @param positions
  */
-const calculate3DBoundingBox = (positions: Array<{ x: number; y: number; z: number }>) => {
+const calculate3DBoundingBox = (positions: readonly { x: number; y: number; z: number }[]) => {
 	let minX = Infinity,
 		maxX = -Infinity;
 	let minY = Infinity,
@@ -144,9 +146,8 @@ const calculate3DBoundingBox = (positions: Array<{ x: number; y: number; z: numb
 
 /**
  * Calculate centroid of positions.
- * @param positions
  */
-const calculateCentroid = (positions: Array<{ x: number; y: number; z: number }>) => {
+const calculateCentroid = (positions: readonly { x: number; y: number; z: number }[]) => {
 	const n = positions.length;
 	if (n === 0) return { x: 0, y: 0, z: 0 };
 
@@ -166,13 +167,12 @@ const calculateCentroid = (positions: Array<{ x: number; y: number; z: number }>
  * Find optimal viewing direction using PCA (Principal Component Analysis).
  * Returns the direction perpendicular to the plane of maximum spread,
  * which shows the largest cross-sectional area of the nodes.
- * @param positions
- * @param centroid
- * @param centroid.x
- * @param centroid.y
- * @param centroid.z
  */
-const findOptimalViewDirection = (positions: Array<{ x: number; y: number; z: number }>, centroid: { x: number; y: number; z: number }): {
+const MIN_POINTS_FOR_PCA = 3;
+const PCA_POWER_ITERATION_COUNT = 20;
+const PCA_MAGNITUDE_EPSILON = 0.0001;
+
+const findOptimalViewDirection = (positions: readonly { x: number; y: number; z: number }[], centroid: Readonly<{ x: number; y: number; z: number }>): {
 	viewDir: { x: number; y: number; z: number };
 	v1: { x: number; y: number; z: number };
 	v2: { x: number; y: number; z: number };
@@ -184,7 +184,7 @@ const findOptimalViewDirection = (positions: Array<{ x: number; y: number; z: nu
 		v2: { x: 0, y: 1, z: 0 },
 	};
 
-	if (n < 3) return defaultResult;
+	if (n < MIN_POINTS_FOR_PCA) return defaultResult;
 
 	// Compute covariance matrix
 	let cxx = 0,
@@ -215,12 +215,12 @@ const findOptimalViewDirection = (positions: Array<{ x: number; y: number; z: nu
 	let vx = 1,
 		vy = 0.5,
 		vz = 0.3;
-	for (let iter = 0; iter < 20; iter++) {
+	for (let iter = 0; iter < PCA_POWER_ITERATION_COUNT; iter++) {
 		const newX = cxx * vx + cxy * vy + cxz * vz;
 		const newY = cxy * vx + cyy * vy + cyz * vz;
 		const newZ = cxz * vx + cyz * vy + czz * vz;
 		const mag = Math.hypot(newX, newY, newZ);
-		if (mag > 0.0001) {
+		if (mag > PCA_MAGNITUDE_EPSILON) {
 			vx = newX / mag;
 			vy = newY / mag;
 			vz = newZ / mag;
@@ -238,13 +238,13 @@ const findOptimalViewDirection = (positions: Array<{ x: number; y: number; z: nu
 	uy -= dot1 * vy;
 	uz -= dot1 * vz;
 	let mag = Math.hypot(ux, uy, uz);
-	if (mag > 0.0001) {
+	if (mag > PCA_MAGNITUDE_EPSILON) {
 		ux /= mag;
 		uy /= mag;
 		uz /= mag;
 	}
 
-	for (let iter = 0; iter < 20; iter++) {
+	for (let iter = 0; iter < PCA_POWER_ITERATION_COUNT; iter++) {
 		let newX = cxx * ux + cxy * uy + cxz * uz;
 		let newY = cxy * ux + cyy * uy + cyz * uz;
 		let newZ = cxz * ux + cyz * uy + czz * uz;
@@ -254,7 +254,7 @@ const findOptimalViewDirection = (positions: Array<{ x: number; y: number; z: nu
 		newY -= dot * vy;
 		newZ -= dot * vz;
 		mag = Math.hypot(newX, newY, newZ);
-		if (mag > 0.0001) {
+		if (mag > PCA_MAGNITUDE_EPSILON) {
 			ux = newX / mag;
 			uy = newY / mag;
 			uz = newZ / mag;
@@ -272,7 +272,7 @@ const findOptimalViewDirection = (positions: Array<{ x: number; y: number; z: nu
 
 	// Normalize
 	mag = Math.hypot(viewDir.x, viewDir.y, viewDir.z);
-	if (mag > 0.0001) {
+	if (mag > PCA_MAGNITUDE_EPSILON) {
 		viewDir.x /= mag;
 		viewDir.y /= mag;
 		viewDir.z /= mag;
@@ -286,12 +286,19 @@ const findOptimalViewDirection = (positions: Array<{ x: number; y: number; z: nu
 	return { viewDir, v1, v2 };
 };
 
+const FIT_ALL_CENTER_DURATION_MS = 200;
+const FIT_ALL_ZOOM_DURATION_MS = 300;
+const FIT_ALL_ZOOM_PADDING = 100;
+const FIT_ALL_ZOOM_DELAY_MS = 250;
+const FIT_ALL_MIN_BOUNDING_DIMENSION_3D = 100;
+const FIT_ZOOM_TO_FIT_DURATION_MS = 400;
+const FIT_ZOOM_TO_FIT_PADDING = 50;
+const FIT_SELECTED_MIN_BOUNDING_DIMENSION_3D = 50;
+const FIT_SELECTED_MIN_CAMERA_DISTANCE = 100;
+const FIT_SELECTED_CAMERA_TRANSITION_DURATION_MS = 500;
+
 /**
  * Hook for fit-to-view operations in graph visualizations.
- * @param root0
- * @param root0.graphMethodsRef
- * @param root0.viewMode
- * @param root0.highlightedNodes
  */
 export const useFitToView = ({
 	graphMethodsRef,
@@ -305,7 +312,7 @@ export const useFitToView = ({
 		const graph = graphMethodsRef.current;
 		if (!graph?.zoomToFit) return;
 
-		const graphNodes = graph.graphData?.()?.nodes ?? [];
+		const graphNodes = graph.graphData?.().nodes ?? [];
 
 		if (viewMode === '2D') {
 			// 2D mode: calculate bounding box center, then use centerAt and zoomToFit
@@ -328,12 +335,12 @@ export const useFitToView = ({
 				const centerY = (minY + maxY) / 2;
 
 				// Center on the bounding box center, then fit
-				graph.centerAt(centerX, centerY, 200);
+				graph.centerAt(centerX, centerY, FIT_ALL_CENTER_DURATION_MS);
 				setTimeout(() => {
-					graph.zoomToFit(300, 100);
-				}, 250);
+					graph.zoomToFit(FIT_ALL_ZOOM_DURATION_MS, FIT_ALL_ZOOM_PADDING);
+				}, FIT_ALL_ZOOM_DELAY_MS);
 			} else {
-				graph.zoomToFit(300, 100);
+				graph.zoomToFit(FIT_ALL_ZOOM_DURATION_MS, FIT_ALL_ZOOM_PADDING);
 			}
 		} else {
 			// 3D mode: use manual camera positioning since zoomToFit is unreliable
@@ -345,7 +352,7 @@ export const useFitToView = ({
 				}));
 
 				const bbox = calculate3DBoundingBox(positions);
-				const maxDimension = Math.max(bbox.dimensions.width, bbox.dimensions.height, bbox.dimensions.depth, 100);
+				const maxDimension = Math.max(bbox.dimensions.width, bbox.dimensions.height, bbox.dimensions.depth, FIT_ALL_MIN_BOUNDING_DIMENSION_3D);
 				const cameraDistance = calculateCameraDistance(maxDimension);
 
 				// Directly set camera position and controls target
@@ -354,15 +361,15 @@ export const useFitToView = ({
 
 				if (camera && controls) {
 					// Set the controls target (orbit center) to the bounding box center
-					if (controls.target?.set) {
+					if (controls.target.set) {
 						controls.target.set(bbox.center.x, bbox.center.y, bbox.center.z);
-					} else if (controls.target) {
+					} else {
 						controls.target.x = bbox.center.x;
 						controls.target.y = bbox.center.y;
 						controls.target.z = bbox.center.z;
 					}
 					// Position camera along z-axis from center
-					if (camera.position?.set) {
+					if (camera.position.set) {
 						camera.position.set(bbox.center.x, bbox.center.y, bbox.center.z + cameraDistance);
 					}
 					// Make camera look at the target
@@ -383,7 +390,7 @@ export const useFitToView = ({
 				}
 			} else {
 				// Fallback to zoomToFit
-				graph.zoomToFit(400, 50);
+				graph.zoomToFit(FIT_ZOOM_TO_FIT_DURATION_MS, FIT_ZOOM_TO_FIT_PADDING);
 			}
 		}
 	}, [graphMethodsRef, viewMode]);
@@ -403,14 +410,14 @@ export const useFitToView = ({
 
 		if (viewMode === '2D') {
 			// 2D mode: use zoomToFit with filter
-			graph.zoomToFit(400, 50, (node: FilterNode) => {
+			graph.zoomToFit(FIT_ZOOM_TO_FIT_DURATION_MS, FIT_ZOOM_TO_FIT_PADDING, (node: Readonly<FilterNode>) => {
 				if (node.id == null) return false;
 				const nodeIdString = String(node.id);
 				return highlightedNodes.has(nodeIdString);
 			});
 		} else {
 			// 3D mode: collect node positions via zoomToFit filter, then manually position camera
-			const matchedPositions: Array<{ x: number; y: number; z: number }> = [];
+			const matchedPositions: { x: number; y: number; z: number }[] = [];
 
 			// Save current camera state to restore after zoomToFit
 			const camera = graph.camera?.();
@@ -419,7 +426,7 @@ export const useFitToView = ({
 			const savedTarget = controls?.target ? { ...controls.target } : null;
 
 			// Call zoomToFit with filter to collect positions (it will also move camera)
-			graph.zoomToFit(0, 0, (node: FilterNode) => {
+			graph.zoomToFit(0, 0, (node: Readonly<FilterNode>) => {
 				if (node.id == null) return false;
 				const nodeIdString = String(node.id);
 				const isMatches = highlightedNodes.has(nodeIdString);
@@ -434,10 +441,10 @@ export const useFitToView = ({
 			});
 
 			// Immediately restore camera to prevent visual glitch
-			if (savedCameraPos && camera?.position?.set) {
+			if (savedCameraPos && camera?.position.set) {
 				camera.position.set(savedCameraPos.x, savedCameraPos.y, savedCameraPos.z);
 			}
-			if (savedTarget && controls?.target?.set) {
+			if (savedTarget && controls?.target.set) {
 				controls.target.set(savedTarget.x, savedTarget.y, savedTarget.z);
 			}
 			if (controls?.update) {
@@ -452,8 +459,8 @@ export const useFitToView = ({
 			// Calculate bounding box and centroid
 			const bbox = calculate3DBoundingBox(matchedPositions);
 			const centroid = calculateCentroid(matchedPositions);
-			const maxDimension = Math.max(bbox.dimensions.width, bbox.dimensions.height, bbox.dimensions.depth, 50);
-			const cameraDistance = calculateCameraDistance(maxDimension, 100);
+			const maxDimension = Math.max(bbox.dimensions.width, bbox.dimensions.height, bbox.dimensions.depth, FIT_SELECTED_MIN_BOUNDING_DIMENSION_3D);
+			const cameraDistance = calculateCameraDistance(maxDimension, FIT_SELECTED_MIN_CAMERA_DISTANCE);
 
 			// Find optimal viewing direction using PCA
 			const { viewDir } = findOptimalViewDirection(matchedPositions, centroid);
@@ -465,7 +472,7 @@ export const useFitToView = ({
 
 			// Use cameraPosition for smooth animation
 			if (graph.cameraPosition) {
-				graph.cameraPosition({ x: camX, y: camY, z: camZ }, { x: centroid.x, y: centroid.y, z: centroid.z }, 500);
+				graph.cameraPosition({ x: camX, y: camY, z: camZ }, { x: centroid.x, y: centroid.y, z: centroid.z }, FIT_SELECTED_CAMERA_TRANSITION_DURATION_MS);
 			}
 		}
 	}, [graphMethodsRef, viewMode, highlightedNodes, fitToViewAll]);

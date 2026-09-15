@@ -8,12 +8,14 @@
 
 import { expect,test } from '@playwright/test';
 
-const BASE_URL = process.env.BASE_URL || (process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173');
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = process.env.BASE_URL ?? (IS_CI ? 'http://localhost:4173' : 'http://localhost:5173');
+const API_CALL_TIMEOUT_MS = 30_000;
 
 test.describe('Keywords Navigation and Display', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(({ page }) => {
     // Set longer timeout for OpenAlex API calls
-    page.setDefaultTimeout(30_000);
+    page.setDefaultTimeout(API_CALL_TIMEOUT_MS);
   });
 
   test('should navigate to keyword detail page and display EntityDetailLayout', async ({ page }) => {

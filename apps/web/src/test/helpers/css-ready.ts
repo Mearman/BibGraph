@@ -7,6 +7,8 @@
 
 import type { Page } from "@playwright/test";
 
+const MANTINE_SETTLE_WAIT_MS = 200;
+
 /**
  * Wait for Mantine CSS to be fully loaded and applied
  * This fixes issues where element size/visibility checks fail before styles are loaded
@@ -48,14 +50,14 @@ export const waitForStylesApplied = async (page: Page, timeout = 15_000): Promis
     document.body.append(testElement);
 
     const computedStyle = getComputedStyle(testElement);
-    const isStylesLoaded = computedStyle && computedStyle.position === 'absolute';
+    const isStylesLoaded = computedStyle.position === 'absolute';
 
     testElement.remove();
     return isStylesLoaded;
   }, { timeout });
 
   // Additional wait for Mantine styles to settle
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(MANTINE_SETTLE_WAIT_MS);
 };
 
 /**
@@ -76,18 +78,29 @@ export const waitForAppReady = async (page: Page, timeout = 20_000): Promise<voi
 };
 
 /**
- * Enhanced wait for element that also ensures CSS is loaded
- * Useful for elements that need correct styling for size/visibility checks
+ * Configuration options for {@link waitForVisibleElement}.
+ */
+interface WaitForVisibleElementOptions {
+  /**
+   * Maximum time to wait in milliseconds
+   */
+  timeout?: number;
+  /**
+   * Whether to wait for CSS to be loaded first
+   */
+  ensureCSS?: boolean;
+}
+
+/**
+ * Enhanced wait for element that also ensures CSS is loaded Useful for elements that need correct styling for size/visibility checks
  * @param page - Playwright Page instance
  * @param selector - CSS selector for the element to wait for
  * @param options - Configuration options
- * @param options.timeout - Maximum time to wait in milliseconds
- * @param options.ensureCSS - Whether to wait for CSS to be loaded first
  */
 export const waitForVisibleElement = async (
   page: Page,
   selector: string,
-  options: { timeout?: number; ensureCSS?: boolean } = {}
+  options: Readonly<WaitForVisibleElementOptions> = {}
 ): Promise<void> => {
   const { timeout = 15_000, ensureCSS = true } = options;
 

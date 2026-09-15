@@ -1,6 +1,5 @@
 /**
  * Transform API results to RelationshipSection and RelationshipItem structures
- * @module relationship-query-transformers
  */
 
 import type { RelationshipQueryConfig } from '@bibgraph/types';
@@ -9,48 +8,35 @@ import { RelationType } from '@bibgraph/types';
 import type { PaginationState, RelationshipItem, RelationshipSection } from '@/types/relationship';
 import { DEFAULT_PAGE_SIZE } from '@/types/relationship';
 
+import { safeStringId } from './relationship-helpers';
 import type { RelationshipQueryResult, SectionLoadState } from './relationship-query-types';
 
 /**
- * Type guard to check if a string is a valid RelationType enum value
- * This allows safe narrowing from string to the enum type
- * @param value
+ * Type guard to check if a string is a valid RelationType enum value This allows safe narrowing from string to the enum type
  */
 export const isRelationType = (value: string): value is RelationType => {
-  const validTypes = new Set(Object.values(RelationType));
-  return validTypes.has(value as RelationType);
+  const validTypes = new Set<string>(Object.values(RelationType));
+  return validTypes.has(value);
 };
 
 /**
  * Check if a displayName looks like an OpenAlex ID URL
  * These need to be prefetched to get the actual display name
- * @param displayName
  */
 export const isOpenAlexIdUrl = (displayName: string): boolean =>
   displayName.startsWith('https://openalex.org/');
 
 /**
  * Create a RelationshipItem from an API entity result
- * @param entity
- * @param config
- * @param direction
  */
 export const createQueryRelationshipItem = (
   entity: Record<string, unknown>,
   config: RelationshipQueryConfig,
   direction: 'inbound' | 'outbound',
 ): RelationshipItem => {
-  // Safely extract ID and display_name, ensuring they are strings
-  // This prevents [object Object] appearing in IDs if API returns unexpected data
-  const rawId = entity.id;
-  const entityId = typeof rawId === 'string' ? rawId : rawId == null ? '' : String(rawId);
-  const rawDisplayName = entity.display_name;
-  const displayName =
-    typeof rawDisplayName === 'string'
-      ? rawDisplayName
-      : rawDisplayName == null
-        ? ''
-        : String(rawDisplayName);
+  // Safely extract ID and display_name, ensuring they are strings This prevents [object Object] appearing in IDs if API returns unexpected data
+  const entityId = safeStringId(entity.id);
+  const displayName = safeStringId(entity.display_name);
 
   // Determine source and target based on direction
   // For inbound: target is the current entity (not in this context), source is the API result
@@ -78,10 +64,6 @@ export const createQueryRelationshipItem = (
 
 /**
  * Create a RelationshipSection from query results
- * @param config
- * @param queryResult
- * @param direction
- * @param additionalState
  */
 export const createQueryRelationshipSection = (
   config: RelationshipQueryConfig,
@@ -136,8 +118,6 @@ export const createQueryRelationshipSection = (
 
 /**
  * Get section ID from config and direction
- * @param config
- * @param direction
  */
 export const getSectionId = (
   config: RelationshipQueryConfig,
@@ -146,19 +126,19 @@ export const getSectionId = (
 
 /**
  * Parse section ID to extract type and direction
- * @param sectionId
  */
 export const parseSectionId = (
   sectionId: string,
 ): { type: string; direction: 'inbound' | 'outbound' } => {
-  const [type, direction] = sectionId.split('-') as [string, 'inbound' | 'outbound'];
+  const [type = '', direction] = sectionId.split('-', 2);
+  if (direction !== 'inbound' && direction !== 'outbound') {
+    throw new Error(`Invalid section ID: ${sectionId}`);
+  }
   return { type, direction };
 };
 
 /**
  * Get effective page size from config and state
- * @param config
- * @param statePageSize
  */
 export const getEffectivePageSize = (
   config: RelationshipQueryConfig,

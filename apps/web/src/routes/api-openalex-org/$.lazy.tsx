@@ -13,8 +13,8 @@ import { ICON_SIZE } from "@/config/style-constants";
 
 /**
  * Parse query parameters from a path string and merge with additional search params
- * @param pathWithQuery Path potentially containing query parameters (e.g., "/works?filter=...")
- * @param additionalSearch Additional search params to merge (from routeSearch)
+ * @param pathWithQuery - Path potentially containing query parameters (e.g., "/works?filter=...")
+ * @param additionalSearch - Additional search params to merge (from routeSearch)
  * @returns Object with path and search params
  */
 const parsePathAndSearch = (pathWithQuery: string, additionalSearch?: Record<string, unknown>): {
@@ -52,14 +52,29 @@ const parsePathAndSearch = (pathWithQuery: string, additionalSearch?: Record<str
   return { path, search };
 };
 
+/**
+ * Build a string-only record suitable for URLSearchParams from a loosely-typed search object, dropping any entries whose value isn't a string or number.
+ * @param search - Search params object (from routeSearch)
+ * @returns String-only record of the search params
+ */
+const toSearchParamsRecord = (search: Readonly<Record<string, unknown>>): Record<string, string> => {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(search)) {
+    if (typeof value === "string" || typeof value === "number") {
+      result[key] = String(value);
+    }
+  }
+  return result;
+};
+
 const ApiOpenAlexRoute = () => {
   const { _splat: splat } = useParams({ from: "/api-openalex-org/$" });
-  const externalId = splat || "";
+  const externalId = splat ?? "";
   const routeSearch = useSearch({ from: "/api-openalex-org/$" });
   const navigate = useNavigate();
 
   useEffect(() => {
-    const resolveExternalId = async () => {
+    const resolveExternalId = () => {
       try {
         // Decode the parameter
         const decodedId = decodeURIComponent(externalId);
@@ -73,7 +88,7 @@ const ApiOpenAlexRoute = () => {
 
         // Check if this is a full OpenAlex API URL that should be redirected
         const openAlexApiPattern = /^https?:\/\/api\.openalex\.org\/(.+)$/i;
-        const apiMatch = decodedId.match(openAlexApiPattern);
+        const apiMatch = openAlexApiPattern.exec(decodedId);
         if (apiMatch) {
           const cleanPath = apiMatch[1];
           logger.debug(
@@ -89,11 +104,11 @@ const ApiOpenAlexRoute = () => {
             // Navigate to the proper entity route
             const targetPath = `/${entityType}/${cleanPath}`;
             const { path, search } = parsePathAndSearch(targetPath);
-            navigate({ to: path, search, replace: true });
+            void navigate({ to: path, search, replace: true });
           } else {
             // Navigate to the clean path (for queries, etc.)
             const { path, search } = parsePathAndSearch(`/${cleanPath}`);
-            navigate({ to: path, search, replace: true });
+            void navigate({ to: path, search, replace: true });
           }
           return;
         }
@@ -108,7 +123,7 @@ const ApiOpenAlexRoute = () => {
         const issnPattern = /^sources\/issn:(\d{4}-\d{3}[0-9X])$/i;
         const orcidPattern = /^authors\/orcid:(\d{4}-\d{4}-\d{4}-\d{3}[0-9X])$/i;
 
-        const rorMatch = decodedId.match(rorPattern);
+        const rorMatch = rorPattern.exec(decodedId);
         if (rorMatch) {
           logger.debug(
             "routing",
@@ -116,11 +131,11 @@ const ApiOpenAlexRoute = () => {
             { rorId: rorMatch[1] },
             "ApiOpenAlexRoute",
           );
-          navigate({ to: `/institutions/ror/${rorMatch[1]}`, replace: true });
+          void navigate({ to: `/institutions/ror/${rorMatch[1]}`, replace: true });
           return;
         }
 
-        const issnMatch = decodedId.match(issnPattern);
+        const issnMatch = issnPattern.exec(decodedId);
         if (issnMatch) {
           logger.debug(
             "routing",
@@ -128,11 +143,11 @@ const ApiOpenAlexRoute = () => {
             { issn: issnMatch[1] },
             "ApiOpenAlexRoute",
           );
-          navigate({ to: `/sources/issn/${issnMatch[1]}`, replace: true });
+          void navigate({ to: `/sources/issn/${issnMatch[1]}`, replace: true });
           return;
         }
 
-        const orcidMatch = decodedId.match(orcidPattern);
+        const orcidMatch = orcidPattern.exec(decodedId);
         if (orcidMatch) {
           logger.debug(
             "routing",
@@ -140,7 +155,7 @@ const ApiOpenAlexRoute = () => {
             { orcid: orcidMatch[1] },
             "ApiOpenAlexRoute",
           );
-          navigate({ to: `/authors/orcid/${orcidMatch[1]}`, replace: true });
+          void navigate({ to: `/authors/orcid/${orcidMatch[1]}`, replace: true });
           return;
         }
 
@@ -152,7 +167,7 @@ const ApiOpenAlexRoute = () => {
           // This is an entity path like "W2741809807"
           const targetPath = `/${entityType}/${decodedId}`;
           const { path, search } = parsePathAndSearch(targetPath);
-          navigate({ to: path, search, replace: true });
+          void navigate({ to: path, search, replace: true });
           return;
         }
 
@@ -170,14 +185,14 @@ const ApiOpenAlexRoute = () => {
         ) {
           // Preserve query parameters by using navigate with parsed search
           const targetPath = `/${decodedId}`;
-          const { path, search } = parsePathAndSearch(targetPath, routeSearch as Record<string, unknown>);
+          const { path, search } = parsePathAndSearch(targetPath, routeSearch);
           logger.debug(
             "routing",
             `Navigating to list endpoint: ${path} with search:`,
             search,
             "ApiOpenAlexRoute",
           );
-          navigate({ to: path, search, replace: true });
+          void navigate({ to: path, search, replace: true });
           return;
         }
 
@@ -185,7 +200,7 @@ const ApiOpenAlexRoute = () => {
         if (decodedId.startsWith("autocomplete/")) {
           const targetPath = `/${decodedId}`;
           const { path, search } = parsePathAndSearch(targetPath);
-          navigate({ to: path, search, replace: true });
+          void navigate({ to: path, search, replace: true });
           return;
         }
 
@@ -202,7 +217,7 @@ const ApiOpenAlexRoute = () => {
           // Navigate to the entity route
           const targetPath = `/${entityTypeFromId}/${decodedId}`;
           const { path, search } = parsePathAndSearch(targetPath);
-          navigate({ to: path, search, replace: true });
+          void navigate({ to: path, search, replace: true });
           return;
         }
 
@@ -210,7 +225,7 @@ const ApiOpenAlexRoute = () => {
         const fullUrl = `https://api.openalex.org/${decodedId}`;
         const searchPath = `/search?q=${encodeURIComponent(fullUrl)}`;
         const { path, search } = parsePathAndSearch(searchPath);
-        navigate({ to: path, search, replace: true });
+        void navigate({ to: path, search, replace: true });
       } catch (error) {
         logError(
           logger,
@@ -245,7 +260,7 @@ const ApiOpenAlexRoute = () => {
       <div style={{ marginBottom: "20px" }}>
         Redirecting {decodeURIComponent(externalId)}
         {Object.keys(routeSearch).length > 0
-          ? `?${new URLSearchParams(routeSearch as Record<string, string>).toString()}`
+          ? `?${new URLSearchParams(toSearchParamsRecord(routeSearch)).toString()}`
           : ""}
       </div>
       <div style={{ marginTop: "20px", fontSize: "14px", color: "var(--mantine-color-dimmed)" }}>

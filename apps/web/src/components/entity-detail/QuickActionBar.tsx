@@ -6,8 +6,6 @@
  * - Add to graph
  * - Add to list
  * - Show current state indicators
- *
- * @module components/entity-detail
  */
 
 import type { EntityType } from '@bibgraph/types';
@@ -21,7 +19,7 @@ import {
   IconPlus,
 } from '@tabler/icons-react';
 import { useNavigate } from '@tanstack/react-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 
 import { useBookmarks } from '@/hooks/useBookmarks';
 import { useCatalogue } from '@/hooks/useCatalogue';
@@ -44,10 +42,6 @@ interface QuickActionBarProperties {
 
 /**
  * QuickActionBar Component
- * @param root0
- * @param root0.entityId
- * @param root0.entityType
- * @param root0.displayName
  */
 export const QuickActionBar: React.FC<QuickActionBarProperties> = ({
   entityId,
@@ -59,21 +53,9 @@ export const QuickActionBar: React.FC<QuickActionBarProperties> = ({
   const { lists } = useCatalogue();
   const { addNode, nodes } = useGraphList();
 
-  const [localIsBookmarked, setLocalIsBookmarked] = useState(false);
-  const [localIsInGraph, _setLocalIsInGraph] = useState(false);
-
-  // Check bookmark status
-  useEffect(() => {
-    const isBookmarked = bookmarks.some((b) => b.id === entityId);
-    setLocalIsBookmarked(isBookmarked);
-  }, [bookmarks, entityId]);
-
-  // Check graph status
-  useEffect(() => {
-    // Check if entity is in graph by checking nodes array
-    const isInGraph = nodes.some((n) => n.id === entityId);
-    _setLocalIsInGraph(isInGraph);
-  }, [nodes, entityId]);
+  // Derived directly from the hook data on every render - no separate state or effect needed to keep these in sync with `bookmarks`/`nodes`.
+  const localIsBookmarked = bookmarks.some((b) => b.id === entityId);
+  const localIsInGraph = nodes.some((n) => n.id === entityId);
 
   // Handle bookmark toggle
   const handleBookmarkToggle = useCallback(async () => {
@@ -101,7 +83,7 @@ export const QuickActionBar: React.FC<QuickActionBarProperties> = ({
   const handleAddToList = useCallback(
     (_listId: string) => {
       // Navigate to catalogue with list selection
-      navigate({
+      void navigate({
         to: '/catalogue',
       });
     },
@@ -127,7 +109,7 @@ export const QuickActionBar: React.FC<QuickActionBarProperties> = ({
               variant={localIsBookmarked ? 'filled' : 'subtle'}
               color="blue"
               size="lg"
-              onClick={handleBookmarkToggle}
+              onClick={() => { void handleBookmarkToggle(); }}
             >
               {localIsBookmarked ? <IconBookmarkFilled size={20} /> : <IconBookmark size={20} />}
             </ActionIcon>
@@ -139,7 +121,7 @@ export const QuickActionBar: React.FC<QuickActionBarProperties> = ({
               variant={localIsInGraph ? 'filled' : 'subtle'}
               color="green"
               size="lg"
-              onClick={handleAddToGraph}
+              onClick={() => { void handleAddToGraph(); }}
               disabled={localIsInGraph}
             >
               {localIsInGraph ? <IconListCheck size={20} /> : <IconNetwork size={20} />}
@@ -171,7 +153,7 @@ export const QuickActionBar: React.FC<QuickActionBarProperties> = ({
                   <Menu.Item
                     key={list.id}
                     leftSection={<IconList size={14} />}
-                    onClick={() => handleAddToList(list.id ?? '')}
+                    onClick={() => { handleAddToList(list.id ?? ''); }}
                   >
                     <Text size="sm">{list.title}</Text>
                   </Menu.Item>
@@ -180,7 +162,7 @@ export const QuickActionBar: React.FC<QuickActionBarProperties> = ({
               <Menu.Divider />
               <Menu.Item
                 leftSection={<IconPlus size={14} />}
-                onClick={() => navigate({ to: '/catalogue' })}
+                onClick={() => { void navigate({ to: '/catalogue' }); }}
               >
                 <Text size="sm">Create New List</Text>
               </Menu.Item>

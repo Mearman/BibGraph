@@ -1,7 +1,5 @@
 /**
- * RelationshipCounts component
- * Displays summary count badges for all relationships (incoming, outgoing, total)
- * @module RelationshipCounts
+ * RelationshipCounts component Displays summary count badges for all relationships (incoming, outgoing, total)
  * @see specs/016-entity-relationship-viz/spec.md (User Story 4)
  */
 
@@ -29,16 +27,12 @@ export interface RelationshipCountsProps {
 /**
  * Displays summary badges showing relationship counts
  * Shows total incoming, outgoing, and optionally grand total
- * @param root0
- * @param root0.incomingCount
- * @param root0.outgoingCount
- * @param root0.showGrandTotal
  */
 export const RelationshipCounts = ({
   incomingCount,
   outgoingCount,
   showGrandTotal = true,
-}) => {
+}: Readonly<RelationshipCountsProps>) => {
   const grandTotal = incomingCount + outgoingCount;
 
   // Don't render if no relationships

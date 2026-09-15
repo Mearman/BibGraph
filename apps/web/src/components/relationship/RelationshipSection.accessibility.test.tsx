@@ -1,7 +1,6 @@
+// @vitest-environment jsdom
 /**
- * Accessibility tests for RelationshipSection component
- * Validates WCAG 2.1 AA compliance and ARIA labels
- * @vitest-environment jsdom
+ * Accessibility tests for RelationshipSection component Validates WCAG 2.1 AA compliance and ARIA labels
  */
 
 import { RelationType } from '@bibgraph/types';
@@ -23,20 +22,24 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => (
   <MantineProvider>{children}</MantineProvider>
 );
 
+const DEFAULT_ITEM_COUNT = 10;
+const MEDIUM_ITEM_COUNT = 25;
+const DEFAULT_PAGE_SIZE = 50;
+
 describe('RelationshipSection Accessibility', () => {
   const createMockSection = (
-    itemCount: number = 10,
-    isPartialData: boolean = false
+    itemCount = DEFAULT_ITEM_COUNT,
+    isPartialData = false
   ): RelationshipSectionType => {
     const items = Array.from({ length: itemCount }, (_, index) => ({
-      id: `rel-${index}`,
+      id: `rel-${String(index)}`,
       sourceId: 'W123',
-      targetId: `A${index}`,
+      targetId: `A${String(index)}`,
       sourceType: 'works' as const,
       targetType: 'authors' as const,
       type: RelationType.AUTHORSHIP,
       direction: 'outbound' as const,
-      displayName: `Author ${index}`,
+      displayName: `Author ${String(index)}`,
       isSelfReference: false,
     }));
 
@@ -46,16 +49,16 @@ describe('RelationshipSection Accessibility', () => {
       direction: 'outbound',
       label: 'Authors',
       items,
-      visibleItems: items.slice(0, Math.min(itemCount, 50)),
+      visibleItems: items.slice(0, Math.min(itemCount, DEFAULT_PAGE_SIZE)),
       isPartialData,
       totalCount: itemCount,
-      visibleCount: Math.min(itemCount, 50),
-      hasMore: itemCount > 50,
+      visibleCount: Math.min(itemCount, DEFAULT_PAGE_SIZE),
+      hasMore: itemCount > DEFAULT_PAGE_SIZE,
       pagination: {
-        pageSize: 50,
+        pageSize: DEFAULT_PAGE_SIZE,
         currentPage: 0,
-        totalPages: Math.ceil(itemCount / 50),
-        hasNextPage: itemCount > 50,
+        totalPages: Math.ceil(itemCount / DEFAULT_PAGE_SIZE),
+        hasNextPage: itemCount > DEFAULT_PAGE_SIZE,
         hasPreviousPage: false,
       },
     };
@@ -70,9 +73,9 @@ describe('RelationshipSection Accessibility', () => {
   });
 
   it('should have no axe accessibility violations', async () => {
-    const section = createMockSection(10);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(DEFAULT_ITEM_COUNT);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
     const { container } = render(
       <TestWrapper>
         <RelationshipSection
@@ -89,9 +92,9 @@ describe('RelationshipSection Accessibility', () => {
   });
 
   it('should have proper semantic structure', () => {
-    const section = createMockSection(10);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(DEFAULT_ITEM_COUNT);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
     const { container } = render(
       <TestWrapper>
         <RelationshipSection
@@ -111,9 +114,9 @@ describe('RelationshipSection Accessibility', () => {
   });
 
   it('should have accessible count badge', () => {
-    const section = createMockSection(25);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(MEDIUM_ITEM_COUNT);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
     render(
       <TestWrapper>
         <RelationshipSection
@@ -131,9 +134,9 @@ describe('RelationshipSection Accessibility', () => {
   });
 
   it('should have accessible partial data warning', async () => {
-    const section = createMockSection(10, true);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(DEFAULT_ITEM_COUNT, true);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
     const { container } = render(
       <TestWrapper>
         <RelationshipSection
@@ -164,9 +167,9 @@ describe('RelationshipSection Accessibility', () => {
   });
 
   it('should have sufficient color contrast', () => {
-    const section = createMockSection(10);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(DEFAULT_ITEM_COUNT);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
     render(
       <TestWrapper>
         <RelationshipSection
@@ -187,9 +190,9 @@ describe('RelationshipSection Accessibility', () => {
   });
 
   it('should handle keyboard navigation', () => {
-    const section = createMockSection(10);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(DEFAULT_ITEM_COUNT);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
     const { container } = render(
       <TestWrapper>
         <RelationshipSection
@@ -216,9 +219,9 @@ describe('RelationshipSection Accessibility', () => {
   });
 
   it('should have proper heading hierarchy', () => {
-    const section = createMockSection(10);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(DEFAULT_ITEM_COUNT);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
     render(
       <TestWrapper>
         <RelationshipSection
@@ -236,9 +239,9 @@ describe('RelationshipSection Accessibility', () => {
   });
 
   it('should provide context for screen readers', () => {
-    const section = createMockSection(10, true);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(DEFAULT_ITEM_COUNT, true);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
     render(
       <TestWrapper>
         <RelationshipSection
@@ -260,10 +263,10 @@ describe('RelationshipSection Accessibility', () => {
   });
 
   it('should handle icon accessibility', () => {
-    const section = createMockSection(10);
+    const section = createMockSection(DEFAULT_ITEM_COUNT);
     section.icon = '👤';
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
     render(
       <TestWrapper>
@@ -282,8 +285,8 @@ describe('RelationshipSection Accessibility', () => {
 
   it('should maintain accessibility with empty sections', async () => {
     const section = createMockSection(0);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
     const { container } = render(
       <TestWrapper>
         <RelationshipSection

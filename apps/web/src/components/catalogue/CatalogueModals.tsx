@@ -60,7 +60,7 @@ interface CatalogueModalsProperties {
   onUseTemplate: (template: ListTemplate) => void;
   onCreateSmartList: (criteria: SmartListCriteria) => Promise<void>;
   onMergeLists: (
-    sourceListIds: string[],
+    sourceListIds: readonly string[],
     mergeStrategy: 'union' | 'intersection' | 'combine',
     newListName: string,
     deduplicate: boolean
@@ -140,7 +140,7 @@ export const CatalogueModals = ({
         returnFocus
       >
         <SmartLists
-          onCreateSmartList={onCreateSmartList}
+          onCreateSmartList={(criteria) => { void onCreateSmartList(criteria); }}
           onClose={onCloseSmartListsModal}
         />
       </Modal>
@@ -170,7 +170,7 @@ export const CatalogueModals = ({
       >
         <ShareModal
           shareUrl={shareUrl}
-          listTitle={selectedList?.title || ""}
+          listTitle={selectedList?.title ?? ""}
           onClose={onCloseShareModal}
         />
       </Modal>
@@ -185,7 +185,7 @@ export const CatalogueModals = ({
       >
         <ImportModal
           onClose={onCloseImportModal}
-          onImport={onImport}
+          onImport={(url) => { void onImport(url); }}
           initialShareData={shareData}
         />
       </Modal>
@@ -198,7 +198,7 @@ export const CatalogueModals = ({
         trapFocus
         returnFocus
       >
-        {selectedList?.id && (
+        {selectedList?.id !== undefined && (
           <ExportModal
             listId={selectedList.id}
             listTitle={selectedList.title}

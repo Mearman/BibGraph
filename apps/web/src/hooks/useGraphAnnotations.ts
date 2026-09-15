@@ -8,8 +8,6 @@
  *
  * Annotations are stored in IndexedDB via storage provider
  * and can be shared via graph snapshots (URL-encoded)
- *
- * @module hooks/use-graph-annotations
  */
 
 import type { GraphAnnotationStorage } from '@bibgraph/utils';
@@ -19,7 +17,7 @@ import { useStorageProvider } from '@/contexts/storage-provider-context';
 
 /**
  * Hook for managing graph annotations
- * @param graphId Optional graph ID for filtering annotations (used for sharing)
+ * @param graphId - Optional graph ID for filtering annotations (used for sharing)
  */
 export const useGraphAnnotations = (graphId?: string) => {
   const storageProvider = useStorageProvider();
@@ -75,7 +73,7 @@ export const useGraphAnnotations = (graphId?: string) => {
   /**
    * Add text annotation (sticky note)
    */
-  const addTextAnnotation = useCallback(async (parameters: {
+  const addTextAnnotation = useCallback(async (parameters: Readonly<{
     content: string;
     x: number;
     y: number;
@@ -83,7 +81,7 @@ export const useGraphAnnotations = (graphId?: string) => {
     backgroundColor?: string;
     nodeId?: string;
     color?: string;
-  }) => {
+  }>) => {
     return addAnnotation({
       type: 'text',
       visible: true,
@@ -100,7 +98,7 @@ export const useGraphAnnotations = (graphId?: string) => {
   /**
    * Add rectangle annotation
    */
-  const addRectangleAnnotation = useCallback(async (parameters: {
+  const addRectangleAnnotation = useCallback(async (parameters: Readonly<{
     x: number;
     y: number;
     width: number;
@@ -109,7 +107,7 @@ export const useGraphAnnotations = (graphId?: string) => {
     fillColor?: string;
     borderWidth?: number;
     color?: string;
-  }) => {
+  }>) => {
     return addAnnotation({
       type: 'rectangle',
       visible: true,
@@ -127,7 +125,7 @@ export const useGraphAnnotations = (graphId?: string) => {
   /**
    * Add circle annotation
    */
-  const addCircleAnnotation = useCallback(async (parameters: {
+  const addCircleAnnotation = useCallback(async (parameters: Readonly<{
     x: number;
     y: number;
     radius: number;
@@ -135,7 +133,7 @@ export const useGraphAnnotations = (graphId?: string) => {
     fillColor?: string;
     borderWidth?: number;
     color?: string;
-  }) => {
+  }>) => {
     return addAnnotation({
       type: 'circle',
       visible: true,
@@ -153,7 +151,7 @@ export const useGraphAnnotations = (graphId?: string) => {
    * Add drawing annotation (freehand)
    */
   const addDrawingAnnotation = useCallback(async (parameters: {
-    points: Array<{ x: number; y: number }>;
+    points: { x: number; y: number }[];
     strokeColor?: string;
     strokeWidth?: number;
     closed?: boolean;
@@ -237,7 +235,7 @@ export const useGraphAnnotations = (graphId?: string) => {
    * Clear all annotations for current graph
    */
   const clearAnnotations = useCallback(async () => {
-    if (!graphId) {
+    if (graphId === undefined || graphId === '') {
       // If no graphId, clear all from local state
       setAnnotations([]);
       return;
@@ -265,16 +263,15 @@ export const useGraphAnnotations = (graphId?: string) => {
    * Annotations grouped by type
    */
   const annotationsByType = useMemo(() => {
-    return annotations.reduce((accumulator, annotation) => {
-      if (!accumulator[annotation.type]) {
-        accumulator[annotation.type] = [];
-      }
-      const typeArray = accumulator[annotation.type];
-      if (typeArray) {
-        typeArray.push(annotation);
+    return annotations.reduce<Partial<Record<string, GraphAnnotationStorage[]>>>((accumulator, annotation) => {
+      const existing = accumulator[annotation.type];
+      if (existing === undefined) {
+        accumulator[annotation.type] = [annotation];
+      } else {
+        existing.push(annotation);
       }
       return accumulator;
-    }, {} as Record<string, GraphAnnotationStorage[]>);
+    }, {});
   }, [annotations]);
 
   return {

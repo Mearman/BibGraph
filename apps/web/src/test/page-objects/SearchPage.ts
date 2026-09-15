@@ -8,10 +8,11 @@
  * @see spec-020 Phase 1: Search page testing
  */
 
-import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
 import { BaseSPAPageObject } from "./BaseSPAPageObject";
+
+const VIEW_MODE_SWITCH_WAIT_MS = 500;
 
 export class SearchPage extends BaseSPAPageObject {
 	// Search-specific selectors
@@ -25,23 +26,18 @@ export class SearchPage extends BaseSPAPageObject {
 		loadingIndicator: "[data-testid='loading']",
 	};
 
-	constructor(page: Page) {
-		super(page);
-	}
-
 	/**
 	 * Navigate to the Search page
-	 * @param query Optional search query to include in URL
+	 * @param query - Optional search query to include in URL
 	 */
 	async gotoSearch(query?: string): Promise<void> {
-		const path = query ? `#/search?q=${encodeURIComponent(query)}` : "#/search";
+		const path = query !== undefined && query !== "" ? `#/search?q=${encodeURIComponent(query)}` : "#/search";
 		await this.goto(path);
 		await this.expectSearchLoaded();
 	}
 
 	/**
 	 * Type a search query into the search input field
-	 * @param query
 	 */
 	async enterSearchQuery(query: string): Promise<void> {
 		await this.fill(this.searchSelectors.searchInput, query);
@@ -57,7 +53,6 @@ export class SearchPage extends BaseSPAPageObject {
 
 	/**
 	 * Perform a complete search: enter query + submit
-	 * @param query
 	 */
 	async search(query: string): Promise<void> {
 		await this.enterSearchQuery(query);
@@ -80,7 +75,6 @@ export class SearchPage extends BaseSPAPageObject {
 
 	/**
 	 * Click a search result by index (0-based)
-	 * @param index
 	 */
 	async clickResult(index: number): Promise<void> {
 		const results = this.page.locator(this.searchSelectors.searchResultItem);
@@ -90,7 +84,7 @@ export class SearchPage extends BaseSPAPageObject {
 
 	/**
 	 * Apply entity type filter
-	 * @param entityType Entity type to filter by (e.g., "works", "authors")
+	 * @param entityType - Entity type to filter by (e.g., "works", "authors")
 	 */
 	async filterByEntityType(entityType: string): Promise<void> {
 		// Locate filter control and select the entity type
@@ -136,7 +130,7 @@ export class SearchPage extends BaseSPAPageObject {
 		const targetLabel = segmentedControl.locator(`label:has(input[value="${mode}"])`);
 		await targetLabel.click();
 		// Allow time for React state update and re-render
-		await this.page.waitForTimeout(500);
+		await this.page.waitForTimeout(VIEW_MODE_SWITCH_WAIT_MS);
 	}
 
 	/**
@@ -159,7 +153,7 @@ export class SearchPage extends BaseSPAPageObject {
 			"[data-testid='pagination'] [aria-current='page'], .mantine-Pagination-control[data-active='true']"
 		);
 		const text = await activePage.textContent();
-		return text ? Number.parseInt(text, 10) : 1;
+		return text !== null ? Number.parseInt(text, 10) : 1;
 	}
 
 	/**

@@ -101,6 +101,8 @@ export type QueryDataType =
   | "entity"
   | "array";
 
+const DRAGGING_OPACITY = 0.5;
+
 interface VisualQueryBuilderProperties {
   entityType: EntityType;
   initialQuery?: VisualQuery;
@@ -137,7 +139,7 @@ const SortableChip: React.FC<SortableChipProperties> = ({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? DRAGGING_OPACITY : 1,
   };
 
   const getChipColor = (category: QueryChipCategory): string => {
@@ -152,8 +154,10 @@ const SortableChip: React.FC<SortableChipProperties> = ({
         return "orange";
       case "boolean":
         return "cyan";
-      default:
+      case "general":
         return "gray";
+      default:
+        return category satisfies never;
     }
   };
 
@@ -169,8 +173,10 @@ const SortableChip: React.FC<SortableChipProperties> = ({
         return <IconTags size={14} />;
       case "boolean":
         return <IconFilter size={14} />;
-      default:
+      case "general":
         return <IconInfoCircle size={14} />;
+      default:
+        return category satisfies never;
     }
   };
 
@@ -197,7 +203,7 @@ const SortableChip: React.FC<SortableChipProperties> = ({
               size="xs"
               variant="subtle"
               color="red"
-              onClick={() => onRemove(chip.id)}
+              onClick={() => { onRemove(chip.id); }}
               disabled={disabled}
             >
               <IconX size={12} />
@@ -248,7 +254,7 @@ const DropZone: React.FC<DropZoneProperties> = ({
           <Text size="sm" fw={500}>
             {title}
           </Text>
-          {description && (
+          {description !== undefined && description !== "" && (
             <Text size="xs" c="dimmed">
               {description}
             </Text>
@@ -406,10 +412,10 @@ export const VisualQueryBuilder = ({
       return initialQuery;
     }
     return {
-      id: `query-${Date.now()}`,
+      id: `query-${String(Date.now())}`,
       groups: [
         {
-          id: `group-${Date.now()}`,
+          id: `group-${String(Date.now())}`,
           operator: "AND",
           chips: [],
           enabled: true,
@@ -422,7 +428,7 @@ export const VisualQueryBuilder = ({
   const [availableChips] = useState<QueryFilterChip[]>(() =>
     getAvailableChips(entityType),
   );
-  const [, setDraggedChip] = useState<QueryFilterChip | null>(null);
+  const [_draggedChip, setDraggedChip] = useState<QueryFilterChip | null>(null);
 
   // DnD sensors
   const sensors = useSensors(
@@ -477,7 +483,7 @@ export const VisualQueryBuilder = ({
         // Create a copy of the chip with a new ID for the query
         const newChip: QueryFilterChip = {
           ...sourceChip,
-          id: `${sourceChip.id}-${Date.now()}`,
+          id: `${sourceChip.id}-${String(Date.now())}`,
         };
 
         const updatedQuery: VisualQuery = {
@@ -522,7 +528,7 @@ export const VisualQueryBuilder = ({
 
   const handleAddGroup = useCallback(() => {
     const newGroup: QueryGroup = {
-      id: `group-${Date.now()}`,
+      id: `group-${String(Date.now())}`,
       operator: "AND",
       chips: [],
       enabled: true,
@@ -558,7 +564,7 @@ export const VisualQueryBuilder = ({
       ...query,
       groups: [
         {
-          id: `group-${Date.now()}`,
+          id: `group-${String(Date.now())}`,
           operator: "AND",
           chips: [],
           enabled: true,
@@ -625,7 +631,7 @@ export const VisualQueryBuilder = ({
               <Box key={group.id}>
                 {index > 0 && (
                   <Group justify="center" my="xs">
-                    <Chip checked={false} onChange={() => {}}>
+                    <Chip checked={false} onChange={() => { /* Display-only: operator toggling between groups is not yet implemented */ }}>
                       {group.operator}
                     </Chip>
                   </Group>
@@ -636,8 +642,8 @@ export const VisualQueryBuilder = ({
                 >
                   <DropZone
                     id={group.id}
-                    title={`Query Group ${index + 1}`}
-                    description={`${group.chips.length} filter${group.chips.length === 1 ? "" : "s"}`}
+                    title={`Query Group ${String(index + 1)}`}
+                    description={`${String(group.chips.length)} filter${group.chips.length === 1 ? "" : "s"}`}
                     isEmpty={group.chips.length === 0}
                   >
                     {group.chips.map((chip) => (
@@ -678,17 +684,11 @@ export const VisualQueryBuilder = ({
             </Text>
 
             {/* Group available chips by category */}
-            {Object.entries(
-              availableChips.reduce(
-                (accumulator, chip) => {
-                  const { category } = chip;
-                  if (!accumulator[category]) accumulator[category] = [];
-                  accumulator[category].push(chip);
-                  return accumulator;
-                },
-                {} as Record<QueryChipCategory, QueryFilterChip[]>,
-              ),
-            ).map(([category, chips]) => (
+            {[...availableChips.reduce((accumulator, chip) => {
+              const existing = accumulator.get(chip.category) ?? [];
+              accumulator.set(chip.category, [...existing, chip]);
+              return accumulator;
+            }, new Map<QueryChipCategory, QueryFilterChip[]>())].map(([category, chips]) => (
               <Box key={category}>
                 <Text size="xs" fw={500} c="dimmed" mb={4} tt="capitalize">
                   {category}
@@ -698,7 +698,7 @@ export const VisualQueryBuilder = ({
                     <SortableChip
                       key={chip.id}
                       chip={chip}
-                      onRemove={() => {}} // No remove for palette chips
+                      onRemove={() => { /* Palette chips are templates, not removable */ }}
                       disabled={disabled}
                     />
                   ))}

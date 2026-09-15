@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 /**
  * Component tests for RelationshipList component
- * @vitest-environment jsdom
  */
 
 import { RelationType } from '@bibgraph/types';
@@ -19,24 +19,30 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 // Mock scrollIntoView to prevent Mantine Select cleanup errors
-Element.prototype.scrollIntoView = vi.fn();
+Element.prototype.scrollIntoView = vi.fn(() => { /* no-op */ });
+
+const ITEMS_BELOW_PAGE_SIZE = 10;
+const ITEMS_ABOVE_PAGE_SIZE = 150;
+const DEFAULT_PAGE_SIZE = 50;
+const EXPANDED_PAGE_SIZE = 100;
+const PAGE_SIZE_PLUS_ONE = 51;
 
 describe('RelationshipList', () => {
   const createMockItems = (count: number): RelationshipItem[] => {
     return Array.from({ length: count }, (_, index) => ({
-      id: `rel-${index}`,
+      id: `rel-${String(index)}`,
       sourceId: 'W123',
-      targetId: `A${index}`,
+      targetId: `A${String(index)}`,
       sourceType: 'works' as const,
       targetType: 'authors' as const,
       type: RelationType.AUTHORSHIP,
       direction: 'outbound' as const,
-      displayName: `Author ${index}`,
+      displayName: `Author ${String(index)}`,
       isSelfReference: false,
     }));
   };
 
-  const createMockSection = (itemCount: number, currentPage: number = 0, pageSize: number = 50): RelationshipSection => {
+  const createMockSection = (itemCount: number, currentPage = 0, pageSize = DEFAULT_PAGE_SIZE): RelationshipSection => {
     const startIndex = currentPage * pageSize;
     const endIndex = Math.min(startIndex + pageSize, itemCount);
     const pageItemCount = endIndex - startIndex;
@@ -70,9 +76,9 @@ describe('RelationshipList', () => {
   });
 
   it('should render all items when count is less than page size', () => {
-    const section = createMockSection(10);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(ITEMS_BELOW_PAGE_SIZE);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
     render(
       <TestWrapper>
@@ -91,9 +97,9 @@ describe('RelationshipList', () => {
   });
 
   it('should display "Showing X of Y" count', () => {
-    const section = createMockSection(10);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(ITEMS_BELOW_PAGE_SIZE);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
     render(
       <TestWrapper>
@@ -110,9 +116,9 @@ describe('RelationshipList', () => {
   });
 
   it('should display pagination controls when total items > 10', () => {
-    const section = createMockSection(150);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(ITEMS_ABOVE_PAGE_SIZE);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
     render(
       <TestWrapper>
@@ -130,9 +136,9 @@ describe('RelationshipList', () => {
   });
 
   it('should not display pagination controls when total items <= 10', () => {
-    const section = createMockSection(10);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(ITEMS_BELOW_PAGE_SIZE);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
     render(
       <TestWrapper>
@@ -150,8 +156,8 @@ describe('RelationshipList', () => {
   });
 
   it('should call onPageChange when page navigation is used', async () => {
-    const section = createMockSection(150);
-    const onPageChange = vi.fn();
+    const section = createMockSection(ITEMS_ABOVE_PAGE_SIZE);
+    const onPageChange = vi.fn(() => { /* no-op */ });
     const user = userEvent.setup();
 
     render(
@@ -159,7 +165,7 @@ describe('RelationshipList', () => {
         <RelationshipList
           section={section}
           onPageChange={onPageChange}
-          onPageSizeChange={vi.fn()}
+          onPageSizeChange={vi.fn(() => { /* no-op */ })}
           isLoading={false}
         />
       </TestWrapper>
@@ -179,15 +185,15 @@ describe('RelationshipList', () => {
   });
 
   it('should call onPageSizeChange when page size selector is used', async () => {
-    const section = createMockSection(150);
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(ITEMS_ABOVE_PAGE_SIZE);
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
     const user = userEvent.setup();
 
     render(
       <TestWrapper>
         <RelationshipList
           section={section}
-          onPageChange={vi.fn()}
+          onPageChange={vi.fn(() => { /* no-op */ })}
           onPageSizeChange={onPageSizeChange}
           isLoading={false}
         />
@@ -204,13 +210,13 @@ describe('RelationshipList', () => {
     const option100 = screen.getByText('100 per page');
     await user.click(option100);
 
-    expect(onPageSizeChange).toHaveBeenCalledWith(100);
+    expect(onPageSizeChange).toHaveBeenCalledWith(EXPANDED_PAGE_SIZE);
   });
 
   it('should handle edge case with exactly 50 items', () => {
-    const section = createMockSection(50);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(DEFAULT_PAGE_SIZE);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
     render(
       <TestWrapper>
@@ -228,9 +234,9 @@ describe('RelationshipList', () => {
   });
 
   it('should handle edge case with 51 items', () => {
-    const section = createMockSection(51);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(PAGE_SIZE_PLUS_ONE);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
     render(
       <TestWrapper>

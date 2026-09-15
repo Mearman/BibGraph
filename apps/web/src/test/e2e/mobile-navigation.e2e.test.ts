@@ -7,6 +7,9 @@ import { expect,test } from '@playwright/test';
 
 import { waitForMantineStyles } from '../helpers/css-ready';
 
+const MAX_TAB_ATTEMPTS = 20;
+const MIN_TOUCH_TARGET_SIZE_PX = 44;
+
 test.describe('Mobile Navigation Menu - E2E', () => {
   test.describe('T013: Mobile viewport behavior (375px)', () => {
     test.beforeEach(async ({ page }) => {
@@ -170,9 +173,11 @@ test.describe('Mobile Navigation Menu - E2E', () => {
       // Keep tabbing until we reach the menu button
       let focused = await page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
       let attempts = 0;
-      while (!focused?.includes('navigation menu') && attempts < 20) {
+      let hasFocusedNavigationMenu = focused?.includes('navigation menu') === true;
+      while (!hasFocusedNavigationMenu && attempts < MAX_TAB_ATTEMPTS) {
         await page.keyboard.press('Tab');
         focused = await page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
+        hasFocusedNavigationMenu = focused?.includes('navigation menu') === true;
         attempts++;
       }
 
@@ -194,8 +199,8 @@ test.describe('Mobile Navigation Menu - E2E', () => {
 
       expect(boundingBox).not.toBeNull();
       if (boundingBox) {
-        expect(boundingBox.width).toBeGreaterThanOrEqual(44);
-        expect(boundingBox.height).toBeGreaterThanOrEqual(44);
+        expect(boundingBox.width).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_SIZE_PX);
+        expect(boundingBox.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_SIZE_PX);
       }
     });
   });

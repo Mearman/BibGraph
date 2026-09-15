@@ -21,9 +21,6 @@ export interface StorageProviderWrapperProps {
 
 /**
  * Provider component that wraps the app with a storage implementation
- * @param root0
- * @param root0.provider
- * @param root0.children
  * @example
  * ```tsx
  * // Production setup
@@ -50,7 +47,7 @@ export const StorageProviderWrapper = ({ provider, children }: StorageProviderWr
 
 /**
  * Hook to access the storage provider
- * @throws {Error} If used outside of StorageProviderWrapper
+ * @throws Error if used outside of StorageProviderWrapper
  * @example
  * ```tsx
  * function CatalogueManager() {

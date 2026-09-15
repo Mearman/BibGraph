@@ -14,7 +14,8 @@ import { BaseSPAPageObject } from '@/test/page-objects/BaseSPAPageObject';
 import { SettingsPage } from '@/test/page-objects/SettingsPage';
 
 test.describe('@utility US-29 Xpac Data Toggle', () => {
-	const BASE_URL = process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173';
+	const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+	const BASE_URL = IS_CI ? 'http://localhost:4173' : 'http://localhost:5173';
 
 	let settingsPage: SettingsPage;
 

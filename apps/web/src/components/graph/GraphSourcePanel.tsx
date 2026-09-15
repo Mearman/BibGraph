@@ -3,7 +3,6 @@
  *
  * Displays available data sources (catalogue lists, caches) with toggle switches
  * and entity counts. Sources are grouped by category.
- * @module components/graph/GraphSourcePanel
  */
 
 import type { GraphDataSourceState } from '@bibgraph/utils';
@@ -74,7 +73,6 @@ export interface GraphSourcePanelProps {
 
 /**
  * Get icon for a source based on its ID
- * @param sourceId
  */
 const getSourceIcon = (sourceId: string) => {
   if (sourceId === 'catalogue:bookmarks') return IconBookmark;
@@ -88,10 +86,6 @@ const getSourceIcon = (sourceId: string) => {
 
 /**
  * Single source toggle row
- * @param root0
- * @param root0.state
- * @param root0.enabled
- * @param root0.onToggle
  */
 const SourceToggle = ({
   state,
@@ -132,11 +126,6 @@ const SourceToggle = ({
 
 /**
  * Source category section
- * @param root0
- * @param root0.title
- * @param root0.sources
- * @param root0.enabledIds
- * @param root0.onToggle
  */
 const SourceCategory = ({
   title,
@@ -161,7 +150,7 @@ const SourceCategory = ({
           key={state.source.id}
           state={state}
           enabled={enabledIds.has(state.source.id)}
-          onToggle={() => onToggle(state.source.id)}
+          onToggle={() => { onToggle(state.source.id); }}
         />
       ))}
     </Stack>
@@ -170,14 +159,6 @@ const SourceCategory = ({
 
 /**
  * Collapsible panel for graph data source toggles
- * @param root0
- * @param root0.sources
- * @param root0.enabledSourceIds
- * @param root0.onToggleSource
- * @param root0.onEnableAll
- * @param root0.onDisableAll
- * @param root0.onRefresh
- * @param root0.loading
  */
 export const GraphSourcePanel = ({
   sources,

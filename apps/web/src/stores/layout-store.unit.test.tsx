@@ -1,6 +1,4 @@
-/**
- * @vitest-environment jsdom
- */
+// @vitest-environment jsdom
 
 import type { ProviderType } from "@bibgraph/types";
 import { act,renderHook } from "@testing-library/react";
@@ -13,15 +11,15 @@ import { LayoutProvider,useLayoutActions, useLayoutStore } from "./layout-store"
 
 // Mock localStorage for Zustand persistence
 const localStorageMock = (() => {
-  let store: Record<string, string> = {};
+  let store: Record<string, string | undefined> = {};
 
   return {
-    getItem: vi.fn((key: string) => store[key] || null),
+    getItem: vi.fn((key: string) => store[key] ?? null),
     setItem: vi.fn((key: string, value: string) => {
       store[key] = value;
     }),
     removeItem: vi.fn((key: string) => {
-      store[key] = undefined as any;
+      store[key] = undefined;
     }),
     clear: vi.fn(() => {
       store = {};
@@ -362,9 +360,11 @@ describe("Layout Store", () => {
     it("should handle rapid state changes", () => {
       const { result } = renderHook(() => useLayoutStore(), { wrapper });
 
+      const RAPID_TOGGLE_COUNT = 10;
+
       // Rapid toggles
       act(() => {
-        for (let index = 0; index < 10; index++) {
+        for (let index = 0; index < RAPID_TOGGLE_COUNT; index++) {
           result.current.toggleLeftSidebar();
           result.current.toggleRightSidebar();
         }

@@ -49,7 +49,8 @@ interface CatalogueListProperties {
 }
 
 interface ListCardProperties {
-  list: CatalogueList;
+  // Callers only ever render a ListCard for a list that already has a persisted ID (see the `list.id === undefined` filter before mapping to ListCard below).
+  list: CatalogueList & { id: string };
   isSelected: boolean;
   onSelect: () => void;
   onEdit: () => void;
@@ -67,10 +68,9 @@ const ListCard = ({ list, isSelected, onSelect, onEdit, onDelete, onShare }: Lis
 
   // Load stats when component mounts
   React.useEffect(() => {
-    if (!list.id) return;
     getListStats(list.id)
       .then(setStats)
-      .catch((error) => {
+      .catch((error: unknown) => {
         logger.warn("catalogue-ui", "Failed to load list stats", {
           listId: list.id,
           error
@@ -80,7 +80,7 @@ const ListCard = ({ list, isSelected, onSelect, onEdit, onDelete, onShare }: Lis
 
   const handleCopyLink = async () => {
     try {
-      const url = `${window.location.origin}${window.location.pathname}#/catalogue/shared/${list.shareToken || list.id}`;
+      const url = `${window.location.origin}${window.location.pathname}#/catalogue/shared/${list.shareToken ?? list.id}`;
       await navigator.clipboard.writeText(url);
       notifications.show({
         title: "Link Copied",
@@ -138,7 +138,7 @@ const ListCard = ({ list, isSelected, onSelect, onEdit, onDelete, onShare }: Lis
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
-                handleCopyLink();
+                void handleCopyLink();
               }}
               aria-label={`Copy link for ${list.title}`}
             >
@@ -193,7 +193,7 @@ const ListCard = ({ list, isSelected, onSelect, onEdit, onDelete, onShare }: Lis
         </Group>
       </Group>
 
-      {list.description && (
+      {list.description !== undefined && list.description !== "" && (
         <Text size="sm" c="dimmed" mb="xs" lineClamp={2}>
           {list.description}
         </Text>
@@ -245,14 +245,15 @@ const EditListModal = ({
   onClose,
   onSave,
 }: {
-  list: CatalogueList;
+  // Only ever opened for a list that already has a persisted ID (see the editingList narrowing in CatalogueListComponent below).
+  list: CatalogueList & { id: string };
   opened: boolean;
   onClose: () => void;
   onSave: (updates: Partial<Pick<CatalogueList, "title" | "description" | "tags" | "isPublic">>) => Promise<void>;
 }) => {
   const [title, setTitle] = useState(list.title);
-  const [description, setDescription] = useState(list.description || "");
-  const [tags, setTags] = useState(list.tags || []);
+  const [description, setDescription] = useState(list.description ?? "");
+  const [tags, setTags] = useState(list.tags ?? []);
   const [isPublic, setIsPublic] = useState(list.isPublic);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -270,9 +271,8 @@ const EditListModal = ({
         isPublic,
       };
 
-      if (!list.id) return;
       await updateList(list.id, updateData);
-      onSave(updateData);
+      await onSave(updateData);
       onClose();
 
       logger.debug("catalogue-ui", "List updated successfully", {
@@ -303,7 +303,7 @@ const EditListModal = ({
           label="Title"
           placeholder="List title"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => { setTitle(e.target.value); }}
           required
           data-testid="edit-list-title"
         />
@@ -312,7 +312,7 @@ const EditListModal = ({
           label="Description"
           placeholder="Optional description"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={(e) => { setDescription(e.target.value); }}
           minRows={3}
         />
 
@@ -329,7 +329,7 @@ const EditListModal = ({
           <input
             type="checkbox"
             checked={isPublic}
-            onChange={(e) => setIsPublic(e.target.checked)}
+            onChange={(e) => { setIsPublic(e.target.checked); }}
           />
         </Group>
 
@@ -338,7 +338,7 @@ const EditListModal = ({
             Cancel
           </Button>
           <Button
-            onClick={handleSubmit}
+            onClick={() => { void handleSubmit(); }}
             loading={isSubmitting}
             disabled={!title.trim()}
           >
@@ -358,18 +358,35 @@ export const CatalogueListComponent = ({
   isLoading,
   listType,
 }: CatalogueListProperties) => {
-  const [editingList, setEditingList] = useState<CatalogueList | null>(null);
+  const [editingList, setEditingList] = useState<(CatalogueList & { id: string }) | null>(null);
   const { generateShareUrl } = useCatalogue();
 
   const handleSelectList = (listId: string) => {
     onSelectList(listId);
   };
 
-  const handleEditList = (list: CatalogueList) => {
+  const handleEditList = (list: CatalogueList & { id: string }) => {
     setEditingList(list);
   };
 
-  const handleDeleteList = (list: CatalogueList) => {
+  const handleDeleteList = (list: CatalogueList & { id: string }) => {
+    const performDelete = async () => {
+      try {
+        await onDeleteList(list.id);
+        notifications.show({
+          title: "Deleted",
+          message: `${list.type === "bibliography" ? "Bibliography" : "List"} deleted successfully`,
+          color: "green",
+        });
+      } catch {
+        notifications.show({
+          title: "Error",
+          message: `Failed to delete ${list.type}`,
+          color: "red",
+        });
+      }
+    };
+
     modals.openConfirmModal({
       title: `Delete ${list.type}?`,
       centered: true,
@@ -380,28 +397,11 @@ export const CatalogueListComponent = ({
       ),
       labels: { confirm: "Delete", cancel: "Cancel" },
       confirmProps: { color: "red" },
-      onConfirm: async () => {
-        try {
-          if (!list.id) return;
-          await onDeleteList(list.id);
-          notifications.show({
-            title: "Deleted",
-            message: `${list.type === "bibliography" ? "Bibliography" : "List"} deleted successfully`,
-            color: "green",
-          });
-        } catch {
-          notifications.show({
-            title: "Error",
-            message: `Failed to delete ${list.type}`,
-            color: "red",
-          });
-        }
-      },
+      onConfirm: () => { void performDelete(); },
     });
   };
 
-  const handleShareList = async (list: CatalogueList) => {
-    if (!list.id) return;
+  const handleShareList = async (list: CatalogueList & { id: string }) => {
     try {
       const shareUrl = await generateShareUrl(list.id);
       await navigator.clipboard.writeText(shareUrl);
@@ -465,17 +465,19 @@ export const CatalogueListComponent = ({
     <>
       <SimpleGrid cols={{ base: 1, md: 2, lg: 3 }} spacing="md">
         {lists.map((list) => {
-          if (!list.id) return null;
+          if (list.id === undefined) return null;
           const listId = list.id;
+          // Rebuild the object with a narrowed `id` field: narrowing `list.id` above narrows that property access, but not the type of `list` itself, so the original object still can't satisfy ListCard's `CatalogueList & { id: string }` prop type.
+          const listWithId: CatalogueList & { id: string } = { ...list, id: listId };
           return (
             <ListCard
               key={listId}
-              list={list}
+              list={listWithId}
               isSelected={selectedListId === listId}
-              onSelect={() => handleSelectList(listId)}
-              onEdit={() => handleEditList(list)}
-              onDelete={() => handleDeleteList(list)}
-              onShare={() => handleShareList(list)}
+              onSelect={() => { handleSelectList(listId); }}
+              onEdit={() => { handleEditList(listWithId); }}
+              onDelete={() => { handleDeleteList(listWithId); }}
+              onShare={() => { void handleShareList(listWithId); }}
             />
           );
         })}
@@ -484,8 +486,8 @@ export const CatalogueListComponent = ({
       {editingList && (
         <EditListModal
           list={editingList}
-          opened={!!editingList}
-          onClose={() => setEditingList(null)}
+          opened={true}
+          onClose={() => { setEditingList(null); }}
           onSave={async () => {
             await Promise.resolve();
             setEditingList(null);

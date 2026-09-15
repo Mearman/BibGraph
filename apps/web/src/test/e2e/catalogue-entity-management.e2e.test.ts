@@ -4,6 +4,79 @@
 
 import { expect, type Page,test } from "@playwright/test";
 
+// Helper functions
+
+const createTestList = async (page: Page, listName: string): Promise<void> => {
+  await page.locator('button:has-text("Create New List")').click();
+  const createDialog = page.getByRole('dialog').filter({ hasText: 'Create' });
+  await expect(createDialog).toBeVisible();
+
+  await page.locator('input:below(:text("Title"))').fill(listName);
+  await page.locator('textarea:below(:text("Description"))').fill(`Test description for ${listName}`);
+
+  await page.locator('button:has-text("Create List")').click();
+  await expect(createDialog).not.toBeVisible({ timeout: 5000 });
+
+  // Wait for the list to appear in the selected list details section
+  await expect(page.locator('[data-testid="selected-list-title"]:has-text("' + listName + '")')).toBeVisible({ timeout: 10_000 });
+};
+
+const addEntityToCatalogue = async (page: Page, entityId: string, entityType: string, targetListName?: string): Promise<void> => {
+  // Navigate to entity page
+  await page.goto(`/#/${entityType}/${entityId}`);
+  await page.waitForLoadState("networkidle");
+
+  // Wait for page to fully load - entity pages can take time to render Removed: waitForTimeout - use locator assertions instead Look for "Add to Catalogue" button using the data-testid attribute
+  const addToCatalogueButton = page.locator('[data-testid="add-to-catalogue-button"]');
+
+  // Button might not be immediately visible, wait longer
+  try {
+    await expect(addToCatalogueButton).toBeVisible({ timeout: 15_000 });
+  } catch (error) {
+    // If button still not visible, log page state and rethrow
+    console.log(`Add to catalogue button not found on ${entityType}/${entityId}`);
+    console.log('Page URL:', page.url());
+    console.log('Visible buttons:', await page.locator('button').count());
+    throw error;
+  }
+
+  await addToCatalogueButton.click();
+
+  // Modal opens directly with AddToListModal
+  const addToListDialog = page.getByRole('dialog', { name: 'Add to Catalogue' });
+  await expect(addToListDialog).toBeVisible({ timeout: 5000 });
+
+  // Select a specific list if provided, otherwise first available
+  await page.locator('[data-testid="add-to-list-select"]').click();
+
+  await (targetListName !== undefined ? page.locator(`[role="option"]:has-text("${targetListName}")`).click() : page.locator('[role="option"]').first().click());
+
+  // Click Add to List button
+  await page.locator('[data-testid="add-to-list-submit"]').click();
+
+  // Wait for success notification or modal to close
+  await Promise.race([
+    page.locator('text="Added to List"').waitFor({ timeout: 5000 }),
+    addToListDialog.waitFor({ state: 'hidden', timeout: 5000 })
+  ]).catch(() => {
+    // Continue even if notification doesn't appear - modal closing is enough
+  });
+
+  // Ensure modal is closed
+  await expect(addToListDialog).not.toBeVisible({ timeout: 5000 });
+
+  // Give time for the add operation to complete Removed: waitForTimeout - use locator assertions instead
+};
+
+const createListWithMultipleEntities = async (page: Page, listName: string): Promise<void> => {
+  // Create the list first
+  await createTestList(page, listName);
+
+  // Add multiple entities to the created list
+  await addEntityToCatalogue(page, "A5017898742", "authors", listName);
+  await addEntityToCatalogue(page, "W4389376197", "works", listName);
+};
+
 test.describe("Catalogue Entity Management", () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to catalogue page
@@ -83,8 +156,8 @@ test.describe("Catalogue Entity Management", () => {
 
     // Verify list shows items were added
     const cardText = await listCard.textContent();
-    if (!cardText || !cardText.includes("1")) {
-      throw new Error(`Expected at least "1 item" in list card, got: ${cardText}`);
+    if (cardText?.includes("1") !== true) {
+      throw new Error(`Expected at least "1 item" in list card, got: ${String(cardText)}`);
     }
 
     // Click on the list card to select it
@@ -208,7 +281,7 @@ test.describe("Catalogue Entity Management", () => {
 
     // Verify order changed (first entity is now second)
     const firstEntityAfter = entities.first().locator(String.raw`text=/^(A|W)\d+/`).first();
-    if (!firstEntityBefore) {
+    if (firstEntityBefore === null) {
       throw new Error("First entity ID before reorder is null");
     }
     await expect(firstEntityAfter).not.toHaveText(firstEntityBefore);
@@ -378,7 +451,7 @@ test.describe("Catalogue Entity Management", () => {
 
     // Verify the list card shows "1 item" (entity was added successfully)
     const cardText = await listCard.textContent();
-    if (cardText && !cardText.includes("1")) {
+    if (cardText !== null && !cardText.includes("1")) {
       throw new Error(`Expected "1 item" in list card, got: ${cardText}`);
     }
 
@@ -401,79 +474,3 @@ test.describe("Catalogue Entity Management", () => {
     console.log("Note: Entity display in details panel may require additional UI implementation");
   });
 });
-
-// Helper functions
-
-const createTestList = async (page: Page, listName: string): Promise<void> => {
-  await page.click('button:has-text("Create New List")');
-  const createDialog = page.getByRole('dialog').filter({ hasText: 'Create' });
-  await expect(createDialog).toBeVisible();
-
-  await page.fill('input:below(:text("Title"))', listName);
-  await page.fill('textarea:below(:text("Description"))', `Test description for ${listName}`);
-
-  await page.click('button:has-text("Create List")');
-  await expect(createDialog).not.toBeVisible({ timeout: 5000 });
-
-  // Wait for the list to appear in the selected list details section
-  await expect(page.locator('[data-testid="selected-list-title"]:has-text("' + listName + '")')).toBeVisible({ timeout: 10_000 });
-};
-
-const addEntityToCatalogue = async (page: Page, entityId: string, entityType: string, targetListName?: string): Promise<void> => {
-  // Navigate to entity page
-  await page.goto(`/#/${entityType}/${entityId}`);
-  await page.waitForLoadState("networkidle");
-
-  // Wait for page to fully load - entity pages can take time to render
-  // Removed: waitForTimeout - use locator assertions instead
-  // Look for "Add to Catalogue" button using the data-testid attribute
-  const addToCatalogueButton = page.locator('[data-testid="add-to-catalogue-button"]');
-
-  // Button might not be immediately visible, wait longer
-  try {
-    await expect(addToCatalogueButton).toBeVisible({ timeout: 15_000 });
-  } catch (error) {
-    // If button still not visible, log page state and rethrow
-    console.log(`Add to catalogue button not found on ${entityType}/${entityId}`);
-    console.log('Page URL:', page.url());
-    console.log('Visible buttons:', await page.locator('button').count());
-    throw error;
-  }
-
-  await addToCatalogueButton.click();
-
-  // Modal opens directly with AddToListModal
-  const addToListDialog = page.getByRole('dialog', { name: 'Add to Catalogue' });
-  await expect(addToListDialog).toBeVisible({ timeout: 5000 });
-
-  // Select a specific list if provided, otherwise first available
-  await page.locator('[data-testid="add-to-list-select"]').click();
-
-  await (targetListName ? page.locator(`[role="option"]:has-text("${targetListName}")`).click() : page.locator('[role="option"]').first().click());
-
-  // Click Add to List button
-  await page.locator('[data-testid="add-to-list-submit"]').click();
-
-  // Wait for success notification or modal to close
-  await Promise.race([
-    page.locator('text="Added to List"').waitFor({ timeout: 5000 }),
-    addToListDialog.waitFor({ state: 'hidden', timeout: 5000 })
-  ]).catch(() => {
-    // Continue even if notification doesn't appear - modal closing is enough
-  });
-
-  // Ensure modal is closed
-  await expect(addToListDialog).not.toBeVisible({ timeout: 5000 });
-
-  // Give time for the add operation to complete
-  // Removed: waitForTimeout - use locator assertions instead
-};
-
-const createListWithMultipleEntities = async (page: Page, listName: string): Promise<void> => {
-  // Create the list first
-  await createTestList(page, listName);
-
-  // Add multiple entities to the created list
-  await addEntityToCatalogue(page, "A5017898742", "authors", listName);
-  await addEntityToCatalogue(page, "W4389376197", "works", listName);
-};

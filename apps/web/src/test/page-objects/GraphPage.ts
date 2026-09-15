@@ -4,13 +4,14 @@
  * Extends ExplorePage with advanced graph interaction capabilities including
  * 2D/3D toggling, node expansion, pathfinding, community detection, and motif detection.
  *
- * Hierarchy: BasePageObject -> BaseSPAPageObject -> ExplorePage -> GraphPage
+ * Hierarchy: BasePageObject -\> BaseSPAPageObject -\> ExplorePage -\> GraphPage
  * @see US-10 through US-16
  */
 
-import type { Page } from "@playwright/test";
-
 import { ExplorePage } from "./ExplorePage";
+
+const DIMENSION_TOGGLE_WAIT_MS = 500;
+const NODE_EXPAND_WAIT_MS = 1000;
 
 export class GraphPage extends ExplorePage {
 	protected readonly graphSelectors = {
@@ -59,15 +60,11 @@ export class GraphPage extends ExplorePage {
 		workerStatus: "[data-testid='worker-status']",
 	};
 
-	constructor(page: Page) {
-		super(page);
-	}
-
 	// --- 2D/3D Toggling ---
 
 	async toggle2D3D(): Promise<void> {
 		await this.click(this.graphSelectors.dimensionToggle);
-		await this.page.waitForTimeout(500);
+		await this.page.waitForTimeout(DIMENSION_TOGGLE_WAIT_MS);
 	}
 
 	async getCurrentDimension(): Promise<"2d" | "3d"> {
@@ -99,7 +96,9 @@ export class GraphPage extends ExplorePage {
 			if (nodeCount > 0) {
 				await nodes.nth(nodeIndex).click({ button: "right" });
 				const contextMenu = this.page.locator(this.graphSelectors.contextMenu);
-				await contextMenu.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+				await contextMenu.waitFor({ state: "visible", timeout: 5000 }).catch(() => {
+					// Context menu may not appear for every node; expansion falls through silently.
+				});
 				const expandOption = contextMenu.getByText(/expand/i);
 				if (await expandOption.isVisible().catch(() => false)) {
 					await expandOption.click();
@@ -107,7 +106,7 @@ export class GraphPage extends ExplorePage {
 			}
 		}
 
-		await this.page.waitForTimeout(1000);
+		await this.page.waitForTimeout(NODE_EXPAND_WAIT_MS);
 	}
 
 	async getExpandedNeighborCount(): Promise<number> {
@@ -141,7 +140,7 @@ export class GraphPage extends ExplorePage {
 	async getHighlightedPathLength(): Promise<number> {
 		const pathLengthElement = this.page.locator(this.graphSelectors.pathLength);
 		const text = await pathLengthElement.textContent();
-		return text ? Number.parseInt(text, 10) : 0;
+		return text !== null ? Number.parseInt(text, 10) : 0;
 	}
 
 	// --- Community Detection ---
@@ -154,7 +153,7 @@ export class GraphPage extends ExplorePage {
 	async getCommunityCount(): Promise<number> {
 		const countElement = this.page.locator(this.graphSelectors.communityCount);
 		const text = await countElement.textContent();
-		return text ? Number.parseInt(text, 10) : 0;
+		return text !== null ? Number.parseInt(text, 10) : 0;
 	}
 
 	// --- Motif Detection ---
@@ -167,7 +166,7 @@ export class GraphPage extends ExplorePage {
 	async getMotifCount(): Promise<number> {
 		const countElement = this.page.locator(this.graphSelectors.motifCount);
 		const text = await countElement.textContent();
-		return text ? Number.parseInt(text, 10) : 0;
+		return text !== null ? Number.parseInt(text, 10) : 0;
 	}
 }
 

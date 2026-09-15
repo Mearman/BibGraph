@@ -1,20 +1,17 @@
 import { logger } from "@bibgraph/utils/logger";
-import { createLazyFileRoute } from "@tanstack/react-router";
+import { createLazyFileRoute, useSearch } from "@tanstack/react-router";
 
 import { CatalogueErrorBoundary } from "@/components/catalogue/CatalogueErrorBoundary";
 import { CatalogueManager } from "@/components/catalogue/CatalogueManager";
 import { CatalogueProvider } from "@/contexts/catalogue-context";
 
-import type { CatalogueSearch } from "./catalogue";
-
-// T078: Wrap CatalogueManager in error boundary for graceful error handling
-// T082: Wrap in CatalogueProvider to share useCatalogue state between components
+// T078: Wrap CatalogueManager in error boundary for graceful error handling T082: Wrap in CatalogueProvider to share useCatalogue state between components
 const CataloguePage = () => {
   // T064: Get search params from router
-  const search = Route.useSearch() as CatalogueSearch;
+  const search = useSearch({ from: "/catalogue" });
 
   logger.debug("catalogue", "Catalogue page rendering", {
-    hasShareData: !!search.data,
+    hasShareData: search.data !== undefined && search.data !== "",
     initialListId: search.list,
   });
 

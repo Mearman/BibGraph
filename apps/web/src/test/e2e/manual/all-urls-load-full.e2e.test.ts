@@ -19,13 +19,23 @@ import { expect,test } from '@playwright/test';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+interface OpenAlexTestUrlsData {
+  urls: string[];
+  totalUrls: number;
+}
+
 // Load all URLs from the JSON file
 const urlsPath = join(__dirname, '../../data/openalex-test-urls.json');
-const urlsData: { urls: string[]; totalUrls: number } = JSON.parse(readFileSync(urlsPath, 'utf-8'));
+const urlsData = JSON.parse(readFileSync(urlsPath, 'utf-8')) as OpenAlexTestUrlsData;
 const urls: string[] = urlsData.urls;
 
-const BASE_URL = process.env.BASE_URL || (process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173');
+const BASE_URL = process.env.BASE_URL ?? (process.env.CI !== undefined && process.env.CI !== '' ? 'http://localhost:4173' : 'http://localhost:5173');
 const API_BASE = 'https://api.openalex.org';
+
+// Minimum expected content lengths, varying by page type
+const MIN_CONTENT_LENGTH_LIST_OR_SELECT = 50;
+const MIN_CONTENT_LENGTH_EXTERNAL_ID = 75;
+const MIN_CONTENT_LENGTH_DEFAULT = 100;
 
 // Helper to convert API URL to app URL
 // Uses the /openalex-url/ route which handles API URL conversion internally
@@ -41,25 +51,31 @@ const toAppUrl = (apiUrl: string): string => {
 
 // Helper to get entity type from URL
 const getEntityType = (url: string): string | null => {
-  const match = url.match(/\/([a-z]+)(?:\/|$|\?)/);
+  const match = /\/([a-z]+)(?:\/|$|\?)/.exec(url);
   return match?.[1] ?? null;
 };
 
+const ALL_URLS_TEST_TIMEOUT_MS = 3_600_000; // 60 minutes for all URLs (276 URLs + retries, ~6.5 seconds each)
+
 test.describe('All OpenAlex URLs - Load Test', () => {
-  test.setTimeout(3_600_000); // 60 minutes for all URLs (276 URLs + retries, ~6.5 seconds each)
+  test.setTimeout(ALL_URLS_TEST_TIMEOUT_MS);
 
   // Group URLs by type for better organization
-  const urlsByType: Record<string, string[]> = {};
+  const urlsByType = new Map<string, string[]>();
   for (const url of urls) {
-    const type = getEntityType(url) || 'other';
-    if (!urlsByType[type]) urlsByType[type] = [];
-    urlsByType[type].push(url);
+    const type = getEntityType(url) ?? 'other';
+    const existingUrls = urlsByType.get(type);
+    if (existingUrls === undefined) {
+      urlsByType.set(type, [url]);
+    } else {
+      existingUrls.push(url);
+    }
   }
 
-  for (const [type, typeUrls] of Object.entries(urlsByType)) {
-    test.describe(`${type} (${typeUrls.length} URLs)`, () => {
+  for (const [type, typeUrls] of urlsByType) {
+    test.describe(`${type} (${String(typeUrls.length)} URLs)`, () => {
       for (const [index, apiUrl] of typeUrls.entries()) {
-        test(`${index + 1}/${typeUrls.length}: ${apiUrl}`, async ({ page }) => {
+        test(`${String(index + 1)}/${String(typeUrls.length)}: ${apiUrl}`, async ({ page }) => {
           const appUrl = toAppUrl(apiUrl);
           const errors: string[] = [];
 
@@ -102,7 +118,9 @@ test.describe('All OpenAlex URLs - Load Test', () => {
           // Check if URL is a list page (ends with entity type, no ID)
           const isListPage = /\/(?:authors|concepts|funders|institutions|publishers|sources|topics|works)(?:\?|$)/.test(apiUrl);
           const isExternalId = apiUrl.includes('orcid:') || apiUrl.includes('issn:') || apiUrl.includes('ror:');
-          const minContentLength = hasSelectParameter || isListPage ? 50 : (isExternalId ? 75 : 100);
+          const minContentLength = hasSelectParameter || isListPage
+            ? MIN_CONTENT_LENGTH_LIST_OR_SELECT
+            : (isExternalId ? MIN_CONTENT_LENGTH_EXTERNAL_ID : MIN_CONTENT_LENGTH_DEFAULT);
 
           expect(mainText!.length).toBeGreaterThan(minContentLength);
 
@@ -132,6 +150,6 @@ test.describe('All OpenAlex URLs - Load Test', () => {
 test.describe('Summary', () => {
   test('should have loaded all URLs', () => {
     expect(urls).toHaveLength(urlsData.totalUrls);
-    console.log(`✅ Tested ${urls.length} URLs`);
+    console.log(`✅ Tested ${String(urls.length)} URLs`);
   });
 });

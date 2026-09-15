@@ -8,7 +8,6 @@
  * - Simulation toggle
  * - View mode (2D/3D) with localStorage persistence
  * - Path source/target selection for pathfinding
- * @module hooks/use-graph-visualization
  */
 
 import type { GraphNode, ViewMode } from '@bibgraph/types';
@@ -85,12 +84,12 @@ export interface GraphVisualizationActions {
   /**
   Highlight specific nodes (clears previous highlights)
    */
-  highlightNodes: (nodeIds: string[]) => void;
+  highlightNodes: (nodeIds: readonly string[]) => void;
 
   /**
   Highlight a path (ordered array of node IDs)
    */
-  highlightPath: (path: string[]) => void;
+  highlightPath: (path: readonly string[]) => void;
 
   /**
   Clear all highlights and path
@@ -101,14 +100,14 @@ export interface GraphVisualizationActions {
   Set community detection results for coloring
    */
   setCommunitiesResult: (
-    communities: CommunityResult[],
+    communities: readonly CommunityResult[],
     colors: Map<number, string>
   ) => void;
 
   /**
   Select a specific community (highlights its nodes)
    */
-  selectCommunity: (communityId: number, nodeIds: string[]) => void;
+  selectCommunity: (communityId: number, nodeIds: readonly string[]) => void;
 
   /**
   Change display mode
@@ -237,7 +236,7 @@ export const useGraphVisualization = (): UseGraphVisualizationResult => {
   /**
    * Highlight specific nodes (clears previous highlights)
    */
-  const highlightNodes = useCallback((nodeIds: string[]) => {
+  const highlightNodes = useCallback((nodeIds: readonly string[]) => {
     setHighlightedNodes(new Set(nodeIds));
     setHighlightedPath([]);
   }, []);
@@ -245,8 +244,8 @@ export const useGraphVisualization = (): UseGraphVisualizationResult => {
   /**
    * Highlight a path (ordered array of node IDs)
    */
-  const highlightPath = useCallback((path: string[]) => {
-    setHighlightedPath(path);
+  const highlightPath = useCallback((path: readonly string[]) => {
+    setHighlightedPath([...path]);
     setHighlightedNodes(new Set(path));
   }, []);
 
@@ -262,7 +261,7 @@ export const useGraphVisualization = (): UseGraphVisualizationResult => {
    * Set community detection results for coloring
    */
   const setCommunitiesResult = useCallback((
-    communities: CommunityResult[],
+    communities: readonly CommunityResult[],
     colors: Map<number, string>
   ) => {
     // Build node -> community assignment map
@@ -279,7 +278,7 @@ export const useGraphVisualization = (): UseGraphVisualizationResult => {
   /**
    * Select a specific community (highlights its nodes)
    */
-  const selectCommunity = useCallback((communityId: number, nodeIds: string[]) => {
+  const selectCommunity = useCallback((communityId: number, nodeIds: readonly string[]) => {
     setHighlightedNodes(new Set(nodeIds));
     setHighlightedPath([]);
   }, []);

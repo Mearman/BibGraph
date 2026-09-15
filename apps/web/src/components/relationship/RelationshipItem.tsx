@@ -1,7 +1,5 @@
 /**
- * RelationshipItem component
- * Displays an individual relationship connection with clickable entity link and optional metadata
- * @module RelationshipItem
+ * RelationshipItem component Displays an individual relationship connection with clickable entity link and optional metadata
  * @see specs/016-entity-relationship-viz/data-model.md
  */
 
@@ -25,14 +23,12 @@ export interface RelationshipItemProps {
 /**
  * Displays a single relationship connection
  * Shows the related entity name as a clickable link, with optional subtitle and metadata
- * @param root0
- * @param root0.item
  */
 export const RelationshipItem: React.FC<RelationshipItemProps> = ({ item }) => {
   const navigate = useNavigate();
 
   // Defensive checks for required item properties
-  if (!item.id || !item.direction) {
+  if (!item.id) {
     return (
       <Text size="xs" c="red" data-testid="relationship-item-error">
         Invalid relationship data
@@ -45,7 +41,7 @@ export const RelationshipItem: React.FC<RelationshipItemProps> = ({ item }) => {
   const entityType = item.direction === 'inbound' ? item.sourceType : item.targetType;
 
   // Validate we have the required entity info
-  if (!relatedEntityId || !entityType) {
+  if (!relatedEntityId) {
     return (
       <Text size="xs" c="dimmed" data-testid="relationship-item-missing">
         Unknown entity
@@ -56,7 +52,7 @@ export const RelationshipItem: React.FC<RelationshipItemProps> = ({ item }) => {
   // Extract just the ID portion if it's a full OpenAlex URL
   const extractEntityId = (id: string): string => {
     if (id.startsWith('https://openalex.org/') || id.startsWith('https://openalex.org/')) {
-      return id.split('/').pop() || id;
+      return id.split('/').pop() ?? id;
     }
     return id;
   };
@@ -124,7 +120,7 @@ export const RelationshipItem: React.FC<RelationshipItemProps> = ({ item }) => {
           )}
         </Group>
       </Group>
-      {item.subtitle && (
+      {item.subtitle !== undefined && item.subtitle !== '' && (
         <Text size="xs" c="dimmed" data-testid="relationship-subtitle" ml={4}>
           {decodeHtmlEntities(item.subtitle)}
         </Text>

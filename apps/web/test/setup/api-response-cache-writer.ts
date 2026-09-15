@@ -7,8 +7,6 @@ import { writeToFilesystemCache } from './filesystem-cache';
 
 /**
  * Intercept and cache successful API responses
- * @param url
- * @param responseData
  */
 export const cacheApiResponse = async (url: string, responseData: unknown): Promise<void> => {
   try {
@@ -18,7 +16,7 @@ export const cacheApiResponse = async (url: string, responseData: unknown): Prom
 
     // Parse URL to extract entity type and ID
     // Example: https://api.openalex.org/works/W123456789
-    const apiMatch = url.match(/api\.openalex\.org\/([a-z]+)\/([A-Z]\d+)/);
+    const apiMatch = /api\.openalex\.org\/([a-z]+)\/([A-Z]\d+)/.exec(url);
     if (!apiMatch) {
       console.log(`⚠️ Could not extract entity info from URL: ${url}`);
       return;
@@ -57,12 +55,12 @@ export const setupResponseCacheInterceptor = (): void => {
     if (
       response.ok &&
       urlString.includes('api.openalex.org') &&
-      response.headers.get('content-type')?.includes('application/json')
+      response.headers.get('content-type')?.includes('application/json') === true
     ) {
       try {
         // Clone response to avoid consuming it
         const clonedResponse = response.clone();
-        const data = await clonedResponse.json();
+        const data: unknown = await clonedResponse.json();
 
         // Cache the response
         await cacheApiResponse(urlString, data);

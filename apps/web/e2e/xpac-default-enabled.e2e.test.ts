@@ -14,10 +14,13 @@
 
 import { expect,test } from '@playwright/test';
 
+const MIN_PAGE_CONTENT_LENGTH = 100;
+const HTTP_OK = 200;
+
 test.describe('xpac Works Default Inclusion', () => {
   test('should include include_xpac=true parameter by default', async ({ page }) => {
     // Track API requests to verify parameters
-    const apiRequests: Array<{ url: string; params: URLSearchParams }> = [];
+    const apiRequests: { url: string; params: URLSearchParams }[] = [];
 
     page.on('request', (request) => {
       const url = request.url();
@@ -40,8 +43,8 @@ test.describe('xpac Works Default Inclusion', () => {
     // Verify page loaded successfully
     const bodyText = page.locator('body');
     await expect(bodyText).not.toBeEmpty();
-    const textLength = await bodyText.evaluate((element) => element.textContent?.length ?? 0);
-    expect(textLength).toBeGreaterThan(100);
+    const textLength = await bodyText.evaluate((element) => element.textContent.length);
+    expect(textLength).toBeGreaterThan(MIN_PAGE_CONTENT_LENGTH);
 
     // Verify API requests were made (or check for page content indicating success)
     if (apiRequests.length > 0) {
@@ -51,7 +54,7 @@ test.describe('xpac Works Default Inclusion', () => {
       );
 
       expect(requestsWithIncludeXpac.length).toBeGreaterThan(0);
-      console.log(`✅ Verified ${requestsWithIncludeXpac.length}/${apiRequests.length} API requests included include_xpac=true parameter`);
+      console.log(`✅ Verified ${String(requestsWithIncludeXpac.length)}/${String(apiRequests.length)} API requests included include_xpac=true parameter`);
     } else {
       console.log('ℹ️ No API requests captured (may be using MSW mocks), but page loaded successfully with content');
       // This is acceptable in test environment with MSW mocks
@@ -60,15 +63,15 @@ test.describe('xpac Works Default Inclusion', () => {
 
   test('should fetch xpac work successfully when include_xpac=true', async ({ page }) => {
     // Track API responses to verify xpac works are returned
-    const apiResponses: Array<{ url: string; data: unknown }> = [];
+    const apiResponses: { url: string; data: unknown }[] = [];
 
     page.on('response', async (response) => {
       const url = response.url();
       if ((url.includes('api.openalex.org') || url.includes('/api/openalex')) &&
-          response.status() === 200 &&
+          response.status() === HTTP_OK &&
           url.includes('/works/')) {
         try {
-          const data = await response.json();
+          const data: unknown = await response.json();
           apiResponses.push({ url, data });
         } catch {
           // Ignore non-JSON responses
@@ -96,7 +99,7 @@ test.describe('xpac Works Default Inclusion', () => {
         const data = resp.data as Record<string, unknown>;
 
         // Check if response has is_xpac field
-        return data && (
+        return (
           'is_xpac' in data ||
           Object.prototype.hasOwnProperty.call(data, 'is_xpac')
         );
@@ -104,7 +107,7 @@ test.describe('xpac Works Default Inclusion', () => {
 
       // At least one response should have xpac fields
       if (responsesWithXpac.length > 0) {
-        console.log(`✅ Found ${responsesWithXpac.length} responses with is_xpac field`);
+        console.log(`✅ Found ${String(responsesWithXpac.length)} responses with is_xpac field`);
         expect(responsesWithXpac.length).toBeGreaterThan(0);
 
         // Verify the xpac work has is_xpac=true
@@ -127,7 +130,7 @@ test.describe('xpac Works Default Inclusion', () => {
 
   test('should include xpac works in search results', async ({ page }) => {
     // Track API requests for works search/list
-    const apiRequests: Array<{ url: string; params: URLSearchParams }> = [];
+    const apiRequests: { url: string; params: URLSearchParams }[] = [];
 
     page.on('request', (request) => {
       const url = request.url();
@@ -159,7 +162,7 @@ test.describe('xpac Works Default Inclusion', () => {
       );
 
       expect(worksRequestsWithXpac.length).toBeGreaterThan(0);
-      console.log(`✅ Works search/list requests include include_xpac=true: ${worksRequestsWithXpac.length}/${apiRequests.length}`);
+      console.log(`✅ Works search/list requests include include_xpac=true: ${String(worksRequestsWithXpac.length)}/${String(apiRequests.length)}`);
     } else {
       console.log('ℹ️ No API requests captured (may be using MSW mocks), but works page loaded successfully');
       // This is acceptable in test environment with MSW mocks
@@ -168,15 +171,15 @@ test.describe('xpac Works Default Inclusion', () => {
 
   test('should verify xpac work types are accessible', async ({ page }) => {
     // Track API responses to check for xpac work types
-    const apiResponses: Array<{ url: string; data: unknown }> = [];
+    const apiResponses: { url: string; data: unknown }[] = [];
 
     page.on('response', async (response) => {
       const url = response.url();
       if ((url.includes('api.openalex.org') || url.includes('/api/openalex')) &&
-          response.status() === 200 &&
+          response.status() === HTTP_OK &&
           url.includes('/works')) {
         try {
-          const data = await response.json();
+          const data: unknown = await response.json();
           apiResponses.push({ url, data });
         } catch {
           // Ignore non-JSON responses
@@ -205,14 +208,14 @@ test.describe('xpac Works Default Inclusion', () => {
         const data = resp.data as Record<string, unknown>;
 
         // Check if response has type field matching xpac types
-        if (data && 'type' in data) {
-          return xpacWorkTypes.has(String(data.type).toLowerCase());
+        if ('type' in data && typeof data.type === 'string') {
+          return xpacWorkTypes.has(data.type.toLowerCase());
         }
 
         // Check if response has results array with xpac types
-        if (data && 'results' in data && Array.isArray(data.results)) {
+        if ('results' in data && Array.isArray(data.results)) {
           return data.results.some((result: Record<string, unknown>) =>
-            result.type && xpacWorkTypes.has(String(result.type).toLowerCase())
+            typeof result.type === 'string' && xpacWorkTypes.has(result.type.toLowerCase())
           );
         }
 
@@ -220,7 +223,7 @@ test.describe('xpac Works Default Inclusion', () => {
       });
 
       if (responsesWithXpacTypes.length > 0) {
-        console.log(`✅ Found ${responsesWithXpacTypes.length} responses with xpac work types`);
+        console.log(`✅ Found ${String(responsesWithXpacTypes.length)} responses with xpac work types`);
       } else {
         console.log('ℹ️ No xpac work types found in responses (may be using cache or different work type)');
         // This is not a failure - the specific work W2741809807 may not be one of these types
@@ -253,13 +256,13 @@ test.describe('xpac Works Default Inclusion', () => {
 
     // Verify page has content (not empty or error page)
     const textLength = bodyTextContent?.length ?? 0;
-    expect(textLength).toBeGreaterThan(100);
+    expect(textLength).toBeGreaterThan(MIN_PAGE_CONTENT_LENGTH);
 
     console.log('✅ Page renders xpac work without errors');
   });
 
   test('should include include_xpac parameter for author works requests', async ({ page }) => {
-    const apiRequests: Array<{ url: string; params: URLSearchParams }> = [];
+    const apiRequests: { url: string; params: URLSearchParams }[] = [];
 
     page.on('request', (request) => {
       const url = request.url();
@@ -295,14 +298,14 @@ test.describe('xpac Works Default Inclusion', () => {
 
       expect(worksRequestsWithXpac.length).toBeGreaterThan(0);
 
-      console.log(`✅ Author works requests include include_xpac=true: ${worksRequestsWithXpac.length}/${worksRequests.length}`);
+      console.log(`✅ Author works requests include include_xpac=true: ${String(worksRequestsWithXpac.length)}/${String(worksRequests.length)}`);
     } else {
       console.log('ℹ️ No works requests captured (may be using cache)');
     }
   });
 
   test('should include include_xpac parameter for institution works requests', async ({ page }) => {
-    const apiRequests: Array<{ url: string; params: URLSearchParams }> = [];
+    const apiRequests: { url: string; params: URLSearchParams }[] = [];
 
     page.on('request', (request) => {
       const url = request.url();
@@ -338,7 +341,7 @@ test.describe('xpac Works Default Inclusion', () => {
 
       expect(worksRequestsWithXpac.length).toBeGreaterThan(0);
 
-      console.log(`✅ Institution works requests include include_xpac=true: ${worksRequestsWithXpac.length}/${worksRequests.length}`);
+      console.log(`✅ Institution works requests include include_xpac=true: ${String(worksRequestsWithXpac.length)}/${String(worksRequests.length)}`);
     } else {
       console.log('ℹ️ No works requests captured (may be using cache)');
     }

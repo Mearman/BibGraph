@@ -1,6 +1,5 @@
 /**
- * Web Vitals Performance Monitoring
- * Tracks Core Web Vitals and reports to app activity store
+ * Web Vitals Performance Monitoring Tracks Core Web Vitals and reports to app activity store
  */
 
 import { logger } from "@bibgraph/utils";
@@ -35,16 +34,28 @@ const THRESHOLDS = {
 
 type Rating = "good" | "needs-improvement" | "poor";
 
-const getRating = (metric: Metric): Rating => {
-  const threshold = THRESHOLDS[metric.name as keyof typeof THRESHOLDS];
-  if (!threshold) return "good";
+const getRating = (metric: Readonly<Metric>): Rating => {
+  const threshold = THRESHOLDS[metric.name];
 
   if (metric.value <= threshold.good) return "good";
   if (metric.value <= threshold.needsImprovement) return "needs-improvement";
   return "poor";
 };
 
-const reportMetric = (metric: Metric) => {
+/**
+ * Get user agent group for analytics (privacy-friendly grouping)
+ */
+const getUserAgentGroup = (): string => {
+  if (typeof navigator === 'undefined') return 'unknown';
+  const userAgent = navigator.userAgent.toLowerCase();
+  if (userAgent.includes('chrome')) return 'chrome';
+  if (userAgent.includes('firefox')) return 'firefox';
+  if (userAgent.includes('safari')) return 'safari';
+  if (userAgent.includes('edge')) return 'edge';
+  return 'other';
+};
+
+const reportMetric = (metric: Readonly<Metric>) => {
   const rating = getRating(metric);
 
   logger.debug("performance", `Web Vital: ${metric.name}`, {
@@ -101,21 +112,7 @@ const reportMetric = (metric: Metric) => {
 };
 
 /**
- * Get user agent group for analytics (privacy-friendly grouping)
- */
-const getUserAgentGroup = (): string => {
-  if (typeof navigator === 'undefined') return 'unknown';
-  const userAgent = navigator.userAgent.toLowerCase();
-  if (userAgent.includes('chrome')) return 'chrome';
-  if (userAgent.includes('firefox')) return 'firefox';
-  if (userAgent.includes('safari')) return 'safari';
-  if (userAgent.includes('edge')) return 'edge';
-  return 'other';
-};
-
-/**
- * Initialize Web Vitals monitoring
- * Call this once when the app starts
+ * Initialize Web Vitals monitoring Call this once when the app starts
  */
 export const initWebVitals = async () => {
   if (typeof window === "undefined") return;
@@ -123,8 +120,7 @@ export const initWebVitals = async () => {
   try {
     const { onCLS, onLCP, onFCP, onTTFB, onINP } = await import("web-vitals");
 
-    // Report all Web Vitals
-    // Note: FID has been replaced by INP in web-vitals v4+
+    // Report all Web Vitals Note: FID has been replaced by INP in web-vitals v4+
     onCLS(reportMetric);
     onLCP(reportMetric);
     onFCP(reportMetric);
@@ -138,21 +134,40 @@ export const initWebVitals = async () => {
 };
 
 /**
+ * Shape of the `detail` object attached to a web-vital performance mark by reportMetric()
+ */
+interface WebVitalMarkDetail {
+  name: string;
+  value: number;
+  rating: Rating;
+  id: string;
+}
+
+const isPerformanceMark = (entry: Readonly<PerformanceEntry>): entry is PerformanceMark => entry.entryType === 'mark';
+
+const isWebVitalMarkDetail = (value: unknown): value is WebVitalMarkDetail =>
+  typeof value === 'object' && value !== null &&
+  'name' in value && typeof value.name === 'string' &&
+  'value' in value && typeof value.value === 'number' &&
+  'rating' in value && typeof value.rating === 'string' &&
+  'id' in value && typeof value.id === 'string';
+
+/**
  * Get all recorded Web Vitals metrics
  */
-export const getWebVitalsMetrics = () => {
+export const getWebVitalsMetrics = (): (WebVitalMarkDetail & { timestamp: number })[] => {
   if (typeof window === "undefined" || !("performance" in window)) {
     return [];
   }
 
-  return performance
-    .getEntriesByType("mark")
-    .filter((entry) => entry.name.startsWith("web-vital:"))
-    .map((entry) => ({
-      name: entry.name.replace("web-vital:", ""),
-      ...(entry as PerformanceMark).detail,
-      timestamp: entry.startTime,
-    }));
+  const results: (WebVitalMarkDetail & { timestamp: number })[] = [];
+  for (const entry of performance.getEntriesByType("mark")) {
+    if (!entry.name.startsWith("web-vital:")) continue;
+    if (!isPerformanceMark(entry)) continue;
+    if (!isWebVitalMarkDetail(entry.detail)) continue;
+    results.push({ ...entry.detail, timestamp: entry.startTime });
+  }
+  return results;
 };
 
 /**
@@ -171,17 +186,11 @@ export const getWebVitalsSummary = () => {
   > = {};
 
   for (const metric of metrics) {
-    if (
-      metric.name &&
-      !summary[metric.name] &&
-      "value" in metric &&
-      "rating" in metric &&
-      "timestamp" in metric
-    ) {
+    if (!(metric.name in summary)) {
       summary[metric.name] = {
-        value: metric.value as number,
-        rating: metric.rating as Rating,
-        timestamp: metric.timestamp as number,
+        value: metric.value,
+        rating: metric.rating,
+        timestamp: metric.timestamp,
       };
     }
   }

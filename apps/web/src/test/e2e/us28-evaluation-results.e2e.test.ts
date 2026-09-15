@@ -13,7 +13,8 @@ import { waitForAppReady } from '@/test/helpers/app-ready';
 import { EvaluationPage } from '@/test/page-objects/EvaluationPage';
 
 test.describe('@utility US-28 Evaluation Results', () => {
-	const BASE_URL = process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173';
+	const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+	const BASE_URL = IS_CI ? 'http://localhost:4173' : 'http://localhost:5173';
 
 	let evaluationPage: EvaluationPage;
 

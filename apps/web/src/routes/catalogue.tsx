@@ -3,7 +3,7 @@ import { lazy } from "react";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const CataloguePage = lazy(() => import("./catalogue.lazy"));
+const CataloguePage = lazy(async () => import("./catalogue.lazy"));
 
 // T064: Define search params schema for share URL detection and list selection
 export interface CatalogueSearch {
@@ -14,8 +14,8 @@ export interface CatalogueSearch {
 export const Route = createFileRoute("/catalogue")({
   validateSearch: (search: Record<string, unknown>): CatalogueSearch => {
     return {
-      data: (search.data as string) || undefined,
-      list: (search.list as string) || undefined,
+      data: typeof search.data === "string" && search.data !== "" ? search.data : undefined,
+      list: typeof search.list === "string" && search.list !== "" ? search.list : undefined,
     };
   },
   component: () => (

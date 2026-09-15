@@ -7,8 +7,6 @@
  * - Circular layout
  * - Bipartite layout
  * - Timeline layout
- *
- * @module hooks/use-graph-layout
  */
 
 import type { GraphEdge, GraphNode } from '@bibgraph/types';
@@ -80,17 +78,51 @@ export interface TimelineLayoutOptions {
 }
 
 /**
- * Apply circular layout to nodes
- * @param nodes
- * @param edges
- * @param options
+ * The four layout-specific options types are all-optional and share no property names with each other except `nodeSpacing`, so TypeScript can't narrow the combined union to a single member by control flow alone - `applyLayout` only knows which shape is correct via the separate `layoutType` argument, not from the `layoutOptions` value itself. These helpers extract exactly the fields each layout algorithm reads, narrowing per-property via `in` (the same technique `applyBipartiteLayout`/`applyTimelineLayout`'s required-field checks already use below).
  */
+type AnyLayoutOptions =
+  | HierarchicalLayoutOptions
+  | CircularLayoutOptions
+  | BipartiteLayoutOptions
+  | TimelineLayoutOptions;
+
+const toHierarchicalLayoutOptions = (
+  options: AnyLayoutOptions | undefined
+): HierarchicalLayoutOptions | undefined => {
+  if (options === undefined) return undefined;
+  const narrowed: HierarchicalLayoutOptions = {};
+  if ('levelSpacing' in options) narrowed.levelSpacing = options.levelSpacing;
+  if ('nodeSpacing' in options) narrowed.nodeSpacing = options.nodeSpacing;
+  if ('rootNodeId' in options) narrowed.rootNodeId = options.rootNodeId;
+  if ('direction' in options) narrowed.direction = options.direction;
+  return narrowed;
+};
+
+const toCircularLayoutOptions = (
+  options: AnyLayoutOptions | undefined
+): CircularLayoutOptions | undefined => {
+  if (options === undefined) return undefined;
+  const narrowed: CircularLayoutOptions = {};
+  if ('startAngle' in options) narrowed.startAngle = options.startAngle;
+  if ('radius' in options) narrowed.radius = options.radius;
+  return narrowed;
+};
+
+/**
+ * Apply circular layout to nodes
+ */
+const DEFAULT_CIRCULAR_RADIUS = 300;
+const DEFAULT_BIPARTITE_COLUMN_SPACING = 200;
+const DEFAULT_BIPARTITE_NODE_SPACING = 80;
+const DEFAULT_TIMELINE_TIME_SPACING = 100;
+const DEFAULT_TIMELINE_NODE_SPACING = 50;
+
 const applyCircularLayout = (
-  nodes: GraphNode[],
-  edges: GraphEdge[],
-  options: CircularLayoutOptions = {}
+  nodes: readonly GraphNode[],
+  edges: readonly GraphEdge[],
+  options: Readonly<CircularLayoutOptions> = {}
 ): Map<GraphNode, { x: number; y: number }> => {
-  const radius = options.radius ?? 300;
+  const radius = options.radius ?? DEFAULT_CIRCULAR_RADIUS;
   const startAngle = options.startAngle ?? 0;
   const positionMap = new Map<GraphNode, { x: number; y: number }>();
 
@@ -107,17 +139,14 @@ const applyCircularLayout = (
 
 /**
  * Apply bipartite layout to nodes
- * @param nodes
- * @param edges
- * @param options
  */
 const applyBipartiteLayout = (
-  nodes: GraphNode[],
-  edges: GraphEdge[],
-  options: BipartiteLayoutOptions
+  nodes: readonly GraphNode[],
+  edges: readonly GraphEdge[],
+  options: Readonly<BipartiteLayoutOptions>
 ): Map<GraphNode, { x: number; y: number }> => {
-  const columnSpacing = options.columnSpacing ?? 200;
-  const nodeSpacing = options.nodeSpacing ?? 80;
+  const columnSpacing = options.columnSpacing ?? DEFAULT_BIPARTITE_COLUMN_SPACING;
+  const nodeSpacing = options.nodeSpacing ?? DEFAULT_BIPARTITE_NODE_SPACING;
   const positionMap = new Map<GraphNode, { x: number; y: number }>();
 
   // Separate nodes into two columns
@@ -149,17 +178,14 @@ const applyBipartiteLayout = (
 
 /**
  * Apply timeline layout to nodes
- * @param nodes
- * @param edges
- * @param options
  */
 const applyTimelineLayout = (
-  nodes: GraphNode[],
-  edges: GraphEdge[],
-  options: TimelineLayoutOptions
+  nodes: readonly GraphNode[],
+  edges: readonly GraphEdge[],
+  options: Readonly<TimelineLayoutOptions>
 ): Map<GraphNode, { x: number; y: number }> => {
-  const timeSpacing = options.timeSpacing ?? 100;
-  const nodeSpacing = options.nodeSpacing ?? 50;
+  const timeSpacing = options.timeSpacing ?? DEFAULT_TIMELINE_TIME_SPACING;
+  const nodeSpacing = options.nodeSpacing ?? DEFAULT_TIMELINE_NODE_SPACING;
   const positionMap = new Map<GraphNode, { x: number; y: number }>();
 
   // Group nodes by timestamp
@@ -199,13 +225,13 @@ const applyTimelineLayout = (
 
 /**
  * Hook for applying graph layouts
- * @param nodes Graph nodes
- * @param edges Graph edges
- * @param initialLayout Initial layout type
+ * @param nodes - Graph nodes
+ * @param edges - Graph edges
+ * @param initialLayout - Initial layout type
  */
 export const useGraphLayout = (
-  nodes: GraphNode[],
-  edges: GraphEdge[],
+  nodes: readonly GraphNode[],
+  edges: readonly GraphEdge[],
   initialLayout: GraphLayoutType = 'force'
 ) => {
   const [currentLayout, setCurrentLayout] = useState<GraphLayoutType>(initialLayout);
@@ -231,7 +257,7 @@ export const useGraphLayout = (
 
     switch (layoutType) {
       case 'hierarchical': {
-        const result = hierarchicalLayout(nodes, edges, layoutOptions as HierarchicalLayoutOptions);
+        const result = hierarchicalLayout(nodes, edges, toHierarchicalLayoutOptions(layoutOptions));
         positionMap = new Map();
         for (const { node, x, y } of result.nodes) {
           positionMap.set(node, { x, y });
@@ -239,21 +265,21 @@ export const useGraphLayout = (
         break;
       }
       case 'circular': {
-        positionMap = applyCircularLayout(nodes, edges, layoutOptions as CircularLayoutOptions);
+        positionMap = applyCircularLayout(nodes, edges, toCircularLayoutOptions(layoutOptions));
         break;
       }
       case 'bipartite': {
         if (!layoutOptions || !('getColumn' in layoutOptions)) {
           throw new Error('Bipartite layout requires getColumn option');
         }
-        positionMap = applyBipartiteLayout(nodes, edges, layoutOptions as BipartiteLayoutOptions);
+        positionMap = applyBipartiteLayout(nodes, edges, layoutOptions);
         break;
       }
       case 'timeline': {
         if (!layoutOptions || !('getTimestamp' in layoutOptions)) {
           throw new Error('Timeline layout requires getTimestamp option');
         }
-        positionMap = applyTimelineLayout(nodes, edges, layoutOptions as TimelineLayoutOptions);
+        positionMap = applyTimelineLayout(nodes, edges, layoutOptions);
         break;
       }
       default:
@@ -280,7 +306,7 @@ export const useGraphLayout = (
   /**
    * Apply hierarchical layout with options
    */
-  const applyHierarchicalLayout = useCallback((options: HierarchicalLayoutOptions = {}) => {
+  const applyHierarchicalLayout = useCallback((options: Readonly<HierarchicalLayoutOptions> = {}) => {
     setCurrentLayout('hierarchical');
     return applyLayout('hierarchical', options);
   }, [applyLayout]);
@@ -288,7 +314,7 @@ export const useGraphLayout = (
   /**
    * Apply circular layout with options
    */
-  const applyCircularLayoutFunction = useCallback((options: CircularLayoutOptions = {}) => {
+  const applyCircularLayoutFunction = useCallback((options: Readonly<CircularLayoutOptions> = {}) => {
     setCurrentLayout('circular');
     return applyLayout('circular', options);
   }, [applyLayout]);
@@ -296,7 +322,7 @@ export const useGraphLayout = (
   /**
    * Apply bipartite layout with options
    */
-  const applyBipartiteLayoutFunction = useCallback((options: BipartiteLayoutOptions) => {
+  const applyBipartiteLayoutFunction = useCallback((options: Readonly<BipartiteLayoutOptions>) => {
     setCurrentLayout('bipartite');
     return applyLayout('bipartite', options);
   }, [applyLayout]);
@@ -304,7 +330,7 @@ export const useGraphLayout = (
   /**
    * Apply timeline layout with options
    */
-  const applyTimelineLayoutFunction = useCallback((options: TimelineLayoutOptions) => {
+  const applyTimelineLayoutFunction = useCallback((options: Readonly<TimelineLayoutOptions>) => {
     setCurrentLayout('timeline');
     return applyLayout('timeline', options);
   }, [applyLayout]);

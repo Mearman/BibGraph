@@ -8,6 +8,8 @@
 import { logger } from "@bibgraph/utils";
 import { useCallback, useEffect, useRef,useState } from 'react';
 
+import { isPlainObject } from './extractors/unknown-helpers';
+
 export interface CameraState {
   /**
   Camera position in 3D space
@@ -49,37 +51,38 @@ const DEFAULT_CAMERA_STATE: CameraState = {
 
 /**
  * Parse stored camera state with validation
- * @param stored
  */
 const parseStoredCameraState = (stored: string | null): CameraState | null => {
-  if (!stored) return null;
+  if (stored === null || stored === '') return null;
 
   try {
-    const parsed = JSON.parse(stored);
+    const parsed: unknown = JSON.parse(stored);
+
+    if (!isPlainObject(parsed)) return null;
+    const position = parsed.position;
+    const lookAt = parsed.lookAt;
 
     // Validate structure
     if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      typeof parsed.position === 'object' &&
-      typeof parsed.position.x === 'number' &&
-      typeof parsed.position.y === 'number' &&
-      typeof parsed.position.z === 'number' &&
-      typeof parsed.lookAt === 'object' &&
-      typeof parsed.lookAt.x === 'number' &&
-      typeof parsed.lookAt.y === 'number' &&
-      typeof parsed.lookAt.z === 'number'
+      isPlainObject(position) &&
+      typeof position.x === 'number' &&
+      typeof position.y === 'number' &&
+      typeof position.z === 'number' &&
+      isPlainObject(lookAt) &&
+      typeof lookAt.x === 'number' &&
+      typeof lookAt.y === 'number' &&
+      typeof lookAt.z === 'number'
     ) {
       return {
         position: {
-          x: parsed.position.x,
-          y: parsed.position.y,
-          z: parsed.position.z,
+          x: position.x,
+          y: position.y,
+          z: position.z,
         },
         lookAt: {
-          x: parsed.lookAt.x,
-          y: parsed.lookAt.y,
-          z: parsed.lookAt.z,
+          x: lookAt.x,
+          y: lookAt.y,
+          z: lookAt.z,
         },
         zoom: typeof parsed.zoom === 'number' ? parsed.zoom : 1,
       };
@@ -135,7 +138,7 @@ export interface UseCameraPersistenceReturn {
  * }
  * ```
  */
-export const useCameraPersistence = (options: UseCameraPersistenceOptions = {}): UseCameraPersistenceReturn => {
+export const useCameraPersistence = (options: Readonly<UseCameraPersistenceOptions> = {}): UseCameraPersistenceReturn => {
   const {
     storageKey = DEFAULT_STORAGE_KEY,
     debounceMs = DEFAULT_DEBOUNCE_MS,

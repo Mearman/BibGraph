@@ -7,7 +7,8 @@ import type { CatalogueList,ListType  } from "@bibgraph/utils";
 import { logger } from "@bibgraph/utils";
 import { SPECIAL_LIST_IDS } from "@bibgraph/utils/storage/catalogue-db";
 import { useHotkeys } from "@mantine/hooks";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type React from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ListTemplate } from "@/components/catalogue/ListTemplates";
 import type { SmartListCriteria } from "@/components/catalogue/SmartLists";
@@ -71,7 +72,7 @@ export interface UseCatalogueManagerStateReturn {
   handleUseTemplate: (template: ListTemplate) => void;
   handleCreateSmartList: (criteria: SmartListCriteria) => Promise<void>;
   handleMergeLists: (
-    sourceListIds: string[],
+    sourceListIds: readonly string[],
     mergeStrategy: 'union' | 'intersection' | 'combine',
     newListName: string,
     deduplicate: boolean
@@ -95,7 +96,7 @@ interface UseCatalogueManagerStateOptions {
   initialListId?: string;
 }
 
-export const useCatalogueManagerState = (options: UseCatalogueManagerStateOptions = {}): UseCatalogueManagerStateReturn => {
+export const useCatalogueManagerState = (options: Readonly<UseCatalogueManagerStateOptions> = {}): UseCatalogueManagerStateReturn => {
   const { shareData, initialListId } = options;
 
   const {
@@ -135,7 +136,7 @@ export const useCatalogueManagerState = (options: UseCatalogueManagerStateOption
 
   // T064: Auto-open import modal when share data is present in URL
   useEffect(() => {
-    if (!shareData) {
+    if (shareData === undefined || shareData === "") {
     	return;
     }
 
@@ -147,7 +148,7 @@ export const useCatalogueManagerState = (options: UseCatalogueManagerStateOption
 
   // Select list from URL parameter (sidebar navigation)
   useEffect(() => {
-    if (!(initialListId && lists.length > 0) || selectedList) {
+    if (!(initialListId !== undefined && initialListId !== "" && lists.length > 0) || selectedList) {
     	return;
     }
 
@@ -160,7 +161,7 @@ export const useCatalogueManagerState = (options: UseCatalogueManagerStateOption
 
   // Load stats when selected list changes
   useEffect(() => {
-    if (selectedList?.id) {
+    if (selectedList?.id !== undefined) {
       getListStats(selectedList.id)
         .then(setListStats)
         .catch((error: unknown) => {
@@ -176,7 +177,7 @@ export const useCatalogueManagerState = (options: UseCatalogueManagerStateOption
 
   // Handle sharing
   const handleShare = useCallback(async () => {
-    if (!selectedList?.id) return;
+    if (selectedList?.id === undefined) return;
 
     try {
       const url = await generateShareUrl(selectedList.id);
@@ -196,12 +197,12 @@ export const useCatalogueManagerState = (options: UseCatalogueManagerStateOption
 
   // Keyboard shortcuts
   useHotkeys([
-    ["mod+N", () => setShowCreateModal(true)],
+    ["mod+N", () => { setShowCreateModal(true); }],
     ["mod+K", () => {
       searchInputReference.current?.focus();
     }],
-    ["mod+Shift+S", () => selectedList && void handleShare()],
-    ["mod+Shift+I", () => setShowImportModal(true)],
+    ["mod+Shift+S", () => { if (selectedList) { void handleShare(); } }],
+    ["mod+Shift+I", () => { setShowImportModal(true); }],
   ]);
 
   // Handle toggle for showing system catalogues
@@ -231,30 +232,30 @@ export const useCatalogueManagerState = (options: UseCatalogueManagerStateOption
   const filteredLists = useMemo(() => {
     const specialListIdValues: string[] = Object.values(SPECIAL_LIST_IDS);
 
-    if (searchQuery || selectedTags.size > 0) {
+    if (searchQuery !== "" || selectedTags.size > 0) {
       return lists.filter(list =>
-        list.id && (showSystemCatalogues || !specialListIdValues.includes(list.id)) &&
+        list.id !== undefined && (showSystemCatalogues || !specialListIdValues.includes(list.id)) &&
         // Search query filter
         (!searchQuery ||
           list.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          list.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          list.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+          list.description?.toLowerCase().includes(searchQuery.toLowerCase()) === true ||
+          list.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) === true
         ) &&
         // Tag filter (list must have ALL selected tags)
         (selectedTags.size === 0 ||
-          (list.tags && list.tags.length > 0 && [...selectedTags].every(tag => list.tags?.includes(tag) ?? false))
+          (list.tags !== undefined && list.tags.length > 0 && [...selectedTags].every(tag => list.tags?.includes(tag) ?? false))
         )
       );
     }
 
-    return lists.filter(list => list.id && (showSystemCatalogues || !specialListIdValues.includes(list.id)));
+    return lists.filter(list => list.id !== undefined && (showSystemCatalogues || !specialListIdValues.includes(list.id)));
   }, [lists, searchQuery, selectedTags, showSystemCatalogues]);
 
   // Handle import
   const handleImport = useCallback(async (url: string) => {
     try {
       const listId = await importFromShareUrl(url);
-      if (listId) {
+      if (listId !== null) {
         selectList(listId);
         setShowImportModal(false);
         logger.info("catalogue-ui", "List imported successfully", {
@@ -303,7 +304,7 @@ export const useCatalogueManagerState = (options: UseCatalogueManagerStateOption
 
   // Handle merge lists
   const handleMergeLists = useCallback(async (
-    sourceListIds: string[],
+    sourceListIds: readonly string[],
     mergeStrategy: 'union' | 'intersection' | 'combine',
     newListName: string,
     deduplicate: boolean
@@ -339,7 +340,7 @@ export const useCatalogueManagerState = (options: UseCatalogueManagerStateOption
   }) => {
     // Merge template tags with user-provided tags (avoiding duplicates)
     const mergedTags = selectedTemplate
-      ? [...new Set([...selectedTemplate.tags, ...(parameters.tags || [])])]
+      ? [...new Set([...selectedTemplate.tags, ...(parameters.tags ?? [])])]
       : parameters.tags;
 
     const listId = await createList({

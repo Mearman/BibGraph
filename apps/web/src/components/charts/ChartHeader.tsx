@@ -22,10 +22,6 @@ interface ChartHeaderProperties {
 
 /**
  * Header component with title and description for charts
- * @param root0
- * @param root0.title
- * @param root0.description
- * @param root0.isMobile
  */
 export const ChartHeader = ({ title, description, isMobile }: ChartHeaderProperties) => (
   <div style={{ marginBottom: isMobile ? "16px" : "24px" }}>
@@ -39,7 +35,7 @@ export const ChartHeader = ({ title, description, isMobile }: ChartHeaderPropert
     >
       {title}
     </h3>
-    {description && (
+    {description !== undefined && description !== "" && (
       <p
         style={{
           fontSize: isMobile ? "14px" : "16px",

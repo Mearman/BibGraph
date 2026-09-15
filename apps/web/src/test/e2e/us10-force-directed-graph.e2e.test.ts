@@ -15,10 +15,13 @@ import { expect, test } from '@playwright/test';
 
 import { waitForAppReady } from '@/test/helpers/app-ready';
 
-test.describe('@utility US-10 Force-Directed Graph', () => {
-	test.setTimeout(60_000);
+const TEST_SUITE_TIMEOUT_MS = 60_000;
+const DEFERRED_ERROR_SURFACE_WAIT_MS = 2000;
 
-	test.beforeEach(async ({ page }) => {
+test.describe('@utility US-10 Force-Directed Graph', () => {
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS);
+
+	test.beforeEach(({ page }) => {
 		page.on('console', (message) => {
 			if (message.type() === 'error') {
 				console.error('Browser console error:', message.text());
@@ -54,8 +57,8 @@ test.describe('@utility US-10 Force-Directed Graph', () => {
 
 		// Verify no error alerts (exclude yellow/info alerts, only check for red error alerts)
 		const errorAlert = page.locator('.mantine-Alert-root[data-color="red"]');
-		const errorCount = errorAlert;
-		await expect(errorCount).toHaveCount(0);
+		
+		await expect(errorAlert).toHaveCount(0);
 	});
 
 	test('should display graph container when data is available', async ({ page }) => {
@@ -111,7 +114,7 @@ test.describe('@utility US-10 Force-Directed Graph', () => {
 		expect(hasContent).toBeTruthy();
 
 		// Allow time for deferred errors to surface
-		await page.waitForTimeout(2000);
+		await page.waitForTimeout(DEFERRED_ERROR_SURFACE_WAIT_MS);
 		expect(criticalErrors).toHaveLength(0);
 	});
 

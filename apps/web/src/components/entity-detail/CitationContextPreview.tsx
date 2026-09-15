@@ -6,10 +6,9 @@
  * - Papers this work cites (outgoing citations)
  * - Expandable snippets with metadata
  * - Links to navigate to related works
- *
- * @module components/entity-detail
  */
 
+import { RelationType } from '@bibgraph/types';
 import {
   Accordion,
   Badge,
@@ -46,11 +45,12 @@ interface CitationContextPreviewProperties {
 const MAX_CITATIONS_PER_SECTION = 5;
 
 /**
+ * Returns the first element of an array, or `undefined` for an empty array. Exists because plain index access (`array[0]`) is typed as always-defined under this project's `noUncheckedIndexedAccess: false` tsconfig, which would hide the genuine possibility of an empty array at this call site.
+ */
+const firstOrUndefined = <T,>(array: readonly T[]): T | undefined => array[0];
+
+/**
  * CitationContextPreview Component
- * @param root0
- * @param root0.incomingSections
- * @param root0.outgoingSections
- * @param root0.workId
  */
 export const CitationContextPreview: React.FC<CitationContextPreviewProperties> = ({
   incomingSections,
@@ -61,16 +61,16 @@ export const CitationContextPreview: React.FC<CitationContextPreviewProperties> 
   const citedBySection = useMemo(() => {
     return incomingSections.find((s) => {
       // Check if first item is a work (cited by works)
-      const firstItem = s.items[0];
-      return s.type === 'REFERENCE' && firstItem && firstItem.sourceType === 'works';
+      const firstItem = firstOrUndefined(s.items);
+      return s.type === RelationType.REFERENCE && firstItem?.sourceType === 'works';
     });
   }, [incomingSections]);
 
   const referencesSection = useMemo(() => {
     return outgoingSections.find((s) => {
       // Check if first item is a work (references to works)
-      const firstItem = s.items[0];
-      return s.type === 'REFERENCE' && firstItem && firstItem.targetType === 'works';
+      const firstItem = firstOrUndefined(s.items);
+      return s.type === RelationType.REFERENCE && firstItem?.targetType === 'works';
     });
   }, [outgoingSections]);
 
@@ -115,11 +115,9 @@ export const CitationContextPreview: React.FC<CitationContextPreviewProperties> 
                         <Text size="sm" lineClamp={1} style={{ flex: 1 }}>
                           {item.displayName}
                         </Text>
-                        {item.sourceType && (
-                          <Badge size="xs" variant="light" color="blue">
-                            {ENTITY_TYPE_CONFIGS[item.sourceType]?.name || item.sourceType}
-                          </Badge>
-                        )}
+                        <Badge size="xs" variant="light" color="blue">
+                          {ENTITY_TYPE_CONFIGS[item.sourceType].name || item.sourceType}
+                        </Badge>
                       </Group>
                     </Accordion.Control>
                     <Accordion.Panel>
@@ -127,7 +125,7 @@ export const CitationContextPreview: React.FC<CitationContextPreviewProperties> 
                         <Text size="xs" c="dimmed">
                           ID: {item.id}
                         </Text>
-                        {item.subtitle && (
+                        {item.subtitle !== undefined && item.subtitle !== '' && (
                           <Text size="xs" c="dimmed">
                             {item.subtitle}
                           </Text>
@@ -172,11 +170,9 @@ export const CitationContextPreview: React.FC<CitationContextPreviewProperties> 
                         <Text size="sm" lineClamp={1} style={{ flex: 1 }}>
                           {item.displayName}
                         </Text>
-                        {item.targetType && (
-                          <Badge size="xs" variant="light" color="violet">
-                            {ENTITY_TYPE_CONFIGS[item.targetType]?.name || item.targetType}
-                          </Badge>
-                        )}
+                        <Badge size="xs" variant="light" color="violet">
+                          {ENTITY_TYPE_CONFIGS[item.targetType].name || item.targetType}
+                        </Badge>
                       </Group>
                     </Accordion.Control>
                     <Accordion.Panel>
@@ -184,7 +180,7 @@ export const CitationContextPreview: React.FC<CitationContextPreviewProperties> 
                         <Text size="xs" c="dimmed">
                           ID: {item.id}
                         </Text>
-                        {item.subtitle && (
+                        {item.subtitle !== undefined && item.subtitle !== '' && (
                           <Text size="xs" c="dimmed">
                             {item.subtitle}
                           </Text>

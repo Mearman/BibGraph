@@ -7,7 +7,7 @@ interface DateFilterProperties {
   value: string | [string, string] | null;
   operator: FilterOperator;
   config: FilterFieldConfig;
-  onValueChange: (value: string | [string, string] | null) => void;
+  onValueChange: (value: string | readonly [string, string] | null) => void;
   onOperatorChange: (operator: FilterOperator) => void;
   disabled?: boolean;
   compact?: boolean;
@@ -41,7 +41,7 @@ export const DateFilter = ({
   }, [isRange, onValueChange]);
 
   const displayValue = React.useMemo(() => {
-    if (!value) return "";
+    if (value === null || value === "") return "";
     if (isRange && Array.isArray(value)) {
       return `${value[0]} to ${value[1]}`;
     }
@@ -71,8 +71,8 @@ export const DateFilter = ({
         <TextInput
           id={properties.fieldId}
           value={displayValue}
-          onChange={(event) => handleValueChange(event.currentTarget.value)}
-          placeholder={config.placeholder || (isRange ? "2023-01-01 to 2023-12-31" : "YYYY-MM-DD")}
+          onChange={(event) => { handleValueChange(event.currentTarget.value); }}
+          placeholder={config.placeholder ?? (isRange ? "2023-01-01 to 2023-12-31" : "YYYY-MM-DD")}
           disabled={properties.disabled}
           size={properties.compact ? "xs" : "sm"}
           flex={1}

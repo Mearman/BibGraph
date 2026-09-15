@@ -3,11 +3,11 @@
  *
  * Manages multiple data sources (catalogue lists, caches) and combines them
  * into a unified graph visualization with toggleable visibility per source.
- * @module hooks/use-multi-source-graph
  */
 
 import { getPersistentGraph } from '@bibgraph/client';
-import type { AuthorPosition,GraphEdge, GraphNode, RelationType } from '@bibgraph/types';
+import type { AuthorPosition,GraphEdge, GraphNode } from '@bibgraph/types';
+import { ENTITY_TYPES } from '@bibgraph/types';
 import type {
   GraphDataSource,
   GraphDataSourceState,
@@ -28,30 +28,18 @@ import {
   createStaticCacheSource,
 } from '@/lib/graph-sources';
 
-const STORAGE_KEY = 'bibgraph:graph-source-toggles';
-const LOG_PREFIX = 'multi-source-graph';
+import { loadEnabledSources, saveEnabledSources } from './graph-source-toggles-storage';
+import { isRelationType } from './relationship-query-transformers';
 
-/**
- * Load enabled source IDs from localStorage
- */
-const loadEnabledSources = (): Set<string> => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored) as string[];
-      return new Set(parsed);
-    }
-  } catch (error) {
-    logger.debug(LOG_PREFIX, 'Failed to load source toggles from localStorage', { error });
-  }
-  // Default: only bookmarks enabled
-  return new Set(['catalogue:bookmarks']);
-};
+const LOG_PREFIX = 'multi-source-graph';
+const AUTHOR_POSITIONS = ['first', 'middle', 'last'] as const;
+
+const isEntityType = (value: string): value is GraphNode['entityType'] => ENTITY_TYPES.some(t => t === value);
+const isAuthorPosition = (value: string): value is AuthorPosition => AUTHOR_POSITIONS.some(p => p === value);
 
 /**
  * Check if an entity is from the graph list source
  * T041: Graph list nodes take priority during deduplication
- * @param entity
  */
 const isGraphListEntity = (entity: GraphSourceEntity): boolean => {
   // Check sourceId first (most reliable)
@@ -60,7 +48,7 @@ const isGraphListEntity = (entity: GraphSourceEntity): boolean => {
   }
 
   // Also check for provenance metadata (nodes can have provenance even from other sources)
-  if (entity.entityData?._graphListProvenance) {
+  if (entity.entityData._graphListProvenance !== undefined) {
     return true;
   }
 
@@ -73,7 +61,7 @@ const isGraphListEntity = (entity: GraphSourceEntity): boolean => {
  * @param entities - Array of entities from multiple sources
  * @returns Deduplicated array with graph list nodes taking priority
  */
-export const deduplicateEntities = (entities: GraphSourceEntity[]): GraphSourceEntity[] => {
+export const deduplicateEntities = (entities: readonly GraphSourceEntity[]): GraphSourceEntity[] => {
   const entityMap = new Map<string, GraphSourceEntity>();
 
   for (const entity of entities) {
@@ -101,29 +89,21 @@ export const deduplicateEntities = (entities: GraphSourceEntity[]): GraphSourceE
   return [...entityMap.values()];
 };
 
-/**
- * Save enabled source IDs to localStorage
- * @param enabledIds
- */
-const saveEnabledSources = (enabledIds: Set<string>): void => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...enabledIds]));
-  } catch (error) {
-    logger.debug(LOG_PREFIX, 'Failed to save source toggles to localStorage', { error });
-  }
-};
+const INITIAL_NODE_X_RANGE = 800;
+const INITIAL_NODE_X_OFFSET = 400;
+const INITIAL_NODE_Y_RANGE = 600;
+const INITIAL_NODE_Y_OFFSET = 300;
 
 /**
  * Convert GraphSourceEntity to GraphNode
- * @param entity
  */
-const sourceEntityToNode = (entity: GraphSourceEntity): GraphNode => ({
+const sourceEntityToNode = (entity: Readonly<GraphSourceEntity>): GraphNode => ({
     id: entity.entityId,
     entityType: entity.entityType,
     entityId: entity.entityId,
     label: entity.label,
-    x: Math.random() * 800 - 400,
-    y: Math.random() * 600 - 300,
+    x: Math.random() * INITIAL_NODE_X_RANGE - INITIAL_NODE_X_OFFSET,
+    y: Math.random() * INITIAL_NODE_Y_RANGE - INITIAL_NODE_Y_OFFSET,
     externalIds: [],
     entityData: {
       ...entity.entityData,
@@ -132,13 +112,9 @@ const sourceEntityToNode = (entity: GraphSourceEntity): GraphNode => ({
   });
 
 /**
- * Build edges from entity relationships
- * Only creates edges where both endpoints exist in the entity map
- * Preserves edge properties (score, authorPosition, etc.) for weighted traversal
- * @param entities
- * @param entityIds
+ * Build edges from entity relationships Only creates edges where both endpoints exist in the entity map Preserves edge properties (score, authorPosition, etc.) for weighted traversal
  */
-const buildEdges = (entities: GraphSourceEntity[], entityIds: Set<string>): GraphEdge[] => {
+const buildEdges = (entities: readonly GraphSourceEntity[], entityIds: Set<string>): GraphEdge[] => {
   const edges: GraphEdge[] = [];
   const seenEdges = new Set<string>();
 
@@ -220,12 +196,12 @@ export interface UseMultiSourceGraphResult {
   /**
   Enable multiple sources
    */
-  enableSources: (sourceIds: string[]) => void;
+  enableSources: (sourceIds: readonly string[]) => void;
 
   /**
   Disable multiple sources
    */
-  disableSources: (sourceIds: string[]) => void;
+  disableSources: (sourceIds: readonly string[]) => void;
 
   /**
   Enable all sources
@@ -246,8 +222,8 @@ export interface UseMultiSourceGraphResult {
   Add nodes and edges incrementally (without full refresh)
    */
   addNodesAndEdges: (
-    newNodes: Array<{ id: string; entityType: string; label: string; completeness?: string }>,
-    newEdges: Array<{ source: string; target: string; type: string; score?: number; authorPosition?: string; isCorresponding?: boolean; isOpenAccess?: boolean }>
+    newNodes: readonly { id: string; entityType: string; label: string; completeness?: string }[],
+    newEdges: readonly { source: string; target: string; type: string; score?: number; authorPosition?: string; isCorresponding?: boolean; isOpenAccess?: boolean }[]
   ) => void;
 
   /**
@@ -258,7 +234,7 @@ export interface UseMultiSourceGraphResult {
   /**
   Add edges discovered through auto-population
    */
-  addDiscoveredEdges: (newEdges: GraphEdge[]) => void;
+  addDiscoveredEdges: (newEdges: readonly GraphEdge[]) => void;
 }
 
 /**
@@ -299,7 +275,7 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
       for (const list of lists) {
         // Skip system lists (bookmarks, history, graph list) - they're added above
         if (list.id === 'bookmarks-list' || list.id === 'history-list' || list.id === 'graph-list') continue;
-        if (list.id) {
+        if (list.id !== undefined && list.id !== '') {
           discovered.push(createCatalogueListSource(storage, list.id, list));
         }
       }
@@ -336,7 +312,7 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
    * Load entity counts for all sources
    */
   const loadSourceStates = useCallback(async (
-    discoveredSources: GraphDataSource[]
+    discoveredSources: readonly GraphDataSource[]
   ): Promise<GraphDataSourceState[]> => {
     const states: GraphDataSourceState[] = [];
 
@@ -367,7 +343,7 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
   /**
    * Load graph data from enabled sources
    */
-  const loadGraphData = useCallback(async (sourceStates: GraphDataSourceState[]) => {
+  const loadGraphData = useCallback(async (sourceStates: readonly GraphDataSourceState[]) => {
     const enabledStates = sourceStates.filter(s => s.enabled);
 
     if (enabledStates.length === 0) {
@@ -514,7 +490,7 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
   /**
    * Enable multiple sources
    */
-  const enableSources = useCallback((sourceIds: string[]) => {
+  const enableSources = useCallback((sourceIds: readonly string[]) => {
     setEnabledSourceIds(previous => {
       const next = new Set(previous);
       for (const id of sourceIds) {
@@ -528,7 +504,7 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
   /**
    * Disable multiple sources
    */
-  const disableSources = useCallback((sourceIds: string[]) => {
+  const disableSources = useCallback((sourceIds: readonly string[]) => {
     setEnabledSourceIds(previous => {
       const next = new Set(previous);
       for (const id of sourceIds) {
@@ -576,10 +552,12 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
     // Reload graph data
     setLoading(true);
     void loadGraphData(updatedStates)
-      .catch(error_ => {
+      .catch((error_: unknown) => {
         logger.error(LOG_PREFIX, 'Failed to reload graph', { error: error_ });
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+      });
   }, [enabledSourceIds, sources.length, loadGraphData]);
 
   const isEmpty = useMemo(() => nodes.length === 0 && edges.length === 0, [nodes, edges]);
@@ -600,28 +578,32 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
    * (non-ID) label and the existing node has an ID-only label.
    */
   const addNodesAndEdges = useCallback((
-    newNodes: Array<{ id: string; entityType: string; label: string; completeness?: string }>,
-    newEdges: Array<{ source: string; target: string; type: string; score?: number; authorPosition?: string; isCorresponding?: boolean; isOpenAccess?: boolean }>
+    newNodes: readonly { id: string; entityType: string; label: string; completeness?: string }[],
+    newEdges: readonly { source: string; target: string; type: string; score?: number; authorPosition?: string; isCorresponding?: boolean; isOpenAccess?: boolean }[]
   ) => {
     // Build map of existing nodes for efficient lookup
     const existingNodeMap = new Map(nodes.map(n => [n.id, n]));
 
     // Separate new nodes from label updates
     const nodesToAdd: GraphNode[] = [];
-    const labelUpdates: Array<{ id: string; label: string }> = [];
+    const labelUpdates: { id: string; label: string }[] = [];
 
     for (const n of newNodes) {
       const existingNode = existingNodeMap.get(n.id);
 
       if (!existingNode) {
+        if (!isEntityType(n.entityType)) {
+          logger.warn(LOG_PREFIX, 'Skipping node with unrecognised entityType', { id: n.id, entityType: n.entityType });
+          continue;
+        }
         // New node - add it
         nodesToAdd.push({
           id: n.id,
-          entityType: n.entityType as GraphNode['entityType'],
+          entityType: n.entityType,
           entityId: n.id,
           label: n.label,
-          x: Math.random() * 800 - 400,
-          y: Math.random() * 600 - 300,
+          x: Math.random() * INITIAL_NODE_X_RANGE - INITIAL_NODE_X_OFFSET,
+          y: Math.random() * INITIAL_NODE_Y_RANGE - INITIAL_NODE_Y_OFFSET,
           externalIds: [],
           entityData: {
             completeness: n.completeness,
@@ -636,24 +618,32 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
     // Get existing edge keys to avoid duplicates
     const existingEdgeKeys = new Set(edges.map(e => `${e.source}-${e.target}-${e.type}`));
 
-    // Convert and filter new edges (skip duplicates)
-    const edgesToAdd: GraphEdge[] = newEdges
-      .filter(e => {
-        const key = `${e.source}-${e.target}-${e.type}`;
-        const reverseKey = `${e.target}-${e.source}-${e.type}`;
-        return !existingEdgeKeys.has(key) && !existingEdgeKeys.has(reverseKey);
-      })
-      .map(e => ({
-        id: `${e.source}-${e.target}-${e.type}`,
+    // Convert and filter new edges (skip duplicates and unrecognised relation types)
+    const edgesToAdd: GraphEdge[] = [];
+    for (const e of newEdges) {
+      const key = `${e.source}-${e.target}-${e.type}`;
+      const reverseKey = `${e.target}-${e.source}-${e.type}`;
+      if (existingEdgeKeys.has(key) || existingEdgeKeys.has(reverseKey)) continue;
+
+      if (!isRelationType(e.type)) {
+        logger.warn(LOG_PREFIX, 'Skipping edge with unrecognised relation type', { source: e.source, target: e.target, type: e.type });
+        continue;
+      }
+
+      const authorPosition = e.authorPosition !== undefined && isAuthorPosition(e.authorPosition) ? e.authorPosition : undefined;
+
+      edgesToAdd.push({
+        id: key,
         source: e.source,
         target: e.target,
-        type: e.type as RelationType,
+        type: e.type,
         weight: e.score ?? 1,
         score: e.score,
-        authorPosition: e.authorPosition as AuthorPosition | undefined,
+        authorPosition,
         isCorresponding: e.isCorresponding,
         isOpenAccess: e.isOpenAccess,
-      }));
+      });
+    }
 
     // Only update state if there's something to add or update
     if (nodesToAdd.length > 0 || edgesToAdd.length > 0 || labelUpdates.length > 0) {
@@ -670,7 +660,7 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
           // Update existing node labels
           const updated = previous.map(n => {
             const newLabel = labelUpdateMap.get(n.id);
-            return newLabel ? { ...n, label: newLabel } : n;
+            return newLabel !== undefined ? { ...n, label: newLabel } : n;
           });
           // Add new nodes
           return [...updated, ...nodesToAdd];
@@ -693,14 +683,14 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
 
     setNodes(previous => previous.map(n => {
       const newLabel = updates.get(n.id);
-      return newLabel ? { ...n, label: newLabel } : n;
+      return newLabel !== undefined ? { ...n, label: newLabel } : n;
     }));
   }, []);
 
   /**
    * Add edges discovered through auto-population
    */
-  const addDiscoveredEdges = useCallback((newEdges: GraphEdge[]) => {
+  const addDiscoveredEdges = useCallback((newEdges: readonly GraphEdge[]) => {
     if (newEdges.length === 0) return;
 
     // Get existing edge keys to avoid duplicates

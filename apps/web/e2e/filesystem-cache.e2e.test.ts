@@ -76,11 +76,11 @@ test.describe('Filesystem Cache', () => {
     await page.locator('[data-testid="error-state"]').waitFor({ timeout: 15_000 });
 
     // Verify error state is shown
-    const pageContent = await page.textContent('body');
-    const hasError = pageContent?.includes('Error') ||
-                     pageContent?.includes('error') ||
-                     pageContent?.includes('not found') ||
-                     pageContent?.includes('404');
+    const pageContent = (await page.locator('body').textContent()) ?? '';
+    const hasError = pageContent.includes('Error') ||
+                     pageContent.includes('error') ||
+                     pageContent.includes('not found') ||
+                     pageContent.includes('404');
 
     expect(hasError).toBe(true);
 

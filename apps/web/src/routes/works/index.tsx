@@ -4,7 +4,7 @@ import { lazy } from "react";
 import { LazyRoute } from "@/components/routing/LazyRoute";
 import { openAlexSearchSchema } from "@/lib/route-schemas";
 
-const WorksListRoute = lazy(() => import("./index.lazy"));
+const WorksListRoute = lazy(async () => import("./index.lazy"));
 
 export const Route = createFileRoute("/works/")({
   component: () => (

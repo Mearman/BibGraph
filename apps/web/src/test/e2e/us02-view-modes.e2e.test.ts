@@ -18,6 +18,9 @@ test.describe('@utility US-02 View Modes', () => {
 
 	// A broad query that reliably returns results
 	const SEARCH_QUERY = 'machine learning';
+	const VIEW_MODE_SWITCH_WAIT_MS = 500;
+	const MIN_RESULT_TEXT_LENGTH = 20;
+	const MIN_ROW_TEXT_LENGTH = 5;
 
 	test.beforeEach(async ({ page }) => {
 		// Dismiss onboarding tour before any navigation
@@ -213,7 +216,7 @@ test.describe('@utility US-02 View Modes', () => {
 		await searchPage.switchViewMode('card');
 
 		// Wait for the SegmentedControl to reflect the change
-		await page.waitForTimeout(500);
+		await page.waitForTimeout(VIEW_MODE_SWITCH_WAIT_MS);
 
 		// Verify card view is active after switching
 		const modeAfterSwitch = await searchPage.getCurrentViewMode();
@@ -221,7 +224,7 @@ test.describe('@utility US-02 View Modes', () => {
 
 		// Switch to list view to further verify toggle works
 		await searchPage.switchViewMode('list');
-		await page.waitForTimeout(500);
+		await page.waitForTimeout(VIEW_MODE_SWITCH_WAIT_MS);
 
 		const modeAfterSecondSwitch = await searchPage.getCurrentViewMode();
 		expect(modeAfterSecondSwitch).toBe('list');
@@ -270,7 +273,7 @@ test.describe('@utility US-02 View Modes', () => {
 		const resultText = await searchResults.textContent();
 		expect(resultText).toBeTruthy();
 		// Results should contain substantive content (entity names, types, etc.)
-		expect(resultText!.length).toBeGreaterThan(20);
+		expect(resultText!.length).toBeGreaterThan(MIN_RESULT_TEXT_LENGTH);
 
 		// Verify table rows contain data (each row should have text)
 		const firstRow = page.locator('.mantine-Table-root tbody tr, table tbody tr').first();
@@ -278,7 +281,7 @@ test.describe('@utility US-02 View Modes', () => {
 		if (isFirstRowVisible) {
 			const rowText = await firstRow.textContent();
 			expect(rowText).toBeTruthy();
-			expect(rowText!.length).toBeGreaterThan(5);
+			expect(rowText!.length).toBeGreaterThan(MIN_ROW_TEXT_LENGTH);
 		}
 	});
 

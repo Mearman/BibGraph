@@ -1,7 +1,9 @@
-import { cachedOpenAlex } from "@bibgraph/client";
+import type * as BibgraphClient from "@bibgraph/client";
+import type { Source } from "@bibgraph/types";
 import { InMemoryStorageProvider } from "@bibgraph/utils";
 import { MantineProvider } from "@mantine/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type * as TanstackReactRouter from "@tanstack/react-router";
 import { useParams, useSearch } from "@tanstack/react-router";
 import { cleanup,fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -11,15 +13,19 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { StorageProviderWrapper } from "@/contexts/storage-provider-context";
 import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
 
+const { getSourceMock } = vi.hoisted(() => ({
+  getSourceMock: vi.fn(),
+}));
+
 // Mock cachedOpenAlex client
 vi.mock("@bibgraph/client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@bibgraph/client")>();
+  const actual = await importOriginal<typeof BibgraphClient>();
   return {
     ...actual,
     cachedOpenAlex: {
       client: {
         sources: {
-          getSource: vi.fn(),
+          getSource: getSourceMock,
         },
       },
     },
@@ -28,7 +34,7 @@ vi.mock("@bibgraph/client", async (importOriginal) => {
 
 // Mock router hooks and Link component
 vi.mock("@tanstack/react-router", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+  const actual = await importOriginal<typeof TanstackReactRouter>();
   return {
     ...actual,
     useParams: vi.fn(),
@@ -52,7 +58,13 @@ const mockSourceData = {
   type: "journal",
   works_count: 5000,
   cited_by_count: 10_000,
-};
+  counts_by_year: [],
+  updated_date: "2023-01-01",
+  created_date: "2023-01-01",
+  works_api_url: "https://api.openalex.org/works?filter=primary_location.source.id:S123",
+  is_oa: false,
+  is_in_doaj: true,
+} as Source;
 
 describe("SourceRoute Integration Tests", () => {
   let queryClient: QueryClient;
@@ -76,9 +88,7 @@ describe("SourceRoute Integration Tests", () => {
     vi.mocked(useSearch).mockReturnValue({});
 
     // Mock successful API response by default
-    vi.mocked(cachedOpenAlex.client.sources.getSource).mockResolvedValue(
-      mockSourceData as any,
-    );
+    getSourceMock.mockResolvedValue(mockSourceData);
   });
 
   const TestWrapper = ({ children }: { children: ReactNode }) => (
@@ -101,11 +111,14 @@ describe("SourceRoute Integration Tests", () => {
     vi.clearAllMocks();
   });
 
-  it("renders loading state initially", async () => {
+  it("renders loading state initially", () => {
     // Make the API call slow to test loading state
-    vi.mocked(cachedOpenAlex.client.sources.getSource).mockImplementation(
-      () => new Promise(() => {}), // Never resolves
-    );
+    getSourceMock.mockImplementation(async () => {
+      await new Promise(() => {
+        // Never resolves - keeps the component in its loading state for this test.
+      });
+      return mockSourceData;
+    });
 
     render(
       <TestWrapper>
@@ -119,9 +132,7 @@ describe("SourceRoute Integration Tests", () => {
 
   it("renders error state when API fails", async () => {
     const mockError = new Error("API Error");
-    vi.mocked(cachedOpenAlex.client.sources.getSource).mockRejectedValue(
-      mockError,
-    );
+    getSourceMock.mockRejectedValue(mockError);
 
     render(
       <TestWrapper>
@@ -213,10 +224,6 @@ describe("SourceRoute Integration Tests", () => {
   });
 
   it("does not refetch data on view toggle", async () => {
-    const getSourceMock = vi.mocked(
-      cachedOpenAlex.client.sources.getSource,
-    );
-
     render(
       <TestWrapper>
         <SourceRoute />

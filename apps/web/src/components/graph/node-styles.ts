@@ -40,7 +40,7 @@ export interface NodeStyleProperties {
  * Colors are deterministic based on state type strings
  * Follows WCAG 2.1 Level AA contrast guidelines
  */
-const COLORS = HASH_BASED_COLORS;
+
 
 /**
  * Get styling for xpac works
@@ -48,20 +48,20 @@ const COLORS = HASH_BASED_COLORS;
  * @param baseStyle - Base style properties to extend
  * @returns Style properties with xpac-specific styling
  */
-export const getXpacWorkStyle = (baseStyle: NodeStyleProperties = {}): NodeStyleProperties => ({
+export const getXpacWorkStyle = (baseStyle: Readonly<NodeStyleProperties> = {}): NodeStyleProperties => ({
     ...baseStyle,
 
     // SVG properties
-    stroke: COLORS.xpac.stroke,
+    stroke: HASH_BASED_COLORS.xpac.stroke,
     strokeWidth: 2,
     strokeDasharray: '5,3', // Dashed border pattern: 5px dash, 3px gap
-    fill: COLORS.xpac.fill,
+    fill: HASH_BASED_COLORS.xpac.fill,
     fillOpacity: 0.7, // Slightly transparent
 
     // CSS properties (for DOM renderers)
-    border: `2px dashed ${COLORS.xpac.stroke}`,
+    border: `2px dashed ${HASH_BASED_COLORS.xpac.stroke}`,
     borderStyle: 'dashed',
-    backgroundColor: COLORS.xpac.fill,
+    backgroundColor: HASH_BASED_COLORS.xpac.fill,
     opacity: 0.7,
 
     // Test attribute
@@ -74,17 +74,17 @@ export const getXpacWorkStyle = (baseStyle: NodeStyleProperties = {}): NodeStyle
  * @param baseStyle - Base style properties to extend
  * @returns Style properties with unverified author warning styling
  */
-export const getUnverifiedAuthorStyle = (baseStyle: NodeStyleProperties = {}): NodeStyleProperties => ({
+export const getUnverifiedAuthorStyle = (baseStyle: Readonly<NodeStyleProperties> = {}): NodeStyleProperties => ({
     ...baseStyle,
 
     // SVG properties
-    stroke: COLORS.warning.stroke,
+    stroke: HASH_BASED_COLORS.warning.stroke,
     strokeWidth: 2.5, // Slightly thicker to draw attention
-    fill: baseStyle.fill || COLORS.standard.fill, // Preserve base fill color
+    fill: baseStyle.fill ?? HASH_BASED_COLORS.standard.fill, // Preserve base fill color
     // Add a warning tint overlay (would need to be applied as a filter/overlay in actual rendering)
 
     // CSS properties (for DOM renderers)
-    border: `2.5px solid ${COLORS.warning.stroke}`,
+    border: `2.5px solid ${HASH_BASED_COLORS.warning.stroke}`,
     // Use box-shadow to add warning tint without changing fill color
     opacity: 1,
 
@@ -98,7 +98,7 @@ export const getUnverifiedAuthorStyle = (baseStyle: NodeStyleProperties = {}): N
  * @param baseStyle - Base style properties to extend
  * @returns Combined style properties
  */
-export const getXpacUnverifiedStyle = (baseStyle: NodeStyleProperties = {}): NodeStyleProperties => {
+export const getXpacUnverifiedStyle = (baseStyle: Readonly<NodeStyleProperties> = {}): NodeStyleProperties => {
   // Start with xpac styling
   const xpacStyle = getXpacWorkStyle(baseStyle);
 
@@ -107,11 +107,11 @@ export const getXpacUnverifiedStyle = (baseStyle: NodeStyleProperties = {}): Nod
     ...xpacStyle,
 
     // Override stroke to show warning color
-    stroke: COLORS.warning.stroke,
+    stroke: HASH_BASED_COLORS.warning.stroke,
     strokeWidth: 2.5,
 
     // CSS override
-    border: `2.5px dashed ${COLORS.warning.stroke}`, // Dashed + warning color
+    border: `2.5px dashed ${HASH_BASED_COLORS.warning.stroke}`, // Dashed + warning color
 
     // Both test attributes
     'data-xpac': 'true',
@@ -126,39 +126,41 @@ export const getXpacUnverifiedStyle = (baseStyle: NodeStyleProperties = {}): Nod
  * @param baseStyle - Base style properties to extend
  * @returns Conditional style properties based on node flags
  * @example
+ * ```tsx
  * const style = getConditionalNodeStyle(node);
  * // Apply to SVG: <circle {...style} />
  * // Apply to DOM: <div style={style} />
+ * ```
  */
-export const getConditionalNodeStyle = (node: Pick<GraphNode, 'isXpac' | 'hasUnverifiedAuthor'>, baseStyle: NodeStyleProperties = {}): NodeStyleProperties => {
+export const getConditionalNodeStyle = (node: Readonly<Pick<GraphNode, 'isXpac' | 'hasUnverifiedAuthor'>>, baseStyle: Readonly<NodeStyleProperties> = {}): NodeStyleProperties => {
   const { isXpac, hasUnverifiedAuthor } = node;
 
   // Both conditions: xpac + unverified
-  if (isXpac && hasUnverifiedAuthor) {
+  if (isXpac === true && hasUnverifiedAuthor === true) {
     return getXpacUnverifiedStyle(baseStyle);
   }
 
   // Only xpac
-  if (isXpac) {
+  if (isXpac === true) {
     return getXpacWorkStyle(baseStyle);
   }
 
   // Only unverified author
-  if (hasUnverifiedAuthor) {
+  if (hasUnverifiedAuthor === true) {
     return getUnverifiedAuthorStyle(baseStyle);
   }
 
   // Standard work (no special styling)
   return {
     ...baseStyle,
-    stroke: COLORS.standard.stroke,
+    stroke: HASH_BASED_COLORS.standard.stroke,
     strokeWidth: 2,
-    fill: COLORS.standard.fill,
+    fill: HASH_BASED_COLORS.standard.fill,
     fillOpacity: 1,
 
     // CSS properties
-    border: `2px solid ${COLORS.standard.stroke}`,
-    backgroundColor: COLORS.standard.fill,
+    border: `2px solid ${HASH_BASED_COLORS.standard.stroke}`,
+    backgroundColor: HASH_BASED_COLORS.standard.fill,
     opacity: 1,
   };
 };
@@ -169,16 +171,16 @@ export const getConditionalNodeStyle = (node: Pick<GraphNode, 'isXpac' | 'hasUnv
  * @param node - Graph node with metadata
  * @returns Descriptive label for accessibility
  */
-export const getNodeAccessibilityLabel = (node: Pick<GraphNode, 'isXpac' | 'hasUnverifiedAuthor' | 'label'>): string => {
+export const getNodeAccessibilityLabel = (node: Readonly<Pick<GraphNode, 'isXpac' | 'hasUnverifiedAuthor' | 'label'>>): string => {
   const { isXpac, hasUnverifiedAuthor, label } = node;
 
   const flags: string[] = [];
 
-  if (isXpac) {
+  if (isXpac === true) {
     flags.push('extended research output');
   }
 
-  if (hasUnverifiedAuthor) {
+  if (hasUnverifiedAuthor === true) {
     flags.push('unverified author');
   }
 
@@ -192,4 +194,4 @@ export const getNodeAccessibilityLabel = (node: Pick<GraphNode, 'isXpac' | 'hasU
 /**
  * Export color palette for external use (e.g., legend components)
  */
-export { COLORS as NODE_STYLE_COLORS };
+

@@ -9,8 +9,7 @@
  * to meet WCAG 2.1 Level AA standards
  */
 
-import type { EdgeDirection,GraphEdge } from "@bibgraph/types";
-import { RelationType } from "@bibgraph/types";
+import type { EdgeDirection,GraphEdge, RelationType  } from "@bibgraph/types";
 
 import { RELATIONSHIP_TYPE_COLORS as HASH_BASED_COLORS } from "../../styles/hash-colors";
 
@@ -44,7 +43,7 @@ export interface EdgeStyleProperties {
  * Colors are deterministic based on relationship type string hashes
  * All colors meet WCAG 2.1 Level AA contrast ratio (≥3:1 for graphical objects)
  */
-export const TYPE_COLORS = HASH_BASED_COLORS;
+
 
 /**
  * Default styling constants
@@ -71,12 +70,17 @@ const STYLE_CONSTANTS = {
   INBOUND_MARKER: 'arrow-dashed',
 } as const;
 
+// Not every RelationType member's runtime value matches a key in HASH_BASED_COLORS (some enum values are lowercase while the color map's keys are uppercase), so a plain index needs this guard rather than a direct lookup.
+const isHashBasedColorKey = (value: string): value is keyof typeof HASH_BASED_COLORS =>
+  value in HASH_BASED_COLORS;
+
 /**
  * Get color for a relationship type
  * @param type - Relationship type
  * @returns Hex color string
  */
-export const getTypeColor = (type: RelationType): string => TYPE_COLORS[type] || TYPE_COLORS.RELATED_TO;
+export const getTypeColor = (type: RelationType): string =>
+  isHashBasedColorKey(type) ? HASH_BASED_COLORS[type] : HASH_BASED_COLORS.RELATED_TO;
 
 /**
  * Get styling for outbound edges (solid lines)
@@ -167,7 +171,7 @@ export const getEdgeStyle = (edge: GraphEdge): EdgeStyleProperties => {
   const { type, direction } = edge;
 
   // Use direction field if available, otherwise default to outbound
-  const edgeDirection = direction || 'outbound';
+  const edgeDirection = direction ?? 'outbound';
 
   if (edgeDirection === 'inbound') {
     return getInboundStyle(type);

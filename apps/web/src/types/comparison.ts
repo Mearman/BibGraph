@@ -89,7 +89,6 @@ export type VisualizationTabKey = "performance" | "scatter" | "heatmap" | "overv
 
 /**
  * Type guard to verify data is a valid STARDataset array
- * @param data
  */
 export const isSTARDatasetArray = (data: unknown): data is STARDataset[] =>
   Array.isArray(data) &&

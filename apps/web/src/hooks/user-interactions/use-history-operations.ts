@@ -2,7 +2,7 @@
  * Hook for history operations (record visits, clear history)
  */
 
-import type { EntityType } from "@bibgraph/types";
+import { isEntityType } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils/logger";
 import { useCallback } from "react";
 
@@ -30,15 +30,20 @@ export const useHistoryOperations = ({
   const recordPageVisit = useCallback(
     async ({ url, metadata }: RecordPageVisitParameters) => {
       try {
-        if (!metadata?.entityId || !metadata?.entityType) {
+        const entityId = metadata?.entityId;
+        const entityType = metadata?.entityType;
+        if (entityId === undefined || entityType === undefined) {
           throw new Error("Entity ID and type are required to record page visit");
+        }
+        if (!isEntityType(entityType)) {
+          throw new Error(`Invalid entity type: ${entityType}`);
         }
 
         await storageProvider.addToHistory({
-          entityType: metadata.entityType as EntityType,
-          entityId: metadata.entityId,
+          entityType,
+          entityId,
           url,
-          title: metadata.searchQuery ? `Search: ${metadata.searchQuery}` : undefined,
+          title: metadata?.searchQuery !== undefined ? `Search: ${metadata.searchQuery}` : undefined,
         });
 
         await refreshData();

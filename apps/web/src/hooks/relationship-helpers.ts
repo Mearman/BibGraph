@@ -1,6 +1,5 @@
 /**
  * Helper functions for creating relationship data structures
- * @module relationship-helpers
  */
 
 import type { EntityType , RelationType } from '@bibgraph/types';
@@ -15,23 +14,15 @@ import { DEFAULT_PAGE_SIZE } from '@/types/relationship';
 /**
  * Safely extract a string ID from an entity property
  * Prevents [object Object] appearing in URLs if API returns unexpected data
- * @param value
  */
 export const safeStringId = (value: unknown): string => {
   if (typeof value === 'string') return value;
-  if (value == null) return '';
-  return String(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return '';
 };
 
 /**
  * Helper to create a properly structured RelationshipItem
- * @param sourceId
- * @param targetId
- * @param sourceType
- * @param targetType
- * @param relationType
- * @param direction
- * @param displayName
  */
 export const createRelationshipItem = (
   sourceId: string,
@@ -55,18 +46,13 @@ export const createRelationshipItem = (
 
 /**
  * Helper to create a properly structured RelationshipSection
- * @param type
- * @param direction
- * @param label
- * @param items
- * @param isPartialData
  */
 export const createRelationshipSection = (
   type: RelationType,
   direction: 'outbound' | 'inbound',
   label: string,
-  items: RelationshipItem[],
-  isPartialData: boolean = false,
+  items: readonly RelationshipItem[],
+  isPartialData = false,
 ): RelationshipSection => {
   const totalCount = items.length;
   const visibleItems = items.slice(0, DEFAULT_PAGE_SIZE);
@@ -86,7 +72,7 @@ export const createRelationshipSection = (
     type,
     direction,
     label,
-    items,
+    items: [...items],
     visibleItems,
     totalCount,
     visibleCount,

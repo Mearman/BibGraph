@@ -4,10 +4,14 @@
  */
 
 import { cachedOpenAlex } from "@bibgraph/client";
-import type { Work } from "@bibgraph/types";
 import { useQuery } from "@tanstack/react-query";
 
 import { settingsStoreInstance } from "@/stores/settings-store";
+
+import { MS_PER_MINUTE } from "./time-constants";
+
+const STALE_TIME_MINUTES = 5;
+const GC_TIME_MINUTES = 10;
 
 interface VersionComparisonData {
   currentVersion: '1' | '2' | undefined;
@@ -19,10 +23,8 @@ interface VersionComparisonData {
 /**
  * Compare metadata between v1 and v2 for a specific work
  * Only active during the November 2025 transition period
- * @param workId
- * @param enabled
  */
-export const useVersionComparison = (workId: string | undefined, enabled: boolean = true): {
+export const useVersionComparison = (workId: string | undefined, enabled = true): {
   comparison: VersionComparisonData | null;
   isLoading: boolean;
   error: Error | null;
@@ -30,7 +32,7 @@ export const useVersionComparison = (workId: string | undefined, enabled: boolea
   const queryResult = useQuery({
     queryKey: ['version-comparison', workId],
     queryFn: async (): Promise<VersionComparisonData | null> => {
-      if (!workId) return null;
+      if (workId === undefined || workId === '') return null;
 
       // Get current version setting
       const settings = await settingsStoreInstance.getSettings();
@@ -44,7 +46,7 @@ export const useVersionComparison = (workId: string | undefined, enabled: boolea
             dataVersion: version,
           });
         } catch (error) {
-          console.warn(`Failed to fetch work with version ${version}:`, error);
+          console.warn(`Failed to fetch work with version ${String(version)}:`, error);
           return null;
         }
       };
@@ -58,10 +60,10 @@ export const useVersionComparison = (workId: string | undefined, enabled: boolea
         return null;
       }
 
-      const referencesV1 = (workV1 as Work | null)?.referenced_works_count ?? 0;
-      const referencesV2 = (workV2 as Work | null)?.referenced_works_count ?? 0;
-      const locationsV1 = (workV1 as Work | null)?.locations_count ?? 0;
-      const locationsV2 = (workV2 as Work | null)?.locations_count ?? 0;
+      const referencesV1 = workV1?.referenced_works_count ?? 0;
+      const referencesV2 = workV2?.referenced_works_count ?? 0;
+      const locationsV1 = workV1?.locations_count ?? 0;
+      const locationsV2 = workV2?.locations_count ?? 0;
 
       return {
         currentVersion,
@@ -79,13 +81,13 @@ export const useVersionComparison = (workId: string | undefined, enabled: boolea
       };
     },
     enabled: enabled && Boolean(workId),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: STALE_TIME_MINUTES * MS_PER_MINUTE,
+    gcTime: GC_TIME_MINUTES * MS_PER_MINUTE,
   });
 
   return {
     comparison: queryResult.data ?? null,
     isLoading: queryResult.isLoading,
-    error: queryResult.error as Error | null,
+    error: queryResult.error,
   };
 };

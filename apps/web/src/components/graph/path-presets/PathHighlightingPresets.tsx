@@ -6,8 +6,6 @@
  * - All outgoing paths from source
  * - All incoming paths to target
  * - All paths between source and target
- *
- * @module components/graph/path-presets
  */
 
 import type { GraphEdge, GraphNode } from '@bibgraph/types';
@@ -44,11 +42,11 @@ interface PathHighlightingPresetsProperties {
   /**
   Callback to highlight nodes
    */
-  onHighlightNodes: (nodeIds: string[]) => void;
+  onHighlightNodes: (nodeIds: readonly string[]) => void;
   /**
   Callback to highlight path
    */
-  onHighlightPath: (path: string[]) => void;
+  onHighlightPath: (path: readonly string[]) => void;
   /**
   Callback to clear highlights
    */
@@ -66,17 +64,19 @@ const PRESET_DESCRIPTIONS: Record<PathPreset, string> = {
 } as const;
 
 /**
+ * Maximum traversal depth used when searching for all paths between a source and target node.
+ */
+const ALL_PATHS_MAX_DEPTH = 10;
+
+/**
+ * Maximum traversal depth used when searching for the shortest path between a source and target node.
+ */
+const SHORTEST_PATH_MAX_DEPTH = 1;
+
+const isPathPreset = (value: string): value is PathPreset => value in PRESET_DESCRIPTIONS;
+
+/**
  * Path Highlighting Presets Component
- * @param root0
- * @param root0.preset
- * @param root0.onPresetChange
- * @param root0.pathSource
- * @param root0.pathTarget
- * @param root0.nodes
- * @param root0.edges
- * @param root0.onHighlightNodes
- * @param root0.onHighlightPath
- * @param root0.onClearHighlights
  */
 export const PathHighlightingPresets: React.FC<PathHighlightingPresetsProperties> = ({
   preset,
@@ -114,28 +114,31 @@ export const PathHighlightingPresets: React.FC<PathHighlightingPresetsProperties
   // Calculate path count
   const pathCount = useMemo(() => {
     if (preset === 'shortest' || preset === 'all-paths') {
-      if (!pathSource || !pathTarget) return 0;
-      const reachable = findReachableNodes(graph, pathSource, pathTarget, preset === 'all-paths' ? 10 : 1);
+      if (pathSource === null || pathSource === '' || pathTarget === null || pathTarget === '') return 0;
+      const reachable = findReachableNodes(
+        graph,
+        pathSource,
+        pathTarget,
+        preset === 'all-paths' ? ALL_PATHS_MAX_DEPTH : SHORTEST_PATH_MAX_DEPTH,
+      );
       return reachable.length;
     }
     if (preset === 'outgoing-paths') {
-      if (!pathSource) return 0;
+      if (pathSource === null || pathSource === '') return 0;
       return findReachableNodes(graph, pathSource).length;
     }
-    if (preset === 'incoming-paths') {
-      if (!pathTarget) return 0;
-      const reversedGraph = new Map<string, Set<string>>();
-      graph.forEach((_, nodeId) => {
-        reversedGraph.set(nodeId, new Set());
+    // The only remaining member of PathPreset here is 'incoming-paths'.
+    if (pathTarget === null || pathTarget === '') return 0;
+    const reversedGraph = new Map<string, Set<string>>();
+    graph.forEach((_, nodeId) => {
+      reversedGraph.set(nodeId, new Set());
+    });
+    graph.forEach((neighbors, fromNode) => {
+      neighbors.forEach((toNode) => {
+        reversedGraph.get(toNode)?.add(fromNode);
       });
-      graph.forEach((neighbors, fromNode) => {
-        neighbors.forEach((toNode) => {
-          reversedGraph.get(toNode)?.add(fromNode);
-        });
-      });
-      return findReachableNodes(reversedGraph, pathTarget).length;
-    }
-    return 0;
+    });
+    return findReachableNodes(reversedGraph, pathTarget).length;
   }, [preset, pathSource, pathTarget, graph]);
 
   return (
@@ -144,7 +147,11 @@ export const PathHighlightingPresets: React.FC<PathHighlightingPresetsProperties
         <SegmentedControl
           size="xs"
           value={preset}
-          onChange={(value) => onPresetChange(value as PathPreset)}
+          onChange={(value) => {
+            if (isPathPreset(value)) {
+              onPresetChange(value);
+            }
+          }}
           data={[
             { label: 'Shortest', value: 'shortest' },
             { label: 'Outgoing', value: 'outgoing-paths' },

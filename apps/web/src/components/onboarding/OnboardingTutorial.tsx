@@ -6,8 +6,6 @@
  * - Catalogue/bookmarks
  * - Graph visualization
  * - Entity detail pages
- *
- * @module components/onboarding/OnboardingTutorial
  */
 
 import { Button, Group, Modal, Paper, Progress, Stack, Text, Title, UnstyledButton } from '@mantine/core';
@@ -78,6 +76,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
 ];
 
 const ONBOARDING_STORAGE_KEY = 'bibgraph-onboarding-completed';
+const PERCENTAGE_MULTIPLIER = 100;
 
 interface OnboardingTutorialProperties {
   opened: boolean;
@@ -110,16 +109,17 @@ export const resetOnboarding = (): void => {
 
 /**
  * Onboarding Tutorial Component
- *
- * @param props
- * @param props.opened
- * @param props.onClose
  */
 export const OnboardingTutorial: React.FC<OnboardingTutorialProperties> = ({ opened, onClose }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
   const currentStep = ONBOARDING_STEPS[currentStepIndex];
-  const progress = ((currentStepIndex + 1) / ONBOARDING_STEPS.length) * 100;
+  const progress = ((currentStepIndex + 1) / ONBOARDING_STEPS.length) * PERCENTAGE_MULTIPLIER;
+
+  const handleComplete = () => {
+    markOnboardingCompleted();
+    onClose();
+  };
 
   const handleNext = () => {
     if (currentStepIndex < ONBOARDING_STEPS.length - 1) {
@@ -137,11 +137,6 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProperties> = ({ ope
 
   const handleSkip = () => {
     handleComplete();
-  };
-
-  const handleComplete = () => {
-    markOnboardingCompleted();
-    onClose();
   };
 
   const handleShowAgain = () => {
@@ -188,7 +183,7 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProperties> = ({ ope
               <Text size="lg" ta="center" c="dimmed">
                 {currentStep.description}
               </Text>
-              {currentStep.action && (
+              {currentStep.action !== undefined && currentStep.action !== "" && (
                 <Text size="sm" fw={500} c="blue" ta="center">
                   💡 {currentStep.action}
                 </Text>
@@ -231,7 +226,7 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProperties> = ({ ope
             {ONBOARDING_STEPS.map((_, index) => (
               <UnstyledButton
                 key={index}
-                onClick={() => setCurrentStepIndex(index)}
+                onClick={() => { setCurrentStepIndex(index); }}
                 style={{
                   width: 12,
                   height: 12,

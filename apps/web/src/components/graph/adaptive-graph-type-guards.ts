@@ -9,70 +9,54 @@ import type { ForceGraphLinkData, ForceGraphNodeData } from './adaptive-graph-ty
 
 /**
  * Type guard for force graph node with position and entity data
- * @param node
  */
 export const isForceGraphNode = (node: unknown): node is ForceGraphNodeData => typeof node === 'object' &&
     node !== null &&
     'x' in node &&
-    typeof (node as Record<string, unknown>).x === 'number' &&
+    typeof node.x === 'number' &&
     'y' in node &&
-    typeof (node as Record<string, unknown>).y === 'number' &&
+    typeof node.y === 'number' &&
     'entityType' in node &&
-    typeof (node as Record<string, unknown>).entityType === 'string' &&
+    typeof node.entityType === 'string' &&
     'label' in node &&
-    typeof (node as Record<string, unknown>).label === 'string';
+    typeof node.label === 'string';
+
+/**
+ * Type guard for a position-bearing endpoint (link source/target) with numeric x/y coordinates
+ */
+const hasNumericPosition = (endpoint: unknown): endpoint is { x: number; y: number } =>
+  typeof endpoint === 'object' &&
+  endpoint !== null &&
+  'x' in endpoint &&
+  typeof endpoint.x === 'number' &&
+  'y' in endpoint &&
+  typeof endpoint.y === 'number';
 
 /**
  * Type guard for force graph link with source and target positions
- * @param link
  */
 export const isForceGraphLink = (link: unknown): link is ForceGraphLinkData => {
   if (typeof link !== 'object' || link === null) return false;
-  const linkObject = link as Record<string, unknown>;
+  if (!('source' in link) || !('target' in link)) return false;
 
-  if (!('source' in linkObject) || !('target' in linkObject)) return false;
-  const source = linkObject.source;
-  const target = linkObject.target;
-
-  if (
-    typeof source !== 'object' ||
-    source === null ||
-    typeof target !== 'object' ||
-    target === null
-  )
-    return false;
-  const sourceObject = source as Record<string, unknown>;
-  const targetObject = target as Record<string, unknown>;
-
-  return (
-    'x' in sourceObject &&
-    typeof sourceObject.x === 'number' &&
-    'y' in sourceObject &&
-    typeof sourceObject.y === 'number' &&
-    'x' in targetObject &&
-    typeof targetObject.x === 'number' &&
-    'y' in targetObject &&
-    typeof targetObject.y === 'number'
-  );
+  return hasNumericPosition(link.source) && hasNumericPosition(link.target);
 };
 
 /**
  * Type guard for GraphNode callback parameter
- * @param node
  */
 export const isGraphCallbackNode = (node: unknown): node is GraphNode => typeof node === 'object' &&
     node !== null &&
     'id' in node &&
-    typeof (node as Record<string, unknown>).id === 'string' &&
+    typeof node.id === 'string' &&
     'entityType' in node &&
-    typeof (node as Record<string, unknown>).entityType === 'string' &&
+    typeof node.entityType === 'string' &&
     'label' in node &&
-    typeof (node as Record<string, unknown>).label === 'string' &&
+    typeof node.label === 'string' &&
     'entityId' in node &&
-    typeof (node as Record<string, unknown>).entityId === 'string';
+    typeof node.entityId === 'string';
 
 /**
  * Type guard for force graph methods with zoom capability
- * @param obj
  */
 export const hasZoomMethod = (obj: ForceGraphMethods<NodeObject, LinkObject<NodeObject>> | undefined): obj is ForceGraphMethods<NodeObject, LinkObject<NodeObject>> => obj !== undefined;

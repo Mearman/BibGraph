@@ -16,6 +16,8 @@ import { SearchPage } from '@/test/page-objects/SearchPage';
 test.describe('@utility US-03 Query Builder', () => {
 	let searchPage: SearchPage;
 
+	const RESULTS_RENDER_WAIT_MS = 2000;
+
 	test.beforeEach(async ({ page }) => {
 		searchPage = new SearchPage(page);
 
@@ -107,7 +109,7 @@ test.describe('@utility US-03 Query Builder', () => {
 		}
 	});
 
-	test('should show operator precedence visually', async () => {
+	test('should show operator precedence visually', () => {
 		test.skip(true, 'Operator precedence visualisation is not yet implemented in the UI. The AdvancedQueryBuilder uses flat term lists with AND/OR selects, and the VisualQueryBuilder uses drag-and-drop groups but does not display precedence hierarchy.');
 	});
 
@@ -130,7 +132,7 @@ test.describe('@utility US-03 Query Builder', () => {
 		try {
 			await page.waitForFunction(
 				(selector) => {
-					const button = document.querySelector(selector) as HTMLButtonElement | null;
+					const button = document.querySelector<HTMLButtonElement>(selector);
 					return button !== null && !button.disabled;
 				},
 				'[data-testid="search-button"]',
@@ -156,7 +158,7 @@ test.describe('@utility US-03 Query Builder', () => {
 			}
 
 			// Allow time for the search response to render
-			await page.waitForTimeout(2000);
+			await page.waitForTimeout(RESULTS_RENDER_WAIT_MS);
 
 			// Check for error feedback, no-results, or validation messages
 			const errorFeedback = page.locator(
@@ -192,7 +194,7 @@ test.describe('@utility US-03 Query Builder', () => {
 		try {
 			await page.waitForFunction(
 				(selector) => {
-					const button = document.querySelector(selector) as HTMLButtonElement | null;
+					const button = document.querySelector<HTMLButtonElement>(selector);
 					return button !== null && !button.disabled;
 				},
 				'[data-testid="search-button"]',
@@ -222,7 +224,7 @@ test.describe('@utility US-03 Query Builder', () => {
 			'tbody tr, .mantine-SimpleGrid-root .mantine-Card-root, .mantine-Stack-root > .mantine-Paper-root'
 		);
 		// Wait briefly for results to render
-		await page.waitForTimeout(2000);
+		await page.waitForTimeout(RESULTS_RENDER_WAIT_MS);
 		const resultCount = await resultItems.count();
 		expect(resultCount).toBeGreaterThan(0);
 

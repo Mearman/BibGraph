@@ -23,14 +23,15 @@ import {
 } from '@tabler/icons-react';
 import type { ClassValue } from 'clsx';
 import { clsx } from 'clsx';
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
+import React, { Component } from 'react';
 
 import { ICON_SIZE } from '@/config/style-constants';
 
 interface ErrorBoundaryProperties {
   children: ReactNode;
   fallback?: ReactNode;
-  onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  onError?: (error: Error, errorInfo: Readonly<ErrorInfo>) => void;
   className?: ClassValue;
 }
 
@@ -64,7 +65,7 @@ export class ErrorBoundary extends Component<
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+  componentDidCatch(error: Error, errorInfo: Readonly<ErrorInfo>): void {
     // Log the error
     logger.error(
       'error-boundary',
@@ -99,7 +100,7 @@ export class ErrorBoundary extends Component<
   render(): ReactNode {
     if (this.state.hasError) {
       // Use custom fallback if provided
-      if (this.props.fallback) {
+      if (this.props.fallback !== undefined) {
         return this.props.fallback;
       }
 
@@ -140,7 +141,7 @@ export class ErrorBoundary extends Component<
                   {error.message}
                 </Text>
 
-                {error.stack && (
+                {error.stack !== undefined && (
                   <details>
                     <summary style={{ cursor: 'pointer', marginBottom: '8px' }}>
                       <Text size="xs" c="dimmed">
@@ -204,7 +205,7 @@ export class ErrorBoundary extends Component<
               </Button>
               <Button
                 leftSection={<IconBug size={ICON_SIZE.MD} />}
-                onClick={() => window.location.reload()}
+                onClick={() => { window.location.reload(); }}
                 variant="outline"
                 color="gray"
               >
@@ -222,20 +223,18 @@ export class ErrorBoundary extends Component<
 
 /**
  * Functional wrapper for easier usage
- * @param Component
- * @param errorBoundaryProps
  */
 export const withErrorBoundary = <P extends object>(
-  Component: React.ComponentType<P>,
+  WrappedComponentType: React.ComponentType<P>,
   errorBoundaryProps?: Omit<ErrorBoundaryProperties, 'children'>
 ): React.FC<P> => {
   const WrappedComponent: React.FC<P> = (properties) => (
     <ErrorBoundary {...errorBoundaryProps}>
-      <Component {...properties} />
+      <WrappedComponentType {...properties} />
     </ErrorBoundary>
   );
 
-  WrappedComponent.displayName = `withErrorBoundary(${Component.displayName || Component.name})`;
+  WrappedComponent.displayName = `withErrorBoundary(${WrappedComponentType.displayName ?? WrappedComponentType.name})`;
 
   return WrappedComponent;
 };

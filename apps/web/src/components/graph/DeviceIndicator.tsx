@@ -27,13 +27,14 @@ const INDICATOR_STYLE: React.CSSProperties = {
 };
 
 const ICON_SIZE = 12;
+const PERCENTAGE_MULTIPLIER = 100;
 
 export const DeviceIndicator: React.FC<DeviceIndicatorProperties> = ({
   isMobile,
   performanceProfile,
   zoomLevel,
 }) => {
-  const zoomPercentage = Math.round(zoomLevel * 100);
+  const zoomPercentage = Math.round(zoomLevel * PERCENTAGE_MULTIPLIER);
 
   return (
     <Group gap="xs" style={INDICATOR_STYLE}>

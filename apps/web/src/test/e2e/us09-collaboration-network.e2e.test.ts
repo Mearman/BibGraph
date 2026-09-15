@@ -19,14 +19,18 @@ import { expect, test } from '@playwright/test';
 import { waitForAppReady } from '@/test/helpers/app-ready';
 import { BaseEntityPageObject } from '@/test/page-objects/BaseEntityPageObject';
 
-const BASE_URL = process.env.BASE_URL || (process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173');
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = process.env.BASE_URL ?? (IS_CI ? 'http://localhost:4173' : 'http://localhost:5173');
+
+const TEST_SUITE_TIMEOUT_MS = 60_000;
+const MAX_AUTHOR_LINKS_TO_CHECK = 5;
 
 test.describe('@workflow US-09 Collaboration Networks', () => {
-	test.setTimeout(60_000);
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS);
 
 	let entityPage: BaseEntityPageObject;
 
-	test.beforeEach(async ({ page }) => {
+	test.beforeEach(({ page }) => {
 		entityPage = new BaseEntityPageObject(page, { entityType: 'authors' });
 
 		// Set up console error listener for debugging
@@ -52,7 +56,7 @@ test.describe('@workflow US-09 Collaboration Networks', () => {
 		await page.locator('main').waitFor({ timeout: 20_000 });
 		await waitForAppReady(page);
 
-		const pageContent = await page.locator('body').textContent() || '';
+		const pageContent = await page.locator('body').textContent() ?? '';
 
 		// Should not have routing errors
 		expect(pageContent).not.toContain('Page not found');
@@ -116,9 +120,9 @@ test.describe('@workflow US-09 Collaboration Networks', () => {
 			// Click a co-author link (skip the first one if it's a self-link)
 			// Find a link that goes to a different author
 			let clickTarget = authorLinks.first();
-			for (let index = 0; index < Math.min(authorLinkCount, 5); index++) {
+			for (let index = 0; index < Math.min(authorLinkCount, MAX_AUTHOR_LINKS_TO_CHECK); index++) {
 				const href = await authorLinks.nth(index).getAttribute('href');
-				if (href && !href.includes('A5017898742')) {
+				if (href !== null && !href.includes('A5017898742')) {
 					clickTarget = authorLinks.nth(index);
 					break;
 				}
@@ -133,7 +137,7 @@ test.describe('@workflow US-09 Collaboration Networks', () => {
 			expect(newUrl).toContain('/authors/');
 
 			// The new page should show author content
-			const pageContent = await page.locator('body').textContent() || '';
+			const pageContent = await page.locator('body').textContent() ?? '';
 			expect(pageContent).not.toContain('Page not found');
 			expect(pageContent).not.toContain('Routing error');
 
@@ -200,7 +204,7 @@ test.describe('@workflow US-09 Collaboration Networks', () => {
 		await page.locator('main').waitFor({ timeout: 20_000 });
 		await waitForAppReady(page);
 
-		const pageContent = await page.locator('body').textContent() || '';
+		const pageContent = await page.locator('body').textContent() ?? '';
 
 		// Page should load without errors regardless of collaboration count
 		expect(pageContent).not.toContain('Routing error');
@@ -222,7 +226,7 @@ test.describe('@workflow US-09 Collaboration Networks', () => {
 		let criticalErrorCount = 0;
 		for (let index = 0; index < errorCount; index++) {
 			const alertText = await errorElements.nth(index).textContent();
-			if (alertText && (alertText.includes('Error') || alertText.includes('error'))) {
+			if (alertText !== null && (alertText.includes('Error') || alertText.includes('error'))) {
 				criticalErrorCount++;
 			}
 		}

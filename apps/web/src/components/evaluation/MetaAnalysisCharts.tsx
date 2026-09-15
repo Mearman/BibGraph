@@ -19,6 +19,9 @@ const COLOR_RED_500 = "var(--mantine-color-red-6)";
 const COLOR_AMBER_500 = "var(--mantine-color-yellow-6)";
 const COLOR_VIOLET_500 = "var(--mantine-color-violet-5)";
 
+// Converts a 0-1 ratio to a percentage value for display.
+const PERCENTAGE_MULTIPLIER = 100;
+
 interface MetaAnalysisChartsProperties {
   comparisonResults: ComparisonResults[];
 }
@@ -26,8 +29,6 @@ interface MetaAnalysisChartsProperties {
 /**
  * Performance Comparison Bar Chart
  * Enhanced responsive version with touch interactions and accessibility
- * @param root0
- * @param root0.comparisonResults
  */
 export const PerformanceComparisonChart = ({
   comparisonResults,
@@ -45,8 +46,6 @@ export const PerformanceComparisonChart = ({
 /**
  * Precision-Recall Scatter Plot
  * Enhanced responsive version with touch interactions and accessibility
- * @param root0
- * @param root0.comparisonResults
  */
 export const PrecisionRecallScatterPlot = ({
   comparisonResults,
@@ -64,8 +63,6 @@ export const PrecisionRecallScatterPlot = ({
 /**
  * Confusion Matrix Heatmap
  * Visual representation of true/false positives/negatives
- * @param root0
- * @param root0.comparisonResults
  */
 export const ConfusionMatrixHeatmap = ({
   comparisonResults,
@@ -367,7 +364,7 @@ export const ConfusionMatrixHeatmap = ({
                   (aggregatedData.truePositives /
                     (aggregatedData.truePositives +
                       aggregatedData.falsePositives)) *
-                  100
+                  PERCENTAGE_MULTIPLIER
                 ).toFixed(1)}
                 %
               </div>
@@ -377,7 +374,7 @@ export const ConfusionMatrixHeatmap = ({
                   (aggregatedData.truePositives /
                     (aggregatedData.truePositives +
                       aggregatedData.falseNegatives)) *
-                  100
+                  PERCENTAGE_MULTIPLIER
                 ).toFixed(1)}
                 %
               </div>
@@ -392,8 +389,6 @@ export const ConfusionMatrixHeatmap = ({
 /**
  * Dataset Statistics Overview
  * Shows key statistics about the datasets being compared
- * @param root0
- * @param root0.comparisonResults
  */
 export const DatasetStatisticsOverview = ({
   comparisonResults,
@@ -630,7 +625,7 @@ export const DatasetStatisticsOverview = ({
                     color: row.coverage > 1 ? COLOR_AMBER_500 : COLOR_GRAY_500,
                   }}
                 >
-                  {(row.coverage * 100).toFixed(1)}%
+                  {(row.coverage * PERCENTAGE_MULTIPLIER).toFixed(1)}%
                 </td>
                 <td
                   style={{
@@ -641,7 +636,7 @@ export const DatasetStatisticsOverview = ({
                     fontWeight: "600",
                   }}
                 >
-                  {(row.precision * 100).toFixed(1)}%
+                  {(row.precision * PERCENTAGE_MULTIPLIER).toFixed(1)}%
                 </td>
                 <td
                   style={{
@@ -652,7 +647,7 @@ export const DatasetStatisticsOverview = ({
                     fontWeight: "600",
                   }}
                 >
-                  {(row.recall * 100).toFixed(1)}%
+                  {(row.recall * PERCENTAGE_MULTIPLIER).toFixed(1)}%
                 </td>
                 <td
                   style={{
@@ -663,7 +658,7 @@ export const DatasetStatisticsOverview = ({
                     fontWeight: "600",
                   }}
                 >
-                  {(row.f1Score * 100).toFixed(1)}%
+                  {(row.f1Score * PERCENTAGE_MULTIPLIER).toFixed(1)}%
                 </td>
                 <td
                   style={{

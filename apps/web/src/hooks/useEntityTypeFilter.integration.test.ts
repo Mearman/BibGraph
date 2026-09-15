@@ -211,12 +211,13 @@ describe('Entity Type Filter Integration (T036)', () => {
 			const selectedTypes: EntityType[] = ['works'];
 			const visible = applyEntityTypeFilter(allNodes, selectedTypes);
 
-			// Should have 3 nodes:
+			// Should have EXPECTED_VISIBLE_NODE_COUNT nodes:
 			// - W1 (graph list work - matches AND bypasses)
 			// - I1 (graph list institution - bypasses)
 			// - W2 (bookmark work - matches filter)
 			// A2 should be filtered out (bookmark author - doesn't match)
-			expect(visible).toHaveLength(3);
+			const EXPECTED_VISIBLE_NODE_COUNT = 3;
+			expect(visible).toHaveLength(EXPECTED_VISIBLE_NODE_COUNT);
 
 			expect(visible.find((n) => n.id === 'W1')).toBeDefined();
 			expect(visible.find((n) => n.id === 'I1')).toBeDefined(); // Bypass!
@@ -269,7 +270,7 @@ describe('Entity Type Filter Integration (T036)', () => {
 	});
 
 	describe('Provenance Metadata Integration', () => {
-		it('should identify nodes by provenance even without sourceId', async () => {
+		it('should identify nodes by provenance even without sourceId', () => {
 			// Simulate node with provenance but different sourceId (edge case)
 			const mixedNode: GraphNode = {
 				id: 'A3',

@@ -17,12 +17,6 @@ interface SkeletonProperties {
 
 /**
  * Individual skeleton element
- * @param root0
- * @param root0.width
- * @param root0.height
- * @param root0.variant
- * @param root0.animate
- * @param root0.'aria-label'
  */
 export const Skeleton = ({
   width = '100%',
@@ -41,8 +35,8 @@ export const Skeleton = ({
 
     const styles: React.CSSProperties = {
       ...baseStyles,
-      width: typeof width === 'number' ? `${width}px` : width,
-      height: typeof height === 'number' ? `${height}px` : height,
+      width: typeof width === 'number' ? `${String(width)}px` : width,
+      height: typeof height === 'number' ? `${String(height)}px` : height,
     };
 
     switch (variant) {
@@ -98,7 +92,7 @@ export const Skeleton = ({
       <Box
         style={skeletonStyle}
         role="presentation"
-        aria-label={ariaLabel || 'Loading...'}
+        aria-label={ariaLabel ?? 'Loading...'}
         aria-live="polite"
         className="Skeleton"
       />
@@ -112,7 +106,7 @@ export const Skeleton = ({
 interface TextSkeletonProperties {
   lines?: number;
   height?: string | number;
-  width?: string | number | Array<string | number>;
+  width?: string | number | (string | number)[];
   className?: string;
 }
 
@@ -122,7 +116,7 @@ export const TextSkeleton = ({
   width,
   className,
 }: TextSkeletonProperties) => {
-  const widths = Array.isArray(width) ? width : new Array(lines).fill(width || '100%');
+  const widths = Array.isArray(width) ? width : Array.from({ length: lines }, () => width ?? '100%');
 
   return (
     <Stack gap={4} className={className}>
@@ -132,7 +126,7 @@ export const TextSkeleton = ({
           variant="text"
           width={w}
           height={height}
-          aria-label={`Loading line ${index + 1} of ${lines}`}
+          aria-label={`Loading line ${String(index + 1)} of ${String(lines)}`}
         />
       ))}
     </Stack>
@@ -174,8 +168,6 @@ export const CardSkeleton = () => {
 
 /**
  * List skeleton for list items
- * @param root0
- * @param root0.items
  */
 export const ListSkeleton = ({ items = 5 }: { items?: number }) => {
   return (
@@ -206,9 +198,6 @@ export const ListSkeleton = ({ items = 5 }: { items?: number }) => {
 
 /**
  * Table skeleton for data tables
- * @param root0
- * @param root0.rows
- * @param root0.columns
  */
 export const DataTableSkeleton = ({
   rows = 5,
@@ -235,9 +224,9 @@ export const DataTableSkeleton = ({
           </tr>
         </thead>
         <tbody>
-          {Array.from({ length: rows }).map((_, rowIndex) => (
+          {Array.from({ length: rows }).map((_row, rowIndex) => (
             <tr key={rowIndex}>
-              {Array.from({ length: columns }).map((_, colIndex) => (
+              {Array.from({ length: columns }).map((_col, colIndex) => (
                 <td
                   key={colIndex}
                   style={{
@@ -351,8 +340,6 @@ export const GraphSkeleton = () => {
 
 /**
  * Stats skeleton for statistics dashboard
- * @param root0
- * @param root0.items
  */
 export const StatsSkeleton = ({ items = 4 }: { items?: number }) => {
   return (

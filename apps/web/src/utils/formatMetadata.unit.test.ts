@@ -90,11 +90,12 @@ describe('formatMetadata', () => {
     });
 
     it('truncates long context', () => {
+      const QUOTES_AND_ELLIPSIS_ALLOWANCE = 5;
       const longContext =
         'This is a very long citation context that exceeds the maximum length allowed for display and should be truncated with an ellipsis character at the end';
       const metadata: CitationMetadata = { type: 'citation', context: longContext };
       const result = formatMetadata(metadata);
-      expect(result.length).toBeLessThan(longContext.length + 5); // accounts for quotes and ellipsis
+      expect(result.length).toBeLessThan(longContext.length + QUOTES_AND_ELLIPSIS_ALLOWANCE); // accounts for quotes and ellipsis
       expect(result).toContain('…');
     });
 

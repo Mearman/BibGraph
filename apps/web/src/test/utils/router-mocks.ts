@@ -1,16 +1,156 @@
 /**
- * React Router mocking utilities for TanStack Router testing
- * Provides consistent mocking patterns for router-dependent components
+ * React Router mocking utilities for TanStack Router testing Provides consistent mocking patterns for router-dependent components
  */
 
 import React from "react";
 import { vi } from "vitest";
 
 /**
- * Mock router with commonly used methods and properties
- * @param overrides
+ * Mock location shape shared by router state and resolved location
  */
-export const createMockRouter = (overrides: Record<string, unknown> = {}): any => ({
+interface MockLocation {
+  pathname: string;
+  search: string;
+  hash: string;
+  href: string;
+  state?: undefined;
+  maskedLocation?: undefined;
+}
+
+/**
+ * Mock router-state shape used by both the router object and useRouterState
+ */
+interface MockRouterState {
+  location: MockLocation;
+  resolvedLocation: Omit<MockLocation, "state" | "maskedLocation">;
+  status: "idle";
+  isFetching: boolean;
+  isLoading: boolean;
+  isTransitioning: boolean;
+}
+
+/**
+ * Mock router object matching the subset of the TanStack Router API used in tests
+ */
+interface MockRouter extends Record<string, unknown> {
+  navigate: ReturnType<typeof vi.fn>;
+  back: ReturnType<typeof vi.fn>;
+  forward: ReturnType<typeof vi.fn>;
+  push: ReturnType<typeof vi.fn>;
+  replace: ReturnType<typeof vi.fn>;
+  invalidate: ReturnType<typeof vi.fn>;
+  load: ReturnType<typeof vi.fn>;
+  preload: ReturnType<typeof vi.fn>;
+  buildLocation: ReturnType<typeof vi.fn>;
+  buildHref: ReturnType<typeof vi.fn>;
+  state: MockRouterState;
+  history: {
+    length: number;
+    action: "POP";
+    location: {
+      pathname: string;
+      search: string;
+      hash: string;
+      state: undefined;
+      key: string;
+    };
+    listen: ReturnType<typeof vi.fn>;
+    push: ReturnType<typeof vi.fn>;
+    replace: ReturnType<typeof vi.fn>;
+    go: ReturnType<typeof vi.fn>;
+    back: ReturnType<typeof vi.fn>;
+    forward: ReturnType<typeof vi.fn>;
+    createHref: ReturnType<typeof vi.fn>;
+  };
+}
+
+/**
+ * Mock navigation context shape
+ */
+interface MockNavigation extends Record<string, unknown> {
+  navigate: ReturnType<typeof vi.fn>;
+  buildLocation: ReturnType<typeof vi.fn>;
+}
+
+/**
+ * Mock route context shape
+ */
+interface MockRouteContext {
+  routeId: string;
+  params: Record<string, string>;
+  search: Record<string, never>;
+  loaderData: Record<string, never>;
+  actionData: undefined;
+  routeSearch: Record<string, never>;
+  routeParams: Record<string, string>;
+  pathname: string;
+  href: string;
+}
+
+/**
+ * Mock route match shape
+ */
+interface MockMatch extends Record<string, unknown> {
+  id: string;
+  params: Record<string, unknown>;
+  pathname: string;
+  search: Record<string, unknown>;
+  hash: string;
+  fullPath: string;
+  state: undefined;
+  staticData: undefined;
+  loaderData: undefined;
+  actionData: undefined;
+  error: undefined;
+  status: "success";
+  isFetching: boolean;
+  invalidAt: number;
+  preload: ReturnType<typeof vi.fn>;
+}
+
+/**
+ * Mock TanStack Router hooks shape used for testing
+ */
+interface MockRouterHooks {
+  useRouter: () => MockRouter;
+  useNavigate: () => ReturnType<typeof vi.fn>;
+  useLocation: () => MockLocation;
+  useParams: () => Record<string, never>;
+  useSearch: () => Record<string, never>;
+  useMatches: () => MockMatch[];
+  useMatch: () => MockMatch;
+  useRouteContext: () => Record<string, never>;
+  useLoaderData: () => undefined;
+  useRouterState: () => MockRouterState;
+}
+
+const createMockLocation = (): MockLocation => ({
+  pathname: "/",
+  search: "",
+  hash: "",
+  href: "/",
+  state: undefined,
+  maskedLocation: undefined,
+});
+
+const createMockRouterState = (): MockRouterState => ({
+  location: createMockLocation(),
+  resolvedLocation: {
+    pathname: "/",
+    search: "",
+    hash: "",
+    href: "/",
+  },
+  status: "idle",
+  isFetching: false,
+  isLoading: false,
+  isTransitioning: false,
+});
+
+/**
+ * Mock router with commonly used methods and properties
+ */
+export const createMockRouter = (overrides: Readonly<Partial<MockRouter>> = {}): MockRouter => ({
   navigate: vi.fn(),
   back: vi.fn(),
   forward: vi.fn(),
@@ -21,29 +161,10 @@ export const createMockRouter = (overrides: Record<string, unknown> = {}): any =
   preload: vi.fn(),
   buildLocation: vi.fn(),
   buildHref: vi.fn(),
-  state: {
-    location: {
-      pathname: "/",
-      search: "",
-      hash: "",
-      href: "/",
-      state: undefined,
-      maskedLocation: undefined,
-    },
-    resolvedLocation: {
-      pathname: "/",
-      search: "",
-      hash: "",
-      href: "/",
-    },
-    status: "idle" as const,
-    isFetching: false,
-    isLoading: false,
-    isTransitioning: false,
-  },
+  state: createMockRouterState(),
   history: {
     length: 1,
-    action: "POP" as const,
+    action: "POP",
     location: {
       pathname: "/",
       search: "",
@@ -64,11 +185,10 @@ export const createMockRouter = (overrides: Record<string, unknown> = {}): any =
 
 /**
  * Mock navigation context for TanStack Router
- * @param overrides
  */
 export const createMockNavigation = (
-  overrides: Record<string, unknown> = {},
-): any => ({
+  overrides: Readonly<Partial<MockNavigation>> = {},
+): MockNavigation => ({
   navigate: vi.fn(),
   buildLocation: vi.fn(),
   ...overrides,
@@ -76,13 +196,11 @@ export const createMockNavigation = (
 
 /**
  * Mock route context for specific routes
- * @param routeId
- * @param params
  */
 export const createMockRouteContext = (
   routeId: string,
-  params: Record<string, string> = {},
-) => ({
+  params: Readonly<Record<string, string>> = {},
+): MockRouteContext => ({
   routeId,
   params,
   search: {},
@@ -96,9 +214,8 @@ export const createMockRouteContext = (
 
 /**
  * Mock match object for route matching
- * @param overrides
  */
-export const createMockMatch = (overrides: Record<string, unknown> = {}): any => ({
+export const createMockMatch = (overrides: Readonly<Partial<MockMatch>> = {}): MockMatch => ({
   id: "test-route",
   params: {},
   pathname: "/",
@@ -110,7 +227,7 @@ export const createMockMatch = (overrides: Record<string, unknown> = {}): any =>
   loaderData: undefined,
   actionData: undefined,
   error: undefined,
-  status: "success" as const,
+  status: "success",
   isFetching: false,
   invalidAt: Infinity,
   preload: vi.fn(),
@@ -118,44 +235,46 @@ export const createMockMatch = (overrides: Record<string, unknown> = {}): any =>
 });
 
 /**
- * Higher-order component to wrap components with mock router context
- * @param Component
- * @param routerOptions
- * @param routerOptions.pathname
- * @param routerOptions.search
- * @param routerOptions.params
- * @param routerOptions.navigate
+ * Options accepted by withMockRouter to control the mocked router state
  */
-export const withMockRouter = <P extends Record<string, unknown>>(Component: React.ComponentType<P>, routerOptions?: {
-    pathname?: string;
-    search?: string;
-    params?: Record<string, string>;
-    navigate?: typeof vi.fn;
-  }) => (properties: P) => {
+interface WithMockRouterOptions {
+  pathname?: string;
+  search?: string;
+  params?: Record<string, string>;
+  navigate?: ReturnType<typeof vi.fn>;
+}
+
+/**
+ * Higher-order component to wrap components with mock router context
+ */
+export const withMockRouter = <P extends Record<string, unknown>>(
+  Component: React.ComponentType<P>,
+  routerOptions?: Readonly<WithMockRouterOptions>,
+) => (properties: P) => {
+    const pathname = routerOptions?.pathname ?? "/";
+    const search = routerOptions?.search ?? "";
     const mockRouter = createMockRouter({
       state: {
         location: {
-          pathname: routerOptions?.pathname || "/",
-          search: routerOptions?.search || "",
+          pathname,
+          search,
           hash: "",
-          href:
-            (routerOptions?.pathname || "/") + (routerOptions?.search || ""),
+          href: pathname + search,
           state: undefined,
           maskedLocation: undefined,
         },
         resolvedLocation: {
-          pathname: routerOptions?.pathname || "/",
-          search: routerOptions?.search || "",
+          pathname,
+          search,
           hash: "",
-          href:
-            (routerOptions?.pathname || "/") + (routerOptions?.search || ""),
+          href: pathname + search,
         },
-        status: "idle" as const,
+        status: "idle",
         isFetching: false,
         isLoading: false,
         isTransitioning: false,
       },
-      navigate: routerOptions?.navigate || vi.fn(),
+      navigate: routerOptions?.navigate ?? vi.fn(),
     });
 
     // Mock the router context
@@ -167,48 +286,32 @@ export const withMockRouter = <P extends Record<string, unknown>>(Component: Rea
 /**
  * Mock TanStack Router hooks for testing
  */
-export const mockRouterHooks: any = {
+export const mockRouterHooks: MockRouterHooks = {
   useRouter: () => createMockRouter(),
   useNavigate: () => vi.fn(),
-  useLocation: () => ({
-    pathname: "/",
-    search: "",
-    hash: "",
-    href: "/",
-    state: undefined,
-    maskedLocation: undefined,
-  }),
+  useLocation: () => createMockLocation(),
   useParams: () => ({}),
   useSearch: () => ({}),
   useMatches: () => [createMockMatch()],
   useMatch: () => createMockMatch(),
   useRouteContext: () => ({}),
-  useLoaderData: () => {},
-  useRouterState: () => ({
-    status: "idle" as const,
-    isFetching: false,
-    isLoading: false,
-    isTransitioning: false,
-    location: {
-      pathname: "/",
-      search: "",
-      hash: "",
-      href: "/",
-      state: undefined,
-      maskedLocation: undefined,
-    },
-    resolvedLocation: {
-      pathname: "/",
-      search: "",
-      hash: "",
-      href: "/",
-    },
-  }),
+  useLoaderData: () => {
+    // No loader data by default in tests
+    return undefined;
+  },
+  useRouterState: () => createMockRouterState(),
 };
 
 /**
- * Setup function to mock all TanStack Router modules
- * Call this in your test setup to mock router dependencies
+ * Type guard for a vitest mock function, used to safely call `mockReset()`
+ * @param value - Value to check
+ * @returns True if the value is a function carrying a `mockReset` method
+ */
+const isMockFunction = (value: unknown): value is { mockReset: () => void } =>
+  typeof value === "function" && "mockReset" in value;
+
+/**
+ * Setup function to mock all TanStack Router modules Call this in your test setup to mock router dependencies
  */
 export const setupRouterMocks = () => {
   // Mock @tanstack/react-router with vi.mock (top-level mocking)
@@ -235,48 +338,22 @@ export const setupRouterMocks = () => {
       createFileRoute: vi.fn((path: string) => (options?: Record<string, unknown>) => {
         const route = {
           path,
-          options: options || {},
+          options: options ?? {},
           ...options,
         };
         return route;
       }),
-      RouterProvider: ({ children }: React.PropsWithChildren<Record<string, unknown>>) => children,
-      useRouterState: () => ({
-        status: "idle" as const,
-        isFetching: false,
-        isLoading: false,
-        isTransitioning: false,
-        location: {
-          pathname: "/",
-          search: "",
-          hash: "",
-          href: "/",
-          state: undefined,
-          maskedLocation: undefined,
-        },
-        resolvedLocation: {
-          pathname: "/",
-          search: "",
-          hash: "",
-          href: "/",
-        },
-      }),
-      useRouter: () => createMockRouter(),
-      useNavigate: () => vi.fn(),
-      useLocation: () => ({
-        pathname: "/",
-        search: "",
-        hash: "",
-        href: "/",
-        state: undefined,
-        maskedLocation: undefined,
-      }),
-      useParams: () => ({}),
-      useSearch: () => ({}),
-      useMatches: () => [createMockMatch()],
-      useMatch: () => createMockMatch(),
-      useRouteContext: () => ({}),
-      useLoaderData: () => {},
+      RouterProvider: async ({ children }: React.PropsWithChildren<Record<string, unknown>>) => children,
+      useRouterState: mockRouterHooks.useRouterState,
+      useRouter: mockRouterHooks.useRouter,
+      useNavigate: mockRouterHooks.useNavigate,
+      useLocation: mockRouterHooks.useLocation,
+      useParams: mockRouterHooks.useParams,
+      useSearch: mockRouterHooks.useSearch,
+      useMatches: mockRouterHooks.useMatches,
+      useMatch: mockRouterHooks.useMatch,
+      useRouteContext: mockRouterHooks.useRouteContext,
+      useLoaderData: mockRouterHooks.useLoaderData,
     };
   });
 
@@ -291,8 +368,8 @@ export const setupRouterMocks = () => {
  */
 export const resetRouterMocks = () => {
   for (const hook of Object.values(mockRouterHooks)) {
-    if (typeof hook === "function" && "mockReset" in hook) {
-      (hook as { mockReset: () => void }).mockReset();
+    if (isMockFunction(hook)) {
+      hook.mockReset();
     }
   }
 };

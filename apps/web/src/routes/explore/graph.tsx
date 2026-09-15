@@ -8,7 +8,7 @@ import { lazy } from "react";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const GraphExplorer = lazy(() => import("./graph.lazy"));
+const GraphExplorer = lazy(async () => import("./graph.lazy"));
 
 export const Route = createFileRoute("/explore/graph")({
   component: () => (

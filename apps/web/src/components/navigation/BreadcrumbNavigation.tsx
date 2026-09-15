@@ -30,6 +30,9 @@ import React, { useCallback,useMemo } from "react";
 import { NOTIFICATION_DURATION } from "@/config/notification-constants";
 import { ICON_SIZE } from "@/config/style-constants";
 
+const BREADCRUMB_FONT_WEIGHT_ACTIVE = 600;
+const BREADCRUMB_FONT_WEIGHT_INACTIVE = 400;
+
 interface BreadcrumbItem {
   label: string;
   href?: string;
@@ -149,7 +152,7 @@ export const BreadcrumbNavigation = () => {
 
   // Share current page
   const handleShare = useCallback(() => {
-    if (navigator.share) {
+    if ("share" in navigator) {
       navigator.share({
         title: document.title,
         url: window.location.href,
@@ -190,7 +193,7 @@ export const BreadcrumbNavigation = () => {
                 component={isLast ? undefined : Link}
                 to={item.href}
                 size="sm"
-                fw={isLast ? 600 : 400}
+                fw={isLast ? BREADCRUMB_FONT_WEIGHT_ACTIVE : BREADCRUMB_FONT_WEIGHT_INACTIVE}
                 c={isLast ? "var(--mantine-color-blue-6)" : "var(--mantine-color-gray-7)"}
                 style={{
                   display: "inline-flex",
@@ -203,7 +206,7 @@ export const BreadcrumbNavigation = () => {
               >
                 {item.icon}
                 <Text span>{item.label}</Text>
-                {item.badge && (
+                {item.badge !== undefined && item.badge !== "" && item.badge !== 0 && (
                   <Badge
                     size="xs"
                     variant="light"

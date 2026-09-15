@@ -12,8 +12,10 @@ const DEPLOYED_URL = 'https://mearman.github.io/BibGraph';
  * 4. All 8 entity types
  */
 
+const TEST_SUITE_TIMEOUT_MS = 60_000;
+
 test.describe('Deployed Site - Critical Verification', () => {
-  test.setTimeout(60_000);
+  test.setTimeout(TEST_SUITE_TIMEOUT_MS);
 
   test('should load author A5017898742 correctly', async ({ page }) => {
     await page.goto(`${DEPLOYED_URL}/#/authors/A5017898742`, {

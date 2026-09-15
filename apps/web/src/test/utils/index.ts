@@ -37,15 +37,5 @@ export {
   resetRouterMocks,
 } from "./router-mocks";
 
-// Import the setup functions for use in setupAllTestMocks
-import { setupComponentMocks } from "./component-mocks";
-import { setupRouterMocks } from "./router-mocks";
-
-/**
- * Setup all test mocks for component testing
- * This function combines all mock setup functions
- */
-export const setupAllTestMocks = () => {
-  setupComponentMocks();
-  setupRouterMocks();
-};
+// Combined setup
+export { setupAllTestMocks } from "./setup-all-test-mocks";

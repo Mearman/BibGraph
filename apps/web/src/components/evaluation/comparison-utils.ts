@@ -8,22 +8,24 @@ import type {
   NormalizedMetrics,
 } from "@/types/comparison";
 
+// Converts a 0-1 ratio to a percentage value for display.
+const PERCENTAGE_MULTIPLIER = 100;
+// Converts a millisecond duration into seconds for display.
+const MILLISECONDS_PER_SECOND = 1000;
+
 /**
  * Format a decimal value as a percentage string
- * @param value
  */
 export const formatPercent = (value: number): string =>
-  `${(value * 100).toFixed(1)}%`;
+  `${(value * PERCENTAGE_MULTIPLIER).toFixed(1)}%`;
 
 /**
  * Format milliseconds as a seconds string
- * @param ms
  */
-export const formatTime = (ms: number): string => `${(ms / 1000).toFixed(1)}s`;
+export const formatTime = (ms: number): string => `${(ms / MILLISECONDS_PER_SECOND).toFixed(1)}s`;
 
 /**
  * Extract normalized metrics from either ComparisonRun or LegacyResult format
- * @param result
  */
 export const getResultMetrics = (
   result: ComparisonRun | LegacyResult,
@@ -50,7 +52,6 @@ export const getResultMetrics = (
 
 /**
  * Get execution time from a result, handling both formats
- * @param result
  */
 export const getExecutionTime = (result: ComparisonRun | LegacyResult): number => {
   if ("executionTime" in result) {

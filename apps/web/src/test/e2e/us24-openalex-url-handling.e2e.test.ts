@@ -12,7 +12,8 @@ import { waitForAppReady } from '@/test/helpers/app-ready';
 import { BaseSPAPageObject } from '@/test/page-objects/BaseSPAPageObject';
 
 test.describe('@utility US-24 OpenAlex URL Handling', () => {
-	const BASE_URL = process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173';
+	const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+	const BASE_URL = IS_CI ? 'http://localhost:4173' : 'http://localhost:5173';
 
 	test.beforeEach(async ({ page, context }) => {
 		await context.clearCookies();

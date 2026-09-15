@@ -179,7 +179,7 @@ describe('SplitButton', () => {
           <SplitButton
             ref={reference}
             mainButtonProps={{
-              onClick: vi.fn(),
+              onClick: vi.fn(() => { /* no-op mock, only click-tracking is asserted */ }),
               children: 'Action'
             }}
           />

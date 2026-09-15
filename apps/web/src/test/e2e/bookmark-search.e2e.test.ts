@@ -14,11 +14,11 @@ import { expect,test } from "@playwright/test";
 
 const clearBookmarks = async (page: Page): Promise<void> => {
 	await page.goto("/");
-	await page.evaluate(() => {
+	await page.evaluate(async () => {
 		return new Promise<void>((resolve) => {
 			const request = indexedDB.deleteDatabase("bibgraph-db");
-			request.onsuccess = () => resolve();
-			request.onerror = () => resolve();
+			request.onsuccess = () => { resolve(); };
+			request.onerror = () => { resolve(); };
 		});
 	});
 	await page.reload();
@@ -33,6 +33,8 @@ const createBookmark = async (page: Page, entityType: string, entityId: string):
 	await button.click();
 	// Removed: waitForTimeout - use locator assertions instead
 };
+
+const SEEDED_BOOKMARK_COUNT = 3;
 
 test.describe("Bookmark Search", () => {
 	test.beforeEach(async ({ page }) => {
@@ -58,7 +60,7 @@ test.describe("Bookmark Search", () => {
 
 		// Verify all bookmarks shown
 		const bookmarks = page.locator('[data-testid="bookmark-list-item"]');
-		await expect(bookmarks).toHaveCount(3);
+		await expect(bookmarks).toHaveCount(SEEDED_BOOKMARK_COUNT);
 
 		// Search for specific title keyword (feature will be implemented)
 		// const searchInput = page.locator('[data-testid="bookmark-search-input"]');

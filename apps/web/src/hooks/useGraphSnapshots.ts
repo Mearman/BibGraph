@@ -6,14 +6,15 @@
  * - Load snapshot
  * - Auto-save functionality
  * - Share via URL
- *
- * @module hooks/use-graph-snapshots
  */
 
 import type { GraphEdge, GraphNode } from '@bibgraph/types';
+import type { GraphSnapshotStorage } from '@bibgraph/utils';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useStorageProvider } from '@/contexts/storage-provider-context';
+
+import { isPlainObject } from './extractors/unknown-helpers';
 
 interface GraphSnapshot {
   id: string;
@@ -34,6 +35,70 @@ interface GraphSnapshot {
 
 const MAX_AUTO_SAVE_COUNT = 5;
 
+const isMinimalRecordArray = <T extends { id: string }>(value: unknown): value is T[] =>
+  Array.isArray(value) && value.every(item => isPlainObject(item) && typeof item.id === 'string');
+
+const isPositionEntryArray = (value: unknown): value is [string, { x: number; y: number }][] =>
+  Array.isArray(value) &&
+  value.every(
+    entry =>
+      Array.isArray(entry) &&
+      entry.length === 2 &&
+      typeof entry[0] === 'string' &&
+      isPlainObject(entry[1]) &&
+      typeof entry[1].x === 'number' &&
+      typeof entry[1].y === 'number'
+  );
+
+/**
+ * Parse a single stored snapshot row into its deserialized runtime shape, tolerating malformed JSON in any of the serialized fields by falling back to empty/undefined for that field alone
+ */
+const deserializeSnapshot = (snapshot: Readonly<GraphSnapshotStorage>): GraphSnapshot => {
+  let parsedNodes: GraphNode[] = [];
+  let parsedEdges: GraphEdge[] = [];
+  let parsedNodePositions: Map<string, { x: number; y: number }> | undefined;
+  let parsedAnnotations: unknown[] | undefined;
+
+  try {
+    const rawNodes: unknown = JSON.parse(snapshot.nodes);
+    parsedNodes = isMinimalRecordArray<GraphNode>(rawNodes) ? rawNodes : [];
+
+    const rawEdges: unknown = JSON.parse(snapshot.edges);
+    parsedEdges = isMinimalRecordArray<GraphEdge>(rawEdges) ? rawEdges : [];
+
+    if (snapshot.nodePositions !== undefined) {
+      const rawPositions: unknown = JSON.parse(snapshot.nodePositions);
+      if (isPositionEntryArray(rawPositions)) {
+        parsedNodePositions = new Map(rawPositions);
+      }
+    }
+
+    if (snapshot.annotations !== undefined) {
+      const rawAnnotations: unknown = JSON.parse(snapshot.annotations);
+      parsedAnnotations = Array.isArray(rawAnnotations) ? rawAnnotations : undefined;
+    }
+  } catch (parseError) {
+    console.error('Failed to parse snapshot data:', parseError);
+  }
+
+  return {
+    id: snapshot.id ?? '',
+    name: snapshot.name,
+    createdAt: snapshot.createdAt,
+    updatedAt: snapshot.updatedAt,
+    isAutoSave: snapshot.isAutoSave,
+    nodes: parsedNodes,
+    edges: parsedEdges,
+    zoom: snapshot.zoom,
+    panX: snapshot.panX,
+    panY: snapshot.panY,
+    layoutType: snapshot.layoutType,
+    nodePositions: parsedNodePositions,
+    annotations: parsedAnnotations,
+    shareToken: snapshot.shareToken,
+  };
+};
+
 /**
  * Hook for managing graph snapshots
  */
@@ -52,45 +117,7 @@ export const useGraphSnapshots = () => {
         const loadedSnapshots = await storageProvider.getSnapshots();
 
         // Deserialize snapshots
-        const deserialized = loadedSnapshots.map(snapshot => {
-          let parsedNodes: GraphNode[] = [];
-          let parsedEdges: GraphEdge[] = [];
-          let parsedNodePositions: Map<string, { x: number; y: number }> | undefined;
-          let parsedAnnotations: unknown[] | undefined;
-
-          try {
-            parsedNodes = JSON.parse(snapshot.nodes) as GraphNode[];
-            parsedEdges = JSON.parse(snapshot.edges) as GraphEdge[];
-
-            if (snapshot.nodePositions) {
-              const positions = JSON.parse(snapshot.nodePositions) as Array<[string, { x: number; y: number }]>;
-              parsedNodePositions = new Map(positions);
-            }
-
-            if (snapshot.annotations) {
-              parsedAnnotations = JSON.parse(snapshot.annotations) as unknown[];
-            }
-          } catch (parseError) {
-            console.error('Failed to parse snapshot data:', parseError);
-          }
-
-          return {
-            id: snapshot.id ?? '',
-            name: snapshot.name,
-            createdAt: snapshot.createdAt,
-            updatedAt: snapshot.updatedAt,
-            isAutoSave: snapshot.isAutoSave,
-            nodes: parsedNodes,
-            edges: parsedEdges,
-            zoom: snapshot.zoom,
-            panX: snapshot.panX,
-            panY: snapshot.panY,
-            layoutType: snapshot.layoutType,
-            nodePositions: parsedNodePositions,
-            annotations: parsedAnnotations,
-            shareToken: snapshot.shareToken,
-          };
-        });
+        const deserialized = loadedSnapshots.map(deserializeSnapshot);
 
         setSnapshots(deserialized);
       } catch (error_) {
@@ -143,51 +170,13 @@ export const useGraphSnapshots = () => {
       });
 
       // Prune old auto-saves if this is a manual save
-      if (!parameters.isAutoSave) {
+      if (parameters.isAutoSave !== true) {
         await storageProvider.pruneAutoSaveSnapshots(MAX_AUTO_SAVE_COUNT);
       }
 
       // Refresh snapshots from storage
       const updatedSnapshots = await storageProvider.getSnapshots();
-      const deserialized = updatedSnapshots.map(snapshot => {
-        let parsedNodes: GraphNode[] = [];
-        let parsedEdges: GraphEdge[] = [];
-        let parsedNodePositions: Map<string, { x: number; y: number }> | undefined;
-        let parsedAnnotations: unknown[] | undefined;
-
-        try {
-          parsedNodes = JSON.parse(snapshot.nodes) as GraphNode[];
-          parsedEdges = JSON.parse(snapshot.edges) as GraphEdge[];
-
-          if (snapshot.nodePositions) {
-            const positions = JSON.parse(snapshot.nodePositions) as Array<[string, { x: number; y: number }]>;
-            parsedNodePositions = new Map(positions);
-          }
-
-          if (snapshot.annotations) {
-            parsedAnnotations = JSON.parse(snapshot.annotations) as unknown[];
-          }
-        } catch (parseError) {
-          console.error('Failed to parse snapshot data:', parseError);
-        }
-
-        return {
-          id: snapshot.id ?? '',
-          name: snapshot.name,
-          createdAt: snapshot.createdAt,
-          updatedAt: snapshot.updatedAt,
-          isAutoSave: snapshot.isAutoSave,
-          nodes: parsedNodes,
-          edges: parsedEdges,
-          zoom: snapshot.zoom,
-          panX: snapshot.panX,
-          panY: snapshot.panY,
-          layoutType: snapshot.layoutType,
-          nodePositions: parsedNodePositions,
-          annotations: parsedAnnotations,
-          shareToken: snapshot.shareToken,
-        };
-      });
+      const deserialized = updatedSnapshots.map(deserializeSnapshot);
 
       setSnapshots(deserialized);
 
@@ -249,43 +238,7 @@ export const useGraphSnapshots = () => {
 
       if (!snapshot) return null;
 
-      let parsedNodes: GraphNode[] = [];
-      let parsedEdges: GraphEdge[] = [];
-      let parsedNodePositions: Map<string, { x: number; y: number }> | undefined;
-      let parsedAnnotations: unknown[] | undefined;
-
-      try {
-        parsedNodes = JSON.parse(snapshot.nodes) as GraphNode[];
-        parsedEdges = JSON.parse(snapshot.edges) as GraphEdge[];
-
-        if (snapshot.nodePositions) {
-          const positions = JSON.parse(snapshot.nodePositions) as Array<[string, { x: number; y: number }]>;
-          parsedNodePositions = new Map(positions);
-        }
-
-        if (snapshot.annotations) {
-          parsedAnnotations = JSON.parse(snapshot.annotations) as unknown[];
-        }
-      } catch (parseError) {
-        console.error('Failed to parse snapshot data:', parseError);
-      }
-
-      return {
-        id: snapshot.id ?? '',
-        name: snapshot.name,
-        createdAt: snapshot.createdAt,
-        updatedAt: snapshot.updatedAt,
-        isAutoSave: snapshot.isAutoSave,
-        nodes: parsedNodes,
-        edges: parsedEdges,
-        zoom: snapshot.zoom,
-        panX: snapshot.panX,
-        panY: snapshot.panY,
-        layoutType: snapshot.layoutType,
-        nodePositions: parsedNodePositions,
-        annotations: parsedAnnotations,
-        shareToken: snapshot.shareToken,
-      };
+      return deserializeSnapshot(snapshot);
     } catch (error_) {
       const errorObject = error_ instanceof Error ? error_ : new Error(String(error_));
       setError(errorObject);
@@ -325,45 +278,7 @@ export const useGraphSnapshots = () => {
     // Helpers
     refresh: useCallback(async () => {
       const updatedSnapshots = await storageProvider.getSnapshots();
-      const deserialized = updatedSnapshots.map(snapshot => {
-        let parsedNodes: GraphNode[] = [];
-        let parsedEdges: GraphEdge[] = [];
-        let parsedNodePositions: Map<string, { x: number; y: number }> | undefined;
-        let parsedAnnotations: unknown[] | undefined;
-
-        try {
-          parsedNodes = JSON.parse(snapshot.nodes) as GraphNode[];
-          parsedEdges = JSON.parse(snapshot.edges) as GraphEdge[];
-
-          if (snapshot.nodePositions) {
-            const positions = JSON.parse(snapshot.nodePositions) as Array<[string, { x: number; y: number }]>;
-            parsedNodePositions = new Map(positions);
-          }
-
-          if (snapshot.annotations) {
-            parsedAnnotations = JSON.parse(snapshot.annotations) as unknown[];
-          }
-        } catch (parseError) {
-          console.error('Failed to parse snapshot data:', parseError);
-        }
-
-        return {
-          id: snapshot.id ?? '',
-          name: snapshot.name,
-          createdAt: snapshot.createdAt,
-          updatedAt: snapshot.updatedAt,
-          isAutoSave: snapshot.isAutoSave,
-          nodes: parsedNodes,
-          edges: parsedEdges,
-          zoom: snapshot.zoom,
-          panX: snapshot.panX,
-          panY: snapshot.panY,
-          layoutType: snapshot.layoutType,
-          nodePositions: parsedNodePositions,
-          annotations: parsedAnnotations,
-          shareToken: snapshot.shareToken,
-        };
-      });
+      const deserialized = updatedSnapshots.map(deserializeSnapshot);
 
       setSnapshots(deserialized);
     }, []),

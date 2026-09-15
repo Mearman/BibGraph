@@ -7,6 +7,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { MS_PER_SECOND } from './time-constants';
+
 // Configuration for progressive loading
 interface ProgressiveLoadingConfig {
   /**
@@ -52,8 +54,8 @@ const DEFAULT_CONFIG: ProgressiveLoadingConfig = {
  * @param config - progressive loading configuration
  */
 export const useProgressiveGraphLoading = <T>(
-  items: T[],
-  config: Partial<ProgressiveLoadingConfig> = {}
+  items: readonly T[],
+  config: Readonly<Partial<ProgressiveLoadingConfig>> = {}
 ) => {
   const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
@@ -77,7 +79,7 @@ export const useProgressiveGraphLoading = <T>(
       clearTimeout(timeoutReference.current);
       timeoutReference.current = null;
     }
-    if (animationFrameReference.current) {
+    if (animationFrameReference.current !== null) {
       cancelAnimationFrame(animationFrameReference.current);
       animationFrameReference.current = null;
     }
@@ -85,7 +87,7 @@ export const useProgressiveGraphLoading = <T>(
 
   // Load next batch of items
   const loadNextBatch = useCallback(
-    (remainingItems: T[], currentVisible: T[]) => {
+    (remainingItems: readonly T[], currentVisible: readonly T[]) => {
       if (!isMountedReference.current) return;
 
       const batchSize = Math.min(finalConfig.batchSize, remainingItems.length);
@@ -112,7 +114,7 @@ export const useProgressiveGraphLoading = <T>(
 
         // Force load all if max time exceeded
         if (elapsedTime > finalConfig.maxLoadingTimeMs) {
-          setVisibleItems(items);
+          setVisibleItems([...items]);
           setLoadingState(previous => ({
             ...previous,
             isLoading: false,
@@ -147,7 +149,7 @@ export const useProgressiveGraphLoading = <T>(
   // Start progressive loading
   const startLoading = useCallback(() => {
     if (!finalConfig.enabled || items.length === 0) {
-      setVisibleItems(items);
+      setVisibleItems([...items]);
       setLoadingState({
         isLoading: false,
         loadedCount: items.length,
@@ -192,7 +194,7 @@ export const useProgressiveGraphLoading = <T>(
     if (!loadingState.isLoading) return;
 
     cancelLoading();
-    setVisibleItems(items);
+    setVisibleItems([...items]);
     setLoadingState(previous => ({
       ...previous,
       isLoading: false,
@@ -217,16 +219,15 @@ export const useProgressiveGraphLoading = <T>(
  * @param getNodeId - function to get node ID
  * @param getEdgeSourceId - function to get edge source ID
  * @param getEdgeTargetId - function to get edge target ID
- * @param config - progressive loading configuration
- * @param _config
+ * @param _config - progressive loading configuration
  */
 export const useProgressiveEdgeLoading = <Node, Edge>(
-  nodes: Node[],
-  edges: Edge[],
+  nodes: readonly Node[],
+  edges: readonly Edge[],
   getNodeId: (node: Node) => string,
   getEdgeSourceId: (edge: Edge) => string,
   getEdgeTargetId: (edge: Edge) => string,
-  _config: Partial<ProgressiveLoadingConfig> = {}
+  _config: Readonly<Partial<ProgressiveLoadingConfig>> = {}
 ) => {
   const [visibleEdges, setVisibleEdges] = useState<Edge[]>([]);
   const nodeIdSet = useRef<Set<string>>(new Set());
@@ -237,7 +238,7 @@ export const useProgressiveEdgeLoading = <Node, Edge>(
   }, [nodes, getNodeId]);
 
   // Filter edges that have both endpoints visible
-  const filterVisibleEdges = useCallback((allEdges: Edge[]) => {
+  const filterVisibleEdges = useCallback((allEdges: readonly Edge[]) => {
     return allEdges.filter(edge => {
       const sourceId = getEdgeSourceId(edge);
       const targetId = getEdgeTargetId(edge);
@@ -265,13 +266,13 @@ export interface ProgressiveLoadingMetrics {
 }
 
 export const calculateLoadingMetrics = (
-  loadingState: LoadingState,
-  _config: ProgressiveLoadingConfig
+  loadingState: Readonly<LoadingState>,
+  _config: Readonly<ProgressiveLoadingConfig>
 ): ProgressiveLoadingMetrics => {
   const totalTimeMs = performance.now() - loadingState.startTime;
   const batchesLoaded = loadingState.currentBatch;
   const averageBatchTimeMs = batchesLoaded > 0 ? totalTimeMs / batchesLoaded : 0;
-  const itemsPerSecond = totalTimeMs > 0 ? (loadingState.loadedCount / totalTimeMs) * 1000 : 0;
+  const itemsPerSecond = totalTimeMs > 0 ? (loadingState.loadedCount / totalTimeMs) * MS_PER_SECOND : 0;
 
   return {
     totalTimeMs,
@@ -286,9 +287,18 @@ export const calculateLoadingMetrics = (
  * @param initialBatchSize - starting batch size
  * @param targetFrameTime - target frame time in milliseconds (~60fps)
  */
+const DEFAULT_ADAPTIVE_BATCH_SIZE = 50;
+const DEFAULT_TARGET_FRAME_TIME_MS = 16; // ~60fps
+const FRAME_TIME_SLOW_THRESHOLD_RATIO = 1.2;
+const FRAME_TIME_FAST_THRESHOLD_RATIO = 0.8;
+const MIN_ADAPTIVE_BATCH_SIZE = 10;
+const MAX_ADAPTIVE_BATCH_SIZE = 200;
+const BATCH_SIZE_SHRINK_FACTOR = 0.8;
+const BATCH_SIZE_GROW_FACTOR = 1.2;
+
 export const useAdaptiveBatching = (
-  initialBatchSize: number = 50,
-  targetFrameTime: number = 16 // ~60fps
+  initialBatchSize = DEFAULT_ADAPTIVE_BATCH_SIZE,
+  targetFrameTime = DEFAULT_TARGET_FRAME_TIME_MS
 ) => {
   const [batchSize, setBatchSize] = useState(initialBatchSize);
   const frameTimeReference = useRef(0);
@@ -301,12 +311,12 @@ export const useAdaptiveBatching = (
     lastFrameTimeReference.current = now;
 
     // Adjust batch size based on frame time
-    if (frameTime > targetFrameTime * 1.2) {
+    if (frameTime > targetFrameTime * FRAME_TIME_SLOW_THRESHOLD_RATIO) {
       // Frame too slow, reduce batch size
-      setBatchSize(previous => Math.max(10, Math.floor(previous * 0.8)));
-    } else if (frameTime < targetFrameTime * 0.8) {
+      setBatchSize(previous => Math.max(MIN_ADAPTIVE_BATCH_SIZE, Math.floor(previous * BATCH_SIZE_SHRINK_FACTOR)));
+    } else if (frameTime < targetFrameTime * FRAME_TIME_FAST_THRESHOLD_RATIO) {
       // Frame fast, increase batch size
-      setBatchSize(previous => Math.min(200, Math.floor(previous * 1.2)));
+      setBatchSize(previous => Math.min(MAX_ADAPTIVE_BATCH_SIZE, Math.floor(previous * BATCH_SIZE_GROW_FACTOR)));
     }
   }, [targetFrameTime]);
 

@@ -37,16 +37,13 @@ export interface NetworkStatusProps {
 
 export type NetworkStatusType = "online" | "offline" | "slow" | "unstable";
 
+const STATUS_CHECK_INTERVAL_MS = 30000;
+
 /**
  * Network Status Component
  *
  * Displays current network connectivity status with appropriate
  * visual indicators and optional detailed information.
- * @param root0
- * @param root0.detailed
- * @param root0.size
- * @param root0.compact
- * @param root0.label
  */
 export const NetworkStatus = ({
   detailed = false,
@@ -54,10 +51,11 @@ export const NetworkStatus = ({
   compact = false,
   label
 }: NetworkStatusProps) => {
-  const [isBrowserSupported, setIsBrowserSupported] = useState(true);
+  // The browser API's presence doesn't change during a session, so this is computed once at mount.
+  const [isBrowserSupported] = useState(() => typeof navigator !== 'undefined' && 'onLine' in navigator);
 
   // Try to use NetworkProvider context, fallback to browser API
-  let networkContext;
+  let networkContext: ReturnType<typeof useNetwork> | null;
   try {
     networkContext = useNetwork();
   } catch {
@@ -65,11 +63,14 @@ export const NetworkStatus = ({
     networkContext = null;
   }
 
-  const [browserStatus, setBrowserStatus] = useState<NetworkStatusType>("online");
+  const [browserStatus, setBrowserStatus] = useState<NetworkStatusType>(() =>
+    (typeof navigator !== 'undefined' && navigator.onLine) ? "online" : "offline"
+  );
 
   // Fallback network detection if NetworkProvider not available
   useEffect(() => {
-    if (networkContext) return;
+    if (networkContext) return undefined;
+    if (!isBrowserSupported) return undefined;
 
     const checkConnection = () => {
       if (!navigator.onLine) {
@@ -88,31 +89,23 @@ export const NetworkStatus = ({
       setBrowserStatus("offline");
     };
 
-    // Check if browser APIs are supported
-    if (typeof navigator === 'undefined' || !('onLine' in navigator)) {
-      setIsBrowserSupported(false);
-      return;
-    }
-
-    checkConnection();
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
     // Periodic status checks
-    const interval = setInterval(checkConnection, 30000);
+    const interval = setInterval(checkConnection, STATUS_CHECK_INTERVAL_MS);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       clearInterval(interval);
     };
-  }, [networkContext]);
+  }, [networkContext, isBrowserSupported]);
 
   // Get status from context or browser API
   const status = networkContext ? networkContext.status : browserStatus;
   const isOnline = networkContext ? networkContext.isOnline : navigator.onLine;
-  const queueLength = networkContext?.queueLength || 0;
+  const queueLength = networkContext?.queueLength ?? 0;
 
   const getStatusConfig = () => {
     switch (status) {
@@ -155,13 +148,13 @@ export const NetworkStatus = ({
   };
 
   const statusConfig = getStatusConfig();
-  const displayLabel = label || statusConfig.label;
+  const displayLabel = label ?? statusConfig.label;
 
   // Compact badge version
   if (compact) {
     return (
       <Tooltip
-        label={`${displayLabel} - ${statusConfig.description}${queueLength > 0 ? ` (${queueLength} queued)` : ''}`}
+        label={`${displayLabel} - ${statusConfig.description}${queueLength > 0 ? ` (${String(queueLength)} queued)` : ''}`}
         position="top"
       >
         <Badge
@@ -242,7 +235,7 @@ export const NetworkStatus = ({
 
   // Simple badge version
   return (
-    <Tooltip label={`${displayLabel} - ${statusConfig.description}${queueLength > 0 ? ` (${queueLength} queued)` : ''}`}>
+    <Tooltip label={`${displayLabel} - ${statusConfig.description}${queueLength > 0 ? ` (${String(queueLength)} queued)` : ''}`}>
       <Badge
         color={statusConfig.color}
         variant={isOnline ? "filled" : "outline"}
@@ -300,6 +293,8 @@ export const useNetworkConnectivity = () => {
         window.removeEventListener('offline', handleOffline);
       };
     }
+
+    return undefined;
   }, []);
 
   return {

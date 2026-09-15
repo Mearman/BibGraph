@@ -1,6 +1,4 @@
-/**
- * @vitest-environment jsdom
- */
+// @vitest-environment jsdom
 
 /**
  * Settings store unit tests
@@ -28,10 +26,13 @@ Object.defineProperty(window, "localStorage", {
 // Use the existing store instance for testing
 
 
+const MIGRATION_WAIT_MS = 100;
+const INITIALIZATION_WAIT_MS = 50;
+
 describe("SettingsStore", () => {
   beforeEach(async () => {
     // Wait for any pending migrations to complete
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => { setTimeout(resolve, MIGRATION_WAIT_MS); });
     // Clear store state before each test
     await settingsStoreInstance.resetSettings();
     // Clear localStorage mock calls
@@ -40,7 +41,7 @@ describe("SettingsStore", () => {
     localStorageMock.removeItem.mockClear();
     localStorageMock.clear.mockClear();
     // Wait for initialization to complete
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => { setTimeout(resolve, INITIALIZATION_WAIT_MS); });
   });
 
   afterEach(() => {

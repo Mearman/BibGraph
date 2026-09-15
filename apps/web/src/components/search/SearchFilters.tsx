@@ -27,119 +27,28 @@ import {
 } from "@tabler/icons-react";
 import { useCallback, useState } from "react";
 
-export interface AdvancedSearchFilters {
-  // Text filters
-  title?: string;
-  abstract?: string;
-  author?: string;
-  institution?: string;
-  venue?: string;
-  keywords?: string;
-
-  // Date filters
-  publicationYear?: {
-    from?: number;
-    to?: number;
-  };
-  dateRangePreset?: string;
-
-  // Type filters
-  entityType?: string[];
-  publicationType?: string[];
-  openAccess?: boolean;
-
-  // Citation filters
-  citationCount?: {
-    from?: number;
-    to?: number;
-  };
-  citationImpact?: string;
-
-  // Field of study
-  fieldOfStudy?: string[];
-  concepts?: string[];
-
-  // Language
-  language?: string[];
-}
+import type { AdvancedSearchFilters } from "./search-filters-types";
+import {
+  CITATION_IMPACT_LEVELS,
+  COMMON_FIELDS,
+  countActiveSubValues,
+  DATE_RANGE_PRESETS,
+  ENTITY_TYPES,
+  FILTER_KEYS,
+  formatFilterSummaryValue,
+  isFilterValueActive,
+  LANGUAGES,
+  MAX_PUBLICATION_YEAR,
+  MIN_PUBLICATION_YEAR,
+  PUBLICATION_TYPES,
+  QUICK_ENTITY_FILTERS,
+} from "./search-filters-types";
 
 interface SearchFiltersProperties {
   filters: AdvancedSearchFilters;
   onFiltersChange: (filters: AdvancedSearchFilters) => void;
   onReset: () => void;
 }
-
-const ENTITY_TYPES = [
-  { value: "works", label: "Works (Papers, Books, etc.)" },
-  { value: "authors", label: "Authors" },
-  { value: "institutions", label: "Institutions" },
-  { value: "venues", label: "Venues (Journals, Conferences)" },
-  { value: "concepts", label: "Concepts & Topics" },
-];
-
-const PUBLICATION_TYPES = [
-  { value: "journal-article", label: "Journal Article" },
-  { value: "book", label: "Book" },
-  { value: "book-chapter", label: "Book Chapter" },
-  { value: "conference-paper", label: "Conference Paper" },
-  { value: "dissertation", label: "Dissertation/Thesis" },
-  { value: "patent", label: "Patent" },
-  { value: "preprint", label: "Preprint" },
-  { value: "report", label: "Report" },
-];
-
-const LANGUAGES = [
-  { value: "en", label: "English" },
-  { value: "es", label: "Spanish" },
-  { value: "fr", label: "French" },
-  { value: "de", label: "German" },
-  { value: "zh", label: "Chinese" },
-  { value: "ja", label: "Japanese" },
-  { value: "pt", label: "Portuguese" },
-  { value: "ru", label: "Russian" },
-  { value: "ar", label: "Arabic" },
-  { value: "hi", label: "Hindi" },
-];
-
-const COMMON_FIELDS = [
-  { value: "Computer Science", label: "Computer Science" },
-  { value: "Medicine", label: "Medicine" },
-  { value: "Biology", label: "Biology" },
-  { value: "Chemistry", label: "Chemistry" },
-  { value: "Physics", label: "Physics" },
-  { value: "Mathematics", label: "Mathematics" },
-  { value: "Engineering", label: "Engineering" },
-  { value: "Psychology", label: "Psychology" },
-  { value: "Economics", label: "Economics" },
-  { value: "Sociology", label: "Sociology" },
-];
-
-// Date range presets for quick filtering
-const DATE_RANGE_PRESETS = [
-  { value: "this-year", label: "This Year", from: 2024, to: 2024 },
-  { value: "last-5-years", label: "Last 5 Years", from: 2019, to: 2024 },
-  { value: "last-10-years", label: "Last 10 Years", from: 2014, to: 2024 },
-  { value: "2000s", label: "2000s", from: 2000, to: 2009 },
-  { value: "1990s", label: "1990s", from: 1990, to: 1999 },
-  { value: "classic", label: "Classic (pre-1990)", from: 1900, to: 1989 },
-];
-
-// Citation impact levels
-const CITATION_IMPACT_LEVELS = [
-  { value: "high", label: "High Impact (100+)", from: 100, to: undefined },
-  { value: "moderate", label: "Moderate (10-99)", from: 10, to: 99 },
-  { value: "low", label: "Low (0-9)", from: 0, to: 9 },
-  { value: "viral", label: "Viral (1000+)", from: 1000, to: undefined },
-];
-
-// Quick filter entity type pills with colors
-const QUICK_ENTITY_FILTERS = [
-  { value: "works", label: "Works", color: "blue" },
-  { value: "authors", label: "Authors", color: "green" },
-  { value: "institutions", label: "Institutions", color: "orange" },
-  { value: "venues", label: "Venues", color: "purple" },
-  { value: "concepts", label: "Concepts", color: "pink" },
-];
 
 export const SearchFilters = ({
   filters,
@@ -171,7 +80,7 @@ export const SearchFilters = ({
 
   // Helper function to toggle quick entity filter
   const toggleQuickEntityFilter = useCallback((entityType: string) => {
-    const currentTypes = localFilters.entityType || [];
+    const currentTypes = localFilters.entityType ?? [];
     const newTypes = currentTypes.includes(entityType)
       ? currentTypes.filter(t => t !== entityType)
       : [...currentTypes, entityType];
@@ -179,26 +88,11 @@ export const SearchFilters = ({
   }, [localFilters.entityType, updateFilter]);
 
   const hasActiveFilters = useCallback(() => {
-    return Object.values(localFilters).some((value) => {
-      if (value === undefined || value === null || value === "") return false;
-      if (Array.isArray(value)) return value.length > 0;
-      if (typeof value === "object") {
-        return Object.values(value).some(v => v !== undefined && v !== null && v !== "");
-      }
-      return true;
-    });
+    return FILTER_KEYS.some((key) => isFilterValueActive(localFilters[key]));
   }, [localFilters]);
 
   const getActiveFilterCount = useCallback(() => {
-    let count = 0;
-    for (const [_key, value] of Object.entries(localFilters)) {
-      if (value === undefined || value === null || value === "") continue;
-      if (Array.isArray(value)) count += value.length;
-      else if (typeof value === "object") {
-        count += Object.values(value).filter(v => v !== undefined && v !== null && v !== "").length;
-      } else count++;
-    }
-    return count;
+    return FILTER_KEYS.reduce((count, key) => count + countActiveSubValues(localFilters[key]), 0);
   }, [localFilters]);
 
   const activeFilterCount = getActiveFilterCount();
@@ -244,14 +138,14 @@ export const SearchFilters = ({
           </Group>
           <Group gap="xs" wrap="wrap">
             {QUICK_ENTITY_FILTERS.map((entity) => {
-              const isSelected = localFilters.entityType?.includes(entity.value);
+              const isSelected = localFilters.entityType?.includes(entity.value) ?? false;
               return (
                 <Tooltip key={entity.value} label={`Click to ${isSelected ? 'remove' : 'add'} ${entity.label} filter`}>
                   <Button
                     size="compact-sm"
                     variant={isSelected ? "filled" : "outline"}
                     color={isSelected ? entity.color : "gray"}
-                    onClick={() => toggleQuickEntityFilter(entity.value)}
+                    onClick={() => { toggleQuickEntityFilter(entity.value); }}
                     leftSection={
                       isSelected ? <IconX size={10} /> : undefined
                     }
@@ -284,14 +178,14 @@ export const SearchFilters = ({
                 <TextInput
                   label="Title"
                   placeholder="Search in title only"
-                  value={localFilters.title || ""}
-                  onChange={(e) => updateFilter("title", e.target.value)}
+                  value={localFilters.title ?? ""}
+                  onChange={(e) => { updateFilter("title", e.target.value); }}
                   rightSection={
-                    localFilters.title && (
+                    localFilters.title !== undefined && localFilters.title !== "" && (
                       <ActionIcon
                         size="sm"
                         variant="subtle"
-                        onClick={() => updateFilter("title", "")}
+                        onClick={() => { updateFilter("title", ""); }}
                       >
                         <IconX size={12} />
                       </ActionIcon>
@@ -302,14 +196,14 @@ export const SearchFilters = ({
                 <TextInput
                   label="Abstract"
                   placeholder="Search in abstract only"
-                  value={localFilters.abstract || ""}
-                  onChange={(e) => updateFilter("abstract", e.target.value)}
+                  value={localFilters.abstract ?? ""}
+                  onChange={(e) => { updateFilter("abstract", e.target.value); }}
                   rightSection={
-                    localFilters.abstract && (
+                    localFilters.abstract !== undefined && localFilters.abstract !== "" && (
                       <ActionIcon
                         size="sm"
                         variant="subtle"
-                        onClick={() => updateFilter("abstract", "")}
+                        onClick={() => { updateFilter("abstract", ""); }}
                       >
                         <IconX size={12} />
                       </ActionIcon>
@@ -320,14 +214,14 @@ export const SearchFilters = ({
                 <TextInput
                   label="Author"
                   placeholder="Search by author name"
-                  value={localFilters.author || ""}
-                  onChange={(e) => updateFilter("author", e.target.value)}
+                  value={localFilters.author ?? ""}
+                  onChange={(e) => { updateFilter("author", e.target.value); }}
                   rightSection={
-                    localFilters.author && (
+                    localFilters.author !== undefined && localFilters.author !== "" && (
                       <ActionIcon
                         size="sm"
                         variant="subtle"
-                        onClick={() => updateFilter("author", "")}
+                        onClick={() => { updateFilter("author", ""); }}
                       >
                         <IconX size={12} />
                       </ActionIcon>
@@ -338,14 +232,14 @@ export const SearchFilters = ({
                 <TextInput
                   label="Institution"
                   placeholder="Search by institution name"
-                  value={localFilters.institution || ""}
-                  onChange={(e) => updateFilter("institution", e.target.value)}
+                  value={localFilters.institution ?? ""}
+                  onChange={(e) => { updateFilter("institution", e.target.value); }}
                   rightSection={
-                    localFilters.institution && (
+                    localFilters.institution !== undefined && localFilters.institution !== "" && (
                       <ActionIcon
                         size="sm"
                         variant="subtle"
-                        onClick={() => updateFilter("institution", "")}
+                        onClick={() => { updateFilter("institution", ""); }}
                       >
                         <IconX size={12} />
                       </ActionIcon>
@@ -356,14 +250,14 @@ export const SearchFilters = ({
                 <TextInput
                   label="Venue"
                   placeholder="Journal or conference name"
-                  value={localFilters.venue || ""}
-                  onChange={(e) => updateFilter("venue", e.target.value)}
+                  value={localFilters.venue ?? ""}
+                  onChange={(e) => { updateFilter("venue", e.target.value); }}
                   rightSection={
-                    localFilters.venue && (
+                    localFilters.venue !== undefined && localFilters.venue !== "" && (
                       <ActionIcon
                         size="sm"
                         variant="subtle"
-                        onClick={() => updateFilter("venue", "")}
+                        onClick={() => { updateFilter("venue", ""); }}
                       >
                         <IconX size={12} />
                       </ActionIcon>
@@ -374,14 +268,14 @@ export const SearchFilters = ({
                 <TextInput
                   label="Keywords"
                   placeholder="Comma-separated keywords"
-                  value={localFilters.keywords || ""}
-                  onChange={(e) => updateFilter("keywords", e.target.value)}
+                  value={localFilters.keywords ?? ""}
+                  onChange={(e) => { updateFilter("keywords", e.target.value); }}
                   rightSection={
-                    localFilters.keywords && (
+                    localFilters.keywords !== undefined && localFilters.keywords !== "" && (
                       <ActionIcon
                         size="sm"
                         variant="subtle"
-                        onClick={() => updateFilter("keywords", "")}
+                        onClick={() => { updateFilter("keywords", ""); }}
                       >
                         <IconX size={12} />
                       </ActionIcon>
@@ -411,7 +305,7 @@ export const SearchFilters = ({
                             variant={
                               localFilters.dateRangePreset === preset.value ? "filled" : "light"
                             }
-                            onClick={() => applyDateRangePreset(preset)}
+                            onClick={() => { applyDateRangePreset(preset); }}
                             leftSection={<IconClock size={10} />}
                           >
                             {preset.label.split(" ", 1)[0]}
@@ -428,7 +322,7 @@ export const SearchFilters = ({
                     <Text size="sm" fw={500}>
                       Custom Publication Year
                     </Text>
-                    {localFilters.dateRangePreset && (
+                    {localFilters.dateRangePreset !== undefined && localFilters.dateRangePreset !== "" && (
                       <ActionIcon
                         size="sm"
                         variant="subtle"
@@ -442,16 +336,16 @@ export const SearchFilters = ({
                     )}
                   </Group>
                   <RangeSlider
-                    min={1900}
-                    max={2024}
+                    min={MIN_PUBLICATION_YEAR}
+                    max={MAX_PUBLICATION_YEAR}
                     value={[
-                      localFilters.publicationYear?.from || 1900,
-                      localFilters.publicationYear?.to || 2024,
+                      localFilters.publicationYear?.from ?? MIN_PUBLICATION_YEAR,
+                      localFilters.publicationYear?.to ?? MAX_PUBLICATION_YEAR,
                     ]}
                     onChange={([from, to]) => {
                       updateFilter("publicationYear", { from, to });
                       // Clear preset when manually adjusting
-                      if (localFilters.dateRangePreset) {
+                      if (localFilters.dateRangePreset !== undefined && localFilters.dateRangePreset !== "") {
                         updateFilter("dateRangePreset", undefined);
                       }
                     }}
@@ -479,7 +373,7 @@ export const SearchFilters = ({
                         value: level.value,
                       }))
                     ]}
-                    value={localFilters.citationImpact || 'all'}
+                    value={localFilters.citationImpact ?? 'all'}
                     onChange={(value) => {
                       if (value === 'all') {
                         updateFilter("citationCount", { from: undefined, to: undefined });
@@ -502,7 +396,7 @@ export const SearchFilters = ({
                     <Text size="sm" fw={500}>
                       Custom Citation Count
                     </Text>
-                    {localFilters.citationImpact && (
+                    {localFilters.citationImpact !== undefined && localFilters.citationImpact !== "" && (
                       <ActionIcon
                         size="sm"
                         variant="subtle"
@@ -526,7 +420,7 @@ export const SearchFilters = ({
                           from: typeof value === "number" ? value : undefined,
                         });
                         // Clear impact level when manually adjusting
-                        if (localFilters.citationImpact) {
+                        if (localFilters.citationImpact !== undefined && localFilters.citationImpact !== "") {
                           updateFilter("citationImpact", undefined);
                         }
                       }}
@@ -541,7 +435,7 @@ export const SearchFilters = ({
                           to: typeof value === "number" ? value : undefined,
                         });
                         // Clear impact level when manually adjusting
-                        if (localFilters.citationImpact) {
+                        if (localFilters.citationImpact !== undefined && localFilters.citationImpact !== "") {
                           updateFilter("citationImpact", undefined);
                         }
                       }}
@@ -563,24 +457,24 @@ export const SearchFilters = ({
                   label="Entity Types"
                   placeholder="Select types to search"
                   data={ENTITY_TYPES}
-                  value={localFilters.entityType || []}
-                  onChange={(value) => updateFilter("entityType", value)}
+                  value={localFilters.entityType ?? []}
+                  onChange={(value) => { updateFilter("entityType", value); }}
                 />
 
                 <MultiSelect
                   label="Publication Types"
                   placeholder="Select publication types"
                   data={PUBLICATION_TYPES}
-                  value={localFilters.publicationType || []}
-                  onChange={(value) => updateFilter("publicationType", value)}
+                  value={localFilters.publicationType ?? []}
+                  onChange={(value) => { updateFilter("publicationType", value); }}
                 />
 
                 <MultiSelect
                   label="Languages"
                   placeholder="Select languages"
                   data={LANGUAGES}
-                  value={localFilters.language || []}
-                  onChange={(value) => updateFilter("language", value)}
+                  value={localFilters.language ?? []}
+                  onChange={(value) => { updateFilter("language", value); }}
                   searchable
                 />
 
@@ -588,15 +482,15 @@ export const SearchFilters = ({
                   label="Fields of Study"
                   placeholder="Select academic fields"
                   data={COMMON_FIELDS}
-                  value={localFilters.fieldOfStudy || []}
-                  onChange={(value) => updateFilter("fieldOfStudy", value)}
+                  value={localFilters.fieldOfStudy ?? []}
+                  onChange={(value) => { updateFilter("fieldOfStudy", value); }}
                   searchable
                 />
 
                 <Checkbox
                   label="Open Access only"
-                  checked={localFilters.openAccess || false}
-                  onChange={(e) => updateFilter("openAccess", e.currentTarget.checked)}
+                  checked={localFilters.openAccess ?? false}
+                  onChange={(e) => { updateFilter("openAccess", e.currentTarget.checked); }}
                 />
               </Stack>
             </Accordion.Panel>
@@ -618,8 +512,8 @@ export const SearchFilters = ({
                   label="Concepts"
                   placeholder="e.g., Machine Learning, Climate Change, COVID-19"
                   data={COMMON_FIELDS}
-                  value={localFilters.concepts || []}
-                  onChange={(value) => updateFilter("concepts", value)}
+                  value={localFilters.concepts ?? []}
+                  onChange={(value) => { updateFilter("concepts", value); }}
                   searchable
                 />
               </Stack>
@@ -634,69 +528,11 @@ export const SearchFilters = ({
               Active Filters:
             </Text>
             <Group gap="xs" wrap="wrap">
-              {Object.keys(localFilters).map((key) => {
+              {FILTER_KEYS.map((key) => {
                 const value = localFilters[key];
-                if (!value || (Array.isArray(value) && value.length === 0)) return null;
+                if (!isFilterValueActive(value)) return null;
 
-                const formatValue = (k: string, v: unknown): string => {
-                  switch (k) {
-                    case "entityType":
-                    case "publicationType":
-                    case "language":
-                    case "fieldOfStudy":
-                    case "concepts":
-                      return `${k}: ${Array.isArray(v) ? v.join(", ") : v}`;
-                    case "publicationYear":
-                      // Check for preset first
-                      if (localFilters.dateRangePreset) {
-                        const preset = DATE_RANGE_PRESETS.find(p => p.value === localFilters.dateRangePreset);
-                        if (preset) return `dates: ${preset.label}`;
-                      }
-                      // Fallback to custom range
-                      if (typeof v === "object" && v !== null) {
-                        const yearObject = v as { from?: unknown; to?: unknown };
-                        if (yearObject.from && yearObject.to) {
-                          return `year: ${yearObject.from}-${yearObject.to}`;
-                        }
-                        if (yearObject.from) {
-                          return `year: >= ${yearObject.from}`;
-                        }
-                        if (yearObject.to) {
-                          return `year: <= ${yearObject.to}`;
-                        }
-                      }
-                      return "";
-                    case "citationCount":
-                      // Check for impact level first
-                      if (localFilters.citationImpact) {
-                        const impact = CITATION_IMPACT_LEVELS.find(l => l.value === localFilters.citationImpact);
-                        if (impact) return `impact: ${impact.label}`;
-                      }
-                      // Fallback to custom range
-                      if (typeof v === "object" && v !== null) {
-                        const citationObject = v as { from?: unknown; to?: unknown };
-                        if (citationObject.from || citationObject.to) {
-                          return `citations: ${citationObject.from || "0"}-${citationObject.to || "∞"}`;
-                        }
-                      }
-                      return "";
-                    case "dateRangePreset": {
-                      const preset = DATE_RANGE_PRESETS.find(p => p.value === v);
-                      return preset ? `dates: ${preset.label}` : "";
-                    }
-                    case "citationImpact": {
-                      const impact = CITATION_IMPACT_LEVELS.find(l => l.value === v);
-                      return impact ? `impact: ${impact.label}` : "";
-                    }
-                    case "openAccess":
-                      return v ? "Open Access" : "";
-                    default:
-                      if (typeof v === "string") return `${k}: ${v}`;
-                      return "";
-                  }
-                };
-
-                const formatted = formatValue(key, value);
+                const formatted = formatFilterSummaryValue(key, value, localFilters);
                 if (!formatted) return null;
 
                 return (

@@ -79,7 +79,7 @@ export const ExportModal = ({ listId, listTitle, onClose }: ExportModalPropertie
 
       <Radio.Group
         value={selectedFormat}
-        onChange={(value) => setSelectedFormat(value as ExportFormat)}
+        onChange={(value) => { setSelectedFormat(value); }}
         label="Select Export Format"
         required
         aria-required="true"
@@ -130,7 +130,7 @@ export const ExportModal = ({ listId, listTitle, onClose }: ExportModalPropertie
           {exportSuccess ? "Done" : "Cancel"}
         </Button>
         <Button
-          onClick={handleExport}
+          onClick={() => { void handleExport(); }}
           loading={isExporting}
           leftSection={<IconDownload size={ICON_SIZE.MD} />}
           data-testid="export-list-button"

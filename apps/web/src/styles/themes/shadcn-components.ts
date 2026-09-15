@@ -1,5 +1,6 @@
-// Shadcn-inspired component overrides
-// These components add shadcn/ui styling patterns on top of Mantine base components
+import { Card } from '@mantine/core'
+
+// Shadcn-inspired component overrides These components add shadcn/ui styling patterns on top of Mantine base components
 
 export const shadcnComponents = {
   // Shadcn Button with hover transforms and cubic-bezier transitions
@@ -20,43 +21,7 @@ export const shadcnComponents = {
   },
 
   // Shadcn Card with semantic colors and shadows
-  Card: {
-    vars: (theme, properties) => {
-      const variant = properties.variant ?? 'default'
-      const colorKey = properties.color && Object.keys(theme.colors).includes(properties.color) ? properties.color : undefined
-      const isNeutralColor = colorKey && ["zinc", "slate", "gray", "neutral", "stone"].includes(colorKey)
-
-      return {
-        root: {
-          '--card-bg': (() => {
-            if (variant === 'filled' && colorKey) {
-              return 'var(--mantine-color-' + colorKey + '-light)'
-            }
-            if (variant === 'outline') {
-              return 'var(--mantine-color-body)'
-            }
-            return 'hsl(var(--shadcn-card))'
-          })(),
-          '--card-border-color': (() => {
-            if (variant === 'outline' && colorKey) {
-              return 'var(--mantine-color-' + colorKey + '-outline)'
-            }
-            if (variant === 'filled' && isNeutralColor) {
-              return 'transparent'
-            }
-            return 'hsl(var(--shadcn-border))'
-          })(),
-          '--card-shadow': (() => {
-            if (variant === 'filled') {
-              return 'none'
-            }
-            return '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
-          })(),
-          '--card-radius': 'var(--mantine-radius-default)',
-          '--card-padding': variant === 'compact' ? 'var(--mantine-spacing-md)' : 'var(--mantine-spacing-xl)',
-        },
-      }
-    },
+  Card: Card.extend({
     defaultProps: {
       p: 'xl',
       shadow: 'xl',
@@ -64,11 +29,11 @@ export const shadcnComponents = {
     },
     styles: {
       root: {
-        backgroundColor: 'var(--card-bg)',
-        border: '1px solid var(--card-border-color)',
-        boxShadow: 'var(--card-shadow)',
-        borderRadius: 'var(--card-radius)',
-        padding: 'var(--card-padding)',
+        backgroundColor: 'hsl(var(--shadcn-card))',
+        border: '1px solid hsl(var(--shadcn-border))',
+        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+        borderRadius: 'var(--mantine-radius-default)',
+        padding: 'var(--mantine-spacing-xl)',
         position: 'relative',
         overflow: 'hidden',
         transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -77,7 +42,7 @@ export const shadcnComponents = {
         },
       },
     },
-  },
+  }),
 
   // Shadcn Input with focus states and ring effects
   Input: {
@@ -165,12 +130,6 @@ export const shadcnComponents = {
     defaultProps: {
       shadow: 'xl',
     },
-    vars: (theme) => ({
-      root: {
-        'paper-bg': 'hsl(var(--shadcn-background))',
-        'paper-shadow': theme.shadows.md,
-      },
-    }),
     styles: {
       root: {
         backgroundColor: 'hsl(var(--shadcn-background))',
@@ -184,12 +143,6 @@ export const shadcnComponents = {
     defaultProps: {
       withBorder: true,
     },
-    vars: (theme) => ({
-      content: {
-        'modal-bg': 'hsl(var(--shadcn-background))',
-        'modal-shadow': theme.shadows.xl,
-      },
-    }),
     styles: {
       content: {
         backgroundColor: 'hsl(var(--shadcn-background))',
@@ -200,12 +153,6 @@ export const shadcnComponents = {
 
   // Shadcn Drawer with shadcn styling
   Drawer: {
-    vars: (theme) => ({
-      content: {
-        'drawer-bg': 'hsl(var(--shadcn-background))',
-        'drawer-shadow': theme.shadows.lg,
-      },
-    }),
     styles: {
       content: {
         backgroundColor: 'hsl(var(--shadcn-background))',

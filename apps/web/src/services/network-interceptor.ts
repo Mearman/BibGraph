@@ -17,17 +17,22 @@ interface RequestContext {
   category: NetworkRequest["category"];
 }
 
+const XHR_READY_STATE_DONE = 4;
+const HTTP_STATUS_SUCCESS_MIN = 200;
+const HTTP_STATUS_SUCCESS_MAX_EXCLUSIVE = 300;
+const HTTP_STATUS_OK = 200;
+
 /**
  * Global network interceptor for monitoring all HTTP requests
  */
 export class NetworkInterceptor {
   private static instance: NetworkInterceptor | null = null;
-  private originalFetch: typeof fetch;
-  private originalXhrOpen: typeof XMLHttpRequest.prototype.open;
-  private originalXhrSend: typeof XMLHttpRequest.prototype.send;
+  private readonly originalFetch: typeof fetch;
+  private readonly originalXhrOpen: typeof XMLHttpRequest.prototype.open;
+  private readonly originalXhrSend: typeof XMLHttpRequest.prototype.send;
   private isInitialized = false;
-  private activeRequests = new Map<string, RequestContext>();
-  private xhrDataMap = new WeakMap<
+  private readonly activeRequests = new Map<string, RequestContext>();
+  private readonly xhrDataMap = new WeakMap<
     XMLHttpRequest,
     {
       url: string;
@@ -50,10 +55,10 @@ export class NetworkInterceptor {
       );
     } else {
       // Fallback for Node.js environment (tests)
-      this.originalFetch = (() =>
-        Promise.reject(
-          new Error("fetch not available in Node.js"),
-        )) satisfies typeof fetch;
+      this.originalFetch = (async (): Promise<Response> => {
+        await Promise.resolve();
+        throw new Error("fetch not available in Node.js");
+      }) satisfies typeof fetch;
       this.originalXhrOpen = ((): void => {
         // No-op for Node.js environment
       }) satisfies typeof XMLHttpRequest.prototype.open;
@@ -131,7 +136,7 @@ export class NetworkInterceptor {
    * Intercept fetch requests
    */
   private interceptFetch(): void {
-    window.fetch = (
+    window.fetch = async (
       input: RequestInfo | URL,
       init?: RequestInit,
     ): Promise<Response> => {
@@ -165,67 +170,67 @@ export class NetworkInterceptor {
         category: requestInfo.category,
       });
 
-      return this.originalFetch(input, init)
-        .then((response) => {
-          try {
-            // Calculate response size if possible
-            const contentLength = response.headers.get("content-length");
-            const size = contentLength
-              ? Number.parseInt(contentLength, 10)
-              : undefined;
+      try {
+        const response = await this.originalFetch(input, init);
 
-            networkActivityStore.completeRequest(
-              requestId,
-              response.status,
-              size,
-            );
+        try {
+          // Calculate response size if possible
+          const contentLength = response.headers.get("content-length");
+          const size = contentLength !== null
+            ? Number.parseInt(contentLength, 10)
+            : undefined;
 
-            logger.debug(
-              "api",
-              "Fetch request completed",
-              {
-                requestId,
-                url,
-                status: response.status,
-                size,
-              },
-              "NetworkInterceptor",
-            );
-          } catch (error) {
-            logger.warn(
-              "api",
-              "Error processing fetch response",
-              {
-                requestId,
-                error: error instanceof Error ? error.message : String(error),
-              },
-              "NetworkInterceptor",
-            );
-          }
-
-          this.activeRequests.delete(requestId);
-          return response;
-        })
-        .catch((error: unknown) => {
-          networkActivityStore.failRequest(
+          networkActivityStore.completeRequest(
             requestId,
-            error instanceof Error ? error.message : String(error),
+            response.status,
+            size,
           );
 
-          logger.error(
+          logger.debug(
             "api",
-            "Fetch request failed",
+            "Fetch request completed",
             {
               requestId,
               url,
+              status: response.status,
+              size,
+            },
+            "NetworkInterceptor",
+          );
+        } catch (error) {
+          logger.warn(
+            "api",
+            "Error processing fetch response",
+            {
+              requestId,
               error: error instanceof Error ? error.message : String(error),
             },
             "NetworkInterceptor",
           );
+        }
 
-          this.activeRequests.delete(requestId);
-          throw error;
-        });
+        this.activeRequests.delete(requestId);
+        return response;
+      } catch (error) {
+        networkActivityStore.failRequest(
+          requestId,
+          error instanceof Error ? error.message : String(error),
+        );
+
+        logger.error(
+          "api",
+          "Fetch request failed",
+          {
+            requestId,
+            url,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "NetworkInterceptor",
+        );
+
+        this.activeRequests.delete(requestId);
+        throw error;
+      }
     };
   }
 
@@ -290,13 +295,12 @@ export class NetworkInterceptor {
         // Override readystatechange handler
         const originalReadyStateChange = this.onreadystatechange;
         this.onreadystatechange = function (event) {
-          if (this.readyState === 4) {
-            // Request completed
-            // Access request data from WeakMap for type safety
+          if (this.readyState === XHR_READY_STATE_DONE) {
+            // Request completed Access request data from WeakMap for type safety
             const xhrData = xhrDataMap.get(this);
-            const finalRequestId = xhrData?.requestId;
-            if (finalRequestId) {
-              if (this.status >= 200 && this.status < 300) {
+            if (xhrData?.requestId !== undefined) {
+              const finalRequestId = xhrData.requestId;
+              if (this.status >= HTTP_STATUS_SUCCESS_MIN && this.status < HTTP_STATUS_SUCCESS_MAX_EXCLUSIVE) {
                 // Calculate response size
                 const responseSize = this.responseText
                   ? this.responseText.length
@@ -354,10 +358,6 @@ export class NetworkInterceptor {
 
   /**
    * Create request info with type and category detection
-   * @param root0
-   * @param root0.url
-   * @param root0.method
-   * @param root0.headers
    */
   private createRequestInfo({
     url,
@@ -378,7 +378,6 @@ export class NetworkInterceptor {
 
   /**
    * Detect request type based on URL
-   * @param url
    */
   private detectRequestType(url: string): NetworkRequest["entityType"] {
     if (url.includes("openalex.org") || url.includes("/api/")) {
@@ -395,9 +394,6 @@ export class NetworkInterceptor {
 
   /**
    * Detect request category (foreground vs background)
-   * @param root0
-   * @param root0.url
-   * @param root0.headers
    */
   private detectRequestCategory({
     url,
@@ -409,7 +405,7 @@ export class NetworkInterceptor {
     // Check for worker User-Agent first
     if (headers) {
       const userAgent = this.getHeaderValue({ headers, key: "User-Agent" });
-      if (userAgent?.includes("data-fetching-worker")) {
+      if (userAgent?.includes("data-fetching-worker") === true) {
         return "background";
       }
     }
@@ -424,9 +420,6 @@ export class NetworkInterceptor {
 
   /**
    * Get header value from HeadersInit (Headers, Record, or array)
-   * @param root0
-   * @param root0.headers
-   * @param root0.key
    */
   private getHeaderValue({
     headers,
@@ -445,18 +438,13 @@ export class NetworkInterceptor {
       return found ? found[1] : null;
     }
     if (typeof headers === "object") {
-      const record = headers;
-      return record[key] || null;
+      return headers[key] || null;
     }
     return null;
   }
 
   /**
    * Track cache operation (called externally by cache services)
-   * @param operation
-   * @param key
-   * @param hit
-   * @param size
    */
   trackCacheOperation(
     operation: "read" | "write" | "delete",
@@ -476,7 +464,7 @@ export class NetworkInterceptor {
     });
 
     // Complete immediately for cache operations
-    networkActivityStore.completeRequest(requestId, 200, size);
+    networkActivityStore.completeRequest(requestId, HTTP_STATUS_OK, size);
 
     logger.debug(
       "cache",
@@ -494,10 +482,6 @@ export class NetworkInterceptor {
 
   /**
    * Track worker operation (called externally by worker services)
-   * @param operation
-   * @param data
-   * @param entityType
-   * @param entityId
    */
   trackWorkerOperation(
     operation: string,
@@ -511,10 +495,10 @@ export class NetworkInterceptor {
       url: `worker://${operation}`,
       method: "POST",
       status: "pending",
-      ...(entityType && {
+      ...(entityType !== undefined && {
         metadata: {
           entityType,
-          ...(entityId && { entityId }),
+          ...(entityId !== undefined && { entityId }),
         },
       }),
     });
@@ -536,9 +520,6 @@ export class NetworkInterceptor {
 
   /**
    * Track request deduplication
-   * @param root0
-   * @param root0.url
-   * @param root0.entityId
    */
   trackDeduplication({
     url,
@@ -555,7 +536,7 @@ export class NetworkInterceptor {
       status: "deduplicated",
       metadata: {
         deduplicated: true,
-        ...(entityId && { entityId }),
+        ...(entityId !== undefined && { entityId }),
       },
     });
 
@@ -593,10 +574,6 @@ export const networkInterceptor = NetworkInterceptor.getInstance();
 
 /**
  * Helper functions for external services
- * @param operation
- * @param key
- * @param hit
- * @param size
  */
 export const trackCacheOperation = (
   operation: "read" | "write" | "delete",

@@ -7,6 +7,19 @@ import { logger } from "@bibgraph/utils";
 
 import { ENTITY_TYPE_TO_ENDPOINT } from "./types";
 
+/**
+ * Lower bound (inclusive) of the HTTP status range that indicates a redirect response.
+ */
+const HTTP_REDIRECT_STATUS_MIN = 300;
+/**
+ * Upper bound (exclusive) of the HTTP status range that indicates a redirect response.
+ */
+const HTTP_REDIRECT_STATUS_MAX = 400;
+/**
+ * HTTP status code indicating the requested entity does not exist.
+ */
+const HTTP_STATUS_NOT_FOUND = 404;
+
 // Download result types
 export type DownloadResult =
   | boolean
@@ -16,7 +29,6 @@ export type DownloadResult =
 /**
  * Simple fetch function for OpenAlex API queries
  * This is a minimal implementation for use in the build plugin
- * @param url
  */
 export const fetchOpenAlexQuery = async (url: string): Promise<unknown> => {
   try {
@@ -40,12 +52,7 @@ export const fetchOpenAlexQuery = async (url: string): Promise<unknown> => {
 };
 
 /**
- * Download entity directly with encoded filename (avoids temporary file creation)
- * Returns: true for success, false for non-404 errors, "not_found" for 404 errors,
- * or { redirected: true, finalUrl: string } for redirected URLs
- * @param entityType
- * @param entityId
- * @param targetFilePath
+ * Download entity directly with encoded filename (avoids temporary file creation). Returns `true` for success, `false` for non-404 errors, `"not_found"` for 404 errors, or an object of the form `{ redirected: true, finalUrl: string }` for redirected URLs.
  */
 export const downloadEntityWithEncodedFilename = async (
   entityType: string,
@@ -80,9 +87,9 @@ export const downloadEntityWithEncodedFilename = async (
       const response = await fetch(currentUrl, { redirect: "manual" });
 
       // Handle redirects (302, 301, etc.)
-      if (response.status >= 300 && response.status < 400) {
+      if (response.status >= HTTP_REDIRECT_STATUS_MIN && response.status < HTTP_REDIRECT_STATUS_MAX) {
         const location = response.headers.get("Location");
-        if (!location) {
+        if (location === null) {
           logger.error("general", "Redirect response missing Location header", {
             entityType,
             entityId,
@@ -113,7 +120,7 @@ export const downloadEntityWithEncodedFilename = async (
 
       // Non-redirect response - process it
       if (!response.ok) {
-        if (response.status === 404) {
+        if (response.status === HTTP_STATUS_NOT_FOUND) {
           logger.warn(
             "general",
             "Entity not found (404) after redirect chain - will remove from index",

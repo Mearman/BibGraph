@@ -13,7 +13,8 @@ import { expect,test } from '@playwright/test';
 import { waitForAppReady } from '@/test/helpers/app-ready';
 import { BrowsePage } from '@/test/page-objects/BrowsePage';
 
-const BASE_URL = process.env.BASE_URL || (process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173');
+const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+const BASE_URL = process.env.BASE_URL ?? (IS_CI ? 'http://localhost:4173' : 'http://localhost:5173');
 
 // All 12 OpenAlex entity types that should be displayed
 const EXPECTED_ENTITY_TYPES = [
@@ -31,10 +32,14 @@ const EXPECTED_ENTITY_TYPES = [
 	'Subfields',
 ] as const;
 
-test.describe('@utility Browse Page', () => {
-	test.setTimeout(60_000); // 1 minute timeout
+const TEST_SUITE_TIMEOUT_MS = 60_000;
+const ENTITY_TYPE_COUNT = 12;
+const MOBILE_VIEWPORT_WIDTH = 375;
 
-	test.beforeEach(async ({ page }) => {
+test.describe('@utility Browse Page', () => {
+	test.setTimeout(TEST_SUITE_TIMEOUT_MS); // 1 minute timeout
+
+	test.beforeEach(({ page }) => {
 		// Set up console error listener for debugging
 		page.on('console', (message) => {
 			if (message.type() === 'error') {
@@ -78,10 +83,10 @@ test.describe('@utility Browse Page', () => {
 		const cardCount = await browsePage.getEntityTypeCount();
 
 		// Should have exactly 12 entity type cards
-		expect(cardCount).toBe(12);
+		expect(cardCount).toBe(ENTITY_TYPE_COUNT);
 
 		// Verify minimum number of cards (using page object method)
-		await browsePage.expectMinimumEntityTypes(12);
+		await browsePage.expectMinimumEntityTypes(ENTITY_TYPE_COUNT);
 	});
 
 	test('should display correct entity type names', async ({ page }) => {
@@ -100,7 +105,7 @@ test.describe('@utility Browse Page', () => {
 		}
 
 		// Verify we have exactly 12 entity types (no duplicates or extras)
-		expect(displayedEntityTypes).toHaveLength(12);
+		expect(displayedEntityTypes).toHaveLength(ENTITY_TYPE_COUNT);
 	});
 
 	test('should display entity type icons', async ({ page }) => {
@@ -115,7 +120,7 @@ test.describe('@utility Browse Page', () => {
 		const iconCount = await icons.count();
 
 		// Each entity type card should have an icon
-		expect(iconCount).toBeGreaterThanOrEqual(12);
+		expect(iconCount).toBeGreaterThanOrEqual(ENTITY_TYPE_COUNT);
 
 		// Verify at least one icon is visible
 		await expect(icons.first()).toBeVisible();
@@ -136,7 +141,7 @@ test.describe('@utility Browse Page', () => {
 		expect(pageTitle).not.toBe('');
 
 		// Verify title contains expected text (case-insensitive)
-		const titleLower = pageTitle?.toLowerCase() || '';
+		const titleLower = pageTitle?.toLowerCase() ?? '';
 		const hasValidTitle =
 			titleLower.includes('browse') ||
 			titleLower.includes('entity') ||
@@ -258,14 +263,14 @@ test.describe('@utility Browse Page', () => {
 
 		// Verify all cards are still visible in mobile layout
 		const cardCount = await browsePage.getEntityTypeCount();
-		expect(cardCount).toBe(12);
+		expect(cardCount).toBe(ENTITY_TYPE_COUNT);
 
 		// Verify cards are stacked (not overflowing)
 		const browseGrid = page.locator('[data-testid="browse-grid"]');
 		const gridBox = await browseGrid.boundingBox();
 
 		expect(gridBox).toBeTruthy();
-		expect(gridBox?.width).toBeLessThanOrEqual(375);
+		expect(gridBox?.width).toBeLessThanOrEqual(MOBILE_VIEWPORT_WIDTH);
 	});
 
 	test('should display cards in consistent order', async ({ page }) => {
@@ -393,7 +398,7 @@ test.describe('@utility Browse Page', () => {
 
 		// Should still have all cards
 		const cardCount = await browsePage.getEntityTypeCount();
-		expect(cardCount).toBe(12);
+		expect(cardCount).toBe(ENTITY_TYPE_COUNT);
 	});
 
 	test('should pass accessibility checks (WCAG 2.1 AA)', async ({ page }) => {

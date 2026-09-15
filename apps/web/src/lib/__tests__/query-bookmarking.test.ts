@@ -248,10 +248,10 @@ describe("Query Bookmarking", () => {
 
       // Test parts building manually
       const parts: string[] = [];
-      if (queryParameters.search) {
+      if (queryParameters.search !== undefined && queryParameters.search !== "") {
         parts.push(`"${queryParameters.search}"`);
       }
-      if (queryParameters.filter) {
+      if (queryParameters.filter !== undefined && queryParameters.filter !== "") {
         const filterString = queryParameters.filter;
         if (filterString.includes('author.id:')) {
           parts.push('by author');

@@ -15,6 +15,16 @@ import { type ShadcnPalette,shadcnPaletteNames } from '@/styles/shadcn-colors'
 import { sprinkles } from '@/styles/sprinkles'
 
 type ComponentLibrary = 'mantine' | 'shadcn' | 'radix'
+type ColorMode = 'light' | 'dark' | 'auto'
+
+const FONT_WEIGHT_SELECTED = 600
+const FONT_WEIGHT_UNSELECTED = 400
+
+const isColorMode = (value: string): value is ColorMode =>
+  value === 'light' || value === 'dark' || value === 'auto'
+
+const isComponentLibrary = (value: string): value is ComponentLibrary =>
+  value === 'mantine' || value === 'shadcn' || value === 'radix'
 
 const COLOR_SCHEME_LABELS = {
   light: { icon: IconSun, label: 'Light' },
@@ -127,7 +137,7 @@ export const ColorSchemeSelector = () => {
         <Menu.Item
           key={scheme}
           leftSection={<Icon size={ICON_SIZE.MD} />}
-          onClick={() => setColorMode(scheme as 'light' | 'dark' | 'auto')}
+          onClick={() => { if (isColorMode(scheme)) { setColorMode(scheme); } }}
           rightSection={config.colorMode === scheme ? <IconCheck size={ICON_SIZE.MD} /> : null}
         >
           {label}
@@ -164,7 +174,7 @@ export const ColorSchemeSelector = () => {
           {shadcnPaletteNames.map((palette) => (
             <Menu.Item
               key={palette}
-              onClick={() => handlePaletteChange(palette)}
+              onClick={() => { handlePaletteChange(palette); }}
               className={sprinkles({
                 menuItem: true,
                 menuItemSelected: selectedPalette === palette
@@ -180,7 +190,7 @@ export const ColorSchemeSelector = () => {
               />
               <Text
                 size="xs"
-                fw={selectedPalette === palette ? 600 : 400}
+                fw={selectedPalette === palette ? FONT_WEIGHT_SELECTED : FONT_WEIGHT_UNSELECTED}
                 tt="capitalize"
               >
                 {palette}
@@ -222,7 +232,7 @@ export const ColorSchemeSelector = () => {
       {Object.entries(COMPONENT_LIBRARY_LABELS).map(([library, { label, description }]) => (
         <Menu.Item
           key={library}
-          onClick={() => setComponentLibrary(library as ComponentLibrary)}
+          onClick={() => { if (isComponentLibrary(library)) { setComponentLibrary(library); } }}
           rightSection={config.componentLibrary === library ? <IconCheck size={ICON_SIZE.MD} /> : null}
         >
           <Box>
@@ -261,7 +271,7 @@ export const ColorSchemeSelector = () => {
           {BORDER_RADIUS_OPTIONS.map((radius) => (
             <Menu.Item
               key={radius.value}
-              onClick={() => setBorderRadius(radius.value)}
+              onClick={() => { setBorderRadius(radius.value); }}
               className={sprinkles({
                 menuItem: true,
                 menuItemSelected: config.borderRadius === radius.value
@@ -271,7 +281,7 @@ export const ColorSchemeSelector = () => {
                 w={12}
                 h={12}
                 bg="gray"
-                style={{ borderRadius: `${radius.size}px` }}
+                style={{ borderRadius: `${String(radius.size)}px` }}
                 className={sprinkles({
                   colorSwatch: true,
                   colorSwatchSize: 'sm',
@@ -280,7 +290,7 @@ export const ColorSchemeSelector = () => {
               />
               <Text
                 size="xs"
-                fw={config.borderRadius === radius.value ? 600 : 400}
+                fw={config.borderRadius === radius.value ? FONT_WEIGHT_SELECTED : FONT_WEIGHT_UNSELECTED}
                 className={sprinkles({ textTransform: 'uppercase' })}
               >
                 {radius.label}
@@ -328,7 +338,7 @@ export const ColorSchemeSelector = () => {
             </Text>
             <Box
               className={sprinkles({ colorSwatch: true, colorSwatchSize: 'xs' })}
-              bg={selectedPalette || 'gray'}
+              bg={selectedPalette}
             />
           </Group>
         )

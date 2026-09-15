@@ -31,19 +31,15 @@ import { ENTITY_TYPES, type ExtendedIndexEntry, indexEntryToUnified } from "./ty
 /**
  * Apply index updates from seeding results
  * Removes 404 entries and updates redirected entries
- * @param index
- * @param keysToRemove
- * @param redirectUpdates
- * @param entityType
  */
 const applyIndexUpdates = (
   index: Record<string, ExtendedIndexEntry>,
   keysToRemove: Set<string>,
-  redirectUpdates: Array<{
+  redirectUpdates: readonly {
     oldKey: string;
     newKey: string;
     metadata: { lastModified?: string; contentHash?: string };
-  }>,
+  }[],
   entityType: string,
 ): Record<string, ExtendedIndexEntry> => {
   if (keysToRemove.size === 0 && redirectUpdates.length === 0) {
@@ -91,8 +87,6 @@ const applyIndexUpdates = (
 
 /**
  * Process a single entity type through the complete data management pipeline
- * @param dataPath
- * @param entityType
  */
 const processEntityType = async (
   dataPath: string,

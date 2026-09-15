@@ -4,7 +4,6 @@ import { useState } from "react";
 import { EntityList } from "@/components/EntityList";
 import type { TableViewMode } from "@/components/TableViewModeToggle";
 import type { ColumnConfig } from "@/components/types";
-import type { OpenAlexSearchParams } from "@/lib/route-schemas";
 
 const institutionsColumns: ColumnConfig[] = [
   { key: "display_name", header: "Name" },
@@ -15,7 +14,7 @@ const institutionsColumns: ColumnConfig[] = [
 ];
 
 const InstitutionsListRoute = () => {
-  const search = useSearch({ from: "/institutions/" }) as OpenAlexSearchParams;
+  const search = useSearch({ from: "/institutions/" });
   const [viewMode, setViewMode] = useState<TableViewMode>("table");
 
   return (

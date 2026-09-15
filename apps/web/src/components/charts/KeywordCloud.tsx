@@ -49,6 +49,36 @@ interface KeywordInfo {
 type ViewMode = 'cloud' | 'list';
 type SortBy = 'frequency' | 'alphabetical';
 
+const VIEW_MODE_VALUES: ReadonlySet<string> = new Set(['cloud', 'list']);
+const isViewMode = (value: string): value is ViewMode => VIEW_MODE_VALUES.has(value);
+const SORT_BY_VALUES: ReadonlySet<string> = new Set(['frequency', 'alphabetical']);
+const isSortBy = (value: string): value is SortBy => SORT_BY_VALUES.has(value);
+
+// extractKeywords: minimum word length to extract, and the keyword-length thresholds for the "short"/"long" category buckets.
+const DEFAULT_MIN_WORD_LENGTH = 3;
+const SHORT_KEYWORD_MAX_LENGTH = 4;
+const LONG_KEYWORD_MIN_LENGTH = 10;
+
+// generateSVG: canvas size, spiral layout, and font-size-from-frequency scaling.
+const SVG_WIDTH = 900;
+const SVG_HEIGHT = 500;
+const SVG_PADDING = 40;
+const SVG_MAX_KEYWORDS = 50;
+const SVG_BASE_FONT_SIZE = 12;
+const SVG_FONT_SIZE_SCALE = 36;
+const SVG_SPIRAL_ANGLE_STEP = 0.5;
+const SVG_SPIRAL_RADIUS_STEP = 2;
+const SVG_TITLE_FONT_SIZE = 18;
+const SVG_TITLE_Y = 30;
+const HALF = 2;
+
+// Default/selectable "Max Keywords" values and cloud/list badge font-size scaling.
+const DEFAULT_MAX_KEYWORDS = 50;
+const CLOUD_BADGE_BASE_FONT_REM = 0.75;
+const CLOUD_BADGE_FONT_SCALE_REM = 1.25;
+const LIST_BADGE_BASE_FONT_REM = 0.875;
+const LIST_BADGE_FONT_SCALE_REM = 0.5;
+
 /**
  * Extract keywords from entity IDs
  * NOTE: Since CatalogueEntity doesn't include actual keywords/concepts,
@@ -57,7 +87,7 @@ type SortBy = 'frequency' | 'alphabetical';
  * @param entities - The catalogue entities to analyze
  * @param minWordLength - Minimum word length to include (default: 3)
  */
-const extractKeywords = (entities: CatalogueEntity[], minWordLength: number = 3): KeywordInfo[] => {
+const extractKeywords = (entities: readonly CatalogueEntity[], minWordLength = DEFAULT_MIN_WORD_LENGTH): KeywordInfo[] => {
   const keywordMap = new Map<string, number>();
 
   // Extract words from entity IDs (placeholder for actual keywords)
@@ -71,7 +101,7 @@ const extractKeywords = (entities: CatalogueEntity[], minWordLength: number = 3)
       .filter(word => !/^\d+$/.test(word)); // Filter out pure numbers
 
     for (const word of words) {
-      keywordMap.set(word, (keywordMap.get(word) || 0) + 1);
+      keywordMap.set(word, (keywordMap.get(word) ?? 0) + 1);
     }
   }
 
@@ -85,9 +115,9 @@ const extractKeywords = (entities: CatalogueEntity[], minWordLength: number = 3)
       category = 'url';
     } else if (/^\d/.test(keyword)) {
       category = 'numeric';
-    } else if (keyword.length <= 4) {
+    } else if (keyword.length <= SHORT_KEYWORD_MAX_LENGTH) {
       category = 'short';
-    } else if (keyword.length > 10) {
+    } else if (keyword.length > LONG_KEYWORD_MIN_LENGTH) {
       category = 'long';
     }
 
@@ -107,22 +137,18 @@ const extractKeywords = (entities: CatalogueEntity[], minWordLength: number = 3)
  * @param keywords - Keyword data
  * @param maxCount - Maximum keyword count for sizing
  */
-const generateSVG = (keywords: KeywordInfo[], maxCount: number): string => {
-  const width = 900;
-  const height = 500;
-  const padding = 40;
-
+const generateSVG = (keywords: readonly KeywordInfo[], maxCount: number): string => {
   let svgContent = '';
 
   // Simple layout: spiral pattern from center
-  const centerX = width / 2;
-  const centerY = height / 2;
+  const centerX = SVG_WIDTH / HALF;
+  const centerY = SVG_HEIGHT / HALF;
   let angle = 0;
   let radius = 0;
 
-  for (const keyword of keywords.slice(0, 50)) {
+  for (const keyword of keywords.slice(0, SVG_MAX_KEYWORDS)) {
     // Calculate font size based on frequency
-    const fontSize = 12 + (keyword.count / maxCount) * 36;
+    const fontSize = SVG_BASE_FONT_SIZE + (keyword.count / maxCount) * SVG_FONT_SIZE_SCALE;
 
     // Position in spiral
     const x = centerX + radius * Math.cos(angle);
@@ -130,10 +156,10 @@ const generateSVG = (keywords: KeywordInfo[], maxCount: number): string => {
 
     svgContent += `
       <text
-        x="${x}"
-        y="${y}"
+        x="${String(x)}"
+        y="${String(y)}"
         text-anchor="middle"
-        font-size="${fontSize}"
+        font-size="${String(fontSize)}"
         font-weight="bold"
         fill="${keyword.color}"
         style="cursor: pointer"
@@ -143,20 +169,20 @@ const generateSVG = (keywords: KeywordInfo[], maxCount: number): string => {
     `;
 
     // Move to next position in spiral
-    angle += 0.5;
-    radius += 2;
+    angle += SVG_SPIRAL_ANGLE_STEP;
+    radius += SVG_SPIRAL_RADIUS_STEP;
 
     // Reset to center if too far
-    if (radius > Math.min(width, height) / 2 - padding) {
+    if (radius > Math.min(SVG_WIDTH, SVG_HEIGHT) / HALF - SVG_PADDING) {
       angle = 0;
       radius = 0;
     }
   }
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+<svg width="${String(SVG_WIDTH)}" height="${String(SVG_HEIGHT)}" xmlns="http://www.w3.org/2000/svg">
   <rect width="100%" height="100%" fill="white"/>
-  <text x="${width / 2}" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#333">
+  <text x="${String(SVG_WIDTH / HALF)}" y="${String(SVG_TITLE_Y)}" text-anchor="middle" font-size="${String(SVG_TITLE_FONT_SIZE)}" font-weight="bold" fill="#333">
     Keyword Cloud
   </text>
   ${svgContent}
@@ -166,10 +192,10 @@ const generateSVG = (keywords: KeywordInfo[], maxCount: number): string => {
 export const KeywordCloud = ({ entities, onClose, onSearch }: KeywordCloudProperties) => {
   const [viewMode, setViewMode] = useState<ViewMode>('cloud');
   const [sortBy, setSortBy] = useState<SortBy>('frequency');
-  const [maxKeywords, setMaxKeywords] = useState<number>(50);
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [maxKeywords, setMaxKeywords] = useState<number>(DEFAULT_MAX_KEYWORDS);
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(() => new Set());
 
-  const allKeywords = useMemo(() => extractKeywords(entities, 3), [entities]);
+  const allKeywords = useMemo(() => extractKeywords(entities, DEFAULT_MIN_WORD_LENGTH), [entities]);
   const maxCount = Math.max(...allKeywords.map(k => k.count), 1);
   const totalKeywords = allKeywords.length;
   const uniqueCategories = useMemo(() => {
@@ -305,7 +331,7 @@ export const KeywordCloud = ({ entities, onClose, onSearch }: KeywordCloudProper
             label="View Mode"
             description="How to display keywords"
             value={viewMode}
-            onChange={(value) => setViewMode(value as ViewMode)}
+            onChange={(value) => { if (value !== null && isViewMode(value)) setViewMode(value); }}
             data={[
               { value: 'cloud', label: 'Word Cloud' },
               { value: 'list', label: 'List View' },
@@ -317,7 +343,7 @@ export const KeywordCloud = ({ entities, onClose, onSearch }: KeywordCloudProper
             label="Sort By"
             description="Keyword sorting order"
             value={sortBy}
-            onChange={(value) => setSortBy(value as SortBy)}
+            onChange={(value) => { if (value !== null && isSortBy(value)) setSortBy(value); }}
             data={[
               { value: 'frequency', label: 'Frequency' },
               { value: 'alphabetical', label: 'Alphabetical' },
@@ -329,7 +355,7 @@ export const KeywordCloud = ({ entities, onClose, onSearch }: KeywordCloudProper
             label="Max Keywords"
             description="Number of keywords to display"
             value={maxKeywords.toString()}
-            onChange={(value) => setMaxKeywords(Number(value) || 50)}
+            onChange={(value) => { setMaxKeywords(Number(value) || DEFAULT_MAX_KEYWORDS); }}
             data={[
               { value: '20', label: 'Top 20' },
               { value: '50', label: 'Top 50' },
@@ -349,7 +375,7 @@ export const KeywordCloud = ({ entities, onClose, onSearch }: KeywordCloudProper
             <Checkbox
               key={category}
               checked={selectedCategories.has(category)}
-              onChange={() => handleToggleCategory(category)}
+              onChange={() => { handleToggleCategory(category); }}
               label={category}
               styles={{ label: { textTransform: 'capitalize' } }}
             />
@@ -373,15 +399,15 @@ export const KeywordCloud = ({ entities, onClose, onSearch }: KeywordCloudProper
               }}
             >
               {filteredKeywords.map((keyword) => {
-                const fontSize = 0.75 + (keyword.count / maxCount) * 1.25;
+                const fontSize = CLOUD_BADGE_BASE_FONT_REM + (keyword.count / maxCount) * CLOUD_BADGE_FONT_SCALE_REM;
 
                 return (
-                  <Tooltip key={keyword.keyword} label={`${keyword.count} occurrences`}>
+                  <Tooltip key={keyword.keyword} label={`${String(keyword.count)} occurrences`}>
                     <Badge
                       size="xl"
                       leftSection={onSearch && <IconSearch size={12} />}
                       style={{
-                        fontSize: `${fontSize}rem`,
+                        fontSize: `${String(fontSize)}rem`,
                         cursor: onSearch ? 'pointer' : 'default',
                         backgroundColor: keyword.color,
                         color: 'white',
@@ -393,7 +419,7 @@ export const KeywordCloud = ({ entities, onClose, onSearch }: KeywordCloudProper
                       onMouseLeave={(e) => {
                         e.currentTarget.style.transform = 'scale(1)';
                       }}
-                      onClick={() => handleKeywordClick(keyword.keyword)}
+                      onClick={() => { handleKeywordClick(keyword.keyword); }}
                     >
                       {keyword.keyword}
                     </Badge>
@@ -412,7 +438,7 @@ export const KeywordCloud = ({ entities, onClose, onSearch }: KeywordCloudProper
                 radius="xs"
                 withBorder
                 style={{ cursor: onSearch ? 'pointer' : 'default' }}
-                onClick={() => onSearch && handleKeywordClick(keyword.keyword)}
+                onClick={() => { if (onSearch) handleKeywordClick(keyword.keyword); }}
               >
                 <Group justify="space-between">
                   <Group gap="md">
@@ -421,7 +447,7 @@ export const KeywordCloud = ({ entities, onClose, onSearch }: KeywordCloudProper
                       style={{
                         backgroundColor: keyword.color,
                         color: 'white',
-                        fontSize: `${0.875 + (keyword.count / maxCount) * 0.5}rem`,
+                        fontSize: `${String(LIST_BADGE_BASE_FONT_REM + (keyword.count / maxCount) * LIST_BADGE_FONT_SCALE_REM)}rem`,
                       }}
                     >
                       {keyword.keyword}

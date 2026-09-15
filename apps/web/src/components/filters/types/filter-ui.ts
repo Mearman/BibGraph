@@ -30,7 +30,7 @@ export interface FilterCondition<T extends EntityFilters = EntityFilters> {
 export interface FilterGroup<T extends EntityFilters = EntityFilters> {
   id: string;
   operator: LogicalOperator;
-  conditions: Array<FilterCondition<T> | FilterGroup<T>>;
+  conditions: (FilterCondition<T> | FilterGroup<T>)[];
   enabled: boolean;
   label?: string;
 }
@@ -159,6 +159,6 @@ export interface FilterURL {
 }
 
 // Export convenience type unions
-export type AnyFilterCondition = FilterCondition<EntityFilters>;
-export type AnyFilterGroup = FilterGroup<EntityFilters>;
-export type AnyFilterBuilder = FilterBuilderProps<EntityFilters>;
+export type AnyFilterCondition = FilterCondition;
+export type AnyFilterGroup = FilterGroup;
+export type AnyFilterBuilder = FilterBuilderProps;

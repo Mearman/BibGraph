@@ -57,7 +57,7 @@ export const QueryBookmarkButton = ({
 
   // Don't show bookmark button if there are no semantic query parameters
   // and no specific entity ID (i.e., just a plain list page)
-  const hasSemanticQuery = Object.keys(currentQueryParams).length > 0 || !!entityId;
+  const hasSemanticQuery = Object.keys(currentQueryParams).length > 0 || entityId !== undefined;
   if (!hasSemanticQuery) {
     return null;
   }
@@ -114,7 +114,7 @@ export const QueryBookmarkButton = ({
     <Tooltip label={getTooltipLabel()} position="top">
       <div style={{ display: "flex", alignItems: "center", gap: showLabel ? "8px" : "0" }}>
         <ActionIcon
-          onClick={handleClick}
+          onClick={() => { void handleClick(); }}
           disabled={disabled || isLoading}
           variant={variant}
           size={size}

@@ -4,9 +4,18 @@
  */
 
 import { cachedOpenAlex } from "@bibgraph/client";
-import type { EntityType, OpenAlexEntity } from "@bibgraph/types";
+import type { EntityType } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
 import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
+
+import { MS_PER_DAY, MS_PER_HOUR } from "./time-constants";
+
+/**
+ * A display-name fetch selects only id and display_name, so it validates against exactly those fields
+ */
+const displayNameStubSchema = z.object({ id: z.string(), display_name: z.string() });
+
 
 interface UseEntityDisplayNameOptions {
   entityId: string;
@@ -23,10 +32,6 @@ interface UseEntityDisplayNameResult {
 /**
  * Fetches and returns the display_name for an OpenAlex entity
  * Uses minimal field selection to reduce bandwidth
- * @param root0
- * @param root0.entityId
- * @param root0.entityType
- * @param root0.enabled
  */
 export const useEntityDisplayName = ({
   entityId,
@@ -49,15 +54,16 @@ export const useEntityDisplayName = ({
 
       try {
         // Fetch only the display_name field to minimize bandwidth
-        const result = await cachedOpenAlex.getById<OpenAlexEntity>({
+        const result = await cachedOpenAlex.getById({
           endpoint: entityType,
           id: entityId,
           params: {
             select: ["id", "display_name"],
           },
+          schema: displayNameStubSchema,
         });
 
-        return result?.display_name ?? null;
+        return result.display_name;
       } catch (error) {
         logger.error(
           "sidebar",
@@ -69,8 +75,8 @@ export const useEntityDisplayName = ({
       }
     },
     enabled: shouldFetch,
-    staleTime: 1000 * 60 * 60, // 1 hour - display names rarely change
-    gcTime: 1000 * 60 * 60 * 24, // 24 hours
+    staleTime: MS_PER_HOUR, // display names rarely change
+    gcTime: MS_PER_DAY,
     retry: 1, // Only retry once for display names
   });
 

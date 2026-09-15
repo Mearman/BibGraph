@@ -3,11 +3,12 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type {
+  RenderHookOptions,
+  RenderOptions} from "@testing-library/react";
 import {
   render,
-  renderHook,
-  RenderHookOptions,
-  RenderOptions,
+  renderHook
 } from "@testing-library/react";
 import React from "react";
 
@@ -41,7 +42,7 @@ export const renderWithQueryClient = (
   ui: React.ReactElement,
   options?: Omit<RenderOptions, "wrapper"> & { queryClient?: QueryClient },
 ): ReturnType<typeof render> => {
-  const { queryClient, ...renderOptions } = options || {};
+  const { queryClient, ...renderOptions } = options ?? {};
   return render(ui, {
     wrapper: (properties) => <TestWrapper {...properties} queryClient={queryClient} />,
     ...renderOptions,
@@ -55,7 +56,7 @@ export const renderHookWithQueryClient = <T, P>(
     queryClient?: QueryClient;
   },
 ): ReturnType<typeof renderHook<T, P>> => {
-  const { queryClient, ...renderHookOptions } = options || {};
+  const { queryClient, ...renderHookOptions } = options ?? {};
   return renderHook(hook, {
     wrapper: (properties) => <TestWrapper {...properties} queryClient={queryClient} />,
     ...renderHookOptions,

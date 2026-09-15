@@ -39,11 +39,15 @@ interface CullableNode {
  * @param nodeRadius - radius of each node for culling calculations
  * @param cullingMargin - margin multiplier for culling
  */
+const DEFAULT_NODE_RADIUS = 50;
+const DEFAULT_CULLING_MARGIN = 1.2;
+const ZOOM_CHANGE_THRESHOLD = 0.01;
+
 export const useGraphViewportCulling = (
-  nodes: GraphNode[],
+  nodes: readonly GraphNode[],
   viewportBounds: ViewportBounds | null,
-  nodeRadius: number = 50,
-  cullingMargin: number = 1.2
+  nodeRadius = DEFAULT_NODE_RADIUS,
+  cullingMargin = DEFAULT_CULLING_MARGIN
 ) => {
   const previousBounds = useRef<ViewportBounds | null>(null);
 
@@ -79,9 +83,9 @@ export const useGraphViewportCulling = (
   }, [nodes, nodeRadius]);
 
   // Simple 2D viewport culling for 2D graphs
-  const getVisibleNodes2D = useCallback((bounds: ViewportBounds, nodes: CullableNode[]) => {
+  const getVisibleNodes2D = useCallback((bounds: Readonly<ViewportBounds>, candidateNodes: readonly CullableNode[]) => {
     const margin = cullingMargin * nodeRadius;
-    const visibleNodes = nodes.filter(node => {
+    const visibleNodes = candidateNodes.filter(node => {
       return (
         node.x + node.radius >= bounds.left - margin &&
         node.x - node.radius <= bounds.right + margin &&
@@ -100,12 +104,13 @@ export const useGraphViewportCulling = (
     }
 
     // Early return if viewport bounds haven't changed
-    if (previousBounds.current &&
-        previousBounds.current.left === viewportBounds.left &&
-        previousBounds.current.right === viewportBounds.right &&
-        previousBounds.current.top === viewportBounds.top &&
-        previousBounds.current.bottom === viewportBounds.bottom &&
-        Math.abs(previousBounds.current.zoom - viewportBounds.zoom) < 0.01) {
+    const previous = previousBounds.current;
+    if (previous !== null &&
+        previous.left === viewportBounds.left &&
+        previous.right === viewportBounds.right &&
+        previous.top === viewportBounds.top &&
+        previous.bottom === viewportBounds.bottom &&
+        Math.abs(previous.zoom - viewportBounds.zoom) < ZOOM_CHANGE_THRESHOLD) {
       return cullableNodes; // Will be filtered by caller
     }
 

@@ -8,13 +8,11 @@ import { useEffect, useRef } from "react";
 
 interface UseDocumentTitleOptions {
   /**
-   * Base title to append after the main title
-   * @default "BibGraph"
+   * Base title to append after the main title. Defaults to "BibGraph".
    */
   baseTitle?: string;
   /**
-   * Whether to restore the original title when the component unmounts
-   * @default false
+   * Whether to restore the original title when the component unmounts. Defaults to false.
    */
   restoreOnUnmount?: boolean;
 }
@@ -37,7 +35,7 @@ interface UseDocumentTitleOptions {
  */
 export const useDocumentTitle = (
   title: string | null | undefined,
-  options: UseDocumentTitleOptions = {},
+  options: Readonly<UseDocumentTitleOptions> = {},
 ) => {
   const { baseTitle = "BibGraph", restoreOnUnmount = false } = options;
 
@@ -86,7 +84,7 @@ export const useDocumentTitle = (
     // Cleanup effect for restoring original title
     if (restoreOnUnmount) {
       return () => {
-        if (!originalTitle.current) {
+        if (originalTitle.current === null || originalTitle.current === "") {
         	return;
         }
 
@@ -101,6 +99,7 @@ export const useDocumentTitle = (
         );
       };
     }
+    return undefined;
   }, [restoreOnUnmount]);
 };
 
@@ -110,13 +109,12 @@ export const useDocumentTitle = (
  * @param options - Configuration options
  * @example
  * ```typescript
- * const { data: author } = useRawEntityData({ entityId: authorId });
  * useEntityDocumentTitle(author);
  * ```
  */
 export const useEntityDocumentTitle = (
   entity: { display_name?: string } | null | undefined,
-  options: UseDocumentTitleOptions = {},
+  options: Readonly<UseDocumentTitleOptions> = {},
 ) => {
   const displayName = entity?.display_name;
   useDocumentTitle(displayName, options);

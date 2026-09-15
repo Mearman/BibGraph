@@ -7,7 +7,7 @@ import { ICON_SIZE } from "@/config/style-constants";
 
 // Lazy load HomePage for when we need to render it as fallback for root path
 // This works around a TanStack Router bug where the index route isn't matched
-const HomePage = lazy(() => import("./index.lazy"));
+const HomePage = lazy(async () => import("./index.lazy"));
 
 const NotFoundRoute = () => {
   const location = useLocation();

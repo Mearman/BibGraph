@@ -83,6 +83,8 @@ const categoryInfo = {
   },
 };
 
+const isCategoryKey = (key: string): key is keyof typeof categoryInfo => key in categoryInfo;
+
 interface KeyboardShortcutsHelpProperties {
   opened: boolean;
   onClose: () => void;
@@ -94,7 +96,7 @@ export const KeyboardShortcutsHelp = ({
 }: KeyboardShortcutsHelpProperties) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  const categories = Object.keys(categoryInfo) as Array<keyof typeof categoryInfo>;
+  const categories = Object.keys(categoryInfo).filter(isCategoryKey);
   const filteredHotkeys = selectedCategory === 'all'
     ? hotkeysData
     : hotkeysData.filter(hotkey => hotkey.category === selectedCategory);
@@ -142,7 +144,7 @@ export const KeyboardShortcutsHelp = ({
             variant={selectedCategory === 'all' ? 'filled' : 'light'}
             color="gray"
             style={{ cursor: 'pointer' }}
-            onClick={() => setSelectedCategory('all')}
+            onClick={() => { setSelectedCategory('all'); }}
           >
             All Shortcuts
           </Badge>
@@ -154,7 +156,7 @@ export const KeyboardShortcutsHelp = ({
                 variant={selectedCategory === category ? 'filled' : 'light'}
                 color={categoryInfo[category].color}
                 style={{ cursor: 'pointer' }}
-                onClick={() => setSelectedCategory(category)}
+                onClick={() => { setSelectedCategory(category); }}
                 leftSection={<Icon size={12} />}
               >
                 {categoryInfo[category].title}
@@ -164,9 +166,9 @@ export const KeyboardShortcutsHelp = ({
         </Group>
 
         {/* Category Description */}
-        {selectedCategory !== 'all' && (
+        {selectedCategory !== 'all' && isCategoryKey(selectedCategory) && (
           <Text size="sm" c="dimmed" style={{ fontStyle: 'italic' }}>
-            {categoryInfo[selectedCategory as keyof typeof categoryInfo].description}
+            {categoryInfo[selectedCategory].description}
           </Text>
         )}
 

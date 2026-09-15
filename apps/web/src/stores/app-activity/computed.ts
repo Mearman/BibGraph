@@ -5,13 +5,18 @@
 import type { AppActivityEvent, AppActivityFilters, AppActivityStats } from "./types";
 
 const RECENT_EVENTS_LIMIT = 100;
-const FIVE_MINUTES_MS = 5 * 60 * 1000;
-const ONE_MINUTE_MS = 60 * 1000;
+const RECENT_ACTIVITY_WINDOW_MINUTES = 5;
+const SECONDS_PER_MINUTE = 60;
+const MS_PER_SECOND = 1000;
+const FIVE_MINUTES_MS = RECENT_ACTIVITY_WINDOW_MINUTES * SECONDS_PER_MINUTE * MS_PER_SECOND;
+const ONE_MINUTE_MS = SECONDS_PER_MINUTE * MS_PER_SECOND;
 const MAX_PERFORMANCE_SCORE = 100;
 const PERFORMANCE_DURATION_DIVISOR = 10;
+const RANDOM_ID_RADIX = 36;
+const RANDOM_ID_SLICE_END = 11;
 
 export const generateEventId = (): string =>
-  `evt_${Date.now().toString()}_${Math.random().toString(36).slice(2, 11)}`;
+  `evt_${Date.now().toString()}_${Math.random().toString(RANDOM_ID_RADIX).slice(2, RANDOM_ID_SLICE_END)}`;
 
 export const computeRecentEvents = (
   events: Record<string, AppActivityEvent>,
@@ -22,16 +27,15 @@ export const computeRecentEvents = (
 };
 
 const getMemoryUsage = (): number | undefined => {
-  // Memory usage monitoring disabled to avoid type assertions
-  // Performance.memory is not standardized and requires unsafe type casting
+  // Memory usage monitoring disabled to avoid type assertions Performance.memory is not standardized and requires unsafe type casting
   return undefined;
 };
 
 const calculatePerformanceScore = (
-  events: AppActivityEvent[],
+  events: readonly AppActivityEvent[],
 ): number | undefined => {
   const performanceEvents = events.filter(
-    (e) => e.type === "performance" && e.duration,
+    (e) => e.type === "performance" && e.duration !== undefined,
   );
   if (performanceEvents.length === 0) return undefined;
 

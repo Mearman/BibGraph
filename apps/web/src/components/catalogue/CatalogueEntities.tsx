@@ -108,7 +108,7 @@ export const CatalogueEntities = ({ onNavigate }: CatalogueEntitiesProperties) =
         {duplicateStats && (
           <DuplicatesWarningBanner
             duplicateStats={duplicateStats}
-            onViewDuplicates={() => setShowDuplicatesModal(true)}
+            onViewDuplicates={() => { setShowDuplicatesModal(true); }}
           />
         )}
 
@@ -117,7 +117,7 @@ export const CatalogueEntities = ({ onNavigate }: CatalogueEntitiesProperties) =
           entityCount={entities.length}
           selectedList={selectedList}
           duplicateStats={duplicateStats}
-          onViewDuplicates={() => setShowDuplicatesModal(true)}
+          onViewDuplicates={() => { setShowDuplicatesModal(true); }}
         />
 
         {/* Filters */}
@@ -136,8 +136,8 @@ export const CatalogueEntities = ({ onNavigate }: CatalogueEntitiesProperties) =
           <BulkActionsBar
             selectedCount={selectedEntities.size}
             listsCount={lists.length}
-            onMoveClick={() => setShowBulkMoveModal(true)}
-            onRemoveClick={() => setShowBulkConfirm(true)}
+            onMoveClick={() => { setShowBulkMoveModal(true); }}
+            onRemoveClick={() => { setShowBulkConfirm(true); }}
             onClearSelection={clearSelection}
           />
         )}
@@ -173,29 +173,29 @@ export const CatalogueEntities = ({ onNavigate }: CatalogueEntitiesProperties) =
       {/* Bulk Delete Confirmation Modal */}
       <BulkRemoveModal
         opened={showBulkConfirm}
-        onClose={() => setShowBulkConfirm(false)}
+        onClose={() => { setShowBulkConfirm(false); }}
         selectedCount={selectedEntities.size}
-        onConfirm={handleBulkRemove}
+        onConfirm={() => { void handleBulkRemove(); }}
       />
 
       {/* Bulk Move Modal */}
       <BulkMoveModal
         opened={showBulkMoveModal}
-        onClose={() => setShowBulkMoveModal(false)}
+        onClose={() => { setShowBulkMoveModal(false); }}
         selectedCount={selectedEntities.size}
         targetListId={targetListId}
         onTargetListChange={setTargetListId}
         lists={lists}
-        currentListId={selectedList?.id}
-        onConfirm={handleBulkMove}
+        currentListId={selectedList.id}
+        onConfirm={() => { void handleBulkMove(); }}
       />
 
       {/* Duplicates Modal */}
       <DuplicatesModal
         opened={showDuplicatesModal}
-        onClose={() => setShowDuplicatesModal(false)}
+        onClose={() => { setShowDuplicatesModal(false); }}
         duplicateStats={duplicateStats}
-        onRemoveDuplicates={handleRemoveDuplicates}
+        onRemoveDuplicates={() => { void handleRemoveDuplicates(); }}
       />
     </Card>
   );

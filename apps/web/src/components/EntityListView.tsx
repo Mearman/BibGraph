@@ -12,7 +12,7 @@ export interface EntityListItem {
   worksCount?: number;
   citedByCount?: number;
   description?: string;
-  tags?: Array<{ label: string; color?: string }>;
+  tags?: { label: string; color?: string }[];
 }
 
 interface EntityListViewProperties {
@@ -29,7 +29,7 @@ interface EntityListViewProperties {
   /**
   Optional empty state actions
    */
-  emptyActions?: Array<{ label: string; onClick?: () => void }>;
+  emptyActions?: { label: string; onClick?: () => void }[];
   /**
   Whether to show quick start guide in empty state
    */

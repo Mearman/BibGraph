@@ -1,5 +1,4 @@
 import { cachedOpenAlex } from "@bibgraph/client";
-import { type Topic, type TopicField } from "@bibgraph/types";
 import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute,useParams, useSearch  } from "@tanstack/react-router";
 import { useState } from "react";
@@ -27,35 +26,35 @@ const TopicRoute = () => {
   usePrettyUrl("topics", rawTopicId, topicId);
 
   // Parse select parameter - only send select when explicitly provided in URL
-  const selectFields = selectParameter && typeof selectParameter === 'string'
-    ? selectParameter.split(',').map(field => field.trim()) as TopicField[]
+  const selectFields = typeof selectParameter === 'string' && selectParameter !== ''
+    ? selectParameter.split(',').map(field => field.trim())
     : undefined;
 
   // Fetch topic data
   const { data: topic, isLoading, error } = useQuery({
     queryKey: ["topic", topicId, selectParameter, selectFields],
     queryFn: async () => {
-      if (!topicId) {
+      if (topicId === undefined || topicId === '') {
         throw new Error("Topic ID is required");
       }
       const response = await cachedOpenAlex.client.topics.getTopic(
         topicId,
         selectFields ? { select: selectFields } : {}
       );
-      return response as Topic;
+      return response;
     },
-    enabled: !!topicId && topicId !== "random",
+    enabled: topicId !== undefined && topicId !== '' && topicId !== "random",
   });
 
   // Get relationship counts for summary display - MUST be called before early returns (Rules of Hooks)
   const { incomingCount, outgoingCount } = useEntityRelationshipQueries(
-    topicId || "",
+    topicId ?? "",
     'topics'
   );
 
   // Handle loading state
   if (isLoading) {
-    return <LoadingState entityType="Topic" entityId={topicId || ''} config={ENTITY_TYPE_CONFIGS.topics} />;
+    return <LoadingState entityType="Topic" entityId={topicId ?? ''} config={ENTITY_TYPE_CONFIGS.topics} />;
   }
 
   // Handle error state
@@ -64,7 +63,7 @@ const TopicRoute = () => {
       <ErrorState
         error={error}
         entityType="Topic"
-        entityId={topicId || ''}
+        entityId={topicId ?? ''}
       />
     );
   }
@@ -74,15 +73,15 @@ const TopicRoute = () => {
     <EntityDetailLayout
       config={ENTITY_TYPE_CONFIGS.topics}
       entityType="topics"
-      entityId={topicId || ''}
+      entityId={topicId ?? ''}
       displayName={topic.display_name || "Topic"}
       selectParam={typeof selectParameter === 'string' ? selectParameter : undefined}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       data={topic}>
       <RelationshipCounts incomingCount={incomingCount} outgoingCount={outgoingCount} />
-      <IncomingRelationships entityId={topicId || ""} entityType="topics" />
-      <OutgoingRelationships entityId={topicId || ""} entityType="topics" />
+      <IncomingRelationships entityId={topicId ?? ""} entityType="topics" />
+      <OutgoingRelationships entityId={topicId ?? ""} entityType="topics" />
     </EntityDetailLayout>
   );
 };

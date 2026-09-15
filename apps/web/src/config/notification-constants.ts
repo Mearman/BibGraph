@@ -4,7 +4,6 @@
  *
  * This file eliminates magic numbers for notification durations across components,
  * ensuring consistent UX and making timing values discoverable and maintainable.
- * @module config/notification-constants
  */
 
 // =============================================================================

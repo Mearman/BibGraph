@@ -20,10 +20,139 @@ declare global {
   }
 }
 
+// Debounce for logging a navigation/page-view after route params settle, to avoid excessive calls during rapid navigation.
+const NAVIGATION_DEBOUNCE_MS = 100;
+// Maximum number of extractPageInfo results to memoize before evicting the oldest entry.
+const PAGE_INFO_CACHE_MAX_SIZE = 100;
+
+const KNOWN_ENTITY_PAGE_TYPES = new Set([
+  "works",
+  "authors",
+  "institutions",
+  "concepts",
+  "funders",
+  "publishers",
+  "sources",
+  "topics",
+  "keywords",
+]);
+
+const getStringSearchParam = (search: Readonly<Record<string, unknown>>, key: string): string | undefined => {
+  const value = search[key];
+  return typeof value === "string" ? value : undefined;
+};
+
+const buildSearchParamsString = (search: Readonly<Record<string, unknown>>): string => {
+  const stringEntries: [string, string][] = Object.entries(search).map(([key, value]) => [key, String(value)]);
+  return new URLSearchParams(stringEntries).toString();
+};
+
+const buildSearchFilterSummary = (search: Readonly<Record<string, unknown>>): string =>
+  Object.keys(search)
+    .filter((key) => key !== "q" && key !== "search")
+    .map((key) => `${key}:${String(search[key])}`)
+    .join(", ");
+
+// Helper function to extract page information from pathname and search
+const extractPageInfo = (
+  pathname: string,
+  search: Record<string, unknown>,
+): {
+  isEntityPage: boolean;
+  description: string;
+  metadata: Record<string, unknown>;
+} | null => {
+  // Remove leading slash and split by /
+  const parts = pathname.replace(/^\//, "").split("/");
+
+  if (parts.length > 0) {
+    const pageType = parts[0];
+
+    // Handle entity pages and searches
+    if (KNOWN_ENTITY_PAGE_TYPES.has(pageType)) {
+      if (parts.length >= 2 && parts[1]) {
+        // Entity detail page Decode and fix the entity ID (handles URL encoding and collapsed protocol slashes)
+        const entityId = decodeEntityId(parts[1]);
+        if (entityId === undefined) return null;
+
+        const detection = EntityDetectionService.detectEntity(entityId);
+        if (detection?.entityType) {
+          return {
+            isEntityPage: true,
+            description: `Visited ${detection.entityType} page: ${detection.normalizedId}`,
+            metadata: {
+              entityType: detection.entityType,
+              entityId: detection.normalizedId,
+            },
+          };
+        }
+      } else {
+        // Search page for this entity type
+        const query = getStringSearchParam(search, "q") ?? getStringSearchParam(search, "search") ?? "";
+        const filters = buildSearchFilterSummary(search);
+
+        let description = `Searched ${pageType}`;
+        if (query) description += ` for "${query}"`;
+        if (filters) description += ` with filters: ${filters}`;
+
+        return {
+          isEntityPage: false,
+          description,
+          metadata: {
+            entityType: pageType,
+            searchQuery: query,
+            filters: filters || undefined,
+            searchParams:
+              Object.keys(search).length > 0
+                ? buildSearchParamsString(search)
+                : undefined,
+          },
+        };
+      }
+    }
+
+    // Handle other search pages (autocomplete, text search, etc.)
+    if (pageType === "autocomplete" || pageType === "text") {
+      const query = getStringSearchParam(search, "q") ?? getStringSearchParam(search, "search") ?? "";
+      const filters = buildSearchFilterSummary(search);
+
+      let description = `Searched ${pageType}`;
+      if (query) description += ` for "${query}"`;
+      if (filters) description += ` with filters: ${filters}`;
+
+      return {
+        isEntityPage: false,
+        description,
+        metadata: {
+          pageType,
+          searchQuery: query,
+          filters: filters || undefined,
+          searchParams: search,
+        },
+      };
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Get user agent group for analytics (privacy-friendly grouping)
+ */
+const getUserAgentGroup = (): string => {
+  if (typeof navigator === 'undefined') return 'unknown';
+  const userAgent = navigator.userAgent.toLowerCase();
+  if (userAgent.includes('chrome')) return 'chrome';
+  if (userAgent.includes('firefox')) return 'firefox';
+  if (userAgent.includes('safari')) return 'safari';
+  if (userAgent.includes('edge')) return 'edge';
+  return 'other';
+};
+
 export const NavigationTracker = () => {
   const location = useLocation();
   const { logNavigation, addEvent } = useAppActivityStore();
-  const previousLocationReference = useRef<string | null>(null);
+  const previousLocationRef = useRef<string | null>(null);
 
   // Log that the tracker is mounted
   useEffect(() => {
@@ -51,7 +180,7 @@ export const NavigationTracker = () => {
       cache.set(key, result);
 
       // Limit cache size
-      if (cache.size > 100) {
+      if (cache.size > PAGE_INFO_CACHE_MAX_SIZE) {
         const firstKey = cache.keys().next().value;
         if (firstKey !== undefined) {
           cache.delete(firstKey);
@@ -70,7 +199,7 @@ export const NavigationTracker = () => {
       // Extract page information with memoization
       const pageInfo = extractPageInfoMemoized(
         location.pathname,
-        location.search as Record<string, unknown>,
+        location.search,
       );
 
       if (pageInfo) {
@@ -96,9 +225,9 @@ export const NavigationTracker = () => {
             if (posthog) {
               const eventProperties = {
                 page_type: pageInfo.isEntityPage ? 'entity_detail' : 'search',
-                entity_type: pageInfo.metadata.entityType || null,
-                has_search_query: !!(pageInfo.metadata.searchQuery),
-                has_filters: !!(pageInfo.metadata.filters),
+                entity_type: typeof pageInfo.metadata.entityType === "string" ? pageInfo.metadata.entityType : null,
+                has_search_query: pageInfo.metadata.searchQuery !== undefined && pageInfo.metadata.searchQuery !== "",
+                has_filters: pageInfo.metadata.filters !== undefined && pageInfo.metadata.filters !== "",
                 user_agent_group: getUserAgentGroup(),
                 timestamp: new Date().toISOString(),
                 path: location.pathname,
@@ -114,140 +243,22 @@ export const NavigationTracker = () => {
 
       // Log navigation if there's a previous location
       if (
-        previousLocationReference.current &&
-        previousLocationReference.current !== currentLocation
+        previousLocationRef.current !== null &&
+        previousLocationRef.current !== currentLocation
       ) {
-        logNavigation(previousLocationReference.current, currentLocation, {
-          searchParams: location.search || undefined,
+        logNavigation(previousLocationRef.current, currentLocation, {
+          searchParams: location.search,
           ...pageInfo?.metadata,
         });
       }
-    }, 100); // 100ms debounce
+    }, NAVIGATION_DEBOUNCE_MS);
 
     // Update previous location immediately
-    previousLocationReference.current = currentLocation;
+    previousLocationRef.current = currentLocation;
 
-    return () => clearTimeout(timeoutId);
+    return () => { clearTimeout(timeoutId); };
   }, [location.pathname, location.search, location.hash, addEvent, logNavigation, extractPageInfoMemoized]);
 
-  // Helper function to extract page information from pathname and search
-  const extractPageInfo = (
-    pathname: string,
-    search: Record<string, unknown>,
-  ): {
-    isEntityPage: boolean;
-    description: string;
-    metadata: Record<string, unknown>;
-  } | null => {
-    // Remove leading slash and split by /
-    const parts = pathname.replace(/^\//, "").split("/");
-
-    if (parts.length > 0) {
-      const pageType = parts[0];
-
-      // Validate that this is a known entity type
-      const validEntityTypes = [
-        "works",
-        "authors",
-        "institutions",
-        "concepts",
-        "funders",
-        "publishers",
-        "sources",
-        "topics",
-        "keywords",
-      ];
-
-      // Handle entity pages and searches
-      if (validEntityTypes.includes(pageType)) {
-        if (parts.length >= 2 && parts[1]) {
-          // Entity detail page
-          // Decode and fix the entity ID (handles URL encoding and collapsed protocol slashes)
-          const entityId = decodeEntityId(parts[1]);
-          if (!entityId) return null;
-
-          const detection = EntityDetectionService.detectEntity(entityId);
-          if (detection?.entityType) {
-            return {
-              isEntityPage: true,
-              description: `Visited ${detection.entityType} page: ${detection.normalizedId}`,
-              metadata: {
-                entityType: detection.entityType,
-                entityId: detection.normalizedId,
-              },
-            };
-          }
-        } else {
-          // Search page for this entity type
-          const query = (search.q as string) || (search.search as string) || "";
-          const filters = Object.keys(search)
-            .filter((key) => key !== "q" && key !== "search")
-            .map((key) => `${key}:${search[key]}`)
-            .join(", ");
-
-          let description = `Searched ${pageType}`;
-          if (query) description += ` for "${query}"`;
-          if (filters) description += ` with filters: ${filters}`;
-
-          return {
-            isEntityPage: false,
-            description,
-            metadata: {
-              entityType: pageType,
-              searchQuery: query,
-              filters: filters || undefined,
-              searchParams:
-                Object.keys(search).length > 0
-                  ? new URLSearchParams(
-                      search as Record<string, string>,
-                    ).toString()
-                  : undefined,
-            },
-          };
-        }
-      }
-
-      // Handle other search pages (autocomplete, text search, etc.)
-      if (pageType === "autocomplete" || pageType === "text") {
-        const query = (search.q as string) || (search.search as string) || "";
-        const filters = Object.keys(search)
-          .filter((key) => key !== "q" && key !== "search")
-          .map((key) => `${key}:${search[key]}`)
-          .join(", ");
-
-        let description = `Searched ${pageType}`;
-        if (query) description += ` for "${query}"`;
-        if (filters) description += ` with filters: ${filters}`;
-
-        return {
-          isEntityPage: false,
-          description,
-          metadata: {
-            pageType,
-            searchQuery: query,
-            filters: filters || undefined,
-            searchParams: search,
-          },
-        };
-      }
-    }
-
-    return null;
-  };
-
   return null; // This component doesn't render anything
-};
-
-/**
- * Get user agent group for analytics (privacy-friendly grouping)
- */
-const getUserAgentGroup = (): string => {
-  if (typeof navigator === 'undefined') return 'unknown';
-  const userAgent = navigator.userAgent.toLowerCase();
-  if (userAgent.includes('chrome')) return 'chrome';
-  if (userAgent.includes('firefox')) return 'firefox';
-  if (userAgent.includes('safari')) return 'safari';
-  if (userAgent.includes('edge')) return 'edge';
-  return 'other';
 };
 

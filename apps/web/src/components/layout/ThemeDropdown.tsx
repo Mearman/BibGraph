@@ -127,11 +127,11 @@ export const ThemeDropdown = ({ variant = "action-icon", size = "lg" }: ThemeDro
 
         <Modal
           opened={modalOpen}
-          onClose={() => setModalOpen(false)}
+          onClose={() => { setModalOpen(false); }}
           title="Theme Settings"
           size="lg"
         >
-          <ThemeSettings onClose={() => setModalOpen(false)} />
+          <ThemeSettings onClose={() => { setModalOpen(false); }} />
         </Modal>
       </>
     );
@@ -154,11 +154,11 @@ export const ThemeDropdown = ({ variant = "action-icon", size = "lg" }: ThemeDro
 
       <Modal
         opened={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => { setModalOpen(false); }}
         title="Theme Settings"
         size="lg"
       >
-        <ThemeSettings onClose={() => setModalOpen(false)} />
+        <ThemeSettings onClose={() => { setModalOpen(false); }} />
       </Modal>
     </>
   );

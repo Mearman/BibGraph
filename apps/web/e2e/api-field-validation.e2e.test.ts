@@ -24,6 +24,13 @@ import {
 import { expect,test } from '@playwright/test';
 
 const API_BASE = 'https://api.openalex.org';
+const TEST_TIMEOUT_MS = 60_000;
+const MAX_LOGGED_EXTRA_FIELDS = 10;
+const HTTP_BAD_REQUEST = 400;
+const HTTP_OK = 200;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === 'object' && value !== null && !Array.isArray(value);
 
 // Test entity IDs - using specific entities that are known to exist
 const TEST_ENTITIES = {
@@ -49,7 +56,6 @@ interface FieldValidationResult {
 
 /**
  * Get expected fields for an entity type
- * @param entityType
  */
 const getExpectedFields = (entityType: EntityType): readonly string[] => {
 	switch (entityType) {
@@ -68,16 +74,12 @@ const getExpectedFields = (entityType: EntityType): readonly string[] => {
 		case 'topic':
 			return TOPIC_FIELDS;
 		default:
-			throw new Error(`Unknown entity type: ${entityType}`);
+			throw new Error(`Unknown entity type: ${String(entityType)}`);
 	}
 };
 
 /**
  * Validate that all expected fields are present in the API response
- * @param entityType
- * @param entityId
- * @param data
- * @param expectedFields
  */
 const validateFields = (entityType: EntityType, entityId: string, data: Record<string, unknown>, expectedFields: readonly string[]): FieldValidationResult => {
 	const actualFields = Object.keys(data);
@@ -106,7 +108,7 @@ const validateFields = (entityType: EntityType, entityId: string, data: Record<s
 };
 
 test.describe('API Field Validation @manual', () => {
-	test.setTimeout(60_000); // 1 minute per test
+	test.setTimeout(TEST_TIMEOUT_MS); // 1 minute per test
 
 	test('Work entity should return all expected fields', async ({ request }) => {
 		const entityType = 'work';
@@ -116,20 +118,21 @@ test.describe('API Field Validation @manual', () => {
 		const response = await request.get(`${API_BASE}/${entityType}s/${entityId}`);
 		expect(response.ok()).toBeTruthy();
 
-		const data = await response.json();
+		const data: unknown = await response.json();
+		if (!isRecord(data)) throw new Error('Expected object response');
 		const result = validateFields(entityType, entityId, data, expectedFields);
 
 		// Log results for debugging
 		console.log(`\n${entityType} ${entityId}:`);
-		console.log(`  Expected fields: ${result.totalExpectedFields}`);
-		console.log(`  Actual fields: ${result.totalActualFields}`);
+		console.log(`  Expected fields: ${String(result.totalExpectedFields)}`);
+		console.log(`  Actual fields: ${String(result.totalActualFields)}`);
 
 		if (result.missingFields.length > 0) {
-			console.log(`  ❌ Missing fields (${result.missingFields.length}):`, result.missingFields);
+			console.log(`  ❌ Missing fields (${String(result.missingFields.length)}):`, result.missingFields);
 		}
 
 		if (result.extraFields.length > 0) {
-			console.log(`  ℹ️  Extra fields (${result.extraFields.length}):`, result.extraFields.slice(0, 10));
+			console.log(`  ℹ️  Extra fields (${String(result.extraFields.length)}):`, result.extraFields.slice(0, MAX_LOGGED_EXTRA_FIELDS));
 		}
 
 		// The test fails if any expected fields are missing
@@ -144,15 +147,16 @@ test.describe('API Field Validation @manual', () => {
 		const response = await request.get(`${API_BASE}/${entityType}s/${entityId}`);
 		expect(response.ok()).toBeTruthy();
 
-		const data = await response.json();
+		const data: unknown = await response.json();
+		if (!isRecord(data)) throw new Error('Expected object response');
 		const result = validateFields(entityType, entityId, data, expectedFields);
 
 		console.log(`\n${entityType} ${entityId}:`);
-		console.log(`  Expected fields: ${result.totalExpectedFields}`);
-		console.log(`  Actual fields: ${result.totalActualFields}`);
+		console.log(`  Expected fields: ${String(result.totalExpectedFields)}`);
+		console.log(`  Actual fields: ${String(result.totalActualFields)}`);
 
 		if (result.missingFields.length > 0) {
-			console.log(`  ❌ Missing fields (${result.missingFields.length}):`, result.missingFields);
+			console.log(`  ❌ Missing fields (${String(result.missingFields.length)}):`, result.missingFields);
 		}
 
 		expect(result.missingFields).toEqual([]);
@@ -166,15 +170,16 @@ test.describe('API Field Validation @manual', () => {
 		const response = await request.get(`${API_BASE}/${entityType}s/${entityId}`);
 		expect(response.ok()).toBeTruthy();
 
-		const data = await response.json();
+		const data: unknown = await response.json();
+		if (!isRecord(data)) throw new Error('Expected object response');
 		const result = validateFields(entityType, entityId, data, expectedFields);
 
 		console.log(`\n${entityType} ${entityId}:`);
-		console.log(`  Expected fields: ${result.totalExpectedFields}`);
-		console.log(`  Actual fields: ${result.totalActualFields}`);
+		console.log(`  Expected fields: ${String(result.totalExpectedFields)}`);
+		console.log(`  Actual fields: ${String(result.totalActualFields)}`);
 
 		if (result.missingFields.length > 0) {
-			console.log(`  ❌ Missing fields (${result.missingFields.length}):`, result.missingFields);
+			console.log(`  ❌ Missing fields (${String(result.missingFields.length)}):`, result.missingFields);
 		}
 
 		expect(result.missingFields).toEqual([]);
@@ -188,15 +193,16 @@ test.describe('API Field Validation @manual', () => {
 		const response = await request.get(`${API_BASE}/${entityType}s/${entityId}`);
 		expect(response.ok()).toBeTruthy();
 
-		const data = await response.json();
+		const data: unknown = await response.json();
+		if (!isRecord(data)) throw new Error('Expected object response');
 		const result = validateFields(entityType, entityId, data, expectedFields);
 
 		console.log(`\n${entityType} ${entityId}:`);
-		console.log(`  Expected fields: ${result.totalExpectedFields}`);
-		console.log(`  Actual fields: ${result.totalActualFields}`);
+		console.log(`  Expected fields: ${String(result.totalExpectedFields)}`);
+		console.log(`  Actual fields: ${String(result.totalActualFields)}`);
 
 		if (result.missingFields.length > 0) {
-			console.log(`  ❌ Missing fields (${result.missingFields.length}):`, result.missingFields);
+			console.log(`  ❌ Missing fields (${String(result.missingFields.length)}):`, result.missingFields);
 		}
 
 		expect(result.missingFields).toEqual([]);
@@ -210,15 +216,16 @@ test.describe('API Field Validation @manual', () => {
 		const response = await request.get(`${API_BASE}/${entityType}s/${entityId}`);
 		expect(response.ok()).toBeTruthy();
 
-		const data = await response.json();
+		const data: unknown = await response.json();
+		if (!isRecord(data)) throw new Error('Expected object response');
 		const result = validateFields(entityType, entityId, data, expectedFields);
 
 		console.log(`\n${entityType} ${entityId}:`);
-		console.log(`  Expected fields: ${result.totalExpectedFields}`);
-		console.log(`  Actual fields: ${result.totalActualFields}`);
+		console.log(`  Expected fields: ${String(result.totalExpectedFields)}`);
+		console.log(`  Actual fields: ${String(result.totalActualFields)}`);
 
 		if (result.missingFields.length > 0) {
-			console.log(`  ❌ Missing fields (${result.missingFields.length}):`, result.missingFields);
+			console.log(`  ❌ Missing fields (${String(result.missingFields.length)}):`, result.missingFields);
 		}
 
 		expect(result.missingFields).toEqual([]);
@@ -232,15 +239,16 @@ test.describe('API Field Validation @manual', () => {
 		const response = await request.get(`${API_BASE}/${entityType}s/${entityId}`);
 		expect(response.ok()).toBeTruthy();
 
-		const data = await response.json();
+		const data: unknown = await response.json();
+		if (!isRecord(data)) throw new Error('Expected object response');
 		const result = validateFields(entityType, entityId, data, expectedFields);
 
 		console.log(`\n${entityType} ${entityId}:`);
-		console.log(`  Expected fields: ${result.totalExpectedFields}`);
-		console.log(`  Actual fields: ${result.totalActualFields}`);
+		console.log(`  Expected fields: ${String(result.totalExpectedFields)}`);
+		console.log(`  Actual fields: ${String(result.totalActualFields)}`);
 
 		if (result.missingFields.length > 0) {
-			console.log(`  ❌ Missing fields (${result.missingFields.length}):`, result.missingFields);
+			console.log(`  ❌ Missing fields (${String(result.missingFields.length)}):`, result.missingFields);
 		}
 
 		expect(result.missingFields).toEqual([]);
@@ -254,15 +262,16 @@ test.describe('API Field Validation @manual', () => {
 		const response = await request.get(`${API_BASE}/${entityType}s/${entityId}`);
 		expect(response.ok()).toBeTruthy();
 
-		const data = await response.json();
+		const data: unknown = await response.json();
+		if (!isRecord(data)) throw new Error('Expected object response');
 		const result = validateFields(entityType, entityId, data, expectedFields);
 
 		console.log(`\n${entityType} ${entityId}:`);
-		console.log(`  Expected fields: ${result.totalExpectedFields}`);
-		console.log(`  Actual fields: ${result.totalActualFields}`);
+		console.log(`  Expected fields: ${String(result.totalExpectedFields)}`);
+		console.log(`  Actual fields: ${String(result.totalActualFields)}`);
 
 		if (result.missingFields.length > 0) {
-			console.log(`  ❌ Missing fields (${result.missingFields.length}):`, result.missingFields);
+			console.log(`  ❌ Missing fields (${String(result.missingFields.length)}):`, result.missingFields);
 		}
 
 		expect(result.missingFields).toEqual([]);
@@ -270,7 +279,7 @@ test.describe('API Field Validation @manual', () => {
 });
 
 test.describe('API Error Detection @manual', () => {
-	test.setTimeout(60_000); // API tests need longer timeout
+	test.setTimeout(TEST_TIMEOUT_MS); // API tests need longer timeout
 
 	test('Invalid select parameter should return 400 error', async ({ request }) => {
 		const response = await request.get(
@@ -278,9 +287,10 @@ test.describe('API Error Detection @manual', () => {
 		);
 
 		// The API should return a 400 error for invalid field names
-		expect(response.status()).toBe(400);
+		expect(response.status()).toBe(HTTP_BAD_REQUEST);
 
-		const data = await response.json();
+		const data: unknown = await response.json();
+		if (!isRecord(data)) throw new Error('Expected object response');
 		expect(data).toHaveProperty('error');
 		expect(data.error).toContain('invalid');
 	});
@@ -289,9 +299,10 @@ test.describe('API Error Detection @manual', () => {
 		const response = await request.get(`${API_BASE}/works/W2009047091`);
 
 		// Should succeed without select parameter
-		expect(response.status()).toBe(200);
+		expect(response.status()).toBe(HTTP_OK);
 
-		const data = await response.json();
+		const data: unknown = await response.json();
+		if (!isRecord(data)) throw new Error('Expected object response');
 		expect(data).toHaveProperty('id');
 		expect(data).toHaveProperty('display_name');
 	});

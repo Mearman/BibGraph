@@ -31,11 +31,8 @@ export const registerOpenAlexServiceWorker = async (): Promise<boolean> => {
 
     logger.debug("sw", "Registering OpenAlex Service Worker");
 
-    // Register the service worker
-    // In development, vite-plugin-pwa serves the service worker at a different path
-    const serviceWorkerPath = isDevelopment
-      ? "/dev-sw.js?dev-sw"
-      : "/openalex-sw.js";
+    // Register the service worker We only reach here in development (production returns above), where vite-plugin-pwa serves the service worker at this dev-only path.
+    const serviceWorkerPath = "/dev-sw.js?dev-sw";
     swRegistration = await navigator.serviceWorker.register(serviceWorkerPath, {
       scope: "/",
     });

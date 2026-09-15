@@ -1,7 +1,6 @@
 import type {
   BaseFilterRenderProps,
   FilterFieldConfig,
-  FilterFieldOption as UtilitiesFilterFieldOption,
   FilterOperator} from "@bibgraph/utils";
 import { BaseFilter, createEnumOptions } from "@bibgraph/utils";
 import { MultiSelect, Select } from "@mantine/core";
@@ -11,7 +10,7 @@ interface EnumFilterProperties {
   value: string | string[];
   operator: FilterOperator;
   config: FilterFieldConfig;
-  onValueChange: (value: string | string[]) => void;
+  onValueChange: (value: string | readonly string[]) => void;
   onOperatorChange: (operator: FilterOperator) => void;
   disabled?: boolean;
   compact?: boolean;
@@ -30,7 +29,7 @@ export const EnumFilter = ({
 }: EnumFilterProperties) => {
   // Cast to utils type for compatibility with createEnumOptions
   const selectOptions = createEnumOptions(
-    (config.options || []) as UtilitiesFilterFieldOption[],
+    (config.options ?? []),
   ).map(option => ({
     ...option,
     value: String(option.value),
@@ -55,7 +54,7 @@ export const EnumFilter = ({
               id={properties.fieldId}
               data={selectOptions}
               value={Array.isArray(properties.value) ? properties.value : []}
-              onChange={(value_) => properties.onChange(value_)}
+              onChange={(value_) => { properties.onChange(value_); }}
               disabled={properties.disabled}
               size={properties.compact ? "xs" : "sm"}
               placeholder={config.placeholder}
@@ -66,7 +65,7 @@ export const EnumFilter = ({
               id={properties.fieldId}
               data={selectOptions}
               value={Array.isArray(properties.value) ? properties.value[0] : properties.value || ""}
-              onChange={(value_) => properties.onChange(value_ as string)}
+              onChange={(value_) => { properties.onChange(value_ ?? ""); }}
               disabled={properties.disabled}
               size={properties.compact ? "xs" : "sm"}
               placeholder={config.placeholder}

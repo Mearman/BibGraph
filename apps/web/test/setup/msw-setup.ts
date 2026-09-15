@@ -68,7 +68,6 @@ export const startMSWServer = () => {
   });
 
   // Add response interceptor to cache API responses (E2E mode only)
-  const isE2E = process.env.RUNNING_E2E === 'true' || process.env.PLAYWRIGHT_TEST === 'true';
   if (isE2E) {
     mswServer.events.on('response:mocked', async ({ request, response }) => {
       const url = new URL(request.url);
@@ -77,16 +76,15 @@ export const startMSWServer = () => {
       if (url.hostname === 'api.openalex.org' && response.headers.get('x-powered-by') !== 'msw') {
         try {
           // Extract entity type and ID from URL
-          const apiMatch = url.pathname.match(/\/([a-z]+)\/([A-Z]\d+)/);
+          const apiMatch = /\/([a-z]+)\/([A-Z]\d+)/.exec(url.pathname);
           if (apiMatch) {
             const [, entityType, entityId] = apiMatch;
 
             // Read response body
             const clonedResponse = response.clone();
-            const responseData = await clonedResponse.json();
+            const responseData: unknown = await clonedResponse.json();
 
-            // Import and use filesystem cache writer
-            const { writeToFilesystemCache } = await import('./filesystem-cache');
+            // Use filesystem cache writer
             await writeToFilesystemCache(entityType, entityId, responseData);
 
             console.log(`💾 Cached API passthrough response: ${entityType}/${entityId}`);

@@ -29,7 +29,6 @@ export class FieldsDetailPage extends BaseEntityPageObject {
 
 	/**
 	 * Navigate to a specific field detail page
-	 * @param fieldId
 	 */
 	async gotoField(fieldId: string): Promise<void> {
 		await this.gotoEntity(fieldId);
@@ -55,7 +54,7 @@ export class FieldsDetailPage extends BaseEntityPageObject {
 	 */
 	async getSubfieldCount(): Promise<number> {
 		const countText = await this.getText(this.fieldSelectors.subfieldCount);
-		return countText ? Number.parseInt(countText, 10) : 0;
+		return countText !== null ? Number.parseInt(countText, 10) : 0;
 	}
 
 	/**
@@ -75,7 +74,7 @@ export class FieldsDetailPage extends BaseEntityPageObject {
 
 		for (let index = 0; index < count; index++) {
 			const text = await subfieldItems.nth(index).textContent();
-			if (text) {
+			if (text !== null) {
 				subfields.push(text.trim());
 			}
 		}
@@ -93,7 +92,6 @@ export class FieldsDetailPage extends BaseEntityPageObject {
 
 	/**
 	 * Click a related subfield link by index
-	 * @param index
 	 */
 	async clickRelatedSubfield(index: number): Promise<void> {
 		const subfieldItems = this.page.locator(

@@ -13,8 +13,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const HAR_CACHE_DIR = path.join(__dirname, "test-results/har-cache");
+const BYTES_PER_KB = 1024;
 
-const globalTeardown = async () => {
+const globalTeardown = () => {
   console.log("🧹 Starting Playwright global teardown...");
 
   // Log HAR cache statistics
@@ -26,11 +27,11 @@ const globalTeardown = async () => {
     }, 0);
 
     console.log(`📊 HAR cache statistics:`);
-    console.log(`   Files: ${harFiles.length}`);
-    console.log(`   Total size: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`   Files: ${String(harFiles.length)}`);
+    console.log(`   Total size: ${(totalSize / BYTES_PER_KB / BYTES_PER_KB).toFixed(2)} MB`);
 
     // Clean up warmup HAR file if it exists (keep only test-specific HARs in CI)
-    if (process.env.CI) {
+    if (process.env.CI !== undefined) {
       const warmupHar = path.join(HAR_CACHE_DIR, "warmup.har");
       if (fs.existsSync(warmupHar)) {
         fs.unlinkSync(warmupHar);

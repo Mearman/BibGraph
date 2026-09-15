@@ -161,8 +161,8 @@ export const useCatalogueEntities = (): UseCatalogueEntitiesReturn => {
       const matchesSearch =
         searchQuery === "" ||
         entity.entityId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (entity.notes &&
-          entity.notes.toLowerCase().includes(searchQuery.toLowerCase()));
+        (entity.notes?.toLowerCase().includes(searchQuery.toLowerCase()) ??
+          false);
 
       const isMatchesType =
         filterType === "all" || entity.entityType === filterType;
@@ -213,7 +213,10 @@ export const useCatalogueEntities = (): UseCatalogueEntitiesReturn => {
       setSelectedEntities(
         new Set(
           sortedEntities
-            .filter((e): e is typeof e & { id: string } => !!e.id)
+            .filter(
+              (e): e is typeof e & { id: string } =>
+                e.id !== undefined && e.id !== ""
+            )
             .map((e) => e.id)
         )
       );
@@ -238,8 +241,7 @@ export const useCatalogueEntities = (): UseCatalogueEntitiesReturn => {
 
   // Bulk operations
   const handleBulkRemove = useCallback(async () => {
-    if (!selectedList || !selectedList.id || selectedEntities.size === 0)
-      return;
+    if (selectedList?.id === undefined || selectedEntities.size === 0) return;
 
     try {
       await bulkRemoveEntities(selectedList.id, [...selectedEntities]);
@@ -251,7 +253,7 @@ export const useCatalogueEntities = (): UseCatalogueEntitiesReturn => {
 
       notifications.show({
         title: "Removed",
-        message: `${selectedEntities.size} entities removed from list`,
+        message: `${String(selectedEntities.size)} entities removed from list`,
         color: "green",
       });
 
@@ -272,9 +274,8 @@ export const useCatalogueEntities = (): UseCatalogueEntitiesReturn => {
 
   const handleBulkMove = useCallback(async () => {
     if (
-      !selectedList ||
-      !selectedList.id ||
-      !targetListId ||
+      selectedList?.id === undefined ||
+      targetListId === null ||
       selectedEntities.size === 0
     )
       return;
@@ -292,7 +293,7 @@ export const useCatalogueEntities = (): UseCatalogueEntitiesReturn => {
 
       notifications.show({
         title: "Moved",
-        message: `${selectedEntities.size} entities moved to target list`,
+        message: `${String(selectedEntities.size)} entities moved to target list`,
         color: "green",
       });
 
@@ -315,7 +316,7 @@ export const useCatalogueEntities = (): UseCatalogueEntitiesReturn => {
   }, [selectedList, targetListId, selectedEntities, bulkMoveEntities]);
 
   const handleRemoveDuplicates = useCallback(async () => {
-    if (!selectedList?.id) return;
+    if (selectedList?.id === undefined) return;
 
     try {
       const toRemove = suggestDuplicateRemovals(entities);
@@ -326,7 +327,7 @@ export const useCatalogueEntities = (): UseCatalogueEntitiesReturn => {
       });
       notifications.show({
         title: "Duplicates Removed",
-        message: `Removed ${toRemove.length} duplicate entities`,
+        message: `Removed ${String(toRemove.length)} duplicate entities`,
         color: "green",
       });
     } catch (error) {
@@ -344,7 +345,7 @@ export const useCatalogueEntities = (): UseCatalogueEntitiesReturn => {
   // Single entity operations
   const handleRemoveEntity = useCallback(
     async (entityRecordId: string) => {
-      if (!selectedList || !selectedList.id) return;
+      if (selectedList?.id === undefined) return;
 
       try {
         await removeEntityFromList(selectedList.id, entityRecordId);
@@ -417,7 +418,8 @@ export const useCatalogueEntities = (): UseCatalogueEntitiesReturn => {
       // Update positions
       const reorderedIds = items
         .filter(
-          (entity): entity is typeof entity & { id: string } => !!entity.id
+          (entity): entity is typeof entity & { id: string } =>
+            entity.id !== undefined && entity.id !== ""
         )
         .map((entity, index) => {
           entity.position = index + 1;
@@ -425,7 +427,7 @@ export const useCatalogueEntities = (): UseCatalogueEntitiesReturn => {
         });
 
       try {
-        if (!selectedList.id) return;
+        if (selectedList.id === undefined) return;
         await reorderEntities(selectedList.id, reorderedIds);
         logger.debug("catalogue-ui", "Entities reordered successfully", {
           listId: selectedList.id,
@@ -435,7 +437,7 @@ export const useCatalogueEntities = (): UseCatalogueEntitiesReturn => {
         // Announce reorder to screen readers
         notifications.show({
           title: "Reordered",
-          message: `Entity moved from position ${oldIndex + 1} to position ${newIndex + 1}`,
+          message: `Entity moved from position ${String(oldIndex + 1)} to position ${String(newIndex + 1)}`,
           color: "blue",
           autoClose: NOTIFICATION_DURATION.SHORT_MS,
         });
@@ -467,7 +469,7 @@ export const useCatalogueEntities = (): UseCatalogueEntitiesReturn => {
     filterType,
     setFilterType,
     sortBy,
-    setSortBy: setSortBy as (sort: SortOption) => void,
+    setSortBy,
     filteredEntities,
     sortedEntities,
     entityTypes,

@@ -14,9 +14,6 @@ import { generateFilenameFromParsedKey, urlToEncodedKey } from "./url-encoding";
 /**
  * Seed missing data based on unified index entries
  * Returns updates to be applied to the index: removals and redirects
- * @param dataPath
- * @param entityType
- * @param index
  */
 export const seedMissingData = async (
   dataPath: string,
@@ -42,8 +39,7 @@ export const seedMissingData = async (
       // Parse the cleaned key to verify it's valid and belongs to this entity type
       const cleanedParsed = parseIndexKey(cleanKey);
       if (
-        cleanedParsed &&
-        cleanedParsed.entityType === entityType &&
+        cleanedParsed?.entityType === entityType &&
         cleanedParsed.type === "entity"
       ) {
         // Valid cleaned key - add to redirect updates
@@ -111,7 +107,7 @@ export const seedMissingData = async (
             entityId: parsed.entityId,
           });
           await mkdir(join(dataPath, entityType), { recursive: true });
-          if (parsed.entityId) {
+          if (parsed.entityId !== undefined && parsed.entityId !== "") {
             const result = await downloadEntityWithEncodedFilename(
               entityType,
               parsed.entityId,
@@ -167,7 +163,7 @@ export const seedMissingData = async (
     } else {
       // Check if query result file exists in the entity directory
       const filename = generateFilenameFromParsedKey(parsed);
-      if (!filename) continue;
+      if (filename === null || filename === "") continue;
 
       const queryFilePath = join(dataPath, entityType, filename);
 
@@ -181,7 +177,7 @@ export const seedMissingData = async (
           const queryUrl = parsed.canonicalUrl;
           const queryResult = await fetchOpenAlexQuery(queryUrl);
 
-          if (queryResult) {
+          if (queryResult !== null && queryResult !== undefined) {
             const entityDir = join(dataPath, entityType);
             await mkdir(entityDir, { recursive: true });
             // Write the query result directly to entity directory

@@ -1,6 +1,5 @@
 /**
- * Unit tests for cache configuration utilities
- * Tests cache configuration constants, entity-specific settings, and utility functions
+ * Unit tests for cache configuration utilities Tests cache configuration constants, entity-specific settings, and utility functions
  */
 
 import { describe, expect,it } from "vitest";
@@ -12,97 +11,124 @@ import {
   getCacheConfig,
 } from "./cache";
 
+const MILLISECONDS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const DAYS_PER_WEEK = 7;
+const DAYS_PER_MONTH = 30;
+const DAYS_PER_QUARTER = 90;
+const DAYS_FOR_AUTHOR_RETENTION = 3;
+const HOURS_FOR_AUTHOR_STALE = 12;
+const HOURS_FOR_RELATED_STALE = 6;
+const DEFAULT_STALE_MINUTES = 5;
+const BYTES_PER_KILOBYTE = 1024;
+const MAX_CACHE_SIZE_MEGABYTES = 100;
+const DEFAULT_RETRY_ATTEMPTS = 3;
+
+const ONE_MINUTE_MS = MILLISECONDS_PER_SECOND * SECONDS_PER_MINUTE;
+const ONE_HOUR_MS = ONE_MINUTE_MS * MINUTES_PER_HOUR;
+const ONE_DAY_MS = ONE_HOUR_MS * HOURS_PER_DAY;
+const ONE_WEEK_MS = ONE_DAY_MS * DAYS_PER_WEEK;
+const ONE_MONTH_MS = ONE_DAY_MS * DAYS_PER_MONTH;
+const ONE_QUARTER_MS = ONE_DAY_MS * DAYS_PER_QUARTER;
+const TWELVE_HOURS_MS = HOURS_FOR_AUTHOR_STALE * ONE_HOUR_MS;
+const THREE_DAYS_MS = DAYS_FOR_AUTHOR_RETENTION * ONE_DAY_MS;
+const SIX_HOURS_MS = HOURS_FOR_RELATED_STALE * ONE_HOUR_MS;
+const FIVE_MINUTES_MS = DEFAULT_STALE_MINUTES * ONE_MINUTE_MS;
+const MAX_CACHE_SIZE_BYTES = MAX_CACHE_SIZE_MEGABYTES * BYTES_PER_KILOBYTE * BYTES_PER_KILOBYTE;
+
 describe("cache configuration", () => {
   describe("CACHE_CONFIG", () => {
     it("should have correct general cache configuration", () => {
       expect(CACHE_CONFIG).toEqual({
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-        maxSize: 100 * 1024 * 1024, // 100MB
-        compressionThreshold: 1024, // 1KB
-        defaultRetries: 3,
-        defaultStaleTime: 1000 * 60 * 5, // 5 minutes
+        maxAge: ONE_WEEK_MS,
+        maxSize: MAX_CACHE_SIZE_BYTES,
+        compressionThreshold: BYTES_PER_KILOBYTE,
+        defaultRetries: DEFAULT_RETRY_ATTEMPTS,
+        defaultStaleTime: FIVE_MINUTES_MS,
       });
     });
 
     it("should have reasonable cache size limits", () => {
       // Max age should be 7 days
-      expect(CACHE_CONFIG.maxAge).toBe(604_800_000); // 7 * 24 * 60 * 60 * 1000
+      expect(CACHE_CONFIG.maxAge).toBe(ONE_WEEK_MS);
 
       // Max size should be 100MB
-      expect(CACHE_CONFIG.maxSize).toBe(104_857_600); // 100 * 1024 * 1024
+      expect(CACHE_CONFIG.maxSize).toBe(MAX_CACHE_SIZE_BYTES);
 
       // Compression threshold should be 1KB
-      expect(CACHE_CONFIG.compressionThreshold).toBe(1024);
+      expect(CACHE_CONFIG.compressionThreshold).toBe(BYTES_PER_KILOBYTE);
 
       // Default retries should be reasonable
-      expect(CACHE_CONFIG.defaultRetries).toBe(3);
+      expect(CACHE_CONFIG.defaultRetries).toBe(DEFAULT_RETRY_ATTEMPTS);
 
       // Default stale time should be 5 minutes
-      expect(CACHE_CONFIG.defaultStaleTime).toBe(300_000); // 5 * 60 * 1000
+      expect(CACHE_CONFIG.defaultStaleTime).toBe(FIVE_MINUTES_MS);
     });
   });
 
   describe("ENTITY_CACHE_TIMES", () => {
     it("should have works cache configuration", () => {
       expect(ENTITY_CACHE_TIMES.works).toEqual({
-        stale: 1000 * 60 * 60 * 24, // 1 day
-        gc: 1000 * 60 * 60 * 24 * 7, // 7 days
+        stale: ONE_DAY_MS,
+        gc: ONE_WEEK_MS,
       });
     });
 
     it("should have authors cache configuration", () => {
       expect(ENTITY_CACHE_TIMES.authors).toEqual({
-        stale: 1000 * 60 * 60 * 12, // 12 hours
-        gc: 1000 * 60 * 60 * 24 * 3, // 3 days
+        stale: TWELVE_HOURS_MS,
+        gc: THREE_DAYS_MS,
       });
     });
 
     it("should have sources cache configuration", () => {
       expect(ENTITY_CACHE_TIMES.sources).toEqual({
-        stale: 1000 * 60 * 60 * 24 * 7, // 7 days
-        gc: 1000 * 60 * 60 * 24 * 30, // 30 days
+        stale: ONE_WEEK_MS,
+        gc: ONE_MONTH_MS,
       });
     });
 
     it("should have institutions cache configuration", () => {
       expect(ENTITY_CACHE_TIMES.institutions).toEqual({
-        stale: 1000 * 60 * 60 * 24 * 30, // 30 days
-        gc: 1000 * 60 * 60 * 24 * 90, // 90 days
+        stale: ONE_MONTH_MS,
+        gc: ONE_QUARTER_MS,
       });
     });
 
     it("should have topics cache configuration", () => {
       expect(ENTITY_CACHE_TIMES.topics).toEqual({
-        stale: 1000 * 60 * 60 * 24 * 7, // 7 days
-        gc: 1000 * 60 * 60 * 24 * 30, // 30 days
+        stale: ONE_WEEK_MS,
+        gc: ONE_MONTH_MS,
       });
     });
 
     it("should have publishers cache configuration", () => {
       expect(ENTITY_CACHE_TIMES.publishers).toEqual({
-        stale: 1000 * 60 * 60 * 24 * 30, // 30 days
-        gc: 1000 * 60 * 60 * 24 * 90, // 90 days
+        stale: ONE_MONTH_MS,
+        gc: ONE_QUARTER_MS,
       });
     });
 
     it("should have funders cache configuration", () => {
       expect(ENTITY_CACHE_TIMES.funders).toEqual({
-        stale: 1000 * 60 * 60 * 24 * 30, // 30 days
-        gc: 1000 * 60 * 60 * 24 * 90, // 90 days
+        stale: ONE_MONTH_MS,
+        gc: ONE_QUARTER_MS,
       });
     });
 
     it("should have search cache configuration", () => {
       expect(ENTITY_CACHE_TIMES.search).toEqual({
-        stale: 1000 * 60 * 5, // 5 minutes
-        gc: 1000 * 60 * 60, // 1 hour
+        stale: FIVE_MINUTES_MS,
+        gc: ONE_HOUR_MS,
       });
     });
 
     it("should have related cache configuration", () => {
       expect(ENTITY_CACHE_TIMES.related).toEqual({
-        stale: 1000 * 60 * 60 * 6, // 6 hours
-        gc: 1000 * 60 * 60 * 24, // 1 day
+        stale: SIX_HOURS_MS,
+        gc: ONE_DAY_MS,
       });
     });
 
@@ -193,20 +219,20 @@ describe("cache configuration", () => {
 
     it("should have reasonable time values", () => {
       // Works: 1 day stale, 7 days gc
-      expect(ENTITY_CACHE_TIMES.works.stale).toBe(86_400_000); // 1 day
-      expect(ENTITY_CACHE_TIMES.works.gc).toBe(604_800_000); // 7 days
+      expect(ENTITY_CACHE_TIMES.works.stale).toBe(ONE_DAY_MS);
+      expect(ENTITY_CACHE_TIMES.works.gc).toBe(ONE_WEEK_MS);
 
       // Authors: 12 hours stale, 3 days gc
-      expect(ENTITY_CACHE_TIMES.authors.stale).toBe(43_200_000); // 12 hours
-      expect(ENTITY_CACHE_TIMES.authors.gc).toBe(259_200_000); // 3 days
+      expect(ENTITY_CACHE_TIMES.authors.stale).toBe(TWELVE_HOURS_MS);
+      expect(ENTITY_CACHE_TIMES.authors.gc).toBe(THREE_DAYS_MS);
 
       // Search: 5 minutes stale, 1 hour gc (most dynamic)
-      expect(ENTITY_CACHE_TIMES.search.stale).toBe(300_000); // 5 minutes
-      expect(ENTITY_CACHE_TIMES.search.gc).toBe(3_600_000); // 1 hour
+      expect(ENTITY_CACHE_TIMES.search.stale).toBe(FIVE_MINUTES_MS);
+      expect(ENTITY_CACHE_TIMES.search.gc).toBe(ONE_HOUR_MS);
 
       // Institutions: 30 days stale, 90 days gc (most stable)
-      expect(ENTITY_CACHE_TIMES.institutions.stale).toBe(2_592_000_000); // 30 days
-      expect(ENTITY_CACHE_TIMES.institutions.gc).toBe(7_776_000_000); // 90 days
+      expect(ENTITY_CACHE_TIMES.institutions.stale).toBe(ONE_MONTH_MS);
+      expect(ENTITY_CACHE_TIMES.institutions.gc).toBe(ONE_QUARTER_MS);
     });
   });
 
@@ -265,8 +291,7 @@ describe("cache configuration", () => {
     });
 
     it("should maintain type safety", () => {
-      // TypeScript should enforce that only valid EntityType values are passed
-      // This test ensures the function signature matches the type definition
+      // TypeScript should enforce that only valid EntityType values are passed This test ensures the function signature matches the type definition
       const workConfig = getCacheConfig("works");
       expect(workConfig.stale).toBeTypeOf("number");
       expect(workConfig.gc).toBeTypeOf("number");

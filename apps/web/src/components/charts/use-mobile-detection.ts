@@ -13,7 +13,6 @@ import { useEffect, useState } from "react";
  *
  * Uses Mantine's theme breakpoints for consistency with the design system.
  * Updates automatically on window resize.
- *
  * @returns boolean indicating if viewport is mobile-sized
  */
 export const useMobileDetection = (): boolean => {
@@ -30,7 +29,7 @@ export const useMobileDetection = (): boolean => {
 
     checkMobile();
     window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    return () => { window.removeEventListener("resize", checkMobile); };
   }, [theme.breakpoints.sm]);
 
   return isMobile;

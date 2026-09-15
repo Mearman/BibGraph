@@ -48,13 +48,14 @@ export const SelectedListDetails = ({
   onShareClick,
 }: SelectedListDetailsProperties) => {
   const handleEditButtonClick = () => {
-    if (!selectedList.id) return;
-    const card = lists.find(l => l.id === selectedList.id);
+    if (selectedList.id === undefined) return;
+    const listId = selectedList.id;
+    const card = lists.find(l => l.id === listId);
     if (card) {
       // Trigger edit via the list component
       const buttons = document.querySelectorAll<HTMLElement>('[data-testid^="edit-list-"]');
       const editButton = [...buttons].find(button =>
-        button.dataset.testid === `edit-list-${selectedList.id}`
+        button.dataset.testid === `edit-list-${listId}`
       );
       editButton?.click();
     }
@@ -65,7 +66,7 @@ export const SelectedListDetails = ({
       <Group justify="space-between" mb="md">
         <div>
           <Title order={3} data-testid="selected-list-title">{selectedList.title}</Title>
-          {selectedList.description && (
+          {selectedList.description !== undefined && selectedList.description !== "" && (
             <Text c="dimmed" size="sm" mt="xs">
               {selectedList.description}
             </Text>

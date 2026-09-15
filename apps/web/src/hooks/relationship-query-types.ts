@@ -1,6 +1,5 @@
 /**
  * Type definitions for entity relationship query hooks
- * @module relationship-query-types
  */
 
 import type { RelationshipItem, RelationshipSection } from '@/types/relationship';
@@ -20,7 +19,7 @@ export interface SectionLoadState {
  * Result from a relationship query
  */
 export interface RelationshipQueryResult {
-  results: Array<Record<string, unknown>>;
+  results: Record<string, unknown>[];
   totalCount: number;
   page: number;
   perPage: number;

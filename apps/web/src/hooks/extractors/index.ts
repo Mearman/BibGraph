@@ -1,6 +1,5 @@
 /**
  * Entity relationship extractors barrel file
- * @module extractors
  */
 
 export { extractAuthorRelationships } from './author-extractors';

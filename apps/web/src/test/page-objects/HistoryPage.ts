@@ -4,13 +4,14 @@
  * Page object for the Visit History page (US-22).
  * Handles history entries, search, clearing, and navigation.
  *
- * Hierarchy: BasePageObject -> BaseSPAPageObject -> HistoryPage
+ * Hierarchy: BasePageObject -\> BaseSPAPageObject -\> HistoryPage
  * @see US-22
  */
 
-import type { Page } from "@playwright/test";
-
 import { BaseSPAPageObject } from "./BaseSPAPageObject";
+
+const ENTRY_RENDER_SETTLE_WAIT_MS = 500;
+const ADDITIONAL_ENTRIES_WAIT_MS = 2_000;
 
 export class HistoryPage extends BaseSPAPageObject {
 	private readonly historySelectors = {
@@ -25,10 +26,6 @@ export class HistoryPage extends BaseSPAPageObject {
 			"input[placeholder='Search history...'], input[aria-label='Search navigation history']",
 		emptyState: "text='No navigation history yet'",
 	};
-
-	constructor(page: Page) {
-		super(page);
-	}
 
 	async gotoHistory(): Promise<void> {
 		await this.goto("#/history");
@@ -45,12 +42,10 @@ export class HistoryPage extends BaseSPAPageObject {
 	 * Returns the number of entries found, or 0 if none appear within the timeout.
 	 * The useUserInteractions hook has a 10-second internal timeout that can cause
 	 * history data loading to fail in test environments, so this method is lenient.
-	 * @param minCount
-	 * @param timeout
 	 */
 	async waitForEntries(
-		minCount: number = 1,
-		timeout: number = 30_000,
+		minCount = 1,
+		timeout = 30_000,
 	): Promise<number> {
 		try {
 			await this.page
@@ -58,14 +53,14 @@ export class HistoryPage extends BaseSPAPageObject {
 				.first()
 				.waitFor({ state: "visible", timeout });
 			// Give a moment for all entries to render
-			await this.page.waitForTimeout(500);
+			await this.page.waitForTimeout(ENTRY_RENDER_SETTLE_WAIT_MS);
 			const count = await this.getEntryCount();
 			if (count >= minCount) {
 				return count;
 			}
 			// Wait a bit longer for additional entries
-			await this.page.waitForTimeout(2_000);
-			return this.getEntryCount();
+			await this.page.waitForTimeout(ADDITIONAL_ENTRIES_WAIT_MS);
+			return await this.getEntryCount();
 		} catch {
 			return 0;
 		}
@@ -77,7 +72,6 @@ export class HistoryPage extends BaseSPAPageObject {
 	 * inside a Group with gap="xs" within each Card's Stack.
 	 * We target the Badge label specifically to get the text content,
 	 * avoiding any wrapper elements that might interfere.
-	 * @param cardIndex
 	 */
 	async getEntityTypeBadge(cardIndex: number): Promise<string | null> {
 		const card = this.page
@@ -105,7 +99,7 @@ export class HistoryPage extends BaseSPAPageObject {
 		for (let index = 0; index < count; index++) {
 			const firstText = cards.nth(index).locator(".mantine-Text-root").first();
 			const text = await firstText.textContent();
-			if (text) {
+			if (text !== null) {
 				titles.push(text.trim());
 			}
 		}
@@ -124,7 +118,7 @@ export class HistoryPage extends BaseSPAPageObject {
 				const buttons = document.querySelectorAll("button");
 				for (const button of buttons) {
 					if (
-						button.textContent?.includes("Clear History") &&
+						button.textContent.includes("Clear History") &&
 						!button.disabled &&
 						button.dataset.disabled !== "true"
 					) {

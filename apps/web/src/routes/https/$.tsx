@@ -3,7 +3,7 @@ import { lazy } from "react";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const HttpsRoute = lazy(() => import("./$.lazy"));
+const HttpsRoute = lazy(async () => import("./$.lazy"));
 
 export const Route = createFileRoute("/https/$")({
   component: () => (

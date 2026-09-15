@@ -131,15 +131,15 @@ test.describe('Data Version Parameter in API Requests (T041)', () => {
       (request) => request.hasDataVersion && request.dataVersionValue === '1'
     );
 
-    console.log(`Intercepted ${interceptedRequests.length} total API requests`);
-    console.log(`Found ${requestsWithVersion1.length} requests with data_version=1`);
+    console.log(`Intercepted ${String(interceptedRequests.length)} total API requests`);
+    console.log(`Found ${String(requestsWithVersion1.length)} requests with data_version=1`);
 
     expect(interceptedRequests.length).toBeGreaterThan(0);
     expect(requestsWithVersion1.length).toBeGreaterThan(0);
 
     // Log details of captured requests
     for (const [index, request] of interceptedRequests.entries()) {
-      console.log(`Request ${index + 1}:`, {
+      console.log(`Request ${String(index + 1)}:`, {
         path: request.url.split('?', 1)[0],
         hasDataVersion: request.hasDataVersion,
         dataVersion: request.dataVersionValue,
@@ -233,8 +233,8 @@ test.describe('Data Version Parameter in API Requests (T041)', () => {
       (request) => request.hasDataVersion && request.dataVersionValue === '2'
     );
 
-    console.log(`Intercepted ${interceptedRequests.length} API requests`);
-    console.log(`Found ${requestsWithVersion2.length} requests with data_version=2`);
+    console.log(`Intercepted ${String(interceptedRequests.length)} API requests`);
+    console.log(`Found ${String(requestsWithVersion2.length)} requests with data_version=2`);
 
     expect(interceptedRequests.length).toBeGreaterThan(0);
     expect(requestsWithVersion2.length).toBeGreaterThan(0);
@@ -326,8 +326,8 @@ test.describe('Data Version Parameter in API Requests (T041)', () => {
       (request) => request.hasDataVersion
     );
 
-    console.log(`Intercepted ${interceptedRequests.length} API requests`);
-    console.log(`Found ${requestsWithDataVersion.length} requests with data_version parameter`);
+    console.log(`Intercepted ${String(interceptedRequests.length)} API requests`);
+    console.log(`Found ${String(requestsWithDataVersion.length)} requests with data_version parameter`);
 
     // When Auto is selected (undefined), no data_version parameter should be sent
     // This allows the backend to use its default (v2)
@@ -350,11 +350,11 @@ test.describe('Data Version Parameter in API Requests (T041)', () => {
     // Clear any existing settings from IndexedDB and browser cache
     // Must navigate to app origin before accessing IndexedDB (about:blank context denies access)
     await page.goto('#/');
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       return new Promise<void>((resolve) => {
         const request = indexedDB.deleteDatabase('bibgraph-settings');
-        request.onsuccess = () => resolve();
-        request.onerror = () => resolve();
+        request.onsuccess = () => { resolve(); };
+        request.onerror = () => { resolve(); };
       });
     });
 
@@ -395,8 +395,8 @@ test.describe('Data Version Parameter in API Requests (T041)', () => {
       (request) => request.hasDataVersion
     );
 
-    console.log(`Intercepted ${interceptedRequests.length} API requests`);
-    console.log(`Found ${requestsWithDataVersion.length} requests with data_version`);
+    console.log(`Intercepted ${String(interceptedRequests.length)} API requests`);
+    console.log(`Found ${String(requestsWithDataVersion.length)} requests with data_version`);
 
     // If no requests were intercepted (cached), skip the test
     if (interceptedRequests.length === 0) {
@@ -505,8 +505,8 @@ test.describe('Data Version Parameter in API Requests (T041)', () => {
       (request) => request.hasDataVersion && request.dataVersionValue === '1'
     );
 
-    console.log(`Total API requests: ${allInterceptedRequests.length}`);
-    console.log(`Requests with data_version=1: ${actualVersion1Requests.length}`);
+    console.log(`Total API requests: ${String(allInterceptedRequests.length)}`);
+    console.log(`Requests with data_version=1: ${String(actualVersion1Requests.length)}`);
 
     expect(allInterceptedRequests.length).toBeGreaterThan(0);
     expect(isAllHaveVersion1).toBe(true);
@@ -600,8 +600,8 @@ test.describe('Data Version Parameter in API Requests (T041)', () => {
       (request) => request.hasDataVersion && request.dataVersionValue === '1'
     );
 
-    console.log(`API requests after refresh: ${interceptedRequests.length}`);
-    console.log(`Requests with persisted data_version=1: ${version1Requests.length}`);
+    console.log(`API requests after refresh: ${String(interceptedRequests.length)}`);
+    console.log(`Requests with persisted data_version=1: ${String(version1Requests.length)}`);
 
     expect(interceptedRequests.length).toBeGreaterThan(0);
     expect(version1Requests.length).toBeGreaterThan(0);
@@ -646,7 +646,7 @@ test.describe('Data Version Parameter in API Requests (T041)', () => {
       const selectorOptions = page.locator(`[data-testid="data-version-selector"] option`);
       const optionCount = await selectorOptions.count().catch(() => 0);
 
-      console.log(`Version selector options count: ${optionCount}`);
+      console.log(`Version selector options count: ${String(optionCount)}`);
       expect(optionCount).toBeGreaterThan(0);
     } else {
       console.log('ℹ️ Version selector not visible - may be behind menu or conditional rendering');

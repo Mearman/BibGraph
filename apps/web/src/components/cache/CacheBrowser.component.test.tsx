@@ -1,7 +1,6 @@
-/**
- * @vitest-environment jsdom
- */
+// @vitest-environment jsdom
 
+import type * as BibgraphUi from "@bibgraph/ui";
 import { MantineProvider } from "@mantine/core";
 import { cleanup,render, screen } from "@testing-library/react";
 import { afterEach,describe, expect, it, vi } from "vitest";
@@ -48,11 +47,11 @@ vi.mock("@tanstack/react-router", () => ({
 
 // Mock the shared data grid
 vi.mock("@bibgraph/ui", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@bibgraph/ui")>();
+  const original = await importOriginal<typeof BibgraphUi>();
   return {
     ...original,
     DataTable: ({ data }: { data: unknown[] }) => (
-      <div data-testid="data-table">{data?.length || 0} rows</div>
+      <div data-testid="data-table">{data.length || 0} rows</div>
     ),
   };
 });

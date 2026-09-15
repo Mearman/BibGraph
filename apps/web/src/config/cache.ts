@@ -1,86 +1,105 @@
 /**
- * Cache configuration for BibGraph
- * Defines caching strategies optimized for different OpenAlex entity types
+ * Cache configuration for BibGraph Defines caching strategies optimized for different OpenAlex entity types
  */
 
+const MILLISECONDS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const DAYS_PER_WEEK = 7;
+const DAYS_PER_MONTH = 30;
+const DAYS_PER_QUARTER = 90;
+const DAYS_FOR_AUTHOR_RETENTION = 3;
+const HOURS_FOR_AUTHOR_STALE = 12;
+const HOURS_FOR_RELATED_STALE = 6;
+const DEFAULT_STALE_MINUTES = 5;
+const BYTES_PER_KILOBYTE = 1024;
+const MAX_CACHE_SIZE_MEGABYTES = 100;
+const DEFAULT_RETRY_ATTEMPTS = 3;
+
+const ONE_MINUTE_MS = MILLISECONDS_PER_SECOND * SECONDS_PER_MINUTE;
+const ONE_HOUR_MS = ONE_MINUTE_MS * MINUTES_PER_HOUR;
+const ONE_DAY_MS = ONE_HOUR_MS * HOURS_PER_DAY;
+const ONE_WEEK_MS = ONE_DAY_MS * DAYS_PER_WEEK;
+const ONE_MONTH_MS = ONE_DAY_MS * DAYS_PER_MONTH;
+const ONE_QUARTER_MS = ONE_DAY_MS * DAYS_PER_QUARTER;
+
 export const CACHE_CONFIG = {
-  // Maximum cache age for persistence (7 days)
-  maxAge: 1000 * 60 * 60 * 24 * 7,
+  // Maximum cache age for persistence (1 week)
+  maxAge: ONE_WEEK_MS,
 
   // Maximum cache size in bytes (100MB)
-  maxSize: 100 * 1024 * 1024,
+  maxSize: MAX_CACHE_SIZE_MEGABYTES * BYTES_PER_KILOBYTE * BYTES_PER_KILOBYTE,
 
   // Compress responses larger than this threshold (1KB)
-  compressionThreshold: 1024,
+  compressionThreshold: BYTES_PER_KILOBYTE,
 
   // Default retry configuration
-  defaultRetries: 3,
+  defaultRetries: DEFAULT_RETRY_ATTEMPTS,
 
-  // Default stale time (5 minutes)
-  defaultStaleTime: 1000 * 60 * 5,
+  // Default stale time
+  defaultStaleTime: DEFAULT_STALE_MINUTES * ONE_MINUTE_MS,
 } as const;
 
 /**
- * Entity-specific cache times optimized for data stability
- * Stale time: When data is considered stale and should be refetched
- * GC time: How long to keep data in cache after last access
+ * Entity-specific cache times optimized for data stability Stale time: When data is considered stale and should be refetched GC time: How long to keep data in cache after last access
  */
 export const ENTITY_CACHE_TIMES = {
   works: {
-    stale: 1000 * 60 * 60 * 24, // 1 day - works rarely change after publication
-    gc: 1000 * 60 * 60 * 24 * 7, // 7 days - keep for a week
+    stale: ONE_DAY_MS, // works rarely change after publication
+    gc: ONE_WEEK_MS, // keep for a week
   },
   authors: {
-    stale: 1000 * 60 * 60 * 12, // 12 hours - author info updates moderately
-    gc: 1000 * 60 * 60 * 24 * 3, // 3 days - keep for 3 days
+    stale: HOURS_FOR_AUTHOR_STALE * ONE_HOUR_MS, // author info updates moderately
+    gc: DAYS_FOR_AUTHOR_RETENTION * ONE_DAY_MS, // keep for a few days
   },
   sources: {
-    stale: 1000 * 60 * 60 * 24 * 7, // 7 days - journals/sources very stable
-    gc: 1000 * 60 * 60 * 24 * 30, // 30 days - keep for a month
+    stale: ONE_WEEK_MS, // journals/sources very stable
+    gc: ONE_MONTH_MS, // keep for a month
   },
   institutions: {
-    stale: 1000 * 60 * 60 * 24 * 30, // 30 days - institutions very stable
-    gc: 1000 * 60 * 60 * 24 * 90, // 90 days - keep for 3 months
+    stale: ONE_MONTH_MS, // institutions very stable
+    gc: ONE_QUARTER_MS, // keep for a quarter
   },
   topics: {
-    stale: 1000 * 60 * 60 * 24 * 7, // 7 days - topics fairly stable
-    gc: 1000 * 60 * 60 * 24 * 30, // 30 days - keep for a month
+    stale: ONE_WEEK_MS, // topics fairly stable
+    gc: ONE_MONTH_MS, // keep for a month
   },
   publishers: {
-    stale: 1000 * 60 * 60 * 24 * 30, // 30 days - publishers very stable
-    gc: 1000 * 60 * 60 * 24 * 90, // 90 days - keep for 3 months
+    stale: ONE_MONTH_MS, // publishers very stable
+    gc: ONE_QUARTER_MS, // keep for a quarter
   },
   funders: {
-    stale: 1000 * 60 * 60 * 24 * 30, // 30 days - funders very stable
-    gc: 1000 * 60 * 60 * 24 * 90, // 90 days - keep for 3 months
+    stale: ONE_MONTH_MS, // funders very stable
+    gc: ONE_QUARTER_MS, // keep for a quarter
   },
   keywords: {
-    stale: 1000 * 60 * 60 * 24 * 7, // 7 days - keywords fairly stable
-    gc: 1000 * 60 * 60 * 24 * 30, // 30 days - keep for a month
+    stale: ONE_WEEK_MS, // keywords fairly stable
+    gc: ONE_MONTH_MS, // keep for a month
   },
   concepts: {
-    stale: 1000 * 60 * 60 * 24 * 7, // 7 days - concepts fairly stable
-    gc: 1000 * 60 * 60 * 24 * 30, // 30 days - keep for a month
+    stale: ONE_WEEK_MS, // concepts fairly stable
+    gc: ONE_MONTH_MS, // keep for a month
   },
   search: {
-    stale: 1000 * 60 * 5, // 5 minutes - search results need freshness
-    gc: 1000 * 60 * 60, // 1 hour - don't keep search results long
+    stale: DEFAULT_STALE_MINUTES * ONE_MINUTE_MS, // search results need freshness
+    gc: ONE_HOUR_MS, // don't keep search results long
   },
   related: {
-    stale: 1000 * 60 * 60 * 6, // 6 hours - related entities update occasionally
-    gc: 1000 * 60 * 60 * 24, // 1 day - related data doesn't need long storage
+    stale: HOURS_FOR_RELATED_STALE * ONE_HOUR_MS, // related entities update occasionally
+    gc: ONE_DAY_MS, // related data doesn't need long storage
   },
   domains: {
-    stale: 1000 * 60 * 60 * 24 * 7, // 7 days - domains fairly stable
-    gc: 1000 * 60 * 60 * 24 * 30, // 30 days - keep for a month
+    stale: ONE_WEEK_MS, // domains fairly stable
+    gc: ONE_MONTH_MS, // keep for a month
   },
   fields: {
-    stale: 1000 * 60 * 60 * 24 * 7, // 7 days - fields fairly stable
-    gc: 1000 * 60 * 60 * 24 * 30, // 30 days - keep for a month
+    stale: ONE_WEEK_MS, // fields fairly stable
+    gc: ONE_MONTH_MS, // keep for a month
   },
   subfields: {
-    stale: 1000 * 60 * 60 * 24 * 7, // 7 days - subfields fairly stable
-    gc: 1000 * 60 * 60 * 24 * 30, // 30 days - keep for a month
+    stale: ONE_WEEK_MS, // subfields fairly stable
+    gc: ONE_MONTH_MS, // keep for a month
   },
 } as const;
 
@@ -91,6 +110,5 @@ export type CacheKeyType = keyof typeof ENTITY_CACHE_TIMES;
 
 /**
  * Get cache configuration for a specific cache key
- * @param cacheKey
  */
 export const getCacheConfig = (cacheKey: CacheKeyType) => ENTITY_CACHE_TIMES[cacheKey];

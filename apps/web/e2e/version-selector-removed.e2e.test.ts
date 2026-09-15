@@ -17,6 +17,10 @@
 
 import { expect,test } from "@playwright/test";
 
+const MIN_PAGE_CONTENT_LENGTH = 100;
+const SETTINGS_LOAD_TIMEOUT_MS = 10_000;
+const MAX_LABEL_CHECK_INPUTS = 3;
+
 test.describe("Data Version Selector Removal After November 2025", () => {
   test("should hide data version selector when date is December 1, 2025", async ({
     page,
@@ -31,8 +35,8 @@ test.describe("Data Version Selector Removal After November 2025", () => {
     // Verify page loaded successfully
     const bodyText = page.locator('body');
     await expect(bodyText).not.toBeEmpty();
-    const textLength = await bodyText.evaluate((element) => element.textContent?.length ?? 0);
-    expect(textLength).toBeGreaterThan(100);
+    const textLength = await bodyText.evaluate((element) => element.textContent.length);
+    expect(textLength).toBeGreaterThan(MIN_PAGE_CONTENT_LENGTH);
 
     // Verify data version selector is NOT visible
     const dataVersionSelector = page.getByTestId("data-version-selector");
@@ -123,22 +127,22 @@ test.describe("Data Version Selector Removal After November 2025", () => {
     const switchInput = xpacToggle.locator('input[type="checkbox"]');
 
     // Verify initial state is checked
-    const initialChecked = switchInput;
-    await expect(initialChecked).toBeChecked();
+    
+    await expect(switchInput).toBeChecked();
 
     // Toggle OFF
     await switchInput.click();
 
     // Verify state changed
-    const afterToggleChecked = switchInput;
-    await expect(afterToggleChecked).not.toBeChecked();
+    
+    await expect(switchInput).not.toBeChecked();
 
     // Toggle back ON
     await switchInput.click();
 
     // Verify state changed back
-    const finalChecked = switchInput;
-    await expect(finalChecked).toBeChecked();
+    
+    await expect(switchInput).toBeChecked();
 
     console.log("✅ XpacToggle functions correctly when selector is hidden");
   });
@@ -215,12 +219,12 @@ test.describe("Data Version Selector Removal After November 2025", () => {
 
     // Verify form inputs have labels or accessible names
     const inputs = page.locator("input");
-    for (let index = 0; index < Math.min(3, await inputs.count()); index++) {
+    for (let index = 0; index < Math.min(MAX_LABEL_CHECK_INPUTS, await inputs.count()); index++) {
       const input = inputs.nth(index);
       const hasLabel =
-        (await input.getAttribute("aria-label")) ||
-        (await input.getAttribute("placeholder")) ||
-        (await input.getAttribute("title"));
+        (await input.getAttribute("aria-label")) !== null ||
+        (await input.getAttribute("placeholder")) !== null ||
+        (await input.getAttribute("title")) !== null;
       expect(hasLabel).toBeTruthy();
     }
 
@@ -419,7 +423,7 @@ test.describe("Data Version Selector Removal After November 2025", () => {
     expect(relevantErrors).toHaveLength(0);
 
     console.log(
-      `✅ No critical console errors when selector is hidden (${errorMessages.length} other warnings)`
+      `✅ No critical console errors when selector is hidden (${String(errorMessages.length)} other warnings)`
     );
   });
 
@@ -439,16 +443,16 @@ test.describe("Data Version Selector Removal After November 2025", () => {
     const loadTime = Date.now() - startTime;
 
     // Page should load within reasonable time (< 10 seconds)
-    expect(loadTime).toBeLessThan(10_000);
+    expect(loadTime).toBeLessThan(SETTINGS_LOAD_TIMEOUT_MS);
 
     // Verify page is fully rendered
     const bodyText = page.locator('body');
     await expect(bodyText).not.toBeEmpty();
-    const textLength = await bodyText.evaluate((element) => element.textContent?.length ?? 0);
-    expect(textLength).toBeGreaterThan(100);
+    const textLength = await bodyText.evaluate((element) => element.textContent.length);
+    expect(textLength).toBeGreaterThan(MIN_PAGE_CONTENT_LENGTH);
 
     console.log(
-      `✅ Settings page loaded successfully in ${loadTime}ms without selector`
+      `✅ Settings page loaded successfully in ${String(loadTime)}ms without selector`
     );
   });
 

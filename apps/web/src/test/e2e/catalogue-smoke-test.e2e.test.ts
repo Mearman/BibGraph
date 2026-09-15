@@ -71,7 +71,7 @@ test.describe("Catalogue Smoke Test", () => {
     await page.evaluate(() => {
       try {
         // Check if catalogueService is available on window
-        return (window as any).catalogueService !== undefined;
+        return 'catalogueService' in window;
       } catch {
         return false;
       }

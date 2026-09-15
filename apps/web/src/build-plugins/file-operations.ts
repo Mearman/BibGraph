@@ -10,7 +10,6 @@ import { determineCanonicalQueryUrl, generateDescriptiveFilename } from "./url-e
 
 /**
  * Ensure consistent JSON formatting for all files
- * @param jsonContent
  */
 export const formatJsonConsistently = (jsonContent: string): string => {
   try {
@@ -25,8 +24,6 @@ export const formatJsonConsistently = (jsonContent: string): string => {
 
 /**
  * Reformat existing JSON files for consistency
- * @param dataPath
- * @param entityType
  */
 export const reformatExistingFiles = async (
   dataPath: string,
@@ -71,8 +68,6 @@ export const reformatExistingFiles = async (
 
 /**
  * Migrate query files from queries subdirectory to entity directory with simplified names
- * @param dataPath
- * @param entityType
  */
 export const migrateQueryFilesToEntityDirectory = async (
   dataPath: string,
@@ -106,11 +101,11 @@ export const migrateQueryFilesToEntityDirectory = async (
           fileContent,
         );
 
-        if (canonicalUrl) {
+        if (canonicalUrl !== null && canonicalUrl !== "") {
           // Generate the simplified filename
           const newFilename = generateDescriptiveFilename(canonicalUrl);
 
-          if (newFilename) {
+          if (newFilename !== null && newFilename !== "") {
             const newFilePath = join(entityDir, newFilename);
 
             // Check if the target file already exists

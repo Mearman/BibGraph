@@ -134,7 +134,8 @@ describe('Entity Type Filter with Graph List Bypass (T035)', () => {
       const visible = applyEntityTypeFilter(allNodes, selectedTypes);
 
       // Only graph list nodes visible (all bypass filter)
-      expect(visible).toHaveLength(3); // W1, A1, I1
+      const EXPECTED_GRAPH_LIST_NODE_COUNT = 3; // W1, A1, I1
+      expect(visible).toHaveLength(EXPECTED_GRAPH_LIST_NODE_COUNT);
       expect(visible.every(n => n.entityData?.sourceId === 'catalogue:graph-list')).toBe(true);
     });
 
@@ -162,7 +163,8 @@ describe('Entity Type Filter with Graph List Bypass (T035)', () => {
       const visible = applyEntityTypeFilter(allNodes, selectedTypes);
 
       const graphListNodes = visible.filter(n => n.entityData?.sourceId === 'catalogue:graph-list');
-      expect(graphListNodes).toHaveLength(3); // All graph list nodes visible
+      const EXPECTED_GRAPH_LIST_NODE_COUNT = 3; // All graph list nodes visible
+      expect(graphListNodes).toHaveLength(EXPECTED_GRAPH_LIST_NODE_COUNT);
     });
 
     it('should bypass filter for nodes with graph-list provenance', () => {
@@ -258,23 +260,25 @@ describe('Entity Type Filter with Graph List Bypass (T035)', () => {
 
       const visible = applyEntityTypeFilter(allNodes, selectedTypes);
 
-      // Set A: All graph list nodes (3 nodes)
+      // Set A: All graph list nodes
+      const EXPECTED_GRAPH_LIST_COUNT = 3;
       const graphListCount = visible.filter(n =>
         n.entityData?.sourceId === 'catalogue:graph-list' ||
-        n.entityData?._graphListProvenance
+        n.entityData?._graphListProvenance !== undefined
       ).length;
-      expect(graphListCount).toBe(3);
+      expect(graphListCount).toBe(EXPECTED_GRAPH_LIST_COUNT);
 
-      // Set B: Collection nodes matching type filter (2 works from collections)
+      // Set B: Collection nodes matching type filter (W2, W3)
+      const EXPECTED_COLLECTION_WORKS_COUNT = 2;
       const collectionWorksCount = visible.filter(n =>
         n.entityData?.sourceId !== 'catalogue:graph-list' &&
-        !n.entityData?._graphListProvenance &&
+        n.entityData?._graphListProvenance === undefined &&
         n.entityType === 'works'
       ).length;
-      expect(collectionWorksCount).toBe(2); // W2, W3
+      expect(collectionWorksCount).toBe(EXPECTED_COLLECTION_WORKS_COUNT);
 
-      // Union: 3 + 2 = 5 total
-      expect(visible).toHaveLength(5);
+      // Union: graph list count + collection works count total
+      expect(visible).toHaveLength(EXPECTED_GRAPH_LIST_COUNT + EXPECTED_COLLECTION_WORKS_COUNT);
     });
 
     it('should handle overlap: node in both graph list and matching filter', () => {

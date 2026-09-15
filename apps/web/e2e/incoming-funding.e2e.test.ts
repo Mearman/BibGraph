@@ -1,6 +1,5 @@
 /**
  * E2E tests for incoming funding relationships on funder detail pages
- * @module incoming-funding.e2e
  * @see specs/016-entity-relationship-viz/spec.md (User Story 1)
  */
 

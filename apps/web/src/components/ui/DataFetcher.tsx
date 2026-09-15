@@ -13,6 +13,10 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import { CardSkeleton, GraphSkeleton, ListSkeleton, StatsSkeleton } from "./LoadingSkeleton";
 import { useToast } from "./ToastNotification";
 
+const DEFAULT_SKELETON_ITEM_COUNT = 3;
+const DEFAULT_PAGINATION_INITIAL_PAGE = 1;
+const DEFAULT_PAGINATION_PER_PAGE = 25;
+
 export interface DataFetcherConfig<T> {
   /**
   Function to fetch data
@@ -107,7 +111,6 @@ export interface DataFetcherProps<T> {
 
 /**
  * Hook for data fetching with integrated error handling and toasts
- * @param config
  */
 export const useDataFetcher = <T,>(config: DataFetcherConfig<T>) => {
   const toast = useToast();
@@ -125,8 +128,8 @@ export const useDataFetcher = <T,>(config: DataFetcherConfig<T>) => {
       setData(result);
 
       // Show success toast if enabled
-      if (config.showSuccessToast && retryCount === 0) {
-        toast.success(config.successMessage || "Data loaded successfully");
+      if (config.showSuccessToast === true && retryCount === 0) {
+        toast.success(config.successMessage ?? "Data loaded successfully");
       }
 
       setRetryCount(0);
@@ -136,34 +139,34 @@ export const useDataFetcher = <T,>(config: DataFetcherConfig<T>) => {
       setError(errorObject);
 
       // Show error toast if enabled
-      if (config.showErrorToast) {
-        toast.error(config.errorMessage || errorObject.message);
+      if (config.showErrorToast === true) {
+        toast.error(config.errorMessage ?? errorObject.message);
       }
 
       // Handle retry logic with enhanced visibility
       if (config.retry && retryCount < config.retry.maxAttempts) {
         const nextRetryCount = retryCount + 1;
-        const backoffMultiplier = config.retry.backoffMultiplier || 1;
+        const backoffMultiplier = config.retry.backoffMultiplier ?? 1;
         const delay = config.retry.delay * Math.pow(backoffMultiplier, retryCount);
 
         setRetryCount(nextRetryCount);
 
         // Show retry status toast if enabled
-        if (config.showRetryStatus) {
+        if (config.showRetryStatus === true) {
           const remainingAttempts = config.retry.maxAttempts - nextRetryCount;
           toast.info(
-            `Retrying... Attempt ${nextRetryCount} of ${config.retry.maxAttempts} (${remainingAttempts} remaining)`,
+            `Retrying... Attempt ${String(nextRetryCount)} of ${String(config.retry.maxAttempts)} (${String(remainingAttempts)} remaining)`,
             { autoClose: delay }
           );
         }
 
         setTimeout(() => {
-          executeFetch();
+          void executeFetch();
         }, delay);
-      } else if (config.retry && retryCount >= config.retry.maxAttempts && config.showErrorToast) {
+      } else if (config.retry && retryCount >= config.retry.maxAttempts && config.showErrorToast === true) {
         // Show final failure message when all retries exhausted
         toast.error(
-          config.errorMessage || `Failed after ${config.retry.maxAttempts} attempts. Please try again later.`
+          config.errorMessage ?? `Failed after ${String(config.retry.maxAttempts)} attempts. Please try again later.`
         );
       }
 
@@ -178,11 +181,14 @@ export const useDataFetcher = <T,>(config: DataFetcherConfig<T>) => {
     await executeFetch();
   }, [executeFetch]);
 
+  // Serialized so the effect depends on the deps array's contents, not its (potentially unstable) reference identity.
+  const depsSignature = config.deps ? JSON.stringify(config.deps) : "";
+
   useEffect(() => {
     if (config.fetchOnMount !== false) {
-      executeFetch();
+      void executeFetch();
     }
-  }, [executeFetch, ...(config.deps || [])]);
+  }, [executeFetch, config.fetchOnMount, depsSignature]);
 
   return {
     data,
@@ -195,40 +201,38 @@ export const useDataFetcher = <T,>(config: DataFetcherConfig<T>) => {
 
 /**
  * Data Fetcher Component that provides integrated UI and state management
- * @param root0
- * @param root0.config
- * @param root0.children
  */
 export const DataFetcher = <T,>({ config, children }: DataFetcherProps<T>) => {
   const { data, loading, error, refetch, retryCount } = useDataFetcher(config);
 
   // Check if data is empty
-  const isEmpty = config.isEmpty ? (data !== undefined && config.isEmpty(data)) : !data;
+  const isEmpty = config.isEmpty ? (data !== undefined && config.isEmpty(data)) : data === undefined;
 
   // Handle loading state
   if (loading) {
-    if (config.loadingComponent) {
+    if (config.loadingComponent !== undefined) {
       return <>{config.loadingComponent}</>;
     }
 
-    const SkeletonComponent = {
+    const skeletonComponents = {
       card: CardSkeleton,
       list: ListSkeleton,
       graph: GraphSkeleton,
       stats: StatsSkeleton,
       text: ListSkeleton,
       table: ListSkeleton,
-    }[config.skeletonType || "card"] || CardSkeleton;
+    } as const;
+    const SkeletonComponent = skeletonComponents[config.skeletonType ?? "card"];
 
     if (config.skeletonType === "list" || config.skeletonType === "text" || config.skeletonType === "table") {
-      return <SkeletonComponent items={config.skeletonCount || 3} />;
+      return <SkeletonComponent items={config.skeletonCount ?? DEFAULT_SKELETON_ITEM_COUNT} />;
     }
     return <SkeletonComponent />;
   }
 
   // Handle error state
-  if (error && !config.retry?.maxAttempts) {
-    if (config.errorComponent) {
+  if (error && (config.retry?.maxAttempts ?? 0) === 0) {
+    if (config.errorComponent !== undefined) {
       return <>{config.errorComponent}</>;
     }
 
@@ -236,8 +240,8 @@ export const DataFetcher = <T,>({ config, children }: DataFetcherProps<T>) => {
       <ErrorBoundary
         showRetry={true}
         title="Data Loading Error"
-        description={config.errorMessage || error.message}
-        onError={() => refetch()}
+        description={config.errorMessage ?? error.message}
+        onError={() => { void refetch(); }}
       >
         <div>Failed to load data</div>
       </ErrorBoundary>
@@ -245,9 +249,9 @@ export const DataFetcher = <T,>({ config, children }: DataFetcherProps<T>) => {
   }
 
   // Handle empty state
-  if (isEmpty && !loading && !error && config.emptyComponent) {
-      return <>{config.emptyComponent}</>;
-    }
+  if (isEmpty && !error && config.emptyComponent !== undefined) {
+    return <>{config.emptyComponent}</>;
+  }
 
   // Render children with state
   return <>{children({ data, loading, error, refetch, retryCount })}</>;
@@ -255,11 +259,6 @@ export const DataFetcher = <T,>({ config, children }: DataFetcherProps<T>) => {
 
 /**
  * Specialized fetcher for API responses with count and results
- * @param fetchFn
- * @param options
- * @param options.initialPage
- * @param options.perPage
- * @param options.autoFetch
  */
 export const usePaginatedFetcher = <T,>(fetchFn: (page?: number, perPage?: number) => Promise<{
     results: T[];
@@ -271,8 +270,8 @@ export const usePaginatedFetcher = <T,>(fetchFn: (page?: number, perPage?: numbe
     perPage?: number;
     autoFetch?: boolean;
   }) => {
-  const [page, setPage] = useState(options?.initialPage || 1);
-  const [perPage, setPerPage] = useState(options?.perPage || 25);
+  const [page, setPage] = useState(options?.initialPage ?? DEFAULT_PAGINATION_INITIAL_PAGE);
+  const [perPage, setPerPage] = useState(options?.perPage ?? DEFAULT_PAGINATION_PER_PAGE);
   const [pagination, setPagination] = useState<{
     results: T[];
     count: number;
@@ -281,12 +280,12 @@ export const usePaginatedFetcher = <T,>(fetchFn: (page?: number, perPage?: numbe
   }>({
     results: [],
     count: 0,
-    page: 1,
-    perPage: 25,
+    page: DEFAULT_PAGINATION_INITIAL_PAGE,
+    perPage: DEFAULT_PAGINATION_PER_PAGE,
   });
 
   const { loading, error, refetch } = useDataFetcher({
-    fetchFn: () => fetchFn(page, perPage),
+    fetchFn: async () => fetchFn(page, perPage),
     deps: [page, perPage],
     fetchOnMount: options?.autoFetch !== false,
     showSuccessToast: false,
@@ -304,13 +303,13 @@ export const usePaginatedFetcher = <T,>(fetchFn: (page?: number, perPage?: numbe
     };
 
     if (options?.autoFetch !== false) {
-      loadData();
+      void loadData();
     }
   }, [page, perPage, fetchFn, options?.autoFetch]);
 
-  const nextPage = () => setPage((previous) => previous + 1);
-  const previousPage = () => setPage((previous) => Math.max(1, previous - 1));
-  const goToPage = (newPage: number) => setPage(Math.max(1, newPage));
+  const nextPage = () => { setPage((previous) => previous + 1); };
+  const previousPage = () => { setPage((previous) => Math.max(1, previous - 1)); };
+  const goToPage = (newPage: number) => { setPage(Math.max(1, newPage)); };
   const changePerPage = (newPerPage: number) => {
     setPerPage(newPerPage);
     setPage(1); // Reset to first page
@@ -335,20 +334,23 @@ export const usePaginatedFetcher = <T,>(fetchFn: (page?: number, perPage?: numbe
 };;
 
 /**
- * Higher-order component for adding data fetching to existing components
- * @param Component
- * @param config
+ * Higher-order component for adding data fetching to existing components.
+ *
+ * `P` is the wrapped component's own props, excluding the fetcher state - `Component` must accept `P` merged with the fetcher state, so the merge below type-checks structurally with no type assertion needed.
  */
-export const withDataFetching = <P,>(Component: React.ComponentType<P>, config: DataFetcherConfig<unknown>) => {
-  const WrappedComponent = (properties: Omit<P, keyof ReturnType<typeof useDataFetcher>>) => {
+export const withDataFetching = <P extends object,>(
+  Component: React.ComponentType<P & ReturnType<typeof useDataFetcher<unknown>>>,
+  config: DataFetcherConfig<unknown>
+) => {
+  const WrappedComponent = (properties: Readonly<P>) => {
     return (
       <DataFetcher config={config}>
-        {(state) => <Component {...(properties as P)} {...state} />}
+        {(state) => <Component {...properties} {...state} />}
       </DataFetcher>
     );
   };
 
-  WrappedComponent.displayName = `withDataFetching(${Component.displayName || Component.name})`;
+  WrappedComponent.displayName = `withDataFetching(${Component.displayName ?? Component.name})`;
   return WrappedComponent;
 };;
 

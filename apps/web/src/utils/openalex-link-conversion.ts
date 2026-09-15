@@ -11,13 +11,11 @@ export interface ConvertedLink {
 
 /**
  * Detects if a string is an OpenAlex entity ID (e.g., A5017898742, W1234567890)
- * @param str
  */
 export const isOpenAlexId = (str: string): boolean => /^[ACFIPSTVW]\d+$/.test(str);
 
 /**
  * Gets the entity type from an OpenAlex ID
- * @param id
  */
 export const getEntityTypeFromId = (id: string): string | null => {
   const prefix = id.charAt(0);
@@ -51,21 +49,18 @@ const OPENALEX_ENTITY_PATHS = [
  * - Path + ID: https://openalex.org/works/W1234567890
  * - Path-based: https://openalex.org/fields/17, /keywords/machine-learning
  * - API URLs: https://api.openalex.org/works/W1234567890
- * @param url
  */
 export const convertOpenAlexToInternalLink = (url: string): ConvertedLink => {
-  const originalUrl = url;
-
   // Case 1: Direct entity ID URL (https://openalex.org/W1234567890)
-  const directIdMatch = url.match(/https?:\/\/openalex\.org\/([ACFIPSTVW]\d+)$/i);
+  const directIdMatch = /https?:\/\/openalex\.org\/([ACFIPSTVW]\d+)$/i.exec(url);
   if (directIdMatch) {
     const entityId = directIdMatch[1];
     const entityType = getEntityTypeFromId(entityId);
-    if (entityType) {
+    if (entityType !== null && entityType !== '') {
       return {
         isOpenAlexLink: true,
         internalPath: `/${entityType}/${entityId}`,
-        originalUrl,
+        originalUrl: url,
       };
     }
   }
@@ -76,37 +71,37 @@ export const convertOpenAlexToInternalLink = (url: string): ConvertedLink => {
     String.raw`https?://(?:api\.)?openalex\.org/(${OPENALEX_ENTITY_PATHS.join('|')})/([^/?#]+)`,
     'i'
   );
-  const pathMatch = url.match(entityPathPattern);
+  const pathMatch = entityPathPattern.exec(url);
   if (pathMatch) {
     const entityType = pathMatch[1].toLowerCase();
     const entityId = pathMatch[2];
     return {
       isOpenAlexLink: true,
       internalPath: `/${entityType}/${entityId}`,
-      originalUrl,
+      originalUrl: url,
     };
   }
 
   // Case 3: OpenAlex API URL with query params (https://api.openalex.org/works?filter=...)
-  const apiUrlMatch = url.match(/https?:\/\/api\.openalex\.org\/([^?]+)(\?.*)?/i);
+  const apiUrlMatch = /https?:\/\/api\.openalex\.org\/([^?]+)(\?.*)?/i.exec(url);
   if (apiUrlMatch) {
     const path = apiUrlMatch[1];
     const queryString = apiUrlMatch[2] || '';
     return {
       isOpenAlexLink: true,
       internalPath: `/${path}${queryString}`,
-      originalUrl,
+      originalUrl: url,
     };
   }
 
   // Case 4: Just an OpenAlex ID (A5017898742)
   if (isOpenAlexId(url)) {
     const entityType = getEntityTypeFromId(url);
-    if (entityType) {
+    if (entityType !== null && entityType !== '') {
       return {
         isOpenAlexLink: true,
         internalPath: `/${entityType}/${url}`,
-        originalUrl,
+        originalUrl: url,
       };
     }
   }
@@ -115,21 +110,19 @@ export const convertOpenAlexToInternalLink = (url: string): ConvertedLink => {
   return {
     isOpenAlexLink: false,
     internalPath: url,
-    originalUrl,
+    originalUrl: url,
   };
 };
 
 /**
  * Extracts OpenAlex IDs from a string
- * @param str
  */
 export const extractOpenAlexIds = (str: string): string[] => {
   const matches = str.match(/[ACFIPSTVW]\d+/g);
-  return matches || [];
+  return matches ?? [];
 };
 
 /**
  * Checks if a URL is an OpenAlex URL (entity or API)
- * @param url
  */
 export const isOpenAlexUrl = (url: string): boolean => hostnameMatches(url, 'openalex.org');

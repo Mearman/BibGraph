@@ -1,6 +1,5 @@
 /**
  * Type definitions for entity relationship visualization
- * @module relationship
  * @see specs/016-entity-relationship-viz/data-model.md
  */
 

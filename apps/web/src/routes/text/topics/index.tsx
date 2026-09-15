@@ -14,7 +14,7 @@ import {
 } from "@mantine/core";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
@@ -27,8 +27,8 @@ const textTopicsSearchSchema = z.object({
 
 
 const TextTopicsRoute = () => {
-  const urlSearch = Route.useSearch();
-  const initialTitle = useMemo(() => urlSearch.title || "", [urlSearch.title]);
+  const urlSearch = useSearch({ from: "/text/topics/" });
+  const initialTitle = useMemo(() => urlSearch.title ?? "", [urlSearch.title]);
   const [title, setTitle] = useState(initialTitle);
 
   useEffect(() => {
@@ -58,15 +58,15 @@ const TextTopicsRoute = () => {
 
       logger.debug("text", "Extracting topics from title", { title });
 
-      const topics = await cachedOpenAlex.client.textAnalysis.getTopics({
+      const extractedtopics = await cachedOpenAlex.client.textAnalysis.getTopics({
         title,
       });
 
       logger.debug("text", "Topics extracted", {
-        count: topics.length,
+        count: extractedtopics.length,
       });
 
-      return topics;
+      return extractedtopics;
     },
     enabled: title.trim().length > 0,
     staleTime: 60_000,
@@ -98,7 +98,7 @@ const TextTopicsRoute = () => {
           label="Title or Text"
           placeholder="Enter a research title or abstract to extract topics..."
           value={title}
-          onChange={(event) => handleTitleChange(event.currentTarget.value)}
+          onChange={(event) => { handleTitleChange(event.currentTarget.value); }}
           minRows={3}
           autosize
         />
@@ -170,14 +170,14 @@ const TextTopicsRoute = () => {
                     </Badge>
                   </Group>
 
-                  {(topic.subfield || topic.field) && (
+                  {(topic.subfield !== undefined || topic.field !== undefined) && (
                     <Group gap="md">
-                      {topic.subfield && (
+                      {topic.subfield !== undefined && (
                         <Text size="xs" c="dimmed">
                           Subfield: {topic.subfield.display_name}
                         </Text>
                       )}
-                      {topic.field && (
+                      {topic.field !== undefined && (
                         <Text size="xs" c="dimmed">
                           Field: {topic.field.display_name}
                         </Text>

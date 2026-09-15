@@ -14,7 +14,8 @@ import { BaseSPAPageObject } from '@/test/page-objects/BaseSPAPageObject';
 import { CachePage } from '@/test/page-objects/CachePage';
 
 test.describe('@utility US-26 Cache Management', () => {
-	const BASE_URL = process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173';
+	const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+	const BASE_URL = IS_CI ? 'http://localhost:4173' : 'http://localhost:5173';
 
 	const TEST_ENTITIES = [
 		{ type: 'authors', id: 'A5017898742' },

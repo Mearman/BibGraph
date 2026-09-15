@@ -1,13 +1,12 @@
 /**
- * EmptyState component
- * Provides consistent empty state visuals across the application
- * @module EmptyState
+ * EmptyState component Provides consistent empty state visuals across the application
  */
 
+import type {
+  ButtonProps} from '@mantine/core';
 import {
   Box,
   Button,
-  ButtonProps,
   Card,
   Group,
   Stack,
@@ -71,9 +70,6 @@ export interface EmptyStateProps {
 
 /**
  * Large decorative icon with a subtle background
- * @param root0
- * @param root0.children
- * @param root0.color
  */
 const DecorativeIcon = ({ children, color = 'blue' }: { children: React.ReactNode; color?: 'blue' | 'gray' | 'red' }) => (
   <Box
@@ -119,14 +115,6 @@ const DEFAULT_COLORS: Record<EmptyStateVariant, 'blue' | 'gray' | 'red'> = {
 
 /**
  * EmptyState displays consistent, helpful empty states throughout the application
- * @param root0
- * @param root0.variant
- * @param root0.icon
- * @param root0.title
- * @param root0.description
- * @param root0.actions
- * @param root0.tips
- * @param root0.quickStart
  */
 export const EmptyState = ({
   variant,
@@ -148,7 +136,7 @@ export const EmptyState = ({
         <Title order={2} ta="center">
           {title}
         </Title>
-        {description && (
+        {description !== undefined && (
           <Text c="dimmed" ta="center" size="lg">
             {description}
           </Text>
@@ -229,7 +217,6 @@ export const EmptyState = ({
 export const EmptyStatePresets = {
   /**
    * No data in bookmarks/history/catalogue
-   * @param props
    */
   noBookmarks: (props?: Partial<EmptyStateProps>): EmptyStateProps => ({
     variant: 'no-data',
@@ -245,13 +232,12 @@ export const EmptyStatePresets = {
 
   /**
    * No results after filtering
-   * @param filterCount
    */
   noFilteredResults: (filterCount = 0): EmptyStateProps => ({
     variant: 'no-results',
     title: 'No Matching Results',
     description: filterCount > 0
-      ? `Adjust your ${filterCount} filter${filterCount > 1 ? 's' : ''} to see more results.`
+      ? `Adjust your ${String(filterCount)} filter${filterCount > 1 ? 's' : ''} to see more results.`
       : 'Try adjusting your search or filters.',
     actions: [
       { label: 'Clear Filters', variant: 'light', color: 'gray', leftSection: <IconX size={ICON_SIZE.SM} /> },
@@ -260,12 +246,11 @@ export const EmptyStatePresets = {
 
   /**
    * No search results
-   * @param query
    */
   noSearchResults: (query?: string): EmptyStateProps => ({
     variant: 'no-results',
     title: 'No Results Found',
-    description: query
+    description: (query !== undefined && query !== '')
       ? `No matches found for "${query}"`
       : 'Try different keywords or check your spelling.',
     tips: [

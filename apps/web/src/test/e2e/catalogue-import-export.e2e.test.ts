@@ -4,6 +4,58 @@
 
 import { expect, type Page,test } from "@playwright/test";
 
+// Helper functions
+
+const createTestList = async (page: Page, listName: string): Promise<void> => {
+  await page.locator('button:has-text("Create New List")').click();
+  await expect(page.getByRole('dialog').filter({ hasText: 'Create' })).toBeVisible();
+
+  await page.locator('input:below(:text("Title"))').fill(listName);
+  await page.locator('textarea:below(:text("Description"))').fill(`Test description for ${listName}`);
+
+  await page.locator('button:has-text("Create List")').click();
+  await expect(page.getByRole('dialog').filter({ hasText: 'Create' })).toBeHidden();
+  await expect(page.locator('[data-testid="selected-list-title"]:has-text("' + listName + '")')).toBeVisible({ timeout: 10_000 });
+};
+
+const createListWithMultipleEntities = async (page: Page, listName: string): Promise<void> => {
+  // Create the list first
+  await createTestList(page, listName);
+
+  // Add entities by navigating to their pages
+  const entities = [
+    { id: "A5017898742", type: "authors" },
+    { id: "W4389376197", type: "works" }
+  ];
+
+  for (const entity of entities) {
+    await page.goto(`/#/${entity.type}/${entity.id}`, { timeout: 30_000 });
+    await page.waitForLoadState("networkidle", { timeout: 30_000 });
+
+    const addToCatalogueButton = page.locator('[data-testid="add-to-catalogue-button"]');
+    await expect(addToCatalogueButton).toBeVisible({ timeout: 15_000 });
+    await addToCatalogueButton.click();
+
+    // Modal opens directly with AddToListModal
+    await expect(page.getByRole('dialog').filter({ hasText: 'Add to' })).toBeVisible({ timeout: 10_000 });
+
+    // Select the list from dropdown
+    await page.locator('[data-testid="add-to-list-select"]').click();
+    await page.locator('[role="option"]').first().click();
+
+    // Click Add to List button
+    await page.locator('[data-testid="add-to-list-submit"]').click();
+
+    // Wait for modal to close
+    await expect(page.getByRole('dialog').filter({ hasText: 'Add to' })).not.toBeVisible({ timeout: 5000 });
+    // Removed: waitForTimeout - use locator assertions instead
+  }
+
+  // Navigate back to catalogue page
+  await page.goto("/#/catalogue", { timeout: 30_000 });
+  await page.waitForLoadState("networkidle", { timeout: 30_000 });
+};
+
 test.describe("Catalogue Import/Export Functionality", () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to catalogue page
@@ -95,7 +147,7 @@ test.describe("Catalogue Import/Export Functionality", () => {
 
   test("should handle invalid import data gracefully", async ({ page }) => {
     // Open import modal
-    await page.click('button:has-text("Import")');
+    await page.locator('button:has-text("Import")').click();
     await expect(page.getByRole('dialog', { name: 'Import List' })).toBeVisible();
 
     // Try to import invalid compressed data
@@ -129,7 +181,7 @@ test.describe("Catalogue Import/Export Functionality", () => {
     };
 
     // Open import modal
-    await page.click('button:has-text("Import")');
+    await page.locator('button:has-text("Import")').click();
     await expect(page.getByRole('dialog', { name: 'Import List' })).toBeVisible();
 
     // Find file upload area (using data-testid from ImportModal line 278)
@@ -200,7 +252,7 @@ test.describe("Catalogue Import/Export Functionality", () => {
     };
 
     // Open import modal
-    await page.click('button:has-text("Import")');
+    await page.locator('button:has-text("Import")').click();
     await expect(page.getByRole('dialog', { name: 'Import List' })).toBeVisible();
 
     // Upload file to trigger preview (file upload automatically validates and previews)
@@ -238,58 +290,6 @@ test.describe("Catalogue Import/Export Functionality", () => {
     expect(true).toBe(true);
   });
 });
-
-// Helper functions
-
-const createTestList = async (page: Page, listName: string): Promise<void> => {
-  await page.click('button:has-text("Create New List")');
-  await expect(page.getByRole('dialog').filter({ hasText: 'Create' })).toBeVisible();
-
-  await page.fill('input:below(:text("Title"))', listName);
-  await page.fill('textarea:below(:text("Description"))', `Test description for ${listName}`);
-
-  await page.click('button:has-text("Create List")');
-  await expect(page.getByRole('dialog').filter({ hasText: 'Create' })).toBeHidden();
-  await expect(page.locator('[data-testid="selected-list-title"]:has-text("' + listName + '")')).toBeVisible({ timeout: 10_000 });
-};
-
-const createListWithMultipleEntities = async (page: Page, listName: string): Promise<void> => {
-  // Create the list first
-  await createTestList(page, listName);
-
-  // Add entities by navigating to their pages
-  const entities = [
-    { id: "A5017898742", type: "authors" },
-    { id: "W4389376197", type: "works" }
-  ];
-
-  for (const entity of entities) {
-    await page.goto(`/#/${entity.type}/${entity.id}`, { timeout: 30_000 });
-    await page.waitForLoadState("networkidle", { timeout: 30_000 });
-
-    const addToCatalogueButton = page.locator('[data-testid="add-to-catalogue-button"]');
-    await expect(addToCatalogueButton).toBeVisible({ timeout: 15_000 });
-    await addToCatalogueButton.click();
-
-    // Modal opens directly with AddToListModal
-    await expect(page.getByRole('dialog').filter({ hasText: 'Add to' })).toBeVisible({ timeout: 10_000 });
-
-    // Select the list from dropdown
-    await page.locator('[data-testid="add-to-list-select"]').click();
-    await page.locator('[role="option"]').first().click();
-
-    // Click Add to List button
-    await page.locator('[data-testid="add-to-list-submit"]').click();
-
-    // Wait for modal to close
-    await expect(page.getByRole('dialog').filter({ hasText: 'Add to' })).not.toBeVisible({ timeout: 5000 });
-    // Removed: waitForTimeout - use locator assertions instead
-  }
-
-  // Navigate back to catalogue page
-  await page.goto("/#/catalogue", { timeout: 30_000 });
-  await page.waitForLoadState("networkidle", { timeout: 30_000 });
-};
 
 // Currently unused - kept for potential future use when file download handling is implemented
 // async function exportAndGetCompressedData(page: Page): Promise<string> {

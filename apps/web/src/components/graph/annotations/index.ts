@@ -2,8 +2,6 @@
  * Graph Annotations Module
  *
  * Exports all annotation-related components and utilities.
- *
- * @module components/graph/annotations
  */
 
 export { AnnotationToolbar, TextAnnotationPopover, type DrawingTool } from './AnnotationToolbar';

@@ -1,9 +1,7 @@
 /**
  * Cache-based Graph Data Sources
  *
- * Provides graph data sources from the IndexedDB and memory caches.
- * Since entities are already cached, fetching their data is instant.
- * @module lib/graph-sources/cache-source
+ * Provides graph data sources from the IndexedDB and memory caches. Since entities are already cached, fetching their data is instant.
  */
 
 import {
@@ -19,7 +17,6 @@ import {
 import type { EntityType } from '@bibgraph/types';
 import type {
   GraphDataSource,
-  GraphSourceCategory,
   GraphSourceEntity,
 } from '@bibgraph/utils';
 import {
@@ -32,39 +29,44 @@ import {
 /**
  * Map StaticEntityType to EntityType
  * StaticEntityType is a subset used by the cache
- * @param staticType
  */
-const staticToEntityType = (staticType: string): EntityType | null => {
-  const validTypes: EntityType[] = [
-    'works', 'authors', 'sources', 'institutions',
-    'topics', 'publishers', 'funders', 'concepts',
-    'keywords', 'domains', 'fields', 'subfields',
-  ];
-  return validTypes.includes(staticType as EntityType) ? (staticType as EntityType) : null;
-};
+const VALID_ENTITY_TYPES: readonly string[] = [
+  'works', 'authors', 'sources', 'institutions',
+  'topics', 'publishers', 'funders', 'concepts',
+  'keywords', 'domains', 'fields', 'subfields',
+] satisfies readonly EntityType[];
+
+const isEntityType = (staticType: string): staticType is EntityType =>
+  VALID_ENTITY_TYPES.includes(staticType);
+
+const staticToEntityType = (staticType: string): EntityType | null =>
+  isEntityType(staticType) ? staticType : null;
 
 /**
  * Fetch entity data - will be a cache hit since we're loading from cache
- * @param entityType
- * @param entityId
  */
 const fetchEntityData = async (entityType: EntityType, entityId: string): Promise<Record<string, unknown> | null> => {
   try {
     switch (entityType) {
       case 'works':
-        return await getWorkById(entityId) as unknown as Record<string, unknown>;
+        return await getWorkById(entityId);
       case 'authors':
-        return await getAuthorById(entityId) as unknown as Record<string, unknown>;
+        return await getAuthorById(entityId);
       case 'institutions':
-        return await getInstitutionById(entityId) as unknown as Record<string, unknown>;
+        return await getInstitutionById(entityId);
       case 'sources':
-        return await getSourceById(entityId) as unknown as Record<string, unknown>;
+        return await getSourceById(entityId);
       case 'topics':
-        return await getTopicById(entityId) as unknown as Record<string, unknown>;
+        return await getTopicById(entityId);
       case 'funders':
-        return await getFunderById(entityId) as unknown as Record<string, unknown>;
+        return await getFunderById(entityId);
       case 'publishers':
-        return await getPublisherById(entityId) as unknown as Record<string, unknown>;
+        return await getPublisherById(entityId);
+      case 'concepts':
+      case 'keywords':
+      case 'domains':
+      case 'fields':
+      case 'subfields':
       default:
         return null;
     }
@@ -83,7 +85,7 @@ export const createIndexedDBCacheSource = (): GraphDataSource => {
   return {
     id: sourceId,
     label: 'IndexedDB Cache',
-    category: 'cache' as GraphSourceCategory,
+    category: 'cache',
     description: 'Entities cached in browser IndexedDB (persistent)',
 
     getEntities: async (): Promise<GraphSourceEntity[]> => {
@@ -136,12 +138,8 @@ export const createIndexedDBCacheSource = (): GraphDataSource => {
     },
 
     isAvailable: async (): Promise<boolean> => {
-      try {
-        // Check if IndexedDB is available
-        return typeof indexedDB !== 'undefined';
-      } catch {
-        return false;
-      }
+      await Promise.resolve();
+      return typeof indexedDB !== 'undefined';
     },
   };
 };
@@ -155,7 +153,7 @@ export const createMemoryCacheSource = (): GraphDataSource => {
   return {
     id: sourceId,
     label: 'Memory Cache',
-    category: 'cache' as GraphSourceCategory,
+    category: 'cache',
     description: 'Entities cached in memory (session only)',
 
     getEntities: async (): Promise<GraphSourceEntity[]> => {
@@ -195,9 +193,15 @@ export const createMemoryCacheSource = (): GraphDataSource => {
       return results;
     },
 
-    getEntityCount: async (): Promise<number> => cachedOpenAlex.getMemoryCacheSize(),
+    getEntityCount: async (): Promise<number> => {
+      await Promise.resolve();
+      return cachedOpenAlex.getMemoryCacheSize();
+    },
 
-    isAvailable: async (): Promise<boolean> => true,
+    isAvailable: async (): Promise<boolean> => {
+      await Promise.resolve();
+      return true;
+    },
   };
 };
 
@@ -210,7 +214,7 @@ export const createStaticCacheSource = (): GraphDataSource => {
   return {
     id: sourceId,
     label: 'Static Cache',
-    category: 'cache' as GraphSourceCategory,
+    category: 'cache',
     description: 'Pre-cached entities from static files',
 
     getEntities: async (): Promise<GraphSourceEntity[]> => {
@@ -258,6 +262,7 @@ export const createStaticCacheSource = (): GraphDataSource => {
     },
 
     isAvailable: async (): Promise<boolean> => {
+      await Promise.resolve();
       const config = cachedOpenAlex.getStaticCacheTierConfig();
       return config.gitHubPages.isConfigured || config.localStatic.isAvailable;
     },

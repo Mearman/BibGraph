@@ -13,6 +13,8 @@ import { expect, test } from '@playwright/test';
 import { waitForAppReady, waitForSearchResults } from '@/test/helpers/app-ready';
 import { SearchPage } from '@/test/page-objects/SearchPage';
 
+const SEARCH_RESPONSE_RENDER_WAIT_MS = 2000;
+
 test.describe('@utility US-01 Multi-Entity Search', () => {
 	let searchPage: SearchPage;
 
@@ -69,7 +71,7 @@ test.describe('@utility US-01 Multi-Entity Search', () => {
 		}
 
 		// Wait for network to settle so results are fully rendered
-		await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+		await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => { /* timeout is acceptable */ });
 
 		// Verify results container is visible
 		const resultsContainer = page.locator('[data-testid="search-results"]');
@@ -146,11 +148,11 @@ test.describe('@utility US-01 Multi-Entity Search', () => {
 		}
 
 		// Check for page size control
-		const pageSizeSelector = page.locator(
+		const sizeSelectorLocator = page.locator(
 			'[data-testid="page-size-selector"], [aria-label*="page size" i], [aria-label*="per page" i]'
 		);
-		if (await pageSizeSelector.isVisible({ timeout: 3000 }).catch(() => false)) {
-			await expect(pageSizeSelector).toBeVisible();
+		if (await sizeSelectorLocator.isVisible({ timeout: 3000 }).catch(() => false)) {
+			await expect(sizeSelectorLocator).toBeVisible();
 		}
 	});
 
@@ -188,7 +190,7 @@ test.describe('@utility US-01 Multi-Entity Search', () => {
 		}
 
 		// Allow time for the search response to render
-		await page.waitForTimeout(2000);
+		await page.waitForTimeout(SEARCH_RESPONSE_RENDER_WAIT_MS);
 
 		// Check for no-results feedback, empty results area, or loading/error state
 		// The page should not crash - any of these states is acceptable

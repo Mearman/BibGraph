@@ -5,8 +5,6 @@
  * - Entity type colors
  * - Edge type meanings
  * - Relationship direction indicators
- *
- * @module components/graph/GraphLegend
  */
 
 import type { EntityType } from '@bibgraph/types';
@@ -95,10 +93,6 @@ const EDGE_TYPES = [
 
 /**
  * Graph Legend Component
- * @param root0
- * @param root0.entityTypes
- * @param root0.showEdgeTypes
- * @param root0.position
  */
 export const GraphLegend: React.FC<GraphLegendProperties> = ({
   entityTypes,

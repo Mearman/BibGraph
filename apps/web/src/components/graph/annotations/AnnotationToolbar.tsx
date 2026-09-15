@@ -1,10 +1,7 @@
 /**
  * Annotation Toolbar
  *
- * Toolbar for creating and managing graph annotations.
- * Provides tools for text labels, shapes, and freehand drawings.
- *
- * @module components/graph/annotations/AnnotationToolbar
+ * Toolbar for creating and managing graph annotations. Provides tools for text labels, shapes, and freehand drawings.
  */
 
 import {
@@ -69,11 +66,6 @@ interface AnnotationToolbarProperties {
 
 /**
  * Annotation toolbar component
- * @param root0
- * @param root0.activeTool
- * @param root0.onToolChange
- * @param root0.annotationCount
- * @param root0.onClearAll
  */
 export const AnnotationToolbar: React.FC<AnnotationToolbarProperties> = ({
   activeTool,
@@ -88,7 +80,7 @@ export const AnnotationToolbar: React.FC<AnnotationToolbarProperties> = ({
           <ActionIcon
             variant={activeTool === tool.tool ? 'filled' : 'light'}
             color={activeTool === tool.tool ? 'blue' : 'gray'}
-            onClick={() => onToolChange(tool.tool)}
+            onClick={() => { onToolChange(tool.tool); }}
             aria-label={tool.label}
           >
             {tool.icon}
@@ -168,7 +160,7 @@ export const TextAnnotationPopover: React.FC<TextAnnotationPopoverProperties> = 
           <TextInput
             placeholder="Enter text..."
             value={text}
-            onChange={(e) => setText(e.currentTarget.value)}
+            onChange={(e) => { setText(e.currentTarget.value); }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 handleSubmit();

@@ -3,20 +3,22 @@
  *
  * Tests the 2D/3D view mode toggle, WebGL detection, and 3D rendering
  * on the algorithms page.
- * @module 3d-visualization.e2e
  */
 
 import { expect,test } from "@playwright/test";
 
 import { waitForAppReady } from "@/test/helpers/app-ready";
 
+const isCi = process.env.CI !== undefined && process.env.CI !== "";
 const BASE_URL =
-  process.env.BASE_URL ||
-  process.env.E2E_BASE_URL ||
-  (process.env.CI ? "http://localhost:4173" : "http://localhost:5173");
+  process.env.BASE_URL ??
+  process.env.E2E_BASE_URL ??
+  (isCi ? "http://localhost:4173" : "http://localhost:5173");
+
+const SUITE_TIMEOUT_MS = 60_000;
 
 test.describe("@utility @3d 3D Graph Visualization", () => {
-  test.setTimeout(60_000);
+  test.setTimeout(SUITE_TIMEOUT_MS);
 
   test("should display ViewModeToggle on algorithms page", async ({ page }) => {
     const errors: string[] = [];
@@ -49,7 +51,7 @@ test.describe("@utility @3d 3D Graph Visualization", () => {
 
     // If no preference set, should default to 2D
     // Or if preference is set, it should be respected
-    if (!viewModePreference) {
+    if (viewModePreference === null) {
       // 2D mode should be active (no 3D canvas visible)
       // In 2D mode, there might be an SVG or canvas but not the Three.js canvas
       // The 2D ForceGraph uses canvas too, so we check for the specific component

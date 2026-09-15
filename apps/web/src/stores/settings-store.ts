@@ -39,9 +39,12 @@ const getDB = (): SettingsDB => {
 // Background strategy type (matches @bibgraph/utils BackgroundStrategy)
 type BackgroundStrategy = 'idle' | 'scheduler' | 'worker' | 'sync';
 
-const VALID_BACKGROUND_STRATEGIES = new Set<BackgroundStrategy>(['idle', 'scheduler', 'worker', 'sync']);
+const VALID_BACKGROUND_STRATEGIES = new Set<string>(['idle', 'scheduler', 'worker', 'sync']);
 
-const isBackgroundStrategy = (value: unknown): value is BackgroundStrategy => typeof value === 'string' && VALID_BACKGROUND_STRATEGIES.has(value as BackgroundStrategy);
+const isBackgroundStrategy = (value: unknown): value is BackgroundStrategy => typeof value === 'string' && VALID_BACKGROUND_STRATEGIES.has(value);
+
+const isRecordObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 // Settings state interface
 interface SettingsState {
@@ -96,8 +99,8 @@ const SETTINGS_KEYS = {
  * Pure Dexie settings store service
  */
 class SettingsStore {
-  private db: SettingsDB;
-  private logger = logger;
+  private readonly db: SettingsDB;
+  private readonly logger = logger;
 
   constructor() {
     this.db = getDB();
@@ -109,7 +112,7 @@ class SettingsStore {
   async getSettings(): Promise<SettingsState> {
     try {
       const records = await this.db.settings.toArray();
-      const settings: Partial<SettingsState> = { ...DEFAULT_SETTINGS };
+      const settings: SettingsState = { ...DEFAULT_SETTINGS };
 
       // Load stored values
       for (const record of records) {
@@ -123,7 +126,7 @@ class SettingsStore {
           settings.includeXpac = record.value === "true";
         }
         if (record.key === SETTINGS_KEYS.DATA_VERSION) {
-          settings.dataVersion = record.value === "undefined" ? undefined : (record.value as '1' | '2');
+          settings.dataVersion = record.value === "1" || record.value === "2" ? record.value : undefined;
         }
         if (record.key === SETTINGS_KEYS.SHOW_SYSTEM_CATALOGUES) {
           settings.showSystemCatalogues = record.value === "true";
@@ -133,20 +136,19 @@ class SettingsStore {
           }
       }
 
-      return settings as SettingsState;
+      return settings;
     } catch (error) {
-      this.logger?.error("settings", "Failed to load settings", { error });
+      this.logger.error("settings", "Failed to load settings", { error });
       return { ...DEFAULT_SETTINGS };
     }
   }
 
   /**
    * Update polite pool email
-   * @param email
    */
   async setPolitePoolEmail(email?: string): Promise<void> {
     try {
-      const emailValue = email === undefined ? "" : email;
+      const emailValue = email ?? "";
       await this.db.settings.put({
         key: SETTINGS_KEYS.POLITE_POOL_EMAIL,
         value: emailValue,
@@ -158,7 +160,7 @@ class SettingsStore {
         isValid: emailValue ? this.isValidEmail(emailValue) : false,
       });
     } catch (error) {
-      this.logger?.error("settings", "Failed to update polite pool email", {
+      this.logger.error("settings", "Failed to update polite pool email", {
         email,
         error,
       });
@@ -168,13 +170,12 @@ class SettingsStore {
 
   /**
    * Update OpenAlex API key
-   * @param apiKey
    */
   async setApiKey(apiKey?: string): Promise<void> {
     try {
       await this.db.settings.put({
         key: SETTINGS_KEYS.API_KEY,
-        value: apiKey === undefined ? "undefined" : apiKey,
+        value: apiKey ?? "undefined",
         updatedAt: new Date(),
       });
 
@@ -182,7 +183,7 @@ class SettingsStore {
         hasApiKey: apiKey !== undefined && apiKey.length > 0,
       });
     } catch (error) {
-      this.logger?.error("settings", "Failed to update API key", {
+      this.logger.error("settings", "Failed to update API key", {
         error,
       });
       throw error;
@@ -191,7 +192,6 @@ class SettingsStore {
 
   /**
    * Update include Xpac setting
-   * @param value
    */
   async setIncludeXpac(value: boolean): Promise<void> {
     try {
@@ -203,7 +203,7 @@ class SettingsStore {
 
       this.logger.debug("settings", "Updated include Xpac", { value });
     } catch (error) {
-      this.logger?.error("settings", "Failed to update include Xpac", {
+      this.logger.error("settings", "Failed to update include Xpac", {
         value,
         error,
       });
@@ -213,19 +213,18 @@ class SettingsStore {
 
   /**
    * Update data version setting
-   * @param value
    */
   async setDataVersion(value: '1' | '2' | undefined): Promise<void> {
     try {
       await this.db.settings.put({
         key: SETTINGS_KEYS.DATA_VERSION,
-        value: value === undefined ? "undefined" : value,
+        value: value ?? "undefined",
         updatedAt: new Date(),
       });
 
       this.logger.debug("settings", "Updated data version", { value });
     } catch (error) {
-      this.logger?.error("settings", "Failed to update data version", {
+      this.logger.error("settings", "Failed to update data version", {
         value,
         error,
       });
@@ -235,7 +234,6 @@ class SettingsStore {
 
   /**
    * Update show system catalogues setting
-   * @param value
    */
   async setShowSystemCatalogues(value: boolean): Promise<void> {
     try {
@@ -247,7 +245,7 @@ class SettingsStore {
 
       this.logger.debug("settings", "Updated show system catalogues", { value });
     } catch (error) {
-      this.logger?.error("settings", "Failed to update show system catalogues", {
+      this.logger.error("settings", "Failed to update show system catalogues", {
         value,
         error,
       });
@@ -257,7 +255,6 @@ class SettingsStore {
 
   /**
    * Update background processing strategy
-   * @param value
    */
   async setBackgroundStrategy(value: BackgroundStrategy): Promise<void> {
     try {
@@ -269,7 +266,7 @@ class SettingsStore {
 
       this.logger.debug("settings", "Updated background strategy", { value });
     } catch (error) {
-      this.logger?.error("settings", "Failed to update background strategy", {
+      this.logger.error("settings", "Failed to update background strategy", {
         value,
         error,
       });
@@ -293,17 +290,16 @@ class SettingsStore {
       await this.db.settings.clear();
       this.logger.debug("settings", "Reset all settings to defaults");
     } catch (error) {
-      this.logger?.error("settings", "Failed to reset settings", { error });
+      this.logger.error("settings", "Failed to reset settings", { error });
       throw error;
     }
   }
 
   /**
    * Validate email format
-   * @param email
    */
   isValidEmail(email: string | undefined): boolean {
-    if (!email) return false;
+    if (email === undefined || email === "") return false;
     const trimmed = email.trim();
     return EMAIL_REGEX.test(trimmed) && !trimmed.endsWith(".");
   }
@@ -363,19 +359,20 @@ class SettingsStore {
       if (typeof localStorage !== "undefined") {
         try {
           const oldEmail = localStorage.getItem("settings-state");
-          if (oldEmail) {
+          if (oldEmail !== null) {
             // Parse the old Zustand persisted state
-            const parsed = JSON.parse(oldEmail);
-            const email = parsed?.state?.politePoolEmail;
+            const parsed: unknown = JSON.parse(oldEmail);
+            const parsedState = isRecordObject(parsed) ? parsed.state : undefined;
+            const email = isRecordObject(parsedState) ? parsedState.politePoolEmail : undefined;
 
-            if (email && typeof email === "string") {
+            if (typeof email === "string" && email !== "") {
               await this.setPolitePoolEmail(email);
               isMigratedData = true;
               this.logger.debug("settings", "Migrated email from localStorage");
             }
           }
         } catch (error) {
-          this.logger?.warn("settings", "Failed to migrate from localStorage", {
+          this.logger.warn("settings", "Failed to migrate from localStorage", {
             error,
           });
         }
@@ -390,7 +387,7 @@ class SettingsStore {
 
       this.logger.debug("settings", "Migration completed", { migratedData: isMigratedData });
     } catch (error) {
-      this.logger?.error("settings", "Migration failed", { error });
+      this.logger.error("settings", "Migration failed", { error });
     }
   }
 }
@@ -404,9 +401,8 @@ if (typeof window !== "undefined") {
 }
 
 // Export the Dexie store instance for direct usage
-export { dexieStore as settingsStore };
+export { dexieStore as settingsStore, dexieStore as settingsStoreInstance };
 export { SettingsStore };
-export const settingsStoreInstance = dexieStore;
 
 // Simple hook for components - no complex state management
 export const usePolitePoolEmail = (): string => {
@@ -421,17 +417,17 @@ export const useHasValidEmail = (): boolean => {
 
 // Direct function exports for when you need explicit calls
 export const settingsActions = {
-  setPolitePoolEmail: (email: string | undefined) => dexieStore.setPolitePoolEmail(email),
-  setApiKey: (apiKey: string | undefined) => dexieStore.setApiKey(apiKey),
-  resetSettings: () => dexieStore.resetSettings(),
+  setPolitePoolEmail: async (email: string | undefined) => dexieStore.setPolitePoolEmail(email),
+  setApiKey: async (apiKey: string | undefined) => dexieStore.setApiKey(apiKey),
+  resetSettings: async () => dexieStore.resetSettings(),
   isValidEmail: (email: string | undefined) => dexieStore.isValidEmail(email),
-  getPolitePoolEmail: () => dexieStore.getPolitePoolEmail(),
-  getApiKey: () => dexieStore.getApiKey(),
-  hasValidEmail: () => dexieStore.hasValidEmail(),
-  setShowSystemCatalogues: (value: boolean) => dexieStore.setShowSystemCatalogues(value),
-  getShowSystemCatalogues: () => dexieStore.getShowSystemCatalogues(),
-  setBackgroundStrategy: (value: BackgroundStrategy) => dexieStore.setBackgroundStrategy(value),
-  getBackgroundStrategy: () => dexieStore.getBackgroundStrategy(),
+  getPolitePoolEmail: async () => dexieStore.getPolitePoolEmail(),
+  getApiKey: async () => dexieStore.getApiKey(),
+  hasValidEmail: async () => dexieStore.hasValidEmail(),
+  setShowSystemCatalogues: async (value: boolean) => dexieStore.setShowSystemCatalogues(value),
+  getShowSystemCatalogues: async () => dexieStore.getShowSystemCatalogues(),
+  setBackgroundStrategy: async (value: BackgroundStrategy) => dexieStore.setBackgroundStrategy(value),
+  getBackgroundStrategy: async () => dexieStore.getBackgroundStrategy(),
 };
 
 // Export the BackgroundStrategy type for consumers

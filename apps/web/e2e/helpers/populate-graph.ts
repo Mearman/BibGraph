@@ -1,26 +1,39 @@
 /**
- * E2E test helper to populate graph store with test relationship data
- * Used by relationship visualization E2E tests (spec 016)
- * @module populate-graph
+ * E2E test helper to populate graph store with test relationship data. Used by relationship visualization E2E tests (spec 016).
  */
 
 import type { GraphEdge,GraphNode } from '@bibgraph/types';
+import { RelationType } from '@bibgraph/types';
 import type { Page } from '@playwright/test';
 
 /**
- * Populate graph with citation relationships for work W2741809807
- * Creates 3 citing works (incoming REFERENCE edges)
- * @param page
+ * Shape of the graph store actions this test helper expects to find exposed on `window` in development/test mode.
+ */
+interface TestGraphStoreActions {
+  addNode: (node: GraphNode) => void;
+  addNodes: (nodes: readonly GraphNode[]) => void;
+  addEdges: (edges: readonly GraphEdge[]) => void;
+  clear: () => void;
+}
+
+declare global {
+  interface Window {
+    graphStoreActions?: TestGraphStoreActions;
+  }
+}
+
+/**
+ * Populate graph with citation relationships for work W2741809807 Creates 3 citing works (incoming REFERENCE edges)
  */
 export const populateWorkCitations = async (page: Page): Promise<void> => {
-  await page.evaluate(() => {
+  await page.evaluate((referenceType) => {
     // Access the global graph store actions (exposed in development/test mode)
-    const graphStore = (window as any).graphStoreActions;
+    const graphStore = window.graphStoreActions;
 
-    console.log('[E2E] graphStoreActions available:', !!graphStore);
-    console.log('[E2E] Available methods:', graphStore ? Object.keys(graphStore) : 'none');
+    console.log('[E2E] graphStoreActions available:', graphStore !== undefined);
+    console.log('[E2E] Available methods:', graphStore !== undefined ? Object.keys(graphStore) : 'none');
 
-    if (!graphStore) {
+    if (graphStore === undefined) {
       throw new Error('Graph store actions not available - ensure test environment is configured');
     }
 
@@ -92,21 +105,21 @@ export const populateWorkCitations = async (page: Page): Promise<void> => {
         id: 'E1',
         source: 'W100',
         target: 'W2741809807',
-        type: 'reference' as any, // RelationType.REFERENCE
+        type: referenceType,
         direction: 'inbound',
       },
       {
         id: 'E2',
         source: 'W101',
         target: 'W2741809807',
-        type: 'reference' as any,
+        type: referenceType,
         direction: 'inbound',
       },
       {
         id: 'E3',
         source: 'W102',
         target: 'W2741809807',
-        type: 'reference' as any,
+        type: referenceType,
         direction: 'inbound',
       },
     ];
@@ -115,19 +128,17 @@ export const populateWorkCitations = async (page: Page): Promise<void> => {
     graphStore.addNode(workNode);
     graphStore.addNodes(citingWorks);
     graphStore.addEdges(citationEdges);
-  });
+  }, RelationType.REFERENCE);
 };
 
 /**
  * Populate graph with authorship relationships for author A123
  * Creates 2 authored works (incoming AUTHORSHIP edges from works to author)
- * @param page
- * @param authorId
  */
-export const populateAuthorWorks = async (page: Page, authorId: string = 'A123'): Promise<void> => {
-  await page.evaluate((aid) => {
-    const graphStore = (window as any).graphStoreActions;
-    if (!graphStore) throw new Error('Graph store actions not available');
+export const populateAuthorWorks = async (page: Page, authorId = 'A123'): Promise<void> => {
+  await page.evaluate(({ aid, authorshipType }) => {
+    const graphStore = window.graphStoreActions;
+    if (graphStore === undefined) throw new Error('Graph store actions not available');
 
     const authorNode: GraphNode = {
       id: aid,
@@ -168,14 +179,14 @@ export const populateAuthorWorks = async (page: Page, authorId: string = 'A123')
         id: 'E10',
         source: 'W200',
         target: aid,
-        type: 'authorship' as any,
+        type: authorshipType,
         direction: 'inbound',
       },
       {
         id: 'E11',
         source: 'W201',
         target: aid,
-        type: 'authorship' as any,
+        type: authorshipType,
         direction: 'inbound',
       },
     ];
@@ -183,17 +194,16 @@ export const populateAuthorWorks = async (page: Page, authorId: string = 'A123')
     graphStore.addNode(authorNode);
     graphStore.addNodes(works);
     graphStore.addEdges(authorshipEdges);
-  }, authorId);
+  }, { aid: authorId, authorshipType: RelationType.AUTHORSHIP });
 };
 
 /**
  * Clear all graph data (useful for test isolation)
- * @param page
  */
 export const clearGraph = async (page: Page): Promise<void> => {
   await page.evaluate(() => {
-    const graphStoreActions = (window as any).graphStoreActions;
-    if (graphStoreActions) {
+    const graphStoreActions = window.graphStoreActions;
+    if (graphStoreActions !== undefined) {
       graphStoreActions.clear();
     }
   });

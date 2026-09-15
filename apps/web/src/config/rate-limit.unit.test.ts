@@ -1,6 +1,5 @@
 /**
- * Unit tests for rate-limit configuration utilities
- * Tests retry delay calculations, configuration constants, and edge cases
+ * Unit tests for rate-limit configuration utilities Tests retry delay calculations, configuration constants, and edge cases
  */
 
 import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
@@ -50,9 +49,14 @@ describe("rate-limit configuration", () => {
     });
 
     it("should use conservative OpenAlex limits", () => {
+      const openAlexRateLimitCeiling = 10;
+      const oneSecondMs = 1000;
+
       // Should be under the 10 req/sec OpenAlex limit
-      expect(RATE_LIMIT_CONFIG.openAlex.limit).toBeLessThan(10);
-      expect(RATE_LIMIT_CONFIG.openAlex.window).toBe(1000);
+      expect(RATE_LIMIT_CONFIG.openAlex.limit).toBeLessThan(
+        openAlexRateLimitCeiling,
+      );
+      expect(RATE_LIMIT_CONFIG.openAlex.window).toBe(oneSecondMs);
     });
   });
 
@@ -108,9 +112,11 @@ describe("rate-limit configuration", () => {
   });
 
   describe("calculateRetryDelay", () => {
+    const mockRandomMidpoint = 0.5;
+
     beforeEach(() => {
       // Mock Math.random for consistent testing
-      vi.spyOn(Math, "random").mockReturnValue(0.5);
+      vi.spyOn(Math, "random").mockReturnValue(mockRandomMidpoint);
     });
 
     afterEach(() => {
@@ -118,71 +124,90 @@ describe("rate-limit configuration", () => {
     });
 
     it("should respect Retry-After header when provided", () => {
+      const retryAfterMs = 5000;
+
       const delay = calculateRetryDelay({
         attemptIndex: 0,
         config: RETRY_CONFIG.rateLimited,
-        retryAfterMs: 5000,
+        retryAfterMs,
       });
-      expect(delay).toBe(5000);
+      expect(delay).toBe(retryAfterMs);
     });
 
     it("should calculate exponential backoff for rate limited retry", () => {
       const config = RETRY_CONFIG.rateLimited;
 
-      // First attempt (index 0): baseDelay * (exponentialBase^0) + jitter = 2000 * 1 + 500 = 2500
+      // First attempt (index 0): baseDelay * (exponentialBase^0) + jitter
       const delay0 = calculateRetryDelay({ attemptIndex: 0, config });
-      expect(delay0).toBe(2000 + 500); // 2000 + (0.5 * 1000)
+      expect(delay0).toBe(config.baseDelay + mockRandomMidpoint * config.jitterMs);
 
-      // Second attempt (index 1): baseDelay * (exponentialBase^1) + jitter = 2000 * 2 + 500 = 4500
+      // Second attempt (index 1): baseDelay * (exponentialBase^1) + jitter
       const delay1 = calculateRetryDelay({ attemptIndex: 1, config });
-      expect(delay1).toBe(4000 + 500); // 4000 + (0.5 * 1000)
+      expect(delay1).toBe(
+        config.baseDelay * config.exponentialBase +
+          mockRandomMidpoint * config.jitterMs,
+      );
 
-      // Third attempt (index 2): baseDelay * (exponentialBase^2) + jitter = 2000 * 4 + 500 = 8500
+      // Third attempt (index 2): baseDelay * (exponentialBase^2) + jitter
       const delay2 = calculateRetryDelay({ attemptIndex: 2, config });
-      expect(delay2).toBe(8000 + 500); // 8000 + (0.5 * 1000)
+      expect(delay2).toBe(
+        config.baseDelay * config.exponentialBase * config.exponentialBase +
+          mockRandomMidpoint * config.jitterMs,
+      );
     });
 
     it("should calculate exponential backoff for network retry", () => {
       const config = RETRY_CONFIG.network;
 
-      // First attempt: 1000 * 1 + 250 = 1250
+      // First attempt: baseDelay + jitter
       const delay0 = calculateRetryDelay({ attemptIndex: 0, config });
-      expect(delay0).toBe(1000 + 250); // 1000 + (0.5 * 500)
+      expect(delay0).toBe(config.baseDelay + mockRandomMidpoint * config.jitterMs);
 
-      // Second attempt: 1000 * 2 + 250 = 2250
+      // Second attempt: baseDelay * exponentialBase + jitter
       const delay1 = calculateRetryDelay({ attemptIndex: 1, config });
-      expect(delay1).toBe(2000 + 250);
+      expect(delay1).toBe(
+        config.baseDelay * config.exponentialBase +
+          mockRandomMidpoint * config.jitterMs,
+      );
     });
 
     it("should calculate exponential backoff for server retry", () => {
       const config = RETRY_CONFIG.server;
 
-      // First attempt: 2000 * (1.5^0) + 500 = 2000 + 500 = 2500
+      // First attempt: baseDelay * (exponentialBase^0) + jitter
       const delay0 = calculateRetryDelay({ attemptIndex: 0, config });
-      expect(delay0).toBe(2000 + 500);
+      expect(delay0).toBe(config.baseDelay + mockRandomMidpoint * config.jitterMs);
 
-      // Second attempt: 2000 * (1.5^1) + 500 = 3000 + 500 = 3500
+      // Second attempt: baseDelay * (exponentialBase^1) + jitter
       const delay1 = calculateRetryDelay({ attemptIndex: 1, config });
-      expect(delay1).toBe(3000 + 500);
+      expect(delay1).toBe(
+        config.baseDelay * config.exponentialBase +
+          mockRandomMidpoint * config.jitterMs,
+      );
     });
 
     it("should cap delays at maxDelay", () => {
       const config = RETRY_CONFIG.network; // maxDelay: 10000
+      const highAttemptIndex = 10;
 
       // High attempt index should hit the cap
-      const delay = calculateRetryDelay({ attemptIndex: 10, config });
+      const delay = calculateRetryDelay({
+        attemptIndex: highAttemptIndex,
+        config,
+      });
       expect(delay).toBeLessThanOrEqual(config.maxDelay);
-      expect(delay).toBe(10_000); // Should be exactly maxDelay since exponential would exceed it
+      expect(delay).toBe(config.maxDelay); // Should be exactly maxDelay since exponential would exceed it
     });
 
     it("should handle different jitter values", () => {
-      vi.spyOn(Math, "random").mockReturnValue(0.8); // Different random value
+      const mockRandomHigh = 0.8;
+      vi.spyOn(Math, "random").mockReturnValue(mockRandomHigh); // Different random value
 
       const config = RETRY_CONFIG.rateLimited;
       const delay = calculateRetryDelay({ attemptIndex: 0, config });
 
-      // Should be baseDelay + (0.8 * jitterMs) = 2000 + 800 = 2800
-      expect(delay).toBe(2000 + 800);
+      // Should be baseDelay + (randomValue * jitterMs)
+      expect(delay).toBeCloseTo(config.baseDelay + mockRandomHigh * config.jitterMs);
     });
 
     it("should handle zero jitter", () => {
@@ -192,7 +217,7 @@ describe("rate-limit configuration", () => {
       const delay = calculateRetryDelay({ attemptIndex: 0, config });
 
       // Should be exactly baseDelay when jitter is 0
-      expect(delay).toBe(2000);
+      expect(delay).toBe(config.baseDelay);
     });
 
     it("should handle maximum jitter", () => {
@@ -201,35 +226,47 @@ describe("rate-limit configuration", () => {
       const config = RETRY_CONFIG.rateLimited;
       const delay = calculateRetryDelay({ attemptIndex: 0, config });
 
-      // Should be baseDelay + full jitterMs = 2000 + 1000 = 3000
-      expect(delay).toBe(3000);
+      // Should be baseDelay + full jitterMs
+      expect(delay).toBe(config.baseDelay + config.jitterMs);
     });
 
     it("should use fallback calculation for invalid config", () => {
       // Create config without required properties
-      const invalidConfig = {} as any;
+      const invalidConfig = {} as typeof RETRY_CONFIG.network;
+      const attemptIndex = 2;
+      const fallbackBaseDelayMs = 1000;
+      const fallbackExponentialBase = 2;
 
       const delay = calculateRetryDelay({
-        attemptIndex: 2,
+        attemptIndex,
         config: invalidConfig,
       });
 
-      // Should use fallback: 1000 * (2^2) = 4000
-      expect(delay).toBe(4000);
+      // Should use fallback: fallbackBaseDelayMs * (fallbackExponentialBase^attemptIndex)
+      expect(delay).toBe(
+        fallbackBaseDelayMs * fallbackExponentialBase * fallbackExponentialBase,
+      );
     });
 
     it("should handle fallback for different attempt indices", () => {
-      const invalidConfig = {} as any;
+      const invalidConfig = {} as typeof RETRY_CONFIG.network;
+      const fallbackBaseDelayMs = 1000;
+      const fallbackExponentialBase = 2;
 
       expect(
         calculateRetryDelay({ attemptIndex: 0, config: invalidConfig }),
-      ).toBe(1000); // 2^0 = 1
+      ).toBe(fallbackBaseDelayMs); // exponentialBase^0 = 1
       expect(
         calculateRetryDelay({ attemptIndex: 1, config: invalidConfig }),
-      ).toBe(2000); // 2^1 = 2
+      ).toBe(fallbackBaseDelayMs * fallbackExponentialBase);
       expect(
         calculateRetryDelay({ attemptIndex: 3, config: invalidConfig }),
-      ).toBe(8000); // 2^3 = 8
+      ).toBe(
+        fallbackBaseDelayMs *
+          fallbackExponentialBase *
+          fallbackExponentialBase *
+          fallbackExponentialBase,
+      );
     });
 
     it("should prioritize Retry-After over config calculation", () => {
@@ -257,13 +294,15 @@ describe("rate-limit configuration", () => {
 
     it("should generate different delays with different random values", () => {
       const config = RETRY_CONFIG.network;
+      const mockRandomA = 0.5;
+      const mockRandomB = 0.3;
 
-      // First call with random = 0.5
-      vi.spyOn(Math, "random").mockReturnValueOnce(0.5);
+      // First call with random = mockRandomA
+      vi.spyOn(Math, "random").mockReturnValueOnce(mockRandomA);
       const delay1 = calculateRetryDelay({ attemptIndex: 0, config });
 
-      // Second call with random = 0.3
-      vi.spyOn(Math, "random").mockReturnValueOnce(0.3);
+      // Second call with random = mockRandomB
+      vi.spyOn(Math, "random").mockReturnValueOnce(mockRandomB);
       const delay2 = calculateRetryDelay({ attemptIndex: 0, config });
 
       expect(delay1).not.toBe(delay2);
@@ -272,13 +311,16 @@ describe("rate-limit configuration", () => {
 
     it("should handle client config which has no delay properties", () => {
       const config = RETRY_CONFIG.client;
+      const attemptIndex = 1;
+      const fallbackBaseDelayMs = 1000;
+      const fallbackExponentialBase = 2;
 
       // Should use fallback since client config has no delay properties
       const delay = calculateRetryDelay({
-        attemptIndex: 1,
-        config: config as any,
+        attemptIndex,
+        config: config as unknown as typeof RETRY_CONFIG.network,
       });
-      expect(delay).toBe(2000); // Fallback: 1000 * (2^1)
+      expect(delay).toBe(fallbackBaseDelayMs * fallbackExponentialBase); // Fallback: baseDelay * exponentialBase^1
     });
   });
 });

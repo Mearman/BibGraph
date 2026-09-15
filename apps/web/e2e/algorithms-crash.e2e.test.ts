@@ -6,20 +6,22 @@
  *
  * Bug: "Cannot read properties of undefined (reading 'map')" error
  * occurs in GraphAlgorithmsPanel when Select component receives undefined data.
- * @module algorithms-crash.e2e
  */
 
 import { expect,test } from "@playwright/test";
 
 import { waitForAppReady } from "@/test/helpers/app-ready";
 
+const isCi = process.env.CI !== undefined && process.env.CI !== "";
 const BASE_URL =
-  process.env.BASE_URL ||
-  process.env.E2E_BASE_URL ||
-  (process.env.CI ? "http://localhost:4173" : "http://localhost:5173");
+  process.env.BASE_URL ??
+  process.env.E2E_BASE_URL ??
+  (isCi ? "http://localhost:4173" : "http://localhost:5173");
+
+const SUITE_TIMEOUT_MS = 60_000;
 
 test.describe("@utility @error Algorithms Page Crash Detection", () => {
-  test.setTimeout(60_000);
+  test.setTimeout(SUITE_TIMEOUT_MS);
 
   test("should load algorithms page without crashing", async ({ page }) => {
     const errors: string[] = [];
@@ -33,11 +35,11 @@ test.describe("@utility @error Algorithms Page Crash Detection", () => {
     // Removed: waitForTimeout - use locator assertions instead
     // Check for ErrorBoundary indicators (React catches errors before they become pageerrors)
     const navigationError = page.locator("text=Navigation Error");
-    const hasNavigationError = navigationError;
+    
 
     // Fail if either uncaught errors or ErrorBoundary is shown
     expect(errors, "JavaScript errors detected on algorithms page").toHaveLength(0);
-    await expect(hasNavigationError, "ErrorBoundary Navigation Error detected - page crashed").toBeHidden();
+    await expect(navigationError, "ErrorBoundary Navigation Error detected - page crashed").toBeHidden();
   });
 
   test("should not show error boundary crash message", async ({ page }) => {
@@ -101,8 +103,8 @@ test.describe("@utility @error Algorithms Page Crash Detection", () => {
 
     // First check that page didn't crash on load
     const navigationError = page.locator("text=Navigation Error");
-    const hasNavigationError = navigationError;
-    await expect(hasNavigationError, "Page crashed on load - cannot test accordion interaction").toBeHidden();
+    
+    await expect(navigationError, "Page crashed on load - cannot test accordion interaction").toBeHidden();
 
     // Check no initial errors
     expect(errors, "Initial JavaScript errors detected").toHaveLength(0);

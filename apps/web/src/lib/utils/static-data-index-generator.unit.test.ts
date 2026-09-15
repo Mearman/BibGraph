@@ -1,23 +1,25 @@
+// @vitest-environment node
+
 /**
- * @vitest-environment node
- *
- * Unit tests for static data index generator change detection logic
- * Tests that unchanged file/directory entries are preserved to prevent unnecessary timestamp cascades
+ * Unit tests for static data index generator change detection logic Tests that unchanged file/directory entries are preserved to prevent unnecessary timestamp cascades
  */
 
 import { mkdir, rm,writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { DirectoryIndex } from "@bibgraph/utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-// Import the internal helper functions we're testing
-// Note: These are not exported, so we'll test the public API behavior instead
+// Import the internal helper functions we're testing Note: These are not exported, so we'll test the public API behavior instead
 import {
   generateIndexForEntityType,
   getStaticDataIndex,
 } from "./static-data-index-generator";
+
+/**
+Delay used between index generations so a changed timestamp is provably different
+ */
+const TIMESTAMP_SETTLE_DELAY_MS = 10;
 
 describe("static-data-index-generator - Change Detection", () => {
   let testDir: string;
@@ -25,7 +27,7 @@ describe("static-data-index-generator - Change Detection", () => {
 
   beforeEach(async () => {
     // Create temporary test directory
-    testDir = join(tmpdir(), `bibgraph-test-${Date.now()}`);
+    testDir = join(tmpdir(), `bibgraph-test-${String(Date.now())}`);
     entityDir = join(testDir, "works");
     await mkdir(entityDir, { recursive: true });
   });
@@ -47,18 +49,18 @@ describe("static-data-index-generator - Change Detection", () => {
 
       const index1 = await getStaticDataIndex(entityDir);
       expect(index1).toBeDefined();
-      expect(index1?.files?.["W123"]).toBeDefined();
+      expect(index1?.files?.W123).toBeDefined();
 
-      const initialLastRetrieved = index1!.files!["W123"].lastRetrieved;
+      const initialLastRetrieved = index1!.files!.W123.lastRetrieved;
 
       // Wait a bit to ensure timestamp would be different
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise((resolve) => { setTimeout(resolve, TIMESTAMP_SETTLE_DELAY_MS); });
 
       // Regenerate index without changing file
       await generateIndexForEntityType(entityDir, "work", false);
 
       const index2 = await getStaticDataIndex(entityDir);
-      const updatedLastRetrieved = index2!.files!["W123"].lastRetrieved;
+      const updatedLastRetrieved = index2!.files!.W123.lastRetrieved;
 
       // Key assertion: lastRetrieved should be identical (same object reference)
       expect(updatedLastRetrieved).toBe(initialLastRetrieved);
@@ -77,10 +79,10 @@ describe("static-data-index-generator - Change Detection", () => {
       await generateIndexForEntityType(entityDir, "work", false);
 
       const index1 = await getStaticDataIndex(entityDir);
-      const initialLastRetrieved = index1!.files!["W123"].lastRetrieved;
+      const initialLastRetrieved = index1!.files!.W123.lastRetrieved;
 
       // Wait to ensure timestamp difference
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise((resolve) => { setTimeout(resolve, TIMESTAMP_SETTLE_DELAY_MS); });
 
       // Modify file content
       const modifiedContent = { id: "https://openalex.org/W123", title: "Modified" };
@@ -90,7 +92,7 @@ describe("static-data-index-generator - Change Detection", () => {
       await generateIndexForEntityType(entityDir, "work", false);
 
       const index2 = await getStaticDataIndex(entityDir);
-      const updatedLastRetrieved = index2!.files!["W123"].lastRetrieved;
+      const updatedLastRetrieved = index2!.files!.W123.lastRetrieved;
 
       // Key assertion: lastRetrieved should be updated (different content hash)
       expect(updatedLastRetrieved).not.toBe(initialLastRetrieved);
@@ -117,7 +119,7 @@ describe("static-data-index-generator - Change Detection", () => {
 
       const index2 = await getStaticDataIndex(entityDir);
       expect(Object.keys(index2!.files!)).toHaveLength(2);
-      expect(index2!.files!["W456"]).toBeDefined();
+      expect(index2!.files!.W456).toBeDefined();
 
       // lastUpdated should have changed (structure changed)
       expect(index2!.lastUpdated).not.toBe(index1!.lastUpdated);
@@ -142,7 +144,7 @@ describe("static-data-index-generator - Change Detection", () => {
 
       const index2 = await getStaticDataIndex(entityDir);
       expect(Object.keys(index2!.files!)).toHaveLength(1);
-      expect(index2!.files!["W456"]).toBeUndefined();
+      expect(index2!.files!.W456).toBeUndefined();
 
       // lastUpdated should have changed (structure changed)
       expect(index2!.lastUpdated).not.toBe(index1!.lastUpdated);
@@ -162,16 +164,16 @@ describe("static-data-index-generator - Change Detection", () => {
       await generateIndexForEntityType(entityDir, "work", true);
 
       const index1 = await getStaticDataIndex(entityDir);
-      const initialLastModified = index1!.directories!["subdir"].lastModified;
+      const initialLastModified = index1!.directories!.subdir.lastModified;
 
       // Wait to ensure timestamp difference
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise((resolve) => { setTimeout(resolve, TIMESTAMP_SETTLE_DELAY_MS); });
 
       // Regenerate index without changing subdirectory
       await generateIndexForEntityType(entityDir, "work", true);
 
       const index2 = await getStaticDataIndex(entityDir);
-      const updatedLastModified = index2!.directories!["subdir"].lastModified;
+      const updatedLastModified = index2!.directories!.subdir.lastModified;
 
       // Key assertion: lastModified should be identical (subdirectory unchanged)
       expect(updatedLastModified).toBe(initialLastModified);
@@ -191,10 +193,10 @@ describe("static-data-index-generator - Change Detection", () => {
       await generateIndexForEntityType(entityDir, "work", true);
 
       const index1 = await getStaticDataIndex(entityDir);
-      const initialLastModified = index1!.directories!["subdir"].lastModified;
+      const initialLastModified = index1!.directories!.subdir.lastModified;
 
       // Wait to ensure timestamp difference
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise((resolve) => { setTimeout(resolve, TIMESTAMP_SETTLE_DELAY_MS); });
 
       // Modify subdirectory file
       await writeFile(testFile, JSON.stringify({ id: "modified" }), "utf8");
@@ -202,7 +204,7 @@ describe("static-data-index-generator - Change Detection", () => {
       await generateIndexForEntityType(entityDir, "work", true);
 
       const index2 = await getStaticDataIndex(entityDir);
-      const updatedLastModified = index2!.directories!["subdir"].lastModified;
+      const updatedLastModified = index2!.directories!.subdir.lastModified;
 
       // Key assertion: lastModified should be updated (subdirectory changed)
       expect(updatedLastModified).not.toBe(initialLastModified);
@@ -227,15 +229,15 @@ describe("static-data-index-generator - Change Detection", () => {
 
       await generateIndexForEntityType(entityDir, "work", false);
 
-      const index1 = await getStaticDataIndex(entityDir) as DirectoryIndex;
+      const index1 = (await getStaticDataIndex(entityDir))!;
       const initialTimestamps = {
-        W123: index1.files!["W123"].lastRetrieved,
-        W456: index1.files!["W456"].lastRetrieved,
-        W789: index1.files!["W789"].lastRetrieved,
+        W123: index1.files!.W123.lastRetrieved,
+        W456: index1.files!.W456.lastRetrieved,
+        W789: index1.files!.W789.lastRetrieved,
       };
 
       // Wait to ensure timestamp difference
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise((resolve) => { setTimeout(resolve, TIMESTAMP_SETTLE_DELAY_MS); });
 
       // Modify only W456
       await writeFile(
@@ -246,11 +248,11 @@ describe("static-data-index-generator - Change Detection", () => {
 
       await generateIndexForEntityType(entityDir, "work", false);
 
-      const index2 = await getStaticDataIndex(entityDir) as DirectoryIndex;
+      const index2 = (await getStaticDataIndex(entityDir))!;
       const updatedTimestamps = {
-        W123: index2.files!["W123"].lastRetrieved,
-        W456: index2.files!["W456"].lastRetrieved,
-        W789: index2.files!["W789"].lastRetrieved,
+        W123: index2.files!.W123.lastRetrieved,
+        W456: index2.files!.W456.lastRetrieved,
+        W789: index2.files!.W789.lastRetrieved,
       };
 
       // W123 and W789 should have same timestamps (unchanged)

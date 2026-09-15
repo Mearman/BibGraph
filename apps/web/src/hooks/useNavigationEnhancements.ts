@@ -15,6 +15,9 @@ interface NavigationState {
   searchHistory: string[];
 }
 
+const MAX_NAVIGATION_HISTORY_SIZE = 50;
+const MAX_SEARCH_HISTORY_ENTRIES = 20;
+
 export const useNavigationEnhancements = () => {
   const location = useLocation();
   const router = useRouter();
@@ -30,8 +33,8 @@ export const useNavigationEnhancements = () => {
       historyReference.current.push(currentPath);
 
       // Limit history size
-      if (historyReference.current.length > 50) {
-        historyReference.current = historyReference.current.slice(-50);
+      if (historyReference.current.length > MAX_NAVIGATION_HISTORY_SIZE) {
+        historyReference.current = historyReference.current.slice(-MAX_NAVIGATION_HISTORY_SIZE);
       }
     }
   }, [currentPath]);
@@ -51,7 +54,7 @@ export const useNavigationEnhancements = () => {
 
     const previousPath = historyReference.current[historyReference.current.length - 2];
     if (previousPath) {
-      router.navigate({ to: previousPath });
+      void router.navigate({ to: previousPath });
     }
   }, [navigationState.canGoBack, router]);
 
@@ -82,7 +85,7 @@ export const useNavigationEnhancements = () => {
 
     setSearchHistory(previous => {
       const newHistory = [query, ...previous.filter(item => item !== query)];
-      return newHistory.slice(0, 20); // Keep last 20 searches
+      return newHistory.slice(0, MAX_SEARCH_HISTORY_ENTRIES);
     });
   }, []);
 
@@ -92,12 +95,12 @@ export const useNavigationEnhancements = () => {
 
   // Quick navigation shortcuts
   const navigateToSearch = useCallback((entityType?: string) => {
-    const path = entityType ? `/${entityType}` : '/';
-    router.navigate({ to: path });
+    const path = entityType !== undefined && entityType !== '' ? `/${entityType}` : '/';
+    void router.navigate({ to: path });
   }, [router]);
 
   const navigateToHome = useCallback(() => {
-    router.navigate({ to: '/' });
+    void router.navigate({ to: '/', params: {} });
   }, [router]);
 
   // Keyboard navigation is now handled directly in the hook
@@ -109,7 +112,7 @@ export const useNavigationEnhancements = () => {
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement ||
         event.target instanceof HTMLSelectElement ||
-        (event.target as HTMLElement)?.contentEditable === 'true'
+        (event.target instanceof HTMLElement && event.target.contentEditable === 'true')
       ) {
         return;
       }
@@ -146,8 +149,8 @@ export const useNavigationEnhancements = () => {
             // Focus search input
             event.preventDefault();
             const searchInput = document.querySelector('input[aria-label="Global search input"]');
-            if (searchInput) {
-              (searchInput as HTMLInputElement).focus();
+            if (searchInput instanceof HTMLInputElement) {
+              searchInput.focus();
             }
             break;
           }
@@ -156,7 +159,9 @@ export const useNavigationEnhancements = () => {
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [navigateWithKeyboard]);
 
   // Legacy function for backwards compatibility - now a no-op
@@ -169,7 +174,7 @@ export const useNavigationEnhancements = () => {
     const parts = location.pathname.replace(/^\//, "").split("/");
     const entityType = parts[0];
     const isEntityPage = parts.length > 1 && parts[1];
-    const hasSearch = !!location.search;
+    const hasSearch = Object.keys(location.search).length > 0;
 
     return {
       entityType,

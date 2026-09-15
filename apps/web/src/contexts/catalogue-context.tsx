@@ -21,8 +21,6 @@ interface CatalogueProviderProperties {
 /**
  * Catalogue Provider Component
  * Wraps catalogue-related components to share a single useCatalogue instance
- * @param root0
- * @param root0.children
  */
 export const CatalogueProvider = ({ children }: CatalogueProviderProperties) => {
   const catalogueState = useCatalogue();

@@ -3,7 +3,6 @@
  *
  * Tests field entity pages including title display, metadata rendering,
  * related subfields, parent domain navigation, and error handling.
- * @module fields.e2e
  * @see spec-020 E2E Test Coverage
  */
 
@@ -37,7 +36,7 @@ test.describe('@entity Fields Detail Page', () => {
 		// Field name should be visible in heading
 		const heading = page.locator('h1');
 		await expect(heading).toBeVisible();
-		await expect(heading).toContainText(fieldName as string);
+		await expect(heading).toContainText(fieldName!);
 	});
 
 	test('should display field metadata including subfield and works counts', async ({ page }) => {
@@ -110,7 +109,7 @@ test.describe('@entity Fields Detail Page', () => {
 		const parentDomain = await fieldsPage.getParentDomain();
 
 		// If parent domain exists, test navigation
-		if (parentDomain) {
+		if (parentDomain !== null) {
 			// Click parent domain link
 			await fieldsPage.clickParentDomain();
 			await waitForEntityData(page);
@@ -123,8 +122,8 @@ test.describe('@entity Fields Detail Page', () => {
 			await expect(heading).toBeVisible();
 
 			// Should display domain name
-			const domainName = heading;
-			await expect(domainName).toHaveText(/.+/);
+			
+			await expect(heading).toHaveText(/.+/);
 		}
 	});
 
@@ -188,14 +187,14 @@ test.describe('@entity Fields Detail Page', () => {
 			await expect(heading).toBeVisible();
 
 			// Should display subfield name
-			const subfieldPageName = heading;
-			await expect(subfieldPageName).toHaveText(/.+/);
+			
+			await expect(heading).toHaveText(/.+/);
 		}
 	});
 
 	test('should pass accessibility checks (WCAG 2.1 AA)', async ({ page }) => {
-		const fieldsPage = new FieldsDetailPage(page);
-		await fieldsPage.gotoField('F17');
+		const accessibilityFieldsPage = new FieldsDetailPage(page);
+		await accessibilityFieldsPage.gotoField('F17');
 		await waitForAppReady(page);
 		await waitForEntityData(page);
 

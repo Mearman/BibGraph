@@ -1,4 +1,5 @@
 import { cachedOpenAlex } from "@bibgraph/client";
+import { fieldSchema } from "@bibgraph/types";
 import { type Field } from "@bibgraph/types";
 import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute,useParams, useSearch  } from "@tanstack/react-router";
@@ -16,8 +17,8 @@ import { usePrettyUrl } from "@/hooks/use-pretty-url";
 import { decodeEntityId } from "@/utils/url-decoding";
 
 const FieldRoute = () => {
-  const { fieldId: rawFieldId } = useParams({ strict: false }) as { fieldId: string };
-  const { select: selectParameter } = useSearch({ strict: false }) as { select?: string };
+  const { fieldId: rawFieldId } = useParams({ strict: false });
+  const { select: selectParameter } = useSearch({ strict: false });
   const [viewMode, setViewMode] = useState<DetailViewMode>("rich");
 
   // Decode the field ID in case it's URL-encoded
@@ -27,28 +28,29 @@ const FieldRoute = () => {
   usePrettyUrl("fields", rawFieldId, fieldId);
 
   // Parse select parameter - only send select when explicitly provided in URL
-  const selectFields = selectParameter && typeof selectParameter === 'string'
+  const selectFields = typeof selectParameter === 'string' && selectParameter !== ''
     ? selectParameter.split(',').map(field => field.trim())
     : undefined;
 
   // Construct full OpenAlex field URL
-  const fullFieldId = fieldId ? `https://openalex.org/fields/${fieldId}` : '';
+  const fullFieldId = fieldId !== undefined && fieldId !== '' ? `https://openalex.org/fields/${fieldId}` : '';
 
   // Fetch field data - fields use the fields endpoint
   const { data: field, isLoading, error } = useQuery({
     queryKey: ["field", fieldId, selectParameter, selectFields],
     queryFn: async () => {
-      if (!fieldId) {
+      if (fieldId === undefined || fieldId === '') {
         throw new Error("Field ID is required");
       }
-      const response = await cachedOpenAlex.getById(
-        'fields',
-        fieldId,
-        selectFields ? { select: selectFields } : {}
-      );
-      return response as Field;
+      const response = await cachedOpenAlex.getById<Field>({
+        endpoint: 'fields',
+        id: fieldId,
+        params: selectFields ? { select: selectFields } : {},
+        schema: fieldSchema,
+      });
+      return response;
     },
-    enabled: !!fieldId,
+    enabled: fieldId !== undefined && fieldId !== '',
   });
 
   // Get relationship counts for summary display - MUST be called before early returns (Rules of Hooks)
@@ -59,7 +61,7 @@ const FieldRoute = () => {
 
   // Handle loading state
   if (isLoading) {
-    return <LoadingState entityType="Field" entityId={fieldId || ''} config={ENTITY_TYPE_CONFIGS.fields} />;
+    return <LoadingState entityType="Field" entityId={fieldId ?? ''} config={ENTITY_TYPE_CONFIGS.fields} />;
   }
 
   // Handle error state
@@ -68,7 +70,7 @@ const FieldRoute = () => {
       <ErrorState
         error={error}
         entityType="Field"
-        entityId={fieldId || ''}
+        entityId={fieldId ?? ''}
       />
     );
   }

@@ -21,7 +21,8 @@
 import { expect,test } from "@playwright/test";
 
 test.describe("Bookmark Entity Pages (T010)", () => {
-  const BASE_URL = process.env.CI ? "http://localhost:4173" : "http://localhost:5173";
+  const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+  const BASE_URL = IS_CI ? "http://localhost:4173" : "http://localhost:5173";
 
   // Test entities from different types with known stable IDs
   const TEST_ENTITIES = [
@@ -31,6 +32,9 @@ test.describe("Bookmark Entity Pages (T010)", () => {
     { type: "sources", id: "S137773608", description: "Test Source" },
   ];
 
+  const MULTI_BOOKMARK_ENTITY_COUNT = 3;
+  const RAPID_TOGGLE_COUNT = 5;
+
   test.beforeEach(async ({ page, context }) => {
     // Clear all storage to ensure clean state
     await context.clearCookies();
@@ -38,12 +42,12 @@ test.describe("Bookmark Entity Pages (T010)", () => {
     await page.waitForLoadState("networkidle");
 
     // Clear IndexedDB storage (bookmarks are stored here)
-    await page.evaluate(() => {
-      const deleteDB = (databaseName: string) => {
+    await page.evaluate(async () => {
+      const deleteDB = async (databaseName: string) => {
         return new Promise<void>((resolve, reject) => {
           const request = indexedDB.deleteDatabase(databaseName);
-          request.onsuccess = () => resolve();
-          request.onerror = () => reject(request.error);
+          request.onsuccess = () => { resolve(); };
+          request.onerror = () => { reject(new Error(request.error?.message ?? "IndexedDB request failed")); };
           request.onblocked = () => {
             console.warn(`Database ${databaseName} deletion blocked`);
             resolve(); // Continue anyway
@@ -95,8 +99,8 @@ test.describe("Bookmark Entity Pages (T010)", () => {
 
       // Verify initial state - should NOT be bookmarked
       // The button should have variant="light" and color="gray" when not bookmarked
-      const initialVariant = bookmarkButton;
-      await expect(initialVariant).not.toHaveAttribute('data-variant', 'filled');
+      
+      await expect(bookmarkButton).not.toHaveAttribute('data-variant', 'filled');
 
       // Click to bookmark
       await bookmarkButton.click();
@@ -104,33 +108,37 @@ test.describe("Bookmark Entity Pages (T010)", () => {
       // Wait for bookmark operation to complete
       // Removed: waitForTimeout - use locator assertions instead
       // Verify bookmark state changed - button should now be filled/yellow
-      const updatedVariant = bookmarkButton;
-      await expect(updatedVariant).toHaveAttribute('data-variant', 'filled');
+      
+      await expect(bookmarkButton).toHaveAttribute('data-variant', 'filled');
 
       // Verify bookmark was persisted in IndexedDB
       const isBookmarked = await page.evaluate(async () => {
         const database = await new Promise<IDBDatabase>((resolve, reject) => {
           const request = indexedDB.open('catalogue-db');
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
+          request.onsuccess = () => { resolve(request.result); };
+          request.onerror = () => { reject(new Error(request.error?.message ?? "IndexedDB request failed")); };
         });
 
         const transaction = database.transaction(['entities'], 'readonly');
         const store = transaction.objectStore('entities');
-        const getAllRequest = store.getAll();
+        const getAllRequest: IDBRequest<unknown[]> = store.getAll();
 
-        const entities = await new Promise<any[]>((resolve, reject) => {
-          getAllRequest.onsuccess = () => resolve(getAllRequest.result);
-          getAllRequest.onerror = () => reject(getAllRequest.error);
+        const entities = await new Promise<unknown[]>((resolve, reject) => {
+          getAllRequest.onsuccess = () => { resolve(getAllRequest.result); };
+          getAllRequest.onerror = () => { reject(new Error(getAllRequest.error?.message ?? "IndexedDB getAll request failed")); };
         });
+
+        const isCatalogueRecord = (value: unknown): value is { listId: unknown; entityId: unknown; entityType: unknown } =>
+          typeof value === 'object' && value !== null;
 
         database.close();
 
         // Check if entity exists in bookmarks list
-        return entities.some(entity =>
-          entity.listId === 'bookmarks' &&
-          entity.entityId === 'A5017898742' &&
-          entity.entityType === 'authors'
+        return entities.some(record =>
+          isCatalogueRecord(record) &&
+          record.listId === 'bookmarks' &&
+          record.entityId === 'A5017898742' &&
+          record.entityType === 'authors'
         );
       });
 
@@ -170,8 +178,8 @@ test.describe("Bookmark Entity Pages (T010)", () => {
       const returnedBookmarkButton = page.locator('[data-testid="entity-bookmark-button"]');
       await expect(returnedBookmarkButton).toBeVisible({ timeout: 10_000 });
 
-      const variant = returnedBookmarkButton;
-      await expect(variant).toHaveAttribute('data-variant', 'filled');
+      
+      await expect(returnedBookmarkButton).toHaveAttribute('data-variant', 'filled');
     });
 
     test("should unbookmark entity successfully", async ({ page }) => {
@@ -204,26 +212,30 @@ test.describe("Bookmark Entity Pages (T010)", () => {
       const isBookmarked = await page.evaluate(async () => {
         const database = await new Promise<IDBDatabase>((resolve, reject) => {
           const request = indexedDB.open('catalogue-db');
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
+          request.onsuccess = () => { resolve(request.result); };
+          request.onerror = () => { reject(new Error(request.error?.message ?? "IndexedDB request failed")); };
         });
 
         const transaction = database.transaction(['entities'], 'readonly');
         const store = transaction.objectStore('entities');
-        const getAllRequest = store.getAll();
+        const getAllRequest: IDBRequest<unknown[]> = store.getAll();
 
-        const entities = await new Promise<any[]>((resolve, reject) => {
-          getAllRequest.onsuccess = () => resolve(getAllRequest.result);
-          getAllRequest.onerror = () => reject(getAllRequest.error);
+        const entities = await new Promise<unknown[]>((resolve, reject) => {
+          getAllRequest.onsuccess = () => { resolve(getAllRequest.result); };
+          getAllRequest.onerror = () => { reject(new Error(getAllRequest.error?.message ?? "IndexedDB getAll request failed")); };
         });
+
+        const isCatalogueRecord = (value: unknown): value is { listId: unknown; entityId: unknown; entityType: unknown } =>
+          typeof value === 'object' && value !== null;
 
         database.close();
 
         // Check if entity still exists in bookmarks list
-        return entities.some(entity =>
-          entity.listId === 'bookmarks' &&
-          entity.entityId === 'A5017898742' &&
-          entity.entityType === 'authors'
+        return entities.some(record =>
+          isCatalogueRecord(record) &&
+          record.listId === 'bookmarks' &&
+          record.entityId === 'A5017898742' &&
+          record.entityType === 'authors'
         );
       });
 
@@ -252,8 +264,8 @@ test.describe("Bookmark Entity Pages (T010)", () => {
       const reloadedBookmarkButton = page.locator('[data-testid="entity-bookmark-button"]');
       await expect(reloadedBookmarkButton).toBeVisible({ timeout: 10_000 });
 
-      const variant = reloadedBookmarkButton;
-      await expect(variant).toHaveAttribute('data-variant', 'filled');
+      
+      await expect(reloadedBookmarkButton).toHaveAttribute('data-variant', 'filled');
     });
   });
 
@@ -274,32 +286,36 @@ test.describe("Bookmark Entity Pages (T010)", () => {
       await bookmarkButton.click();
       // Removed: waitForTimeout - use locator assertions instead
       // Verify bookmark state changed
-      const variant = bookmarkButton;
-      await expect(variant).toHaveAttribute('data-variant', 'filled');
+      
+      await expect(bookmarkButton).toHaveAttribute('data-variant', 'filled');
 
       // Verify in storage
       const isBookmarked = await page.evaluate(async () => {
         const database = await new Promise<IDBDatabase>((resolve, reject) => {
           const request = indexedDB.open('catalogue-db');
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
+          request.onsuccess = () => { resolve(request.result); };
+          request.onerror = () => { reject(new Error(request.error?.message ?? "IndexedDB request failed")); };
         });
 
         const transaction = database.transaction(['entities'], 'readonly');
         const store = transaction.objectStore('entities');
-        const getAllRequest = store.getAll();
+        const getAllRequest: IDBRequest<unknown[]> = store.getAll();
 
-        const entities = await new Promise<any[]>((resolve, reject) => {
-          getAllRequest.onsuccess = () => resolve(getAllRequest.result);
-          getAllRequest.onerror = () => reject(getAllRequest.error);
+        const entities = await new Promise<unknown[]>((resolve, reject) => {
+          getAllRequest.onsuccess = () => { resolve(getAllRequest.result); };
+          getAllRequest.onerror = () => { reject(new Error(getAllRequest.error?.message ?? "IndexedDB getAll request failed")); };
         });
+
+        const isCatalogueRecord = (value: unknown): value is { listId: unknown; entityId: unknown; entityType: unknown } =>
+          typeof value === 'object' && value !== null;
 
         database.close();
 
-        return entities.some(entity =>
-          entity.listId === 'bookmarks' &&
-          entity.entityId === 'W2741809807' &&
-          entity.entityType === 'works'
+        return entities.some(record =>
+          isCatalogueRecord(record) &&
+          record.listId === 'bookmarks' &&
+          record.entityId === 'W2741809807' &&
+          record.entityType === 'works'
         );
       });
 
@@ -322,15 +338,15 @@ test.describe("Bookmark Entity Pages (T010)", () => {
 
       await bookmarkButton.click();
       // Removed: waitForTimeout - use locator assertions instead
-      const variant = bookmarkButton;
-      await expect(variant).toHaveAttribute('data-variant', 'filled');
+      
+      await expect(bookmarkButton).toHaveAttribute('data-variant', 'filled');
     });
   });
 
   test.describe("Multiple Entity Bookmarking", () => {
     test("should bookmark multiple entities from different types", async ({ page }) => {
       // Bookmark entities of different types
-      for (const entity of TEST_ENTITIES.slice(0, 3)) {
+      for (const entity of TEST_ENTITIES.slice(0, MULTI_BOOKMARK_ENTITY_COUNT)) {
         await page.goto(`${BASE_URL}/#/${entity.type}/${entity.id}`, {
           waitUntil: 'domcontentloaded',
           timeout: 30_000,
@@ -347,25 +363,28 @@ test.describe("Bookmark Entity Pages (T010)", () => {
       const bookmarkCount = await page.evaluate(async () => {
         const database = await new Promise<IDBDatabase>((resolve, reject) => {
           const request = indexedDB.open('catalogue-db');
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
+          request.onsuccess = () => { resolve(request.result); };
+          request.onerror = () => { reject(new Error(request.error?.message ?? "IndexedDB request failed")); };
         });
 
         const transaction = database.transaction(['entities'], 'readonly');
         const store = transaction.objectStore('entities');
-        const getAllRequest = store.getAll();
+        const getAllRequest: IDBRequest<unknown[]> = store.getAll();
 
-        const entities = await new Promise<any[]>((resolve, reject) => {
-          getAllRequest.onsuccess = () => resolve(getAllRequest.result);
-          getAllRequest.onerror = () => reject(getAllRequest.error);
+        const entities = await new Promise<unknown[]>((resolve, reject) => {
+          getAllRequest.onsuccess = () => { resolve(getAllRequest.result); };
+          getAllRequest.onerror = () => { reject(new Error(getAllRequest.error?.message ?? "IndexedDB getAll request failed")); };
         });
+
+        const isCatalogueRecord = (value: unknown): value is { listId: unknown; entityId: unknown; entityType: unknown } =>
+          typeof value === 'object' && value !== null;
 
         database.close();
 
-        return entities.filter(entity => entity.listId === 'bookmarks').length;
+        return entities.filter(record => isCatalogueRecord(record) && record.listId === 'bookmarks').length;
       });
 
-      expect(bookmarkCount).toBe(3);
+      expect(bookmarkCount).toBe(MULTI_BOOKMARK_ENTITY_COUNT);
     });
 
     test("should navigate to bookmarks page and see bookmarked entities", async ({ page }) => {
@@ -415,7 +434,7 @@ test.describe("Bookmark Entity Pages (T010)", () => {
       await expect(bookmarkButton).toBeVisible({ timeout: 10_000 });
 
       // Rapidly toggle bookmark multiple times
-      for (let index = 0; index < 5; index++) {
+      for (let index = 0; index < RAPID_TOGGLE_COUNT; index++) {
         await bookmarkButton.click();
         // Removed: waitForTimeout - use locator assertions instead
       }
@@ -449,8 +468,8 @@ test.describe("Bookmark Entity Pages (T010)", () => {
       // In a real scenario, the loading prop would be briefly true
       // For this test, we just verify the button remains interactable
       // Removed: waitForTimeout - use locator assertions instead
-      const isEnabled = bookmarkButton;
-      await expect(isEnabled).toBeEnabled();
+      
+      await expect(bookmarkButton).toBeEnabled();
     });
   });
 });

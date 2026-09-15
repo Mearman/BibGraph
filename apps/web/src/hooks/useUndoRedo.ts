@@ -34,9 +34,8 @@ const DEFAULT_MAX_HISTORY = 10; // User decision: 10 actions
 
 /**
  * Hook for managing undo/redo state with keyboard shortcuts
- * @param options
  */
-export const useUndoRedo = <T = unknown>(options: UseUndoRedoOptions = {}): UseUndoRedoReturn<T> => {
+export const useUndoRedo = <T = unknown>(options: Readonly<UseUndoRedoOptions> = {}): UseUndoRedoReturn<T> => {
   const {
     maxHistory = DEFAULT_MAX_HISTORY,
     enableKeyboardShortcuts = true,
@@ -75,7 +74,7 @@ export const useUndoRedo = <T = unknown>(options: UseUndoRedoOptions = {}): UseU
         setPast((previous) => previous.slice(0, -1));
         setFuture((previous) => [action, ...previous]);
       },
-      () => {}
+      () => { /* no cleanup needed for undo */ }
     );
   }, [past, canUndo]);
 
@@ -92,7 +91,7 @@ export const useUndoRedo = <T = unknown>(options: UseUndoRedoOptions = {}): UseU
         setFuture((previous) => previous.slice(1));
         setPast((previous) => [...previous, action]);
       },
-      () => {}
+      () => { /* no cleanup needed for redo */ }
     );
   }, [future, canRedo]);
 
@@ -122,22 +121,24 @@ export const useUndoRedo = <T = unknown>(options: UseUndoRedoOptions = {}): UseU
    * Set up keyboard shortcuts
    */
   useEffect(() => {
-    if (!enableKeyboardShortcuts) return;
+    if (!enableKeyboardShortcuts) return undefined;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCommandOrCtrl = e.metaKey || e.ctrlKey;
 
       if (isCommandOrCtrl && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
-        undo();
+        void undo();
       } else if (isCommandOrCtrl && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
         e.preventDefault();
-        redo();
+        void redo();
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [enableKeyboardShortcuts, undo, redo]);
 
   return {

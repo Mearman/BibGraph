@@ -28,9 +28,9 @@ export interface TouchGestureHandlers {
   onPinch?: (scale: number, centerX: number, centerY: number) => void;
   onDoubleTap?: (x: number, y: number) => void;
   onLongPress?: (x: number, y: number) => void;
-  onTouchStart?: (touches: TouchPoint[]) => void;
-  onTouchMove?: (touches: TouchPoint[]) => void;
-  onTouchEnd?: (touches: TouchPoint[]) => void;
+  onTouchStart?: (touches: readonly TouchPoint[]) => void;
+  onTouchMove?: (touches: readonly TouchPoint[]) => void;
+  onTouchEnd?: (touches: readonly TouchPoint[]) => void;
 }
 
 export interface TouchGestureOptions {
@@ -41,9 +41,11 @@ export interface TouchGestureOptions {
   preventDefault?: boolean;
 }
 
+const PINCH_SCALE_PERCENTAGE_DIVISOR = 100;
+
 export const useTouchGestures = (
-  handlers: TouchGestureHandlers = {},
-  options: TouchGestureOptions = {}
+  handlers: Readonly<TouchGestureHandlers> = {},
+  options: Readonly<TouchGestureOptions> = {}
 ) => {
   const {
     swipeThreshold = 50,
@@ -67,25 +69,25 @@ export const useTouchGestures = (
   const initialPinchDistanceReference = useRef<number | null>(null);
 
   const getTouchPoints = useCallback((touches: TouchList | React.TouchList): TouchPoint[] => {
-    const touchArray: Touch[] = [];
-    for (let index = 0; index < touches.length; index++) {
-      touchArray.push(touches[index] as Touch);
-    }
-    return touchArray.map(touch => ({
-      x: touch.clientX,
-      y: touch.clientY,
-      timestamp: Date.now(),
-    }));
+    // Built via the length + index-generator form of Array.from (not a spreadable conversion), since React's TouchList is ArrayLike but not iterable, unlike the DOM's native TouchList
+    return Array.from({ length: touches.length }, (_, index) => {
+      const touch = touches[index];
+      return {
+        x: touch.clientX,
+        y: touch.clientY,
+        timestamp: Date.now(),
+      };
+    });
   }, []);
 
-  const calculateDistance = useCallback((touch1: TouchPoint, touch2: TouchPoint): number => {
+  const calculateDistance = useCallback((touch1: Readonly<TouchPoint>, touch2: Readonly<TouchPoint>): number => {
     const dx = touch2.x - touch1.x;
     const dy = touch2.y - touch1.y;
     return Math.sqrt(dx * dx + dy * dy);
   }, []);
 
   const calculateSwipeDirection = useCallback(
-    (startPoint: TouchPoint, endPoint: TouchPoint): 'left' | 'right' | 'up' | 'down' | null => {
+    (startPoint: Readonly<TouchPoint>, endPoint: Readonly<TouchPoint>): 'left' | 'right' | 'up' | 'down' | null => {
       const dx = endPoint.x - startPoint.x;
       const dy = endPoint.y - startPoint.y;
       const absDx = Math.abs(dx);
@@ -156,13 +158,13 @@ export const useTouchGestures = (
       }
 
       // Handle pinch gesture
-      if (currentTouches.length === 2 && handlers.onPinch && initialPinchDistanceReference.current) {
+      if (currentTouches.length === 2 && handlers.onPinch && initialPinchDistanceReference.current !== null) {
         const currentDistance = calculateDistance(currentTouches[0], currentTouches[1]);
         const scale = currentDistance / initialPinchDistanceReference.current;
         const centerX = (currentTouches[0].x + currentTouches[1].x) / 2;
         const centerY = (currentTouches[0].y + currentTouches[1].y) / 2;
 
-        if (Math.abs(scale - 1) > pinchThreshold / 100) {
+        if (Math.abs(scale - 1) > pinchThreshold / PINCH_SCALE_PERCENTAGE_DIVISOR) {
           handlers.onPinch(scale, centerX, centerY);
           setGestureState(previous => ({
             ...previous,
@@ -228,7 +230,7 @@ export const useTouchGestures = (
         );
 
         if (direction) {
-          const velocity = swipeThreshold / 100; // Simplified velocity calculation
+          const velocity = swipeThreshold / PINCH_SCALE_PERCENTAGE_DIVISOR; // Simplified velocity calculation
           handlers.onSwipe(direction, velocity);
           setGestureState(previous => ({
             ...previous,

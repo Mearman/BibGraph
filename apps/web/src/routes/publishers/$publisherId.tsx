@@ -4,9 +4,10 @@ import { z } from "zod";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const PublisherRoute = lazy(() =>
-  import("./$publisherId.lazy").then((m) => ({ default: m.default })),
-);
+const PublisherRoute = lazy(async () => {
+  const routeModule = await import("./$publisherId.lazy");
+  return { default: routeModule.default };
+});
 
 export const Route = createFileRoute("/publishers/$publisherId")({
   component: () => (

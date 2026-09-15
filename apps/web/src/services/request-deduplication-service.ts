@@ -6,7 +6,7 @@
 import type { OpenAlexEntity } from "@bibgraph/types";
 import { isOpenAlexEntity } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils/logger";
-import { QueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 
 import { trackCacheOperation,trackDeduplication } from "./network-interceptor";
 
@@ -21,7 +21,7 @@ interface RequestCacheEntry {
  * Service to deduplicate API requests and provide cache-first entity fetching
  */
 export class RequestDeduplicationService {
-  private ongoingRequests = new Map<string, RequestCacheEntry>();
+  private readonly ongoingRequests = new Map<string, RequestCacheEntry>();
   private readonly queryClient: QueryClient;
   private readonly defaultFetcher?: () => Promise<OpenAlexEntity>;
 
@@ -35,9 +35,6 @@ export class RequestDeduplicationService {
 
   /**
    * Get entity with request deduplication and cache-first strategy
-   * @param root0
-   * @param root0.entityId
-   * @param root0.fetcher
    */
   async getEntity({
     entityId,
@@ -113,9 +110,6 @@ export class RequestDeduplicationService {
 
   /**
    * Create a dedicated request with proper cleanup
-   * @param root0
-   * @param root0.entityId
-   * @param root0.fetcher
    */
   private async createDedicatedRequest({
     entityId,
@@ -182,7 +176,6 @@ export class RequestDeduplicationService {
 
   /**
    * Check TanStack Query cache for entity
-   * @param entityId
    */
   private getCachedEntity(entityId: string): OpenAlexEntity | null {
     try {
@@ -198,7 +191,7 @@ export class RequestDeduplicationService {
       // Try to find in any cached queries that might contain this entity
       const allQueries = this.queryClient.getQueryCache().findAll({
         predicate: (query) => {
-          if (query.state.status !== "success" || !query.state.data) {
+          if (query.state.status !== "success" || query.state.data === undefined) {
             return false;
           }
 
@@ -212,9 +205,7 @@ export class RequestDeduplicationService {
             queryKey[0] === "entity" &&
             isOpenAlexEntity(data)
           ) {
-            // Type assertion after type guard check
-            const entityData = data as OpenAlexEntity;
-            return entityData.id === entityId;
+            return data.id === entityId;
           }
 
           return false;
@@ -254,7 +245,6 @@ export class RequestDeduplicationService {
 
   /**
    * Simple entity type detection for logging
-   * @param entityId
    */
   private detectEntityType(entityId: string): string {
     if (entityId.includes("/W")) return "works";
@@ -273,11 +263,11 @@ export class RequestDeduplicationService {
    */
   getStats(): {
     ongoingRequests: number;
-    requestDetails: Array<{
+    requestDetails: {
       entityId: string;
       ageMs: number;
       entityType: string;
-    }>;
+    }[];
   } {
     const now = Date.now();
     const requestDetails = [...this.ongoingRequests].map(
@@ -313,9 +303,6 @@ export class RequestDeduplicationService {
 
   /**
    * Force refresh an entity by clearing its cache and ongoing request
-   * @param root0
-   * @param root0.entityId
-   * @param root0.fetcher
    */
   async refreshEntity({
     entityId,
@@ -348,6 +335,5 @@ export class RequestDeduplicationService {
 
 /**
  * Create a request deduplication service instance
- * @param queryClient
  */
 export const createRequestDeduplicationService = (queryClient: QueryClient): RequestDeduplicationService => new RequestDeduplicationService(queryClient);

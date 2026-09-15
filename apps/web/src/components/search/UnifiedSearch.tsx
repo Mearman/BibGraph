@@ -29,16 +29,22 @@ interface SavedQuery {
   usageCount: number;
 }
 
+const ONE_DAY_AGO_MS = 86400000;
+const TWO_DAYS_AGO_MS = 172800000;
+const THREE_DAYS_AGO_MS = 259200000;
+const MAX_SEARCH_HISTORY_ITEMS = 10;
+const RECENT_SEARCHES_DISPLAY_LIMIT = 5;
+
 export const UnifiedSearch = ({ defaultTab = "basic" }: UnifiedSearchProperties) => {
   const [activeTab, setActiveTab] = useState<string | null>(defaultTab);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
-  const [savedQueries] = useState<SavedQuery[]>([
+  const [savedQueries] = useState<SavedQuery[]>(() => [
     {
       id: "1",
       name: "Machine Learning Papers",
       query: "machine learning neural networks deep learning",
       description: "Recent ML research papers",
-      createdAt: new Date(Date.now() - 86400000),
+      createdAt: new Date(Date.now() - ONE_DAY_AGO_MS),
       usageCount: 24,
     },
     {
@@ -46,7 +52,7 @@ export const UnifiedSearch = ({ defaultTab = "basic" }: UnifiedSearchProperties)
       name: "Climate Change Research",
       query: "climate change global warming environmental science",
       description: "Climate science and environmental research",
-      createdAt: new Date(Date.now() - 172800000),
+      createdAt: new Date(Date.now() - TWO_DAYS_AGO_MS),
       usageCount: 18,
     },
     {
@@ -54,13 +60,13 @@ export const UnifiedSearch = ({ defaultTab = "basic" }: UnifiedSearchProperties)
       name: "COVID-19 Studies",
       query: "coronavirus covid-19 pandemic sars-cov-2",
       description: "COVID-19 research and studies",
-      createdAt: new Date(Date.now() - 259200000),
+      createdAt: new Date(Date.now() - THREE_DAYS_AGO_MS),
       usageCount: 42,
     },
   ]);
   const navigate = useNavigate();
 
-  const handleSearch = useCallback((filters: SearchFilters) => {
+  const handleSearch = useCallback((filters: Readonly<SearchFilters>) => {
     if (!filters.query.trim()) {
     	return;
     }
@@ -68,11 +74,11 @@ export const UnifiedSearch = ({ defaultTab = "basic" }: UnifiedSearchProperties)
     // Add to search history (avoid duplicates)
     setSearchHistory(previous => {
       const filtered = previous.filter(q => q !== filters.query.trim());
-      return [filters.query.trim(), ...filtered].slice(0, 10); // Keep last 10 searches
+      return [filters.query.trim(), ...filtered].slice(0, MAX_SEARCH_HISTORY_ITEMS); // Keep last N searches
     });
 
     // Navigate to search results
-    navigate({
+    void navigate({
       to: "/search",
       search: { q: filters.query, filter: undefined, search: undefined },
     });
@@ -123,12 +129,12 @@ export const UnifiedSearch = ({ defaultTab = "basic" }: UnifiedSearchProperties)
                     Recent Searches
                   </Text>
                   <Stack gap="xs">
-                    {searchHistory.slice(0, 5).map((query, index) => (
+                    {searchHistory.slice(0, RECENT_SEARCHES_DISPLAY_LIMIT).map((query, index) => (
                       <Text
                         key={index}
                         size="sm"
                         style={{ cursor: "pointer", padding: "4px 8px", textDecoration: "underline" }}
-                        onClick={() => handleHistoryClick(query)}
+                        onClick={() => { handleHistoryClick(query); }}
                         c="blue"
                       >
                         {query}
@@ -211,7 +217,7 @@ export const UnifiedSearch = ({ defaultTab = "basic" }: UnifiedSearchProperties)
                     p="md"
                     withBorder
                     style={{ cursor: "pointer" }}
-                    onClick={() => handleSavedQueryClick(savedQuery.query)}
+                    onClick={() => { handleSavedQueryClick(savedQuery.query); }}
                   >
                     <Group justify="space-between" align="center">
                       <Stack gap="xs">

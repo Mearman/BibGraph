@@ -40,12 +40,28 @@ export interface FilterBuilderOptions {
 }
 
 /**
+ * Parameters accepted by {@link FilterBuilder.toQueryString} and {@link FilterBuilder.convertWithValidation}
+ */
+export interface QueryStringParams {
+  filters: EntityFilters | Partial<EntityFilters> | null | undefined;
+  entityType?: EntityType;
+}
+
+/**
+ * Parameters accepted by {@link FilterBuilder.validateFilters}
+ */
+export interface ValidateFiltersParams {
+  filters: EntityFilters | Partial<EntityFilters>;
+  entityType: EntityType;
+}
+
+/**
  * FilterBuilder class for converting EntityFilters to OpenAlex API query strings
  */
 export class FilterBuilder {
-  private options: FilterBuilderOptions;
+  private readonly options: FilterBuilderOptions;
 
-  constructor(options: FilterBuilderOptions = {}) {
+  constructor(options: Readonly<FilterBuilderOptions> = {}) {
     this.options = {
       validateInputs: true,
       escapeValues: true,
@@ -57,10 +73,7 @@ export class FilterBuilder {
 
   /**
    * Convert EntityFilters object to OpenAlex API query string format
-   * @param filters - The filter object to convert
-   * @param filters.filters
-   * @param entityType - Optional entity type for enhanced validation
-   * @param filters.entityType
+   * @param params - The filters and optional entity type to convert
    * @returns The formatted filter string for the OpenAlex API
    * @example
    * ```typescript
@@ -74,25 +87,20 @@ export class FilterBuilder {
    * // Result: "publication_year:2023,is_oa:true,authorships.author.id:A1234|A5678"
    * ```
    */
-  toQueryString({
-    filters,
-    entityType,
-  }: {
-    filters: EntityFilters | Partial<EntityFilters> | null | undefined;
-    entityType?: EntityType;
-  }): string {
+  toQueryString(params: Readonly<QueryStringParams>): string {
+    const { filters, entityType } = params;
     logger.debug("filters", "Converting filters to query string", {
       filters,
       entityType,
       options: this.options,
     });
 
-    if (!filters || Object.keys(filters).length === 0) {
+    if (filters === null || filters === undefined || Object.keys(filters).length === 0) {
       return "";
     }
 
     // Validate inputs if enabled
-    if (this.options.validateInputs && entityType) {
+    if (this.options.validateInputs === true && entityType !== undefined) {
       const validation = this.validateFilters({ filters, entityType });
       if (!validation.isValid) {
         logger.warn("filters", "Filter validation failed", {
@@ -111,7 +119,7 @@ export class FilterBuilder {
       }
 
       // Skip empty values unless explicitly included
-      if (!this.options.includeEmpty && this.isEmpty(value)) {
+      if (this.options.includeEmpty !== true && this.isEmpty(value)) {
         continue;
       }
 
@@ -157,8 +165,12 @@ export class FilterBuilder {
       return this.escapeValue(value);
     }
 
-    // Convert other types to string
-    return this.escapeValue(String(value));
+    if (typeof value === "bigint" || typeof value === "symbol") {
+      return this.escapeValue(value.toString());
+    }
+
+    // Remaining object-like or exotic values - use JSON serialization, since the default Object.prototype.toString() only yields "[object Object]"
+    return this.escapeValue(JSON.stringify(value));
   }
 
   /**
@@ -167,7 +179,7 @@ export class FilterBuilder {
    * @returns Escaped value safe for use in API queries
    */
   private escapeValue(value: string): string {
-    if (!this.options.escapeValues || !value || typeof value !== "string") {
+    if (this.options.escapeValues !== true || !value || typeof value !== "string") {
       return value || "";
     }
 
@@ -211,24 +223,12 @@ export class FilterBuilder {
   /**
    * Validate filter object for a specific entity type
    * @param params - The validation parameters
-   * @param params.filters - The filters to validate
-   * @param params.entityType - The entity type to validate against
    * @returns Validation result with errors and warnings
    */
-  validateFilters({
-    filters,
-  }: {
-    filters: EntityFilters | Partial<EntityFilters>;
-    entityType: EntityType;
-  }) {
+  validateFilters(params: Readonly<ValidateFiltersParams>): FilterValidationResult {
+    const { filters } = params;
     const errors: Record<string, string> = {};
     const warnings: Record<string, string> = {};
-
-    // Basic validation
-    if (!filters || typeof filters !== "object") {
-      errors.general = "Filters must be a valid object";
-      return { isValid: false, errors, warnings };
-    }
 
     // Check for known filter fields (this is a basic check - could be enhanced with schema validation)
     const commonFilterPatterns = [
@@ -269,7 +269,9 @@ export class FilterBuilder {
         value !== undefined &&
         !this.isValidNumericFilter(value)
       ) {
-        errors[field] = `Invalid numeric value for field ${field}: ${value}`;
+        const valueDisplay =
+          typeof value === "bigint" || typeof value === "symbol" ? value.toString() : JSON.stringify(value);
+        errors[field] = `Invalid numeric value for field ${field}: ${valueDisplay}`;
       }
 
       // Validate boolean fields
@@ -331,7 +333,7 @@ export class FilterBuilder {
    * @param options - New options to apply
    * @returns New FilterBuilder instance
    */
-  withOptions(options: Partial<FilterBuilderOptions>): FilterBuilder {
+  withOptions(options: Readonly<Partial<FilterBuilderOptions>>): FilterBuilder {
     return new FilterBuilder({ ...this.options, ...options });
   }
 
@@ -345,21 +347,16 @@ export class FilterBuilder {
 
   /**
    * Convert filters and return both the query string and validation results
-   * @param filters - The filters to convert
-   * @param filters.filters
-   * @param entityType - Optional entity type for validation
-   * @param filters.entityType
+   * @param params - The filters and optional entity type to convert
    * @returns Object with query string and validation results
    */
-  convertWithValidation({
-    filters,
-    entityType,
-  }: {
-    filters: EntityFilters | Partial<EntityFilters> | null | undefined;
-    entityType?: EntityType;
-  }) {
+  convertWithValidation(params: Readonly<QueryStringParams>): {
+    queryString: string;
+    validation: FilterValidationResult | undefined;
+  } {
+    const { filters, entityType } = params;
     const validation =
-      entityType && this.options.validateInputs && filters
+      entityType !== undefined && this.options.validateInputs === true && filters !== null && filters !== undefined
         ? this.validateFilters({ filters, entityType })
         : undefined;
 
@@ -415,32 +412,16 @@ export const strictFilterBuilder = FilterBuilder.createStrict();
 
 /**
  * Convenience function to convert filters to query string using default options
- * @param filters - The filters to convert
- * @param filters.filters
- * @param entityType - Optional entity type for validation
- * @param filters.entityType
+ * @param params - The filters and optional entity type to convert
  * @returns The formatted filter string
  */
-export const filtersToQueryString = ({
-  filters,
-  entityType,
-}: {
-  filters: EntityFilters | Partial<EntityFilters> | null | undefined;
-  entityType?: EntityType;
-}): string => defaultFilterBuilder.toQueryString({ filters, entityType });
+export const filtersToQueryString = (params: Readonly<QueryStringParams>): string =>
+  defaultFilterBuilder.toQueryString(params);
 
 /**
  * Convenience function to validate filters without conversion
- * @param filters - The filters to validate
- * @param filters.filters
- * @param entityType - The entity type to validate against
- * @param filters.entityType
+ * @param params - The validation parameters
  * @returns Validation result
  */
-export const validateFilters = ({
-  filters,
-  entityType,
-}: {
-  filters: EntityFilters | Partial<EntityFilters>;
-  entityType: EntityType;
-}) => strictFilterBuilder.validateFilters({ filters, entityType });
+export const validateFilters = (params: Readonly<ValidateFiltersParams>): FilterValidationResult =>
+  strictFilterBuilder.validateFilters(params);

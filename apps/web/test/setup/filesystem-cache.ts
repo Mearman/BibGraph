@@ -4,6 +4,7 @@
  */
 
 import * as fs from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
 
 // Note: When running E2E tests, cwd is already 'apps/web'
@@ -16,8 +17,6 @@ export interface CacheReadResult {
 
 /**
  * Read entity from filesystem cache
- * @param entityType
- * @param id
  */
 export const readFromFilesystemCache = async (entityType: string, id: string): Promise<CacheReadResult> => {
   try {
@@ -29,8 +28,8 @@ export const readFromFilesystemCache = async (entityType: string, id: string): P
       return { found: false };
     }
 
-    const fileContent = fs.readFileSync(filePath, 'utf8');
-    const data = JSON.parse(fileContent);
+    const fileContent = await readFile(filePath, 'utf8');
+    const data: unknown = JSON.parse(fileContent);
 
     console.log(`✅ Filesystem cache hit: ${entityType}/${id}`);
     return { found: true, data };
@@ -42,9 +41,6 @@ export const readFromFilesystemCache = async (entityType: string, id: string): P
 
 /**
  * Write entity to filesystem cache
- * @param entityType
- * @param id
- * @param data
  */
 export const writeToFilesystemCache = async (entityType: string, id: string, data: unknown): Promise<void> => {
   try {
@@ -55,11 +51,11 @@ export const writeToFilesystemCache = async (entityType: string, id: string, dat
 
     // Ensure directory exists
     if (!fs.existsSync(entityDir)) {
-      fs.mkdirSync(entityDir, { recursive: true });
+      await mkdir(entityDir, { recursive: true });
     }
 
     // Write data
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
     console.log(`💾 Filesystem cache write: ${entityType}/${id}`);
   } catch (error) {
     console.error(`❌ Filesystem cache write error: ${entityType}/${id}`, error);
@@ -69,20 +65,19 @@ export const writeToFilesystemCache = async (entityType: string, id: string, dat
 /**
  * Extract entity ID from OpenAlex URL
  * Examples:
- *  - https://openalex.org/W123 -> W123
- *  - https://api.openalex.org/works/W123 -> W123
- *  - W123 -> W123
- * @param idOrUrl
+ *  - https://openalex.org/W123 -\> W123
+ *  - https://api.openalex.org/works/W123 -\> W123
+ *  - W123 -\> W123
  */
 export const extractEntityId = (idOrUrl: string): string => {
   if (!idOrUrl) return '';
 
   // Extract from full OpenAlex URL
-  const openalexMatch = idOrUrl.match(/openalex\.org\/([A-Z]\d+)/);
+  const openalexMatch = /openalex\.org\/([A-Z]\d+)/.exec(idOrUrl);
   if (openalexMatch) return openalexMatch[1];
 
   // Extract from API URL
-  const apiMatch = idOrUrl.match(/\/([A-Z]\d+)$/);
+  const apiMatch = /\/([A-Z]\d+)$/.exec(idOrUrl);
   if (apiMatch) return apiMatch[1];
 
   // Already clean ID
@@ -91,7 +86,6 @@ export const extractEntityId = (idOrUrl: string): string => {
 
 /**
  * Detect entity type from ID prefix
- * @param id
  */
 export const detectEntityType = (id: string): string | null => {
   const cleanId = extractEntityId(id);

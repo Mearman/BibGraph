@@ -3,7 +3,7 @@ import { logger } from "@bibgraph/utils";
 import { ActionIcon, Affix, Badge, Box, Code, Group, Modal, Paper, SegmentedControl, Stack, Text, Title, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconBookmark, IconBookmarkFilled, IconBookmarkOff, IconCode, IconGraph, IconListCheck, IconMenu2, IconX } from "@tabler/icons-react";
-import React, { ReactNode, useState } from "react";
+import React, { type ReactNode, useState } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
 import { useQueryBookmarking } from "@/hooks/use-query-bookmarking";
@@ -19,6 +19,8 @@ import { getMantineColor } from "./EntityTypeConfig";
 import { NavigationTrail } from "./NavigationTrail";
 
 export type DetailViewMode = "rich" | "raw";
+
+const MOBILE_STICKY_ACTION_BAR_HEIGHT = 80;
 
 interface EntityDetailLayoutProperties {
   config: EntityTypeConfig;
@@ -138,7 +140,7 @@ export const EntityDetailLayout = ({
   return (
     <Box
       p={isMobile() ? "sm" : "xl"}
-      pb={isMobile() ? 80 : undefined}
+      pb={isMobile() ? MOBILE_STICKY_ACTION_BAR_HEIGHT : undefined}
       bg="var(--mantine-color-body)"
       style={{ minHeight: '100%' }}
       data-testid="entity-detail-layout"
@@ -174,7 +176,7 @@ export const EntityDetailLayout = ({
 
                   <ActionIcon
                     variant="light"
-                    onClick={() => setMobileActionsOpen(!mobileActionsOpen)}
+                    onClick={() => { setMobileActionsOpen(!mobileActionsOpen); }}
                     aria-label="Actions menu"
                   >
                     {mobileActionsOpen ? <IconX size={ICON_SIZE.LG} /> : <IconMenu2 size={ICON_SIZE.LG} />}
@@ -211,7 +213,7 @@ export const EntityDetailLayout = ({
                         size="lg"
                         variant={isInGraph ? "filled" : "light"}
                         color="grape"
-                        onClick={handleAddToGraphToggle}
+                        onClick={() => { void handleAddToGraphToggle(); }}
                         loading={isAddingToGraph || graphList.loading}
                         data-testid="add-to-graph-button"
                         aria-label={isInGraph ? "Remove from graph" : "Add to graph for analysis"}
@@ -225,7 +227,7 @@ export const EntityDetailLayout = ({
                         size="lg"
                         variant="light"
                         color="green"
-                        onClick={() => setShowAddToListModal(true)}
+                        onClick={() => { setShowAddToListModal(true); }}
                         data-testid="add-to-catalogue-button"
                         aria-label="Add to catalogue list"
                       >
@@ -241,7 +243,7 @@ export const EntityDetailLayout = ({
                         size="lg"
                         variant={userInteractions.isBookmarked ? "filled" : "light"}
                         color={userInteractions.isBookmarked ? "yellow" : "gray"}
-                        onClick={handleBookmarkToggle}
+                        onClick={() => { void handleBookmarkToggle(); }}
                         loading={userInteractions.isLoadingBookmarks}
                         data-testid="entity-bookmark-button"
                         aria-label={userInteractions.isBookmarked ? "Remove entity bookmark" : "Bookmark this entity"}
@@ -254,7 +256,10 @@ export const EntityDetailLayout = ({
                       </ActionIcon>
                     </Tooltip>
 
-                    {(selectParam || Object.keys(queryBookmarking.currentQueryParams).length > 0) && (
+                    {(
+                      (selectParam !== undefined && selectParam !== "") ||
+                      Object.keys(queryBookmarking.currentQueryParams).length > 0
+                    ) && (
                       <Tooltip
                         label={
                           queryBookmarking.isQueryBookmarked
@@ -267,7 +272,7 @@ export const EntityDetailLayout = ({
                           size="lg"
                           variant={queryBookmarking.isQueryBookmarked ? "filled" : "light"}
                           color={queryBookmarking.isQueryBookmarked ? "blue" : "gray"}
-                          onClick={handleQueryBookmarkToggle}
+                          onClick={() => { void handleQueryBookmarkToggle(); }}
                           aria-label={queryBookmarking.isQueryBookmarked ? "Remove query bookmark" : "Bookmark this query"}
                         >
                           {queryBookmarking.isQueryBookmarked ? (
@@ -281,7 +286,7 @@ export const EntityDetailLayout = ({
 
                     <SegmentedControl
                       value={viewMode}
-                      onChange={(value) => onViewModeChange(value as DetailViewMode)}
+                      onChange={(value) => { onViewModeChange(value); }}
                       data={[
                         { label: 'Rich', value: 'rich' },
                         { label: 'Raw', value: 'raw' },
@@ -309,7 +314,7 @@ export const EntityDetailLayout = ({
                             variant={isInGraph ? "filled" : "light"}
                             color="grape"
                             onClick={() => {
-                              handleAddToGraphToggle();
+                              void handleAddToGraphToggle();
                               setMobileActionsOpen(false);
                             }}
                             loading={isAddingToGraph || graphList.loading}
@@ -338,7 +343,7 @@ export const EntityDetailLayout = ({
                             variant={userInteractions.isBookmarked ? "filled" : "light"}
                             color={userInteractions.isBookmarked ? "yellow" : "gray"}
                             onClick={() => {
-                              handleBookmarkToggle();
+                              void handleBookmarkToggle();
                               setMobileActionsOpen(false);
                             }}
                             loading={userInteractions.isLoadingBookmarks}
@@ -352,13 +357,16 @@ export const EntityDetailLayout = ({
                             )}
                           </ActionIcon>
 
-                          {(selectParam || Object.keys(queryBookmarking.currentQueryParams).length > 0) && (
+                          {(
+                            (selectParam !== undefined && selectParam !== "") ||
+                            Object.keys(queryBookmarking.currentQueryParams).length > 0
+                          ) && (
                             <ActionIcon
                               size="lg"
                               variant={queryBookmarking.isQueryBookmarked ? "filled" : "light"}
                               color={queryBookmarking.isQueryBookmarked ? "blue" : "gray"}
                               onClick={() => {
-                                handleQueryBookmarkToggle();
+                                void handleQueryBookmarkToggle();
                                 setMobileActionsOpen(false);
                               }}
                               aria-label={queryBookmarking.isQueryBookmarked ? "Remove query bookmark" : "Add query bookmark"}
@@ -375,7 +383,7 @@ export const EntityDetailLayout = ({
                             size="sm"
                             value={viewMode}
                             onChange={(value) => {
-                              onViewModeChange(value as DetailViewMode);
+                              onViewModeChange(value);
                               setMobileActionsOpen(false);
                             }}
                             data={[
@@ -406,9 +414,9 @@ export const EntityDetailLayout = ({
                       Fields shown:
                     </Text>
                     <Text size="sm" c="dimmed" flex={1}>
-                      {selectParam && typeof selectParam === 'string'
+                      {typeof selectParam === 'string'
                         ? selectParam
-                        : `All fields`}
+                        : 'All fields'}
                     </Text>
                   </Group>
                 </Stack>
@@ -494,7 +502,7 @@ export const EntityDetailLayout = ({
                     size="lg"
                     variant={isInGraph ? "filled" : "light"}
                     color="grape"
-                    onClick={handleAddToGraphToggle}
+                    onClick={() => { void handleAddToGraphToggle(); }}
                     loading={isAddingToGraph || graphList.loading}
                     aria-label={isInGraph ? "Remove from graph" : "Add to graph"}
                   >
@@ -507,7 +515,7 @@ export const EntityDetailLayout = ({
                     size="lg"
                     variant="light"
                     color="green"
-                    onClick={() => setShowAddToListModal(true)}
+                    onClick={() => { setShowAddToListModal(true); }}
                     aria-label="Add to catalogue list"
                   >
                     <IconListCheck size={ICON_SIZE.LG} />
@@ -522,7 +530,7 @@ export const EntityDetailLayout = ({
                     size="lg"
                     variant={userInteractions.isBookmarked ? "filled" : "light"}
                     color={userInteractions.isBookmarked ? "yellow" : "gray"}
-                    onClick={handleBookmarkToggle}
+                    onClick={() => { void handleBookmarkToggle(); }}
                     loading={userInteractions.isLoadingBookmarks}
                     aria-label={userInteractions.isBookmarked ? "Remove bookmark" : "Add bookmark"}
                   >
@@ -534,7 +542,10 @@ export const EntityDetailLayout = ({
                   </ActionIcon>
                 </Tooltip>
 
-                {(selectParam || Object.keys(queryBookmarking.currentQueryParams).length > 0) && (
+                {(
+                  (selectParam !== undefined && selectParam !== "") ||
+                  Object.keys(queryBookmarking.currentQueryParams).length > 0
+                ) && (
                   <Tooltip
                     label={queryBookmarking.isQueryBookmarked ? "Remove query bookmark" : "Bookmark query"}
                     position="top"
@@ -543,7 +554,7 @@ export const EntityDetailLayout = ({
                       size="lg"
                       variant={queryBookmarking.isQueryBookmarked ? "filled" : "light"}
                       color={queryBookmarking.isQueryBookmarked ? "blue" : "gray"}
-                      onClick={handleQueryBookmarkToggle}
+                      onClick={() => { void handleQueryBookmarkToggle(); }}
                       aria-label={queryBookmarking.isQueryBookmarked ? "Remove query bookmark" : "Add query bookmark"}
                     >
                       {queryBookmarking.isQueryBookmarked ? (
@@ -558,7 +569,7 @@ export const EntityDetailLayout = ({
                 <SegmentedControl
                   size="xs"
                   value={viewMode}
-                  onChange={(value) => onViewModeChange(value as DetailViewMode)}
+                  onChange={(value) => { onViewModeChange(value); }}
                   data={[
                     { label: 'Rich', value: 'rich' },
                     { label: 'Raw', value: 'raw' },

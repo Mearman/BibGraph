@@ -128,7 +128,7 @@ describe('IncomingRelationships', () => {
 
     it('should call window.location.reload when retry button is clicked', async () => {
       const user = userEvent.setup();
-      const reloadSpy = vi.fn();
+      const reloadSpy = vi.fn(() => { /* no-op */ });
       window.location.reload = reloadSpy;
 
       vi.mocked(useEntityRelationshipQueries).mockReturnValue({

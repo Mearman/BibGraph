@@ -9,7 +9,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { EntityType } from "@bibgraph/types";
+import { ENTITY_TYPES, type EntityType } from "@bibgraph/types";
 
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -74,6 +74,9 @@ const ENTITY_INDEX_PATHS = new Set([
 /**
  * External ID route patterns and their entity types
  */
+const isEntityType = (value: string): value is EntityType =>
+	ENTITY_TYPES.some((entityType) => entityType === value);
+
 const EXTERNAL_ID_ROUTES: Record<string, { entityType: EntityType; idType: string }> = {
 	"/authors/orcid/$orcid": { entityType: "authors", idType: "orcid" },
 	"/sources/issn/$issn": { entityType: "sources", idType: "issn" },
@@ -91,9 +94,7 @@ export const getAllRoutes = (): string[] => {
 	const content = fs.readFileSync(routeTreePath, "utf8");
 
 	// Extract routes from FileRoutesByFullPath interface
-	const interfaceMatch = content.match(
-		/export interface FileRoutesByFullPath \{([\s\S]*?)\n\}/
-	);
+	const interfaceMatch = /export interface FileRoutesByFullPath \{([\s\S]*?)\n\}/.exec(content);
 	if (!interfaceMatch) {
 		throw new Error("Could not find FileRoutesByFullPath interface in routeTree.gen.ts");
 	}
@@ -108,9 +109,8 @@ export const getAllRoutes = (): string[] => {
 
 /**
  * Categorize routes by their testing requirements
- * @param routes
  */
-export const categorizeRoutes = (routes: string[]): CategorizedRoutes => {
+export const categorizeRoutes = (routes: readonly string[]): CategorizedRoutes => {
 	const result: CategorizedRoutes = {
 		static: [],
 		entityIndex: [],
@@ -128,7 +128,7 @@ export const categorizeRoutes = (routes: string[]): CategorizedRoutes => {
 		}
 
 		// External ID routes
-		if (EXTERNAL_ID_ROUTES[route]) {
+		if (Object.prototype.hasOwnProperty.call(EXTERNAL_ID_ROUTES, route)) {
 			result.externalId.push(route);
 			continue;
 		}
@@ -160,21 +160,22 @@ export const categorizeRoutes = (routes: string[]): CategorizedRoutes => {
 
 /**
  * Extract entity type from a route path
- * @param route
- * @example extractEntityType('/works/$') -> 'works'
- * @example extractEntityType('/authors/$') -> 'authors'
+ * @example extractEntityType('/works/$') -\> 'works'
+ * @example extractEntityType('/authors/$') -\> 'authors'
  */
 export const extractEntityType = (route: string): EntityType | null => {
 	// Match /entityType/$ or /entityType/$paramName patterns
-	const match = route.match(/^\/([a-z]+)\/\$/);
+	const match = /^\/([a-z]+)\/\$/.exec(route);
 	if (match) {
-		return match[1] as EntityType;
+		const candidate = match[1];
+		return isEntityType(candidate) ? candidate : null;
 	}
 
 	// Match nested patterns like /concepts/$conceptId
-	const nestedMatch = route.match(/^\/([a-z]+)\/\$[A-Za-z]+$/);
+	const nestedMatch = /^\/([a-z]+)\/\$[A-Za-z]+$/.exec(route);
 	if (nestedMatch) {
-		return nestedMatch[1] as EntityType;
+		const candidate = nestedMatch[1];
+		return isEntityType(candidate) ? candidate : null;
 	}
 
 	return null;
@@ -182,16 +183,14 @@ export const extractEntityType = (route: string): EntityType | null => {
 
 /**
  * Get external ID info for a route
- * @param route
  */
-export const getExternalIdInfo = (route: string): { entityType: EntityType; idType: string } | null => EXTERNAL_ID_ROUTES[route] || null;
+export const getExternalIdInfo = (route: string): { entityType: EntityType; idType: string } | null =>
+	Object.prototype.hasOwnProperty.call(EXTERNAL_ID_ROUTES, route) ? EXTERNAL_ID_ROUTES[route] : null;
 
 /**
  * Resolve a dynamic route with an actual entity ID
- * @param route
- * @param id
- * @example resolveRoute('/works/$', 'W123') -> '/works/W123'
- * @example resolveRoute('/topics/$topicId', 'T456') -> '/topics/T456'
+ * @example resolveRoute('/works/$', 'W123') -\> '/works/W123'
+ * @example resolveRoute('/topics/$topicId', 'T456') -\> '/topics/T456'
  */
 export const resolveRoute = (route: string, id: string): string => {
 	// Replace $_ or $ with the ID
@@ -205,9 +204,7 @@ export const resolveRoute = (route: string, id: string): string => {
 
 /**
  * Resolve an external ID route with the appropriate identifier
- * @param route
- * @param externalId
  * @example resolveExternalIdRoute('/authors/orcid/$orcid', '0000-0002-1234-5678')
- *          -> '/authors/orcid/0000-0002-1234-5678'
+ *          -\> '/authors/orcid/0000-0002-1234-5678'
  */
 export const resolveExternalIdRoute = (route: string, externalId: string): string => route.replace(/\$[a-z]+$/, externalId);

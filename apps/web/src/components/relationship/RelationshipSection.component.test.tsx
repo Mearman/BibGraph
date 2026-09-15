@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 /**
  * Component tests for RelationshipSection component
- * @vitest-environment jsdom
  */
 
 import { RelationType } from '@bibgraph/types';
@@ -17,22 +17,27 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => (
   <MantineProvider>{children}</MantineProvider>
 );
 
+const FEW_ITEM_COUNT = 5;
+const DEFAULT_ITEM_COUNT = 10;
+const MEDIUM_ITEM_COUNT = 25;
+const DEFAULT_PAGE_SIZE = 50;
+
 describe('RelationshipSection', () => {
   const createMockSection = (
     type: RelationType = RelationType.AUTHORSHIP,
-    itemCount: number = 10,
-    label: string = 'Authors',
-    isPartialData: boolean = false
+    itemCount = DEFAULT_ITEM_COUNT,
+    label = 'Authors',
+    isPartialData = false
   ): RelationshipSectionType => {
     const items = Array.from({ length: itemCount }, (_, index) => ({
-      id: `rel-${index}`,
+      id: `rel-${String(index)}`,
       sourceId: 'W123',
-      targetId: `A${index}`,
+      targetId: `A${String(index)}`,
       sourceType: 'works' as const,
       targetType: 'authors' as const,
       type,
       direction: 'outbound' as const,
-      displayName: `Author ${index}`,
+      displayName: `Author ${String(index)}`,
       isSelfReference: false,
     }));
 
@@ -42,16 +47,16 @@ describe('RelationshipSection', () => {
       direction: 'outbound',
       label,
       items,
-      visibleItems: items.slice(0, Math.min(itemCount, 50)),
+      visibleItems: items.slice(0, Math.min(itemCount, DEFAULT_PAGE_SIZE)),
       isPartialData,
       totalCount: itemCount,
-      visibleCount: Math.min(itemCount, 50),
-      hasMore: itemCount > 50,
+      visibleCount: Math.min(itemCount, DEFAULT_PAGE_SIZE),
+      hasMore: itemCount > DEFAULT_PAGE_SIZE,
       pagination: {
-        pageSize: 50,
+        pageSize: DEFAULT_PAGE_SIZE,
         currentPage: 0,
-        totalPages: Math.ceil(itemCount / 50),
-        hasNextPage: itemCount > 50,
+        totalPages: Math.ceil(itemCount / DEFAULT_PAGE_SIZE),
+        hasNextPage: itemCount > DEFAULT_PAGE_SIZE,
         hasPreviousPage: false,
       },
     };
@@ -66,9 +71,9 @@ describe('RelationshipSection', () => {
   });
 
   it('should render section with label', () => {
-    const section = createMockSection(RelationType.AUTHORSHIP, 10, 'Authors');
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(RelationType.AUTHORSHIP, DEFAULT_ITEM_COUNT, 'Authors');
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
     render(
       <TestWrapper>
@@ -85,9 +90,9 @@ describe('RelationshipSection', () => {
   });
 
   it('should render count badge', () => {
-    const section = createMockSection(RelationType.AUTHORSHIP, 25);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(RelationType.AUTHORSHIP, MEDIUM_ITEM_COUNT);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
     render(
       <TestWrapper>
@@ -104,9 +109,9 @@ describe('RelationshipSection', () => {
   });
 
   it('should render correct data-testid based on type and direction', () => {
-    const section = createMockSection(RelationType.AUTHORSHIP, 10);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(RelationType.AUTHORSHIP, DEFAULT_ITEM_COUNT);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
     const { container } = render(
       <TestWrapper>
@@ -125,11 +130,11 @@ describe('RelationshipSection', () => {
 
   it('should render inbound section with correct testid', () => {
     const section: RelationshipSectionType = {
-      ...createMockSection(RelationType.REFERENCE, 5, 'Citations'),
+      ...createMockSection(RelationType.REFERENCE, FEW_ITEM_COUNT, 'Citations'),
       direction: 'inbound',
     };
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
     const { container } = render(
       <TestWrapper>
@@ -147,9 +152,9 @@ describe('RelationshipSection', () => {
   });
 
   it('should pass section to RelationshipList', () => {
-    const section = createMockSection(RelationType.AUTHORSHIP, 10);
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const section = createMockSection(RelationType.AUTHORSHIP, DEFAULT_ITEM_COUNT);
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
     render(
       <TestWrapper>
@@ -168,10 +173,10 @@ describe('RelationshipSection', () => {
   });
 
   it('should display icon when provided', () => {
-    const section = createMockSection(RelationType.AUTHORSHIP, 10, 'Authors');
+    const section = createMockSection(RelationType.AUTHORSHIP, DEFAULT_ITEM_COUNT, 'Authors');
     section.icon = '👤';
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
     render(
       <TestWrapper>
@@ -188,10 +193,10 @@ describe('RelationshipSection', () => {
   });
 
   it('should not display icon when not provided', () => {
-    const section = createMockSection(RelationType.AUTHORSHIP, 10, 'Authors');
+    const section = createMockSection(RelationType.AUTHORSHIP, DEFAULT_ITEM_COUNT, 'Authors');
     section.icon = undefined;
-    const onPageChange = vi.fn();
-    const onPageSizeChange = vi.fn();
+    const onPageChange = vi.fn(() => { /* no-op */ });
+    const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
     const { container } = render(
       <TestWrapper>
@@ -206,7 +211,7 @@ describe('RelationshipSection', () => {
 
     // Should only show label text
     const textElements = container.querySelectorAll('p');
-    const hasIcon = [...textElements].some(element => element.textContent?.includes('👤'));
+    const hasIcon = [...textElements].some(element => element.textContent.includes('👤'));
     expect(hasIcon).toBe(false);
   });
 
@@ -214,9 +219,9 @@ describe('RelationshipSection', () => {
 
   describe('Partial Data Warning', () => {
     it('should not show warning when isPartialData is false', () => {
-      const section = createMockSection(RelationType.AUTHORSHIP, 10, 'Authors', false);
-      const onPageChange = vi.fn();
-      const onPageSizeChange = vi.fn();
+      const section = createMockSection(RelationType.AUTHORSHIP, DEFAULT_ITEM_COUNT, 'Authors', false);
+      const onPageChange = vi.fn(() => { /* no-op */ });
+      const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
       render(
         <TestWrapper>
@@ -233,9 +238,9 @@ describe('RelationshipSection', () => {
     });
 
     it('should not show warning when isPartialData is undefined', () => {
-      const section = createMockSection(RelationType.AUTHORSHIP, 10, 'Authors');
-      const onPageChange = vi.fn();
-      const onPageSizeChange = vi.fn();
+      const section = createMockSection(RelationType.AUTHORSHIP, DEFAULT_ITEM_COUNT, 'Authors');
+      const onPageChange = vi.fn(() => { /* no-op */ });
+      const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
       render(
         <TestWrapper>
@@ -252,9 +257,9 @@ describe('RelationshipSection', () => {
     });
 
     it('should show warning when isPartialData is true', () => {
-      const section = createMockSection(RelationType.AUTHORSHIP, 10, 'Authors', true);
-      const onPageChange = vi.fn();
-      const onPageSizeChange = vi.fn();
+      const section = createMockSection(RelationType.AUTHORSHIP, DEFAULT_ITEM_COUNT, 'Authors', true);
+      const onPageChange = vi.fn(() => { /* no-op */ });
+      const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
       render(
         <TestWrapper>
@@ -274,9 +279,9 @@ describe('RelationshipSection', () => {
     });
 
     it('should show warning with yellow color variant', () => {
-      const section = createMockSection(RelationType.AUTHORSHIP, 10, 'Authors', true);
-      const onPageChange = vi.fn();
-      const onPageSizeChange = vi.fn();
+      const section = createMockSection(RelationType.AUTHORSHIP, DEFAULT_ITEM_COUNT, 'Authors', true);
+      const onPageChange = vi.fn(() => { /* no-op */ });
+      const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
       render(
         <TestWrapper>
@@ -295,9 +300,9 @@ describe('RelationshipSection', () => {
     });
 
     it('should show icon in warning message', () => {
-      const section = createMockSection(RelationType.AUTHORSHIP, 10, 'Authors', true);
-      const onPageChange = vi.fn();
-      const onPageSizeChange = vi.fn();
+      const section = createMockSection(RelationType.AUTHORSHIP, DEFAULT_ITEM_COUNT, 'Authors', true);
+      const onPageChange = vi.fn(() => { /* no-op */ });
+      const onPageSizeChange = vi.fn(() => { /* no-op */ });
 
       render(
         <TestWrapper>

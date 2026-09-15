@@ -5,7 +5,8 @@
  * variants, positioning, and auto-dismiss functionality.
  */
 
-import { NotificationData,notifications } from '@mantine/notifications';
+import type { NotificationData} from '@mantine/notifications';
+import {notifications } from '@mantine/notifications';
 import {
   IconAlertTriangle,
   IconCheck,
@@ -31,7 +32,6 @@ const IS_LOADING_AUTO_CLOSE = false;
 
 /**
  * Get notification configuration for variant
- * @param variant
  */
 const getNotificationConfig = (variant: ToastVariant = 'info') => {
   const configs = {
@@ -63,13 +63,11 @@ const getNotificationConfig = (variant: ToastVariant = 'info') => {
     },
   };
 
-  return configs[variant] || configs.info;
+  return configs[variant];
 };
 
 /**
  * Show a success toast notification
- * @param message
- * @param options
  */
 export const showSuccessToast = (
   message: string,
@@ -85,8 +83,6 @@ export const showSuccessToast = (
 
 /**
  * Show an error toast notification
- * @param message
- * @param options
  */
 export const showErrorToast = (
   message: string,
@@ -102,8 +98,6 @@ export const showErrorToast = (
 
 /**
  * Show a warning toast notification
- * @param message
- * @param options
  */
 export const showWarningToast = (
   message: string,
@@ -119,8 +113,6 @@ export const showWarningToast = (
 
 /**
  * Show an info toast notification
- * @param message
- * @param options
  */
 export const showInfoToast = (
   message: string,
@@ -136,8 +128,6 @@ export const showInfoToast = (
 
 /**
  * Show a loading toast notification
- * @param message
- * @param options
  */
 export const showLoadingToast = (
   message: string,
@@ -153,10 +143,6 @@ export const showLoadingToast = (
 
 /**
  * Show a custom toast with specific configuration
- * @param title
- * @param message
- * @param variant
- * @param options
  */
 export const showToast = (
   title: string,
@@ -175,7 +161,6 @@ export const showToast = (
 
 /**
  * Hide a specific toast notification
- * @param id
  */
 export const hideToast = (id: string): void => {
   notifications.hide(id);
@@ -188,131 +173,128 @@ export const hideAllToasts = (): void => {
   notifications.clean();
 };
 
+// Module-scoped state backing ToastManager below - there's exactly one toast registry for the whole app, so a plain object of functions replaces what would otherwise be a class with only static members.
+let managedToastIds: string[] = [];
+
 /**
- * Toast utility class for common application scenarios
+ * Show operation success toast
  */
-export class ToastManager {
-  private static toastIds: string[] = [];
+const showOperationSuccess = (operation: string, details?: string): string => {
+  const message = details !== undefined ? `${operation}: ${details}` : operation;
+  const id = showSuccessToast(message);
+  managedToastIds.push(id);
+  return id;
+};
 
-  /**
-   * Show operation success toast
-   * @param operation
-   * @param details
-   */
-  static showOperationSuccess(operation: string, details?: string): string {
-    const message = details ? `${operation}: ${details}` : operation;
-    const id = showSuccessToast(message);
-    this.toastIds.push(id);
-    return id;
-  }
+/**
+ * Show operation error toast
+ */
+const showOperationError = (operation: string, error?: string | Error): string => {
+  const errorMessage = error instanceof Error ? error.message : error ?? 'Unknown error';
+  const message = `${operation} failed: ${errorMessage}`;
+  const id = showErrorToast(message, {
+    autoClose: 8000, // Show errors longer
+  });
+  managedToastIds.push(id);
+  return id;
+};
 
-  /**
-   * Show operation error toast
-   * @param operation
-   * @param error
-   */
-  static showOperationError(operation: string, error?: string | Error): string {
-    const errorMessage = error instanceof Error ? error.message : error || 'Unknown error';
-    const message = `${operation} failed: ${errorMessage}`;
-    const id = showErrorToast(message, {
-      autoClose: 8000, // Show errors longer
-    });
-    this.toastIds.push(id);
-    return id;
-  }
+/**
+ * Show operation loading toast
+ */
+const showOperationLoading = (operation: string): string => {
+  const message = `${operation}...`;
+  const id = showLoadingToast(message);
+  managedToastIds.push(id);
+  return id;
+};
 
-  /**
-   * Show operation loading toast
-   * @param operation
-   */
-  static showOperationLoading(operation: string): string {
-    const message = `${operation}...`;
-    const id = showLoadingToast(message);
-    this.toastIds.push(id);
-    return id;
-  }
+/**
+ * Update loading toast to success
+ */
+const updateLoadingToSuccess = (loadingId: string, operation: string, details?: string): void => {
+  notifications.update({
+    id: loadingId,
+    color: 'green',
+    icon: <IconCheck size={20} />,
+    message: details !== undefined ? `${operation}: ${details}` : operation,
+    loading: false,
+    autoClose: DEFAULT_AUTO_CLOSE,
+  });
+};
 
-  /**
-   * Update loading toast to success
-   * @param loadingId
-   * @param operation
-   * @param details
-   */
-  static updateLoadingToSuccess(loadingId: string, operation: string, details?: string): void {
-    notifications.update({
-      id: loadingId,
-      color: 'green',
-      icon: <IconCheck size={20} />,
-      message: details ? `${operation}: ${details}` : operation,
-      loading: false,
-      autoClose: DEFAULT_AUTO_CLOSE,
-    });
-  }
+/**
+ * Update loading toast to error
+ */
+const updateLoadingToError = (loadingId: string, operation: string, error?: string | Error): void => {
+  const errorMessage = error instanceof Error ? error.message : error ?? 'Unknown error';
+  const message = `${operation} failed: ${errorMessage}`;
+  notifications.update({
+    id: loadingId,
+    color: 'red',
+    icon: <IconX size={20} />,
+    message,
+    loading: false,
+    autoClose: 8000,
+  });
+};
 
-  /**
-   * Update loading toast to error
-   * @param loadingId
-   * @param operation
-   * @param error
-   */
-  static updateLoadingToError(loadingId: string, operation: string, error?: string | Error): void {
-    const errorMessage = error instanceof Error ? error.message : error || 'Unknown error';
-    const message = `${operation} failed: ${errorMessage}`;
-    notifications.update({
-      id: loadingId,
-      color: 'red',
-      icon: <IconX size={20} />,
-      message,
-      loading: false,
-      autoClose: 8000,
-    });
-  }
+/**
+ * Show network error toast
+ */
+const showNetworkError = (error = 'Network error occurred. Please check your connection.'): string => {
+  return showErrorToast(error, {
+    title: 'Network Error',
+    autoClose: 10000,
+  });
+};
 
-  /**
-   * Show network error toast
-   * @param error
-   */
-  static showNetworkError(error: string = 'Network error occurred. Please check your connection.'): string {
-    return showErrorToast(error, {
-      title: 'Network Error',
-      autoClose: 10000,
-    });
-  }
+/**
+ * Show validation error toast
+ */
+const showValidationError = (errors: readonly string[]): string => {
+  const message = `Please fix the following errors: ${errors.join(', ')}`;
+  return showWarningToast(message, {
+    title: 'Validation Error',
+    autoClose: 10000,
+  });
+};
 
-  /**
-   * Show validation error toast
-   * @param errors
-   */
-  static showValidationError(errors: string[]): string {
-    const message = `Please fix the following errors: ${errors.join(', ')}`;
-    return showWarningToast(message, {
-      title: 'Validation Error',
-      autoClose: 10000,
-    });
-  }
+/**
+ * Show permission error toast
+ */
+const showPermissionError = (action: string): string => {
+  const message = `You don't have permission to ${action}.`;
+  return showWarningToast(message, {
+    title: 'Permission Denied',
+    autoClose: 8000,
+  });
+};
 
-  /**
-   * Show permission error toast
-   * @param action
-   */
-  static showPermissionError(action: string): string {
-    const message = `You don't have permission to ${action}.`;
-    return showWarningToast(message, {
-      title: 'Permission Denied',
-      autoClose: 8000,
-    });
+/**
+ * Clear all toasts managed by this instance
+ */
+const clearAll = (): void => {
+  for (const id of managedToastIds) {
+    hideToast(id);
   }
+  managedToastIds = [];
+};
 
-  /**
-   * Clear all toasts managed by this instance
-   */
-  static clearAll(): void {
-    for (const id of this.toastIds) {
-      hideToast(id);
-    }
-    this.toastIds = [];
-  }
-}
+/**
+ * Toast utility for common application scenarios
+ */
+export const ToastManager = {
+  showOperationSuccess,
+  showOperationError,
+  showOperationLoading,
+  updateLoadingToSuccess,
+  updateLoadingToError,
+  showNetworkError,
+  showValidationError,
+  showPermissionError,
+  clearAll,
+};
 
 /**
  * React hook for toast management
@@ -325,7 +307,7 @@ export const useToast = () => {
   const info = useCallback(showInfoToast, []);
   const loading = useCallback(showLoadingToast, []);
   const hide = useCallback(hideToast, []);
-  const clearAll = useCallback(hideAllToasts, []);
+  const clearAllToasts = useCallback(hideAllToasts, []);
 
   return {
     success,
@@ -334,9 +316,9 @@ export const useToast = () => {
     info,
     loading,
     hide,
-    clearAll,
+    clearAll: clearAllToasts,
     manager: ToastManager,
   };
 };
 
-// No default export - use named exports from the class declaration above
+// No default export - use the named exports above

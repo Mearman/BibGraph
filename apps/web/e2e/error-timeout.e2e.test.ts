@@ -2,7 +2,6 @@
  * E2E tests for timeout error scenarios
  *
  * Tests handling of slow/hanging requests that exceed timeout limits
- * @module error-timeout.e2e
  * @see spec-020 Phase 5: Error scenario coverage
  */
 
@@ -10,15 +9,22 @@ import { expect,test } from '@playwright/test';
 
 import { waitForAppReady } from '@/test/helpers/app-ready';
 
+const TIMEOUT_TEST_SUITE_TIMEOUT_MS = 90_000;
+const SLOW_RESPONSE_DELAY_MS = 5000;
+const HANGING_ROUTE_DELAY_MS = 30_000;
+
 test.describe('@error Timeout Errors', () => {
   // Set shorter test timeout for timeout tests
-  test.setTimeout(90_000);
+  test.setTimeout(TIMEOUT_TEST_SUITE_TIMEOUT_MS);
 
   test('should handle request timeout gracefully', async ({ page }) => {
     // Simulate a very slow response that will timeout
     await page.route('**/api.openalex.org/**', async () => {
       // Never respond - will cause timeout
-      await new Promise(() => {}); // Hang forever
+      await new Promise<void>(() => {
+        // Deliberately never resolves: simulates a hung network request for the timeout test.
+        return undefined;
+      });
     });
 
     // Set a shorter timeout for the navigation
@@ -52,7 +58,9 @@ test.describe('@error Timeout Errors', () => {
   test('should show loading state while waiting', async ({ page }) => {
     // Add 5 second delay to response
     await page.route('**/api.openalex.org/**', async (route) => {
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, SLOW_RESPONSE_DELAY_MS);
+      });
       await route.continue();
     });
 
@@ -74,7 +82,9 @@ test.describe('@error Timeout Errors', () => {
     await page.route('**/api.openalex.org/**', async (route) => {
       try {
         // Long delay
-        await new Promise(resolve => setTimeout(resolve, 30_000));
+        await new Promise<void>(resolve => {
+          setTimeout(resolve, HANGING_ROUTE_DELAY_MS);
+        });
         await route.continue();
       } catch {
         // Request was aborted, which is expected behavior
@@ -82,7 +92,10 @@ test.describe('@error Timeout Errors', () => {
     });
 
     // Start navigation to entity page
-    page.goto('/works/W2741809807').catch(() => {});
+    page.goto('/works/W2741809807').catch(() => {
+      // Navigation is intentionally abandoned once the test navigates to '#/browse' below.
+      return undefined;
+    });
 
     // Wait a bit then navigate away
     // Removed: waitForTimeout - use locator assertions instead
@@ -100,7 +113,7 @@ test.describe('@error Timeout Errors', () => {
       requestCount++;
       if (requestCount <= 1) {
         // First request: abort to simulate timeout
-        route.abort('timedout');
+        await route.abort('timedout');
       } else {
         // Subsequent requests: succeed
         await route.continue();
@@ -121,8 +134,8 @@ test.describe('@error Timeout Errors', () => {
   });
 
   test('should display timeout-specific error message', async ({ page }) => {
-    await page.route('**/api.openalex.org/**', (route) => {
-      route.abort('timedout');
+    await page.route('**/api.openalex.org/**', async (route) => {
+      await route.abort('timedout');
     });
 
     await page.goto('#/authors/A5017898742');

@@ -54,8 +54,10 @@ const ActionButton: React.FC<ActionButtonProperties> = ({
         return "var(--mantine-primary-color-filled)";
       case "success":
         return "var(--mantine-color-green-6)";
-      default:
+      case "default":
         return "var(--mantine-color-gray-2)";
+      default:
+        return variant satisfies never;
     }
   };
 
@@ -64,8 +66,10 @@ const ActionButton: React.FC<ActionButtonProperties> = ({
       case "primary":
       case "success":
         return "var(--mantine-primary-color-contrast)";
-      default:
+      case "default":
         return "var(--mantine-color-gray-7)";
+      default:
+        return variant satisfies never;
     }
   };
 
@@ -128,7 +132,7 @@ const MetricsGrid: React.FC<{ metrics: NormalizedMetrics }> = ({ metrics }) => (
       color="var(--mantine-color-yellow-7)"
     />
     <MetricDisplay
-      value={`+${metrics.additionalPapersFound}`}
+      value={`+${String(metrics.additionalPapersFound)}`}
       label="Additional Found"
       color="var(--mantine-color-yellow-6)"
     />
@@ -257,7 +261,7 @@ export const IndividualResultCard: React.FC<IndividualResultCardProperties> = ({
           variant="primary"
         />
         <ActionButton
-          label={`View Additional Papers (${metrics.additionalPapersFound})`}
+          label={`View Additional Papers (${String(metrics.additionalPapersFound)})`}
           onClick={handleViewAdditionalPapers}
           variant="success"
         />

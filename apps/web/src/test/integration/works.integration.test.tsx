@@ -1,7 +1,9 @@
-import { cachedOpenAlex } from "@bibgraph/client";
+import type * as BibgraphClient from "@bibgraph/client";
+import type { Work } from "@bibgraph/types";
 import { InMemoryStorageProvider } from "@bibgraph/utils";
 import { MantineProvider } from "@mantine/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type * as TanstackReactRouter from "@tanstack/react-router";
 import { useParams, useSearch } from "@tanstack/react-router";
 import { cleanup,fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -11,15 +13,19 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { StorageProviderWrapper } from "@/contexts/storage-provider-context";
 import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
 
+const { getWorkMock } = vi.hoisted(() => ({
+  getWorkMock: vi.fn(),
+}));
+
 // Mock cachedOpenAlex client
 vi.mock("@bibgraph/client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@bibgraph/client")>();
+  const actual = await importOriginal<typeof BibgraphClient>();
   return {
     ...actual,
     cachedOpenAlex: {
       client: {
         works: {
-          getWork: vi.fn(),
+          getWork: getWorkMock,
         },
       },
     },
@@ -28,7 +34,7 @@ vi.mock("@bibgraph/client", async (importOriginal) => {
 
 // Mock router hooks and Link component
 vi.mock("@tanstack/react-router", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+  const actual = await importOriginal<typeof TanstackReactRouter>();
   return {
     ...actual,
     useParams: vi.fn(),
@@ -51,7 +57,7 @@ const mockWorkData = {
   publication_year: 2023,
   cited_by_count: 100,
   type: "journal-article",
-};
+} as Work;
 
 describe("WorkRoute Integration Tests", () => {
   let queryClient: QueryClient;
@@ -75,9 +81,7 @@ describe("WorkRoute Integration Tests", () => {
     vi.mocked(useSearch).mockReturnValue({});
 
     // Mock successful API response by default
-    vi.mocked(cachedOpenAlex.client.works.getWork).mockResolvedValue(
-      mockWorkData as any,
-    );
+    getWorkMock.mockResolvedValue(mockWorkData);
   });
 
   const TestWrapper = ({ children }: { children: ReactNode }) => (
@@ -100,11 +104,14 @@ describe("WorkRoute Integration Tests", () => {
     vi.clearAllMocks();
   });
 
-  it("renders loading state initially", async () => {
+  it("renders loading state initially", () => {
     // Make the API call slow to test loading state
-    vi.mocked(cachedOpenAlex.client.works.getWork).mockImplementation(
-      () => new Promise(() => {}), // Never resolves
-    );
+    getWorkMock.mockImplementation(async () => {
+      await new Promise(() => {
+        // Never resolves - keeps the component in its loading state for this test.
+      });
+      return mockWorkData;
+    });
 
     render(
       <TestWrapper>
@@ -118,9 +125,7 @@ describe("WorkRoute Integration Tests", () => {
 
   it("renders error state when API fails", async () => {
     const mockError = new Error("API Error");
-    vi.mocked(cachedOpenAlex.client.works.getWork).mockRejectedValue(
-      mockError,
-    );
+    getWorkMock.mockRejectedValue(mockError);
 
     render(
       <TestWrapper>
@@ -212,10 +217,6 @@ describe("WorkRoute Integration Tests", () => {
   });
 
   it("does not refetch data on view toggle", async () => {
-    const getWorkMock = vi.mocked(
-      cachedOpenAlex.client.works.getWork,
-    );
-
     render(
       <TestWrapper>
         <WorkRoute />

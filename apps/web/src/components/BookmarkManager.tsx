@@ -43,6 +43,9 @@ interface BookmarkManagerProperties {
   onNavigate?: (url: string) => void;
 }
 
+// Debounce for re-enabling the "Select All" button after a bulk selection completes.
+const SELECT_ALL_REENABLE_DELAY_MS = 100;
+
 // Bookmark card component with selection
 const BookmarkCard = ({
   bookmark,
@@ -56,18 +59,18 @@ const BookmarkCard = ({
   onNavigate: (url: string) => void;
 }) => {
   // Helper functions to extract data from CatalogueEntity
-  const extractTitle = (bookmark: CatalogueEntity): string => {
-    const titleMatch = bookmark.notes?.match(/Title: ([^\n]+)/);
-    return titleMatch?.[1] || bookmark.entityId;
+  const extractTitle = (entity: CatalogueEntity): string => {
+    const titleMatch = entity.notes?.match(/Title: ([^\n]+)/);
+    return titleMatch?.[1] ?? entity.entityId;
   };
 
-  const extractUrl = (bookmark: CatalogueEntity): string => {
-    const urlMatch = bookmark.notes?.match(/URL: ([^\n]+)/);
-    return urlMatch?.[1] || "";
+  const extractUrl = (entity: CatalogueEntity): string => {
+    const urlMatch = entity.notes?.match(/URL: ([^\n]+)/);
+    return urlMatch?.[1] ?? "";
   };
 
-  const extractNotes = (bookmark: CatalogueEntity): string => {
-    return bookmark.notes?.split('\n').filter(line => !line.startsWith('URL:') && !line.startsWith('Title:')).join('\n') || '';
+  const extractNotes = (entity: CatalogueEntity): string => {
+    return entity.notes?.split('\n').filter(line => !line.startsWith('URL:') && !line.startsWith('Title:')).join('\n') ?? '';
   };
 
   const title = extractTitle(bookmark);
@@ -175,14 +178,14 @@ const BookmarkManagerInner = ({ onNavigate }: BookmarkManagerProperties) => {
   // Helper functions to extract data from CatalogueEntity
   const extractTitle = (bookmark: CatalogueEntity): string => {
     const titleMatch = bookmark.notes?.match(/Title: ([^\n]+)/);
-    return titleMatch?.[1] || bookmark.entityId;
+    return titleMatch?.[1] ?? bookmark.entityId;
   };
 
   const filteredBookmarks = searchQuery
     ? bookmarks.filter(
         (bookmark) => {
           const title = extractTitle(bookmark);
-          const notes = bookmark.notes?.split('\n').filter(line => !line.startsWith('URL:') && !line.startsWith('Title:')).join('\n') || '';
+          const notes = bookmark.notes?.split('\n').filter(line => !line.startsWith('URL:') && !line.startsWith('Title:')).join('\n') ?? '';
           return (
             title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             notes.toLowerCase().includes(searchQuery.toLowerCase())
@@ -192,6 +195,37 @@ const BookmarkManagerInner = ({ onNavigate }: BookmarkManagerProperties) => {
     : bookmarks;
 
   // Bulk operation handlers
+  const performBulkDelete = async (selectedIds: readonly string[]): Promise<void> => {
+    try {
+      const result = await bulkRemoveBookmarks(selectedIds);
+
+      // Always show result to user
+      modals.open({
+        title: result.failed > 0 ? "Partial Success" : "Success",
+        children: (
+          <Text size="sm">
+            {result.failed > 0
+              ? `Successfully deleted ${String(result.success)} bookmark${result.success === 1 ? "" : "s"}, but ${String(result.failed)} failed.`
+              : `Successfully deleted ${String(result.success)} bookmark${result.success === 1 ? "" : "s"}.`
+            }
+          </Text>
+        ),
+      });
+
+      deselectAll();
+    } catch {
+      // Show error modal
+      modals.open({
+        title: "Error",
+        children: (
+          <Text size="sm">
+            Failed to delete bookmarks. Please try again.
+          </Text>
+        ),
+      });
+    }
+  };
+
   const handleBulkDelete = () => {
     const selectedIds = [...selectedBookmarks];
 
@@ -209,35 +243,8 @@ const BookmarkManagerInner = ({ onNavigate }: BookmarkManagerProperties) => {
       ),
       labels: { confirm: "Delete", cancel: "Cancel" },
       confirmProps: { color: "red" },
-      onConfirm: async () => {
-        try {
-          const result = await bulkRemoveBookmarks(selectedIds);
-
-          // Always show result to user
-          modals.open({
-            title: result.failed > 0 ? "Partial Success" : "Success",
-            children: (
-              <Text size="sm">
-                {result.failed > 0
-                  ? `Successfully deleted ${result.success} bookmark${result.success === 1 ? "" : "s"}, but ${result.failed} failed.`
-                  : `Successfully deleted ${result.success} bookmark${result.success === 1 ? "" : "s"}.`
-                }
-              </Text>
-            ),
-          });
-
-          deselectAll();
-        } catch {
-          // Show error modal
-          modals.open({
-            title: "Error",
-            children: (
-              <Text size="sm">
-                Failed to delete bookmarks. Please try again.
-              </Text>
-            ),
-          });
-        }
+      onConfirm: () => {
+        void performBulkDelete(selectedIds);
       },
     });
   };
@@ -294,9 +301,9 @@ const BookmarkManagerInner = ({ onNavigate }: BookmarkManagerProperties) => {
                   if (selecting) return;
                   setSelecting(true);
                   try {
-                    selectAll(filteredBookmarks.map(b => b.id || b.entityId));
+                    selectAll(filteredBookmarks.map(b => b.id ?? b.entityId));
                   } finally {
-                    setTimeout(() => setSelecting(false), 100);
+                    setTimeout(() => { setSelecting(false); }, SELECT_ALL_REENABLE_DELAY_MS);
                   }
                 }}
               >
@@ -332,7 +339,7 @@ const BookmarkManagerInner = ({ onNavigate }: BookmarkManagerProperties) => {
           placeholder="Search bookmarks..."
           aria-label="Search bookmarks"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => { setSearchQuery(e.target.value); }}
           leftSection={<IconSearch size={ICON_SIZE.MD} />}
           mb="md"
         />
@@ -357,10 +364,10 @@ const BookmarkManagerInner = ({ onNavigate }: BookmarkManagerProperties) => {
         <SimpleGrid cols={{ base: 1, md: 2, lg: 3 }} spacing="md">
           {filteredBookmarks.map((bookmark) => (
             <BookmarkCard
-              key={bookmark.id || bookmark.entityId}
+              key={bookmark.id ?? bookmark.entityId}
               bookmark={bookmark}
-              isSelected={selectedBookmarks.has(bookmark.id || bookmark.entityId)}
-              onToggleSelection={() => toggleSelection(bookmark.id || bookmark.entityId)}
+              isSelected={selectedBookmarks.has(bookmark.id ?? bookmark.entityId)}
+              onToggleSelection={() => { toggleSelection(bookmark.id ?? bookmark.entityId); }}
               onNavigate={handleNavigate}
             />
           ))}

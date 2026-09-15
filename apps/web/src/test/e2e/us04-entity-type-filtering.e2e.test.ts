@@ -18,6 +18,9 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 
 	// A broad query guaranteed to return mixed entity types
 	const SEARCH_QUERY = 'machine learning';
+	const FILTER_RESULT_WAIT_MS = 3000;
+	const FILTER_SETTLE_WAIT_MS = 2000;
+	const DEBOUNCE_WAIT_MS = 1000;
 
 	// Known entity types in OpenAlex
 	test.beforeEach(async ({ page }) => {
@@ -52,7 +55,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 		try {
 			await page.waitForFunction(
 				(selector) => {
-					const button = document.querySelector(selector) as HTMLButtonElement | null;
+					const button = document.querySelector<HTMLButtonElement>(selector);
 					return button !== null && !button.disabled;
 				},
 				'[data-testid="search-button"]',
@@ -72,7 +75,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 		}
 
 		// Wait for results to fully render including the filter badges
-		await page.waitForTimeout(3000);
+		await page.waitForTimeout(FILTER_RESULT_WAIT_MS);
 
 		// The app uses clickable Mantine Badge components for entity type filtering
 		// rendered in SearchResultsHeader with "Filter by type:" label
@@ -103,7 +106,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 		try {
 			await page.waitForFunction(
 				(selector) => {
-					const button = document.querySelector(selector) as HTMLButtonElement | null;
+					const button = document.querySelector<HTMLButtonElement>(selector);
 					return button !== null && !button.disabled;
 				},
 				'[data-testid="search-button"]',
@@ -123,7 +126,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 		}
 
 		// Wait for results to fully render
-		await page.waitForTimeout(3000);
+		await page.waitForTimeout(FILTER_RESULT_WAIT_MS);
 
 		// Count initial results using actual rendered elements (table rows, cards, papers)
 		const resultsContainer = page.locator('[data-testid="search-results"]');
@@ -152,7 +155,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 				await firstBadge.click();
 
 				// Wait for results to update
-				await page.waitForTimeout(2000);
+				await page.waitForTimeout(FILTER_SETTLE_WAIT_MS);
 
 				// Verify no full page reload occurred
 				expect(isFullPageReloadDetected).toBe(false);
@@ -171,7 +174,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 		try {
 			await page.waitForFunction(
 				(selector) => {
-					const button = document.querySelector(selector) as HTMLButtonElement | null;
+					const button = document.querySelector<HTMLButtonElement>(selector);
 					return button !== null && !button.disabled;
 				},
 				'[data-testid="search-button"]',
@@ -190,7 +193,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 			return;
 		}
 
-		await page.waitForTimeout(3000);
+		await page.waitForTimeout(FILTER_RESULT_WAIT_MS);
 
 		// The search query itself is reflected in the URL via the "q" parameter
 		// (managed by TanStack Router's useSearch). Verify this is present.
@@ -214,7 +217,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 				await firstBadge.click();
 
 				// Wait for client-side filter to apply
-				await page.waitForTimeout(1000);
+				await page.waitForTimeout(DEBOUNCE_WAIT_MS);
 
 				// After clicking, the badge should change to "filled" variant (selected state)
 				// Verify the badge is still visible and the filter was applied
@@ -243,7 +246,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 		try {
 			await page.waitForFunction(
 				(selector) => {
-					const button = document.querySelector(selector) as HTMLButtonElement | null;
+					const button = document.querySelector<HTMLButtonElement>(selector);
 					return button !== null && !button.disabled;
 				},
 				'[data-testid="search-button"]',
@@ -262,7 +265,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 			return;
 		}
 
-		await page.waitForTimeout(3000);
+		await page.waitForTimeout(FILTER_RESULT_WAIT_MS);
 
 		// The app renders entity type filter badges like "work (15)" with counts in parentheses
 		// These are Mantine Badge components in the SearchResultsHeader
@@ -276,7 +279,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 			if (badgeCount > 0) {
 				// Each badge contains text like "work (15)" - verify count is present
 				const firstBadgeText = await filterBadges.first().textContent();
-				if (firstBadgeText) {
+				if (firstBadgeText !== null) {
 					// Badge text should contain a number in parentheses
 					const hasCount = /\(\d+\)/.test(firstBadgeText);
 					expect(hasCount).toBe(true);
@@ -299,7 +302,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 		try {
 			await page.waitForFunction(
 				(selector) => {
-					const button = document.querySelector(selector) as HTMLButtonElement | null;
+					const button = document.querySelector<HTMLButtonElement>(selector);
 					return button !== null && !button.disabled;
 				},
 				'[data-testid="search-button"]',
@@ -319,7 +322,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 		}
 
 		// Wait for results to fully render
-		await page.waitForTimeout(3000);
+		await page.waitForTimeout(FILTER_RESULT_WAIT_MS);
 
 		// Count initial results using actual rendered elements
 		const resultsContainer = page.locator('[data-testid="search-results"]');
@@ -343,7 +346,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 				await filterBadges.first().click();
 
 				// Wait for results to update
-				await page.waitForTimeout(2000);
+				await page.waitForTimeout(FILTER_SETTLE_WAIT_MS);
 
 				// The filtered count should be >= 0 (could be same if only one type existed)
 				const filteredCount = await resultItems.count();
@@ -368,7 +371,7 @@ test.describe('@utility US-04 Entity Type Filtering', () => {
 		try {
 			await page.waitForFunction(
 				(selector) => {
-					const button = document.querySelector(selector) as HTMLButtonElement | null;
+					const button = document.querySelector<HTMLButtonElement>(selector);
 					return button !== null && !button.disabled;
 				},
 				'[data-testid="search-button"]',

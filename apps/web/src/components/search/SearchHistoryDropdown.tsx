@@ -63,7 +63,9 @@ export const SearchHistoryDropdown: React.FC<SearchHistoryDropdownProperties> = 
                   variant="subtle"
                   color="red"
                   size="sm"
-                  onClick={handleClearAll}
+                  onClick={() => {
+                    void handleClearAll();
+                  }}
                   aria-label="Clear all history"
                 >
                   <IconTrash size={ICON_SIZE.XS} />
@@ -82,7 +84,9 @@ export const SearchHistoryDropdown: React.FC<SearchHistoryDropdownProperties> = 
               {displayHistory.map((entry) => (
                 <UnstyledButton
                   key={entry.id}
-                  onClick={() => onSearchQuerySelect(entry.query)}
+                  onClick={() => {
+                    onSearchQuerySelect(entry.query);
+                  }}
                   py="xs"
                   px="sm"
                   style={{
@@ -113,7 +117,11 @@ export const SearchHistoryDropdown: React.FC<SearchHistoryDropdownProperties> = 
                       variant="transparent"
                       color="gray"
                       size="xs"
-                      onClick={(e) => entry.id && void handleRemoveQuery(entry.id, e)}
+                      onClick={(e) => {
+                        if (entry.id !== undefined) {
+                          void handleRemoveQuery(entry.id, e);
+                        }
+                      }}
                     >
                       <IconX size={ICON_SIZE.XS} />
                     </ActionIcon>

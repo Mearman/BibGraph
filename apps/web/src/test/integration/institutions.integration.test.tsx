@@ -1,7 +1,9 @@
-import { cachedOpenAlex } from "@bibgraph/client";
+import type * as BibgraphClient from "@bibgraph/client";
+import type { InstitutionEntity } from "@bibgraph/types";
 import { InMemoryStorageProvider } from "@bibgraph/utils";
 import { MantineProvider } from "@mantine/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type * as TanstackReactRouter from "@tanstack/react-router";
 import { useParams, useSearch } from "@tanstack/react-router";
 import { cleanup,fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -11,15 +13,19 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { StorageProviderWrapper } from "@/contexts/storage-provider-context";
 import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
 
+const { getInstitutionMock } = vi.hoisted(() => ({
+  getInstitutionMock: vi.fn(),
+}));
+
 // Mock cachedOpenAlex client
 vi.mock("@bibgraph/client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@bibgraph/client")>();
+  const actual = await importOriginal<typeof BibgraphClient>();
   return {
     ...actual,
     cachedOpenAlex: {
       client: {
         institutions: {
-          getInstitution: vi.fn(),
+          getInstitution: getInstitutionMock,
         },
       },
     },
@@ -28,7 +34,7 @@ vi.mock("@bibgraph/client", async (importOriginal) => {
 
 // Mock router hooks and Link component
 vi.mock("@tanstack/react-router", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+  const actual = await importOriginal<typeof TanstackReactRouter>();
   return {
     ...actual,
     useParams: vi.fn(),
@@ -50,7 +56,17 @@ const mockInstitutionData = {
   works_count: 5000,
   cited_by_count: 10_000,
   ror: "https://ror.org/123",
-};
+  counts_by_year: [],
+  updated_date: "2023-01-01",
+  created_date: "2023-01-01",
+  geo: {
+    country_code: "US",
+    country: "United States",
+  },
+  international: {
+    display_name: {},
+  },
+} as InstitutionEntity;
 
 describe("InstitutionRoute Integration Tests", () => {
   let queryClient: QueryClient;
@@ -74,9 +90,7 @@ describe("InstitutionRoute Integration Tests", () => {
     vi.mocked(useSearch).mockReturnValue({});
 
     // Mock successful API response by default
-    vi.mocked(cachedOpenAlex.client.institutions.getInstitution).mockResolvedValue(
-      mockInstitutionData as any,
-    );
+    getInstitutionMock.mockResolvedValue(mockInstitutionData);
   });
 
   const TestWrapper = ({ children }: { children: ReactNode }) => (
@@ -99,11 +113,14 @@ describe("InstitutionRoute Integration Tests", () => {
     vi.clearAllMocks();
   });
 
-  it("renders loading state initially", async () => {
+  it("renders loading state initially", () => {
     // Make the API call slow to test loading state
-    vi.mocked(cachedOpenAlex.client.institutions.getInstitution).mockImplementation(
-      () => new Promise(() => {}), // Never resolves
-    );
+    getInstitutionMock.mockImplementation(async () => {
+      await new Promise(() => {
+        // Never resolves - keeps the component in its loading state for this test.
+      });
+      return mockInstitutionData;
+    });
 
     render(
       <TestWrapper>
@@ -117,9 +134,7 @@ describe("InstitutionRoute Integration Tests", () => {
 
   it("renders error state when API fails", async () => {
     const mockError = new Error("API Error");
-    vi.mocked(cachedOpenAlex.client.institutions.getInstitution).mockRejectedValue(
-      mockError,
-    );
+    getInstitutionMock.mockRejectedValue(mockError);
 
     render(
       <TestWrapper>
@@ -211,10 +226,6 @@ describe("InstitutionRoute Integration Tests", () => {
   });
 
   it("does not refetch data on view toggle", async () => {
-    const getInstitutionMock = vi.mocked(
-      cachedOpenAlex.client.institutions.getInstitution,
-    );
-
     render(
       <TestWrapper>
         <InstitutionRoute />

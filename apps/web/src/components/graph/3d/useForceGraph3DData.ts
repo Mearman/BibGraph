@@ -15,14 +15,20 @@ import { useMemo } from 'react';
 import { SIMULATION } from '../constants';
 import type { ForceGraphData, ForceGraphLink, ForceGraphNode } from './types';
 
+// Constants for the linear congruential generator below (glibc's classic rand() parameters).
+const LCG_MULTIPLIER = 1_103_515_245;
+const LCG_INCREMENT = 12_345;
+const LCG_MODULUS_MASK = 0x7F_FF_FF_FF;
+
 /**
  * Simple seeded random number generator for deterministic layouts
- * @param seed
  */
 const seededRandom = (seed: number): () => number => () => {
-  seed = (seed * 1_103_515_245 + 12_345) & 0x7F_FF_FF_FF;
-  return seed / 0x7F_FF_FF_FF;
+  seed = (seed * LCG_MULTIPLIER + LCG_INCREMENT) & LCG_MODULUS_MASK;
+  return seed / LCG_MODULUS_MASK;
 };
+
+const HALF = 0.5;
 
 export interface UseForceGraph3DDataOptions {
   /**
@@ -58,11 +64,6 @@ export interface UseForceGraph3DDataReturn {
  * - Filters nodes/edges when in filter mode
  * - Generates deterministic initial 3D positions
  * - Transforms to ForceGraphNode/ForceGraphLink format
- * @param root0
- * @param root0.nodes
- * @param root0.edges
- * @param root0.filterNodeIds
- * @param root0.seed
  */
 export const useForceGraph3DData = ({
   nodes,
@@ -102,10 +103,10 @@ export const useForceGraph3DData = ({
       entityType: node.entityType,
       label: node.label,
       entityId: node.entityId,
-      // Use existing positions or generate random ones in 3D space
-      x: node.x ?? (random() - 0.5) * SIMULATION.INITIAL_POSITION_SPREAD,
-      y: node.y ?? (random() - 0.5) * SIMULATION.INITIAL_POSITION_SPREAD,
-      z: (random() - 0.5) * SIMULATION.INITIAL_POSITION_SPREAD,
+      // x/y come from the node's existing 2D layout position; z is randomized for the 3D view
+      x: node.x,
+      y: node.y,
+      z: (random() - HALF) * SIMULATION.INITIAL_POSITION_SPREAD,
       originalNode: node,
     }));
 
@@ -142,8 +143,6 @@ export interface UseHighlightedPathEdgesReturn {
  *
  * Creates a Set of edge keys for O(1) lookup when rendering edges.
  * Includes both directions since graph might be undirected.
- * @param root0
- * @param root0.highlightedPath
  */
 export const useHighlightedPathEdges = ({
   highlightedPath,

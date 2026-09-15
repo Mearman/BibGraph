@@ -3,7 +3,7 @@ import { lazy } from "react";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const HistoryPage = lazy(() => import("./history.lazy"));
+const HistoryPage = lazy(async () => import("./history.lazy"));
 
 export const Route = createFileRoute("/history")({
   component: () => (

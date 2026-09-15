@@ -96,12 +96,11 @@ export class AssertionHelper {
 	}
 
 	/**
-	 * Placeholder for axe-core accessibility integration.
-	 * TODO: Integrate @axe-core/playwright for full accessibility testing.
+	 * Placeholder for axe-core accessibility integration. TODO: Integrate `@axe-core/playwright` for full accessibility testing.
 	 */
 	async expectAccessible(): Promise<void> {
-		 
 		console.log("AssertionHelper: expectAccessible() - Placeholder for axe-core integration");
+		await Promise.resolve();
 	}
 }
 

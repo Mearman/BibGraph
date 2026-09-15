@@ -13,6 +13,12 @@ import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import { useToast } from "./ToastNotification";
 
+/**
+True when a field's value should be treated as absent for required-field validation: undefined, null, or an all-whitespace string.
+ */
+const isEmptyFieldValue = (value: unknown): boolean =>
+  value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
+
 export interface FormFieldConfig<T = unknown> {
   /**
   Field name
@@ -110,7 +116,7 @@ export interface FormManagerProps<T> {
   children: (properties: {
     data: T;
     errors: Record<string, string>;
-    touched: Record<keyof T, boolean>;
+    touched: Partial<Record<keyof T, boolean>>;
     loading: boolean;
     dirty: boolean;
     valid: boolean;
@@ -142,8 +148,15 @@ export interface FormManagerProps<T> {
 }
 
 /**
+ * True when every configured field has a defined value in `data`, meaning the partial record built from `initialData` and each field's own `initialValue` fully covers `T`'s shape.
+ */
+const isCompleteFormData = <T,>(
+  data: Readonly<Partial<Record<keyof T, unknown>>>,
+  fields: readonly FormFieldConfig<T>[]
+): data is T => fields.every((field) => data[field.name] !== undefined);
+
+/**
  * Hook for form state management
- * @param config
  */
 export const useFormManager = <T,>(config: FormConfig<T>) => {
   const toast = useToast();
@@ -151,18 +164,19 @@ export const useFormManager = <T,>(config: FormConfig<T>) => {
 
   // Initialize form data
   const initialData = useMemo(() => {
-    const data = { ...config.initialData } as Record<string, unknown>;
+    const data: Partial<Record<keyof T, unknown>> = { ...config.initialData };
     for (const field of config.fields) {
-      if (data[field.name as string] === undefined) {
-        data[field.name as string] = field.initialValue;
-      }
+      data[field.name] ??= field.initialValue;
     }
-    return data as T;
+    if (!isCompleteFormData(data, config.fields)) {
+      throw new Error('Form initial data is missing a value for one or more configured fields');
+    }
+    return data;
   }, [config.fields, config.initialData]);
 
   const [data, setData] = useState<T>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [touched, setTouched] = useState<Record<keyof T, boolean>>({} as Record<keyof T, boolean>);
+  const [touched, setTouched] = useState<Partial<Record<keyof T, boolean>>>({});
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -174,7 +188,7 @@ export const useFormManager = <T,>(config: FormConfig<T>) => {
   // Check if form is valid
   const isValid = useMemo(() => (
     Object.keys(errors).length === 0 && config.fields.every((field) => (
-      !(field.required && !data[field.name as keyof T])
+      !(field.required === true && isEmptyFieldValue(data[field.name]))
     ))
   ), [errors, data, config.fields]);
 
@@ -184,8 +198,8 @@ export const useFormManager = <T,>(config: FormConfig<T>) => {
     if (!field) return null;
 
     // Check required
-    if (field.required && (!value || (typeof value === 'string' && !value.trim()))) {
-      return field.errorMessage || `${String(name)} is required`;
+    if (field.required === true && isEmptyFieldValue(value)) {
+      return field.errorMessage ?? `${String(name)} is required`;
     }
 
     // Transform value
@@ -201,13 +215,13 @@ export const useFormManager = <T,>(config: FormConfig<T>) => {
 
   // Validate entire form
   const validateForm = useCallback((formData: T): Record<string, string> => {
-    const newErrors: Record<string, string> = {};
+    let newErrors: Record<string, string> = {};
 
     // Validate each field
     for (const field of config.fields) {
-      const error = validateField(field.name, formData[field.name as keyof T]);
-      if (error) {
-        newErrors[field.name as string] = error;
+      const error = validateField(field.name, formData[field.name]);
+      if (error !== null) {
+        newErrors = { ...newErrors, [String(field.name)]: error };
       }
     }
 
@@ -215,23 +229,22 @@ export const useFormManager = <T,>(config: FormConfig<T>) => {
     if (config.validateForm) {
       const customErrors = config.validateForm(formData);
       if (customErrors) {
-        Object.assign(newErrors, customErrors);
+        newErrors = { ...newErrors, ...customErrors };
       }
     }
 
     return newErrors;
-  }, [config.fields, validateField, config.validateForm]);
+  }, [config, validateField]);
 
   // Set field value
   const setFieldValue = useCallback((name: keyof T, value: unknown) => {
     setData((previous) => ({ ...previous, [name]: value }));
 
     // Clear error when value changes
-    if (errors[name as string]) {
+    if (errors[String(name)]) {
       setErrors((previous) => {
-        const newErrors = { ...previous };
-        delete newErrors[name as string];
-        return newErrors;
+        const { [String(name)]: _removed, ...rest } = previous;
+        return rest;
       });
     }
 
@@ -247,9 +260,8 @@ export const useFormManager = <T,>(config: FormConfig<T>) => {
   // Clear field error
   const clearError = useCallback((name: keyof T) => {
     setErrors((previous) => {
-      const newErrors = { ...previous };
-      delete newErrors[name as string];
-      return newErrors;
+      const { [String(name)]: _removed, ...rest } = previous;
+      return rest;
     });
   }, []);
 
@@ -257,7 +269,7 @@ export const useFormManager = <T,>(config: FormConfig<T>) => {
   const handleFieldBlur = useCallback((name: keyof T) => {
     setTouched((previous) => ({ ...previous, [name]: true }));
     const error = validateField(name, data[name]);
-    if (error) {
+    if (error !== null) {
       setError(name, error);
     } else {
       clearError(name);
@@ -267,9 +279,9 @@ export const useFormManager = <T,>(config: FormConfig<T>) => {
   // Get field props for form inputs
   const getFieldProperties = useCallback((name: keyof T) => ({
     value: data[name],
-    error: touched[name] ? errors[name as string] : undefined,
-    onChange: (value: unknown) => setFieldValue(name, value),
-    onBlur: () => handleFieldBlur(name),
+    error: touched[name] === true ? errors[String(name)] : undefined,
+    onChange: (value: unknown) => { setFieldValue(name, value); },
+    onBlur: () => { handleFieldBlur(name); },
     required: config.fields.find((f) => f.name === name)?.required,
   }), [data, touched, errors, setFieldValue, handleFieldBlur, config.fields]);
 
@@ -290,14 +302,14 @@ export const useFormManager = <T,>(config: FormConfig<T>) => {
       setLoading(true);
       await config.onSubmit(data);
 
-      if (config.showSuccessToast) {
-        toast.success(config.successMessage || "Form submitted successfully");
+      if (config.showSuccessToast === true) {
+        toast.success(config.successMessage ?? "Form submitted successfully");
       }
 
       // Mark all fields as untouched after successful submit
-      setTouched({} as Record<keyof T, boolean>);
+      setTouched({});
     } catch (error) {
-      if (config.showErrorToast) {
+      if (config.showErrorToast === true) {
         toast.error(error instanceof Error ? error.message : "Submission failed");
       }
     } finally {
@@ -309,26 +321,29 @@ export const useFormManager = <T,>(config: FormConfig<T>) => {
   const handleReset = useCallback(() => {
     setData(initialData);
     setErrors({});
-    setTouched({} as Record<keyof T, boolean>);
+    setTouched({});
     setSubmitted(false);
     config.onReset?.();
   }, [initialData, config]);
 
   // Auto-save functionality
   useEffect(() => {
-    if (!config.autoSave?.enabled) return;
+    if (config.autoSave?.enabled !== true) return undefined;
 
-    const timeoutId = setTimeout(async () => {
-      if (isDirty && isValid && config.autoSave?.onSave) {
-        try {
-          await config.autoSave.onSave(data);
-        } catch {
-          // Silent auto-save failures
+    const timeoutId = setTimeout(() => {
+      const runAutoSave = async () => {
+        if (isDirty && isValid && config.autoSave?.onSave) {
+          try {
+            await config.autoSave.onSave(data);
+          } catch {
+            // Silent auto-save failures
+          }
         }
-      }
-    }, config.autoSave?.debounceMs);
+      };
+      void runAutoSave();
+    }, config.autoSave.debounceMs);
 
-    return () => clearTimeout(timeoutId);
+    return () => { clearTimeout(timeoutId); };
   }, [data, isDirty, isValid, config.autoSave]);
 
   return {
@@ -351,12 +366,6 @@ export const useFormManager = <T,>(config: FormConfig<T>) => {
 
 /**
  * Form Manager Component
- * @param root0
- * @param root0.config
- * @param root0.children
- * @param root0.submitButton
- * @param root0.resetButton
- * @param root0.showActions
  */
 export const FormManager = <T,>({
   config,
@@ -370,31 +379,31 @@ export const FormManager = <T,>({
   return (
     <form
       id={formState.formId}
-      onSubmit={formState.handleSubmit}
+      onSubmit={(e) => { void formState.handleSubmit(e); }}
       noValidate
     >
       {children(formState)}
 
       {showActions && (
         <Group mt="md" justify="flex-end">
-          {resetButton || (
+          {resetButton ?? (
             <Button
               variant="light"
               onClick={formState.handleReset}
               disabled={formState.loading || !formState.dirty}
             >
-              {config.resetText || "Reset"}
+              {config.resetText ?? "Reset"}
             </Button>
           )}
 
-          {submitButton || (
+          {submitButton ?? (
             <Button
               type="submit"
               loading={formState.loading}
-              disabled={!formState.dirty || !formState.valid || (config.disableSubmitOnLoading && formState.loading)}
+              disabled={!formState.dirty || !formState.valid || (config.disableSubmitOnLoading === true && formState.loading)}
               leftSection={formState.loading ? <IconLoader size={16} /> : <IconCheck size={16} />}
             >
-              {config.submitText || "Submit"}
+              {config.submitText ?? "Submit"}
             </Button>
           )}
         </Group>
@@ -419,10 +428,10 @@ export const FormField = ({ label, error, required, description, children }: For
     <Stack gap="xs">
       <Text fw={500} size="sm">
         {label}
-        {required && <Text span c="red">*</Text>}
+        {required === true && <Text span c="red">*</Text>}
       </Text>
       {children}
-      {error && (
+      {error !== undefined && (
         <Group gap={4} align="center">
           <IconAlertTriangle size={12} />
           <Text c="red" size="sm" fz="xs">
@@ -430,7 +439,7 @@ export const FormField = ({ label, error, required, description, children }: For
           </Text>
         </Group>
       )}
-      {description && (
+      {description !== undefined && (
         <Text c="dimmed" size="sm" fz="xs">
           {description}
         </Text>
@@ -444,7 +453,7 @@ export const FormField = ({ label, error, required, description, children }: For
  */
 export const Validations = {
   required: (message = "This field is required") => (value: unknown) => {
-    if (!value || (typeof value === 'string' && !value.trim())) {
+    if (isEmptyFieldValue(value)) {
       return message;
     }
     return null;
@@ -460,19 +469,19 @@ export const Validations = {
 
   minLength: (min: number, message?: string) => (value: string) => {
     if (value.length < min) {
-      return message || `Must be at least ${min} characters`;
+      return message ?? `Must be at least ${String(min)} characters`;
     }
     return null;
   },
 
   maxLength: (max: number, message?: string) => (value: string) => {
     if (value.length > max) {
-      return message || `Must be no more than ${max} characters`;
+      return message ?? `Must be no more than ${String(max)} characters`;
     }
     return null;
   },
 
-  pattern: (regex: RegExp, message = "Invalid format") => (value: string) => {
+  pattern: (regex: Readonly<RegExp>, message = "Invalid format") => (value: string) => {
     if (!regex.test(value)) {
       return message;
     }
@@ -514,12 +523,12 @@ export const Validations = {
   range: (min: number, max: number, message?: string) => (value: unknown) => {
     const number_ = Number(value);
     if (Number.isNaN(number_) || number_ < min || number_ > max) {
-      return message || `Must be between ${min} and ${max}`;
+      return message ?? `Must be between ${String(min)} and ${String(max)}`;
     }
     return null;
   },
 
-  match: (pattern: RegExp, message = "Invalid format") => (value: string) => {
+  match: (pattern: Readonly<RegExp>, message = "Invalid format") => (value: string) => {
     if (!pattern.test(value)) {
       return message;
     }

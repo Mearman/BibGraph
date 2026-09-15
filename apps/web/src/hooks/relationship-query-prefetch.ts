@@ -1,7 +1,5 @@
 /**
- * Entity prefetch utilities for relationship queries
- * Background prefetching for ID-only relationships
- * @module relationship-query-prefetch
+ * Entity prefetch utilities for relationship queries Background prefetching for ID-only relationships
  */
 
 import {
@@ -16,18 +14,18 @@ import {
 import type { EntityType } from '@bibgraph/types';
 import type { QueryClient } from '@tanstack/react-query';
 
+import { MS_PER_MINUTE } from './time-constants';
+
 /**
 Cache duration for prefetched entities (5 minutes)
  */
-const PREFETCH_STALE_TIME_MS = 5 * 60 * 1000;
+const PREFETCH_STALE_TIME_MINUTES = 5;
+const PREFETCH_STALE_TIME_MS = PREFETCH_STALE_TIME_MINUTES * MS_PER_MINUTE;
 
 /**
  * Prefetch an entity in the background to populate the cache
  * This is used for ID-only relationships where we only have the ID,
  * not the full entity data (e.g., Institutions parent lineage)
- * @param queryClient
- * @param entityId
- * @param targetEntityType
  */
 export const prefetchEntity = async (
   queryClient: QueryClient,
@@ -39,7 +37,7 @@ export const prefetchEntity = async (
 
   // Check if already in cache
   const existingData = queryClient.getQueryData(queryKey);
-  if (existingData) return; // Already cached
+  if (existingData !== undefined) return; // Already cached
 
   // Prefetch the entity; prefetch swallows errors by contract
   const noop = (): void => undefined;
@@ -88,6 +86,11 @@ export const prefetchEntity = async (
         case 'funders': {
           return await getFunderById(entityId);
         }
+        case 'concepts':
+        case 'keywords':
+        case 'domains':
+        case 'fields':
+        case 'subfields':
         default:
           throw new Error(`Unsupported entity type for prefetch: ${targetEntityType}`);
       }

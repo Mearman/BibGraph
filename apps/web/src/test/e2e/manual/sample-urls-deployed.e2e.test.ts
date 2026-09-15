@@ -22,8 +22,11 @@ const toAppUrl = (apiUrl: string): string => {
   return `${BASE_URL}/#/openalex-url${relativePath}`;
 };
 
+const SUITE_TIMEOUT_MS = 30_000;
+const MIN_CONTENT_LENGTH = 50;
+
 test.describe('Sample URLs - All Entity Types', () => {
-  test.setTimeout(30_000);
+  test.setTimeout(SUITE_TIMEOUT_MS);
 
   for (const { url, desc } of testUrls) {
     test(`${desc} should load`, async ({ page }) => {
@@ -39,7 +42,7 @@ test.describe('Sample URLs - All Entity Types', () => {
       expect(hasError).toBe(false);
       
       // Should have content
-      expect(mainText!.length).toBeGreaterThan(50);
+      expect(mainText!.length).toBeGreaterThan(MIN_CONTENT_LENGTH);
       
       console.log(`✅ ${desc}: Loads successfully`);
     });

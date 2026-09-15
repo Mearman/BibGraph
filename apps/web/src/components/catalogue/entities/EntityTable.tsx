@@ -105,13 +105,15 @@ export const EntityTable = ({
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
-                onDragEnd={onDragEnd}
+                onDragEnd={(event) => {
+                  void onDragEnd(event);
+                }}
               >
                 <SortableContext
                   items={sortedEntities
                     .filter(
                       (entity): entity is typeof entity & { id: string } =>
-                        !!entity.id
+                        entity.id !== undefined && entity.id !== ""
                     )
                     .map((entity) => entity.id)}
                   strategy={verticalListSortingStrategy}
@@ -120,7 +122,7 @@ export const EntityTable = ({
                     // Virtualized rendering for large lists
                     <Box
                       style={{
-                        height: `${rowVirtualizer.getTotalSize()}px`,
+                        height: `${String(rowVirtualizer.getTotalSize())}px`,
                         position: "relative",
                       }}
                     >
@@ -134,7 +136,7 @@ export const EntityTable = ({
                               top: 0,
                               left: 0,
                               width: "100%",
-                              transform: `translateY(${virtualRow.start}px)`,
+                              transform: `translateY(${String(virtualRow.start)}px)`,
                             }}
                           >
                             <SortableEntityRow

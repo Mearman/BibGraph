@@ -36,7 +36,7 @@ export const CatalogueSearchBar = ({
           ref={searchInputRef}
           placeholder="Search lists by title, description, or tags..."
           value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
+          onChange={(e) => { onSearchChange(e.target.value); }}
           aria-label="Search catalogue lists"
           aria-describedby="search-help"
           flex={1}
@@ -48,7 +48,7 @@ export const CatalogueSearchBar = ({
       <Switch
         label="Show system catalogues"
         checked={showSystemCatalogues}
-        onChange={(e) => onShowSystemCataloguesChange(e.currentTarget.checked)}
+        onChange={(e) => { onShowSystemCataloguesChange(e.currentTarget.checked); }}
         aria-label="Toggle visibility of system catalogues like bookmarks and history"
         data-testid="show-system-catalogues-toggle"
       />

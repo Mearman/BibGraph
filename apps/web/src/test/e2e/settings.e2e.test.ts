@@ -17,7 +17,8 @@ import { waitForAppReady } from "@/test/helpers/app-ready";
 import { SettingsPage } from "@/test/page-objects/SettingsPage";
 
 test.describe("@utility Settings Page", () => {
-	const BASE_URL = process.env.CI ? "http://localhost:4173" : "http://localhost:5173";
+	const IS_CI = process.env.CI !== undefined && process.env.CI !== "";
+	const BASE_URL = IS_CI ? "http://localhost:4173" : "http://localhost:5173";
 
 	test.beforeEach(async ({ page, context }) => {
 		// Clear storage to ensure clean state
@@ -84,11 +85,15 @@ test.describe("@utility Settings Page", () => {
 
 		// Verify notification message
 		const notification = page.locator(".mantine-Notification-root");
-		await (isNewState ? await expect(notification).toContainText(
+		if (isNewState) {
+			await expect(notification).toContainText(
 				"Extended research outputs (xpac) enabled",
-			) : await expect(notification).toContainText(
+			);
+		} else {
+			await expect(notification).toContainText(
 				"Extended research outputs (xpac) disabled",
-			));
+			);
+		}
 	});
 
 	test("should display theme controls and allow theme switching", async ({
@@ -265,7 +270,7 @@ test.describe("@utility Settings Page", () => {
 			"[data-testid='xpac-toggle'], [data-testid='include-xpac']",
 		);
 		const ariaChecked = await xpacToggle.getAttribute("aria-checked");
-		expect(["true", "false"]).toContain(ariaChecked || "");
+		expect(["true", "false"]).toContain(ariaChecked ?? "");
 
 		// Verify buttons have proper roles
 		const resetButton = page.locator("button", {

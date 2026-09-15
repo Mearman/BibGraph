@@ -3,7 +3,7 @@ import { lazy } from "react";
 
 import { LazyRoute } from "@/components/routing/LazyRoute";
 
-const ErrorTestComponent = lazy(() =>
+const ErrorTestComponent = lazy(async () =>
   import("./error-test.lazy").then((m) => ({ default: m.default })),
 );
 
@@ -15,7 +15,7 @@ export const Route = createFileRoute("/error-test")({
   ),
   // Only show in development
   beforeLoad: () => {
-    const isDevelopment = import.meta.env.DEV ?? false;
+    const isDevelopment = import.meta.env.DEV;
     if (!isDevelopment) {
       throw new Error("Error test page is only available in development mode");
     }

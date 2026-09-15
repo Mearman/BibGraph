@@ -13,6 +13,9 @@ import type { LinkStyle } from '../types';
 import { getDefaultLinkStyle } from './style-helpers';
 import type { ForceGraphLink } from './types';
 
+const HIGHLIGHTED_LINK_WIDTH_FALLBACK = 1.5;
+const DIMMED_LINK_WIDTH = 0.5;
+
 export interface UseLinkStyleOptions {
   /**
   Function to check if an edge is highlighted
@@ -44,10 +47,6 @@ export interface UseLinkStyleReturn {
  *
  * Returns callback functions suitable for react-force-graph-3d's
  * linkColor and linkWidth props.
- * @param root0
- * @param root0.isEdgeHighlighted
- * @param root0.getLinkStyle
- * @param root0.isPathHighlightMode
  */
 export const useLinkStyle = ({
   isEdgeHighlighted,
@@ -80,7 +79,7 @@ export const useLinkStyle = ({
         ? customGetLinkStyle(link.originalEdge, isHighlighted)
         : getDefaultLinkStyle(link, isHighlighted, isPathHighlightMode);
 
-      return isHighlighted ? (style.width ?? 1.5) : 0.5;
+      return isHighlighted ? (style.width ?? HIGHLIGHTED_LINK_WIDTH_FALLBACK) : DIMMED_LINK_WIDTH;
     },
     [isEdgeHighlighted, customGetLinkStyle, isPathHighlightMode]
   );

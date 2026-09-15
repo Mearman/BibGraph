@@ -1,6 +1,5 @@
 /**
  * Static Cache Tier Card component for displaying remote/local static cache information
- * @module components/catalogue/cache-tier/StaticCacheTierCard
  */
 
 import type { CachedEntityEntry } from "@bibgraph/client/internal/static-data-provider";
@@ -28,90 +27,7 @@ import { EntityTypeBreakdown } from "./EntityTypeBreakdown";
 
 const HIGH_HIT_RATE_THRESHOLD = 80;
 const MEDIUM_HIT_RATE_THRESHOLD = 50;
-
-interface StaticCacheTierCardProperties {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  url: string;
-  isConfigured: boolean;
-  entities: CachedEntityEntry[];
-  stats: CacheTierStats | null;
-  isLoading: boolean;
-  onRefresh: () => void;
-  color: string;
-  badges?: React.ReactNode;
-}
-
-/**
- * Displays a static cache tier card with URL, stats, and entity breakdown
- * @param root0
- * @param root0.title
- * @param root0.description
- * @param root0.icon
- * @param root0.url
- * @param root0.isConfigured
- * @param root0.entities
- * @param root0.stats
- * @param root0.isLoading
- * @param root0.onRefresh
- * @param root0.color
- * @param root0.badges
- */
-export const StaticCacheTierCard = ({
-  title,
-  description,
-  icon,
-  url,
-  isConfigured,
-  entities,
-  stats,
-  isLoading,
-  onRefresh,
-  color,
-  badges,
-}: StaticCacheTierCardProperties) => {
-  const entityTypeCounts = groupByEntityType(entities);
-  const hitRate = stats && stats.requests > 0 ? (stats.hits / stats.requests) * 100 : 0;
-
-  return (
-    <Card style={{ border: BORDER_STYLE_GRAY_3 }} padding="md" data-testid={generateTestId(title)}>
-      <StaticCacheHeader
-        title={title}
-        description={description}
-        icon={icon}
-        color={color}
-        badges={badges}
-        isLoading={isLoading}
-        onRefresh={onRefresh}
-      />
-
-      {isConfigured ? (
-        isLoading ? (
-          <LoadingState />
-        ) : (
-          <Stack gap="md">
-            <UrlDisplay url={url} />
-            <StaticCacheStats
-              entityCount={entities.length}
-              entityTypeCount={entityTypeCounts.length}
-              stats={stats}
-              hitRate={hitRate}
-            />
-            {stats && stats.requests > 0 && <HitRateBar stats={stats} hitRate={hitRate} />}
-            {entities.length > 0 ? (
-              <EntityTypeBreakdown entities={entities} showSize={false} showAccessedAt={false} />
-            ) : (
-              <EmptyState />
-            )}
-          </Stack>
-        )
-      ) : (
-        <NotConfiguredState />
-      )}
-    </Card>
-  );
-};
+const HIT_RATE_PERCENT_MULTIPLIER = 100;
 
 interface StaticCacheHeaderProperties {
   title: string;
@@ -195,6 +111,18 @@ const UrlDisplay = ({ url }: UrlDisplayProperties) => (
   </Paper>
 );
 
+interface StatCardProperties {
+  label: string;
+  value: string;
+}
+
+const StatCard = ({ label, value }: StatCardProperties) => (
+  <Paper style={{ border: BORDER_STYLE_GRAY_3 }} p="xs" radius="sm">
+    <Text size="xs" c="dimmed" fw={500}>{label}</Text>
+    <Text size="lg" fw={700}>{value}</Text>
+  </Paper>
+);
+
 interface StaticCacheStatsProperties {
   entityCount: number;
   entityTypeCount: number;
@@ -220,18 +148,6 @@ const StaticCacheStats = ({
   </SimpleGrid>
 );
 
-interface StatCardProperties {
-  label: string;
-  value: string;
-}
-
-const StatCard = ({ label, value }: StatCardProperties) => (
-  <Paper style={{ border: BORDER_STYLE_GRAY_3 }} p="xs" radius="sm">
-    <Text size="xs" c="dimmed" fw={500}>{label}</Text>
-    <Text size="lg" fw={700}>{value}</Text>
-  </Paper>
-);
-
 interface HitRateBarProperties {
   stats: CacheTierStats;
   hitRate: number;
@@ -252,5 +168,77 @@ const HitRateBar = ({ stats, hitRate }: HitRateBarProperties) => {
       </Group>
       <Progress value={hitRate} color={getHitRateColor()} size="sm" />
     </div>
+  );
+};
+
+interface StaticCacheTierCardProperties {
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  url: string;
+  isConfigured: boolean;
+  entities: CachedEntityEntry[];
+  stats: CacheTierStats | null;
+  isLoading: boolean;
+  onRefresh: () => void;
+  color: string;
+  badges?: React.ReactNode;
+}
+
+/**
+ * Displays a static cache tier card with URL, stats, and entity breakdown
+ */
+export const StaticCacheTierCard = ({
+  title,
+  description,
+  icon,
+  url,
+  isConfigured,
+  entities,
+  stats,
+  isLoading,
+  onRefresh,
+  color,
+  badges,
+}: StaticCacheTierCardProperties) => {
+  const entityTypeCounts = groupByEntityType(entities);
+  const hitRate = stats && stats.requests > 0 ? (stats.hits / stats.requests) * HIT_RATE_PERCENT_MULTIPLIER : 0;
+
+  return (
+    <Card style={{ border: BORDER_STYLE_GRAY_3 }} padding="md" data-testid={generateTestId(title)}>
+      <StaticCacheHeader
+        title={title}
+        description={description}
+        icon={icon}
+        color={color}
+        badges={badges}
+        isLoading={isLoading}
+        onRefresh={onRefresh}
+      />
+
+      {isConfigured ? (
+        isLoading ? (
+          <LoadingState />
+        ) : (
+          <Stack gap="md">
+            <UrlDisplay url={url} />
+            <StaticCacheStats
+              entityCount={entities.length}
+              entityTypeCount={entityTypeCounts.length}
+              stats={stats}
+              hitRate={hitRate}
+            />
+            {stats && stats.requests > 0 && <HitRateBar stats={stats} hitRate={hitRate} />}
+            {entities.length > 0 ? (
+              <EntityTypeBreakdown entities={entities} showSize={false} showAccessedAt={false} />
+            ) : (
+              <EmptyState />
+            )}
+          </Stack>
+        )
+      ) : (
+        <NotConfiguredState />
+      )}
+    </Card>
   );
 };

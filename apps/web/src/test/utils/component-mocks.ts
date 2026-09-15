@@ -6,6 +6,9 @@
 import React from "react";
 import { vi } from "vitest";
 
+// Number of bytes per pixel in an RGBA ImageData buffer
+const RGBA_BYTES_PER_PIXEL = 4;
+
 /**
  * Mock XYFlow/React Flow components and hooks
  * These are heavy components that don't need to be tested in isolation
@@ -92,7 +95,7 @@ export const mockXYFlow = () => {
     isNode: vi.fn(),
 
     // Provider
-    ReactFlowProvider: ({ children }: React.PropsWithChildren<Record<string, unknown>>) => children,
+    ReactFlowProvider: async ({ children }: React.PropsWithChildren<Record<string, unknown>>) => children,
 
     // Types and constants
     Position: {
@@ -214,11 +217,11 @@ export const mockWebWorker = (): any => {
 /**
  * Mock Canvas API for components that use canvas rendering
  */
-export const mockCanvas = (): any => {
+export const mockCanvas = (): unknown => {
   const mockContext = {
     fillRect: vi.fn(),
     clearRect: vi.fn(),
-    getImageData: vi.fn(() => ({ data: new Uint8ClampedArray(4) })),
+    getImageData: vi.fn(() => ({ data: new Uint8ClampedArray(RGBA_BYTES_PER_PIXEL) })),
     putImageData: vi.fn(),
     createImageData: vi.fn(),
     setTransform: vi.fn(),
@@ -254,11 +257,18 @@ export const mockCanvas = (): any => {
     createPattern: vi.fn(),
   };
 
-  HTMLCanvasElement.prototype.getContext = vi.fn(() => mockContext) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+  // Assigned via a PropertyDescriptor (whose `value` field is natively typed `any` in lib.es5.d.ts) rather than a type assertion, since the real overloaded `getContext` signature can't be satisfied structurally by a partial mock context.
+  Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+    value: vi.fn(() => mockContext),
+    writable: true,
+    configurable: true,
+  });
   HTMLCanvasElement.prototype.toDataURL = vi.fn(
     () => "data:image/png;base64,test",
   );
-  HTMLCanvasElement.prototype.toBlob = vi.fn();
+  HTMLCanvasElement.prototype.toBlob = vi.fn((): void => {
+    // No-op stub; tests that need the callback invoked set their own implementation
+  });
 
   return mockContext;
 };
@@ -301,12 +311,17 @@ export const mockIndexedDB = (): any => {
     removeEventListener: vi.fn(),
   };
 
-  global.indexedDB = {
-    open: vi.fn(() => mockRequest),
-    deleteDatabase: vi.fn(() => mockRequest),
-    databases: vi.fn(() => Promise.resolve([])),
-    cmp: vi.fn(),
-  } as unknown as IDBFactory;
+  // Assigned via a PropertyDescriptor (whose `value` field is natively typed `any` in lib.es5.d.ts) rather than a type assertion, since the real `IDBFactory` interface can't be satisfied structurally by a partial mock.
+  Object.defineProperty(global, "indexedDB", {
+    value: {
+      open: vi.fn(() => mockRequest),
+      deleteDatabase: vi.fn(() => mockRequest),
+      databases: () => [],
+      cmp: vi.fn(),
+    },
+    writable: true,
+    configurable: true,
+  });
 
   return { mockDB, mockRequest };
 };

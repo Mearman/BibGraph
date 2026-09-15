@@ -2,9 +2,8 @@ import path from "node:path";
 
 /**
  * Simple build configuration for the web app
- * @param isProduction
  */
-export const buildConfig = (isProduction: boolean = false) => ({
+export const buildConfig = (isProduction = false) => ({
   // Configure for hash-based routing deployment
   base: "./",
 

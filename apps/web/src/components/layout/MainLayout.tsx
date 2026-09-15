@@ -67,6 +67,14 @@ interface MainLayoutProperties {
   children?: React.ReactNode;
 }
 
+// Sidebar sizing and spacing constants
+const DEFAULT_SIDEBAR_WIDTH_PX = 300;
+const MIN_SIDEBAR_WIDTH_PX = 200;
+const MAX_SIDEBAR_WIDTH_PX = 600;
+const SIDEBAR_RESIZE_STEP_PX = 20;
+const RIBBON_WIDTH_PX = 60;
+const SPACING_XS_PX = 4;
+
 export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
   // Initialize accessibility features on mount
   useEffect(() => {
@@ -110,7 +118,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return () => { document.removeEventListener('keydown', handleKeyDown); };
   }, []);
 
   // Layout store for sidebar state management
@@ -128,10 +136,10 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
   } = layoutStore;
 
   // Width state for dragging (using React state for immediate visual feedback)
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState(300);
-  const [rightSidebarWidth, setRightSidebarWidth] = useState(300);
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH_PX);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH_PX);
   const [isDragging, setIsDragging] = useState<"left" | "right" | null>(null);
-  const dragStartReference = useRef<{ x: number; width: number } | null>(null);
+  const dragStartRef = useRef<{ x: number; width: number } | null>(null);
 
   // Mobile menu state
   
@@ -144,7 +152,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
     ({ side, e }: { side: "left" | "right"; e: React.MouseEvent }) => {
       e.preventDefault();
       setIsDragging(side);
-      dragStartReference.current = {
+      dragStartRef.current = {
         x: e.clientX,
         width: side === "left" ? leftSidebarWidth : rightSidebarWidth,
       };
@@ -154,14 +162,14 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
 
   const handleDragMove = useCallback(
     (e: MouseEvent) => {
-      if (!isDragging || !dragStartReference.current) return;
+      if (!isDragging || !dragStartRef.current) return;
 
-      const deltaX = e.clientX - dragStartReference.current.x;
+      const deltaX = e.clientX - dragStartRef.current.x;
       const newWidth = Math.max(
-        200,
+        MIN_SIDEBAR_WIDTH_PX,
         Math.min(
-          600,
-          dragStartReference.current.width +
+          MAX_SIDEBAR_WIDTH_PX,
+          dragStartRef.current.width +
             (isDragging === "left" ? deltaX : -deltaX),
         ),
       );
@@ -177,13 +185,13 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
 
   const handleDragEnd = useCallback(() => {
     setIsDragging(null);
-    dragStartReference.current = null;
+    dragStartRef.current = null;
   }, []);
 
   // Add global mouse event listeners for dragging
   React.useEffect(() => {
     if (!isDragging) {
-    	return;
+      return undefined;
     }
 
     document.addEventListener("mousemove", handleDragMove);
@@ -203,12 +211,12 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
     <AppShell
       header={{ height: { base: 50, sm: 60 } }}
       navbar={{
-        width: leftSidebarOpen ? { base: 280, sm: leftSidebarWidth + 60 } : 60,
+        width: leftSidebarOpen ? { base: 280, sm: leftSidebarWidth + RIBBON_WIDTH_PX } : RIBBON_WIDTH_PX,
         breakpoint: "sm",
         collapsed: { mobile: true, desktop: !leftSidebarOpen },
       }}
       aside={{
-        width: rightSidebarOpen ? { base: 280, sm: rightSidebarWidth + 60 } : 60,
+        width: rightSidebarOpen ? { base: 280, sm: rightSidebarWidth + RIBBON_WIDTH_PX } : RIBBON_WIDTH_PX,
         breakpoint: "sm",
         collapsed: { mobile: true, desktop: !rightSidebarOpen },
       }}
@@ -219,7 +227,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
         <Group justify="space-between" h="100%" px={{ base: 'xs', sm: 'md' }}>
           {/* Left side - Always show logo on mobile, hide version badge */}
           <Group gap="xs" style={{ minWidth: 0, flexShrink: 0 }}>
-            <Link to="/" style={{ textDecoration: 'none' }}>
+            <Link to="/" params={{}} style={{ textDecoration: 'none' }}>
               <Text
                 size="lg"
                 fw={600}
@@ -275,7 +283,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
                 }}
               >
                 <ActionIcon
-                  onClick={() => setMobileSearchExpanded(false)}
+                  onClick={() => { setMobileSearchExpanded(false); }}
                   variant="subtle"
                   size="lg"
                   aria-label="Close search"
@@ -288,7 +296,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
               </Box>
             ) : (
               <ActionIcon
-                onClick={() => setMobileSearchExpanded(true)}
+                onClick={() => { setMobileSearchExpanded(true); }}
                 variant="subtle"
                 size="lg"
                 aria-label="Open search"
@@ -299,7 +307,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
             )}
 
             {/* Desktop navigation - hidden on smaller screens */}
-            <Group gap={rem(4)} visibleFrom="lg">
+            <Group gap={rem(SPACING_XS_PX)} visibleFrom="lg">
               <Button
                 component={Link}
                 to="/"
@@ -373,7 +381,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
                 <Menu.Divider />
                 <Menu.Item
                   leftSection={<IconSearch size={ICON_SIZE.MD} />}
-                  onClick={() => setMobileSearchExpanded(true)}
+                  onClick={() => { setMobileSearchExpanded(true); }}
                 >
                   Search
                 </Menu.Item>
@@ -432,7 +440,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
             </Box>
 
             {/* Desktop navigation - additional buttons */}
-            <Group gap={rem(4)} visibleFrom="xl">
+            <Group gap={rem(SPACING_XS_PX)} visibleFrom="xl">
               <Button
                 component={Link}
                 to="/history"
@@ -462,7 +470,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
             {/* Theme selector and help - visible on all screen sizes */}
             <ColorSchemeSelector />
             <KeyboardShortcutsButton
-              onClick={() => setShortcutsHelpOpened(true)}
+              onClick={() => { setShortcutsHelpOpened(true); }}
             />
           </Group>
         </Group>
@@ -548,7 +556,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
                 aria-valuemax={600}
                 tabIndex={0}
                 visibleFrom="md"
-                w={rem(4)}
+                w={rem(SPACING_XS_PX)}
                 h="100%"
                 bg={isDragging === "left" ? "blue" : "transparent"}
                 style={{ position: "absolute", right: 0, top: 0, zIndex: 10 }}
@@ -561,10 +569,10 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
                   // Handle keyboard resize with arrow keys
                   if (e.key === "ArrowLeft") {
                     e.preventDefault();
-                    setLeftSidebarWidth((previous) => Math.max(200, previous - 20));
+                    setLeftSidebarWidth((previous) => Math.max(MIN_SIDEBAR_WIDTH_PX, previous - SIDEBAR_RESIZE_STEP_PX));
                   } else if (e.key === "ArrowRight") {
                     e.preventDefault();
-                    setLeftSidebarWidth((previous) => Math.min(600, previous + 20));
+                    setLeftSidebarWidth((previous) => Math.min(MAX_SIDEBAR_WIDTH_PX, previous + SIDEBAR_RESIZE_STEP_PX));
                   }
                 }}
                 onMouseEnter={(e) => {
@@ -606,7 +614,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
                 aria-valuemax={600}
                 tabIndex={0}
                 visibleFrom="md"
-                w={rem(4)}
+                w={rem(SPACING_XS_PX)}
                 h="100%"
                 bg={isDragging === "right" ? "blue" : "transparent"}
                 style={{ position: "absolute", left: 0, top: 0, zIndex: 10 }}
@@ -619,10 +627,10 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
                   // Handle keyboard resize with arrow keys
                   if (e.key === "ArrowLeft") {
                     e.preventDefault();
-                    setRightSidebarWidth((previous) => Math.min(600, previous + 20));
+                    setRightSidebarWidth((previous) => Math.min(MAX_SIDEBAR_WIDTH_PX, previous + SIDEBAR_RESIZE_STEP_PX));
                   } else if (e.key === "ArrowRight") {
                     e.preventDefault();
-                    setRightSidebarWidth((previous) => Math.max(200, previous - 20));
+                    setRightSidebarWidth((previous) => Math.max(MIN_SIDEBAR_WIDTH_PX, previous - SIDEBAR_RESIZE_STEP_PX));
                   }
                 }}
                 onMouseEnter={(e) => {
@@ -639,7 +647,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
               <Box
                 flex={1}
                 p={{ base: 'xs', sm: 'sm' }}
-                style={{ marginLeft: rem(4) }}
+                style={{ marginLeft: rem(SPACING_XS_PX) }}
                 data-testid="right-sidebar-content"
               >
                 {/* Pinning controls */}
@@ -706,7 +714,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
       {/* Keyboard Shortcuts Help Modal */}
       <KeyboardShortcutsHelp
         opened={shortcutsHelpOpened}
-        onClose={() => setShortcutsHelpOpened(false)}
+        onClose={() => { setShortcutsHelpOpened(false); }}
       />
 
       {/* User Onboarding Tutorial */}

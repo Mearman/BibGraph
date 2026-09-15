@@ -24,7 +24,8 @@ import {
   IconZoomIn,
   IconZoomOut
 } from "@tabler/icons-react";
-import { createContext, ReactNode, use, useCallback, useEffect, useMemo , useRef, useState } from "react";
+import type { ReactNode} from "react";
+import { createContext, use, useCallback, useEffect, useMemo , useRef, useState } from "react";
 
 // Speech Recognition API type definitions
 interface SpeechRecognition extends EventTarget {
@@ -45,17 +46,17 @@ interface SpeechRecognition extends EventTarget {
   onspeechstart: ((this: SpeechRecognition, event_: Event) => unknown) | null;
   onstart: ((this: SpeechRecognition, event_: Event) => unknown) | null;
   serviceURI: string;
-  start(): void;
-  stop(): void;
-  abort(): void;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
 }
 
 // Speech Grammar List interface
 interface SpeechGrammarList {
-  addFromString(string: string, weight?: number): void;
-  addFromURI(source: string, weight?: number): void;
+  addFromString: (string: string, weight?: number) => void;
+  addFromURI: (source: string, weight?: number) => void;
   length: number;
-  item(index: number): SpeechGrammar | null;
+  item: (index: number) => SpeechGrammar | null;
   [index: number]: SpeechGrammar;
 }
 
@@ -76,14 +77,14 @@ interface SpeechRecognitionErrorEvent extends Event {
 
 interface SpeechRecognitionResultList {
   readonly length: number;
-  item(index: number): SpeechRecognitionResult;
+  item: (index: number) => SpeechRecognitionResult;
   [index: number]: SpeechRecognitionResult;
 }
 
 interface SpeechRecognitionResult {
   readonly isFinal: boolean;
   readonly length: number;
-  item(index: number): SpeechRecognitionAlternative;
+  item: (index: number) => SpeechRecognitionAlternative;
   [index: number]: SpeechRecognitionAlternative;
 }
 
@@ -98,6 +99,23 @@ declare global {
     webkitSpeechRecognition?: unknown;
   }
 }
+
+// Type guard narrowing `document.activeElement` (typed `Element | null`) to `HTMLElement`.
+const isHTMLElement = (value: unknown): value is HTMLElement => value instanceof HTMLElement;
+
+const DEFAULT_FONT_SIZE_PX = 16;
+const MIN_FONT_SIZE_PX = 12;
+const MAX_FONT_SIZE_PX = 24;
+const FONT_SIZE_STEP_PX = 2;
+const ANNOUNCEMENT_CLEANUP_DELAY_MS = 1000;
+const VOICE_RECOGNITION_RESTART_DELAY_MS = 100;
+
+// Detects whether a screen reader appears to be active, via available speech-synthesis voices or a known screen-reader user-agent substring.
+const detectScreenReaderStatus = (): boolean =>
+  window.speechSynthesis.getVoices().length > 0 ||
+  navigator.userAgent.includes('NVDA') ||
+  navigator.userAgent.includes('JAWS') ||
+  navigator.userAgent.includes('VoiceOver');
 
 // Accessibility context interface
 interface AccessibilityContextType {
@@ -142,7 +160,7 @@ interface AccessibilityProviderProperties {
 class FocusTrap {
   private element: HTMLElement | null = null;
   private previousFocus: HTMLElement | null = null;
-  private keydownHandler: (e: KeyboardEvent) => void;
+  private readonly keydownHandler: (e: KeyboardEvent) => void;
 
   constructor() {
     this.keydownHandler = this.handleKeydown.bind(this);
@@ -152,7 +170,7 @@ class FocusTrap {
     this.release(); // Release any existing trap
 
     this.element = element;
-    this.previousFocus = document.activeElement as HTMLElement;
+    this.previousFocus = isHTMLElement(document.activeElement) ? document.activeElement : null;
 
     // Focus first focusable element
     const firstFocusable = this.getFirstFocusableElement(element);
@@ -183,18 +201,19 @@ class FocusTrap {
 
     if (!this.element) return;
     const focusableElements = this.getFocusableElements(this.element);
+    if (focusableElements.length === 0) return;
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
 
     if (e.shiftKey) {
       if (document.activeElement === firstElement) {
         e.preventDefault();
-        lastElement?.focus();
+        lastElement.focus();
       }
     } else {
       if (document.activeElement === lastElement) {
         e.preventDefault();
-        firstElement?.focus();
+        firstElement.focus();
       }
     }
   }
@@ -210,12 +229,12 @@ class FocusTrap {
       '[contenteditable="true"]'
     ].join(', ');
 
-    return [...element.querySelectorAll(selector)] as HTMLElement[];
+    return [...element.querySelectorAll<HTMLElement>(selector)];
   }
 
   private getFirstFocusableElement(element: HTMLElement): HTMLElement | null {
     const focusable = this.getFocusableElements(element);
-    return focusable[0] || null;
+    return focusable.length > 0 ? focusable[0] : null;
   }
 }
 
@@ -224,15 +243,15 @@ const isSpeechRecognitionConstructor = (value: unknown): value is new () => Spee
 
 // Voice command utilities
 class VoiceCommandProcessor {
-  private recognition: SpeechRecognition | null = null;
+  private readonly recognition: SpeechRecognition | null = null;
   private isListening = false;
   private onCommand?: (command: string) => void;
 
   constructor() {
-    if (typeof window !== 'undefined' && window.webkitSpeechRecognition && isSpeechRecognitionConstructor(window.webkitSpeechRecognition)) {
+    if (typeof window !== 'undefined' && typeof window.webkitSpeechRecognition !== 'undefined' && isSpeechRecognitionConstructor(window.webkitSpeechRecognition)) {
       this.recognition = new window.webkitSpeechRecognition();
       this.setupRecognition();
-    } else if (typeof window !== 'undefined' && window.SpeechRecognition && isSpeechRecognitionConstructor(window.SpeechRecognition)) {
+    } else if (typeof window !== 'undefined' && typeof window.SpeechRecognition !== 'undefined' && isSpeechRecognitionConstructor(window.SpeechRecognition)) {
       this.recognition = new window.SpeechRecognition();
       this.setupRecognition();
     }
@@ -264,7 +283,7 @@ class VoiceCommandProcessor {
       // Auto-restart if we were intentionally listening
       if (this.recognition && this.onCommand) {
         const onCommand = this.onCommand;
-        setTimeout(() => this.start(onCommand), 100);
+        setTimeout(() => { this.start(onCommand); }, VOICE_RECOGNITION_RESTART_DELAY_MS);
       }
     };
   }
@@ -300,43 +319,30 @@ class VoiceCommandProcessor {
  *
  * Provides comprehensive accessibility features including screen reader support,
  * focus management, voice commands, and visual accommodations.
- * @param root0
- * @param root0.children
  */
 export const AccessibilityProvider = ({ children }: AccessibilityProviderProperties) => {
-  const [isScreenReaderActive, setIsScreenReaderActive] = useState(false);
+  const [isScreenReaderActive, setIsScreenReaderActive] = useState(detectScreenReaderStatus);
   const [highContrastMode, setHighContrastMode] = useState(false);
-  const [fontSize, setFontSize] = useState(16);
+  const [fontSize, setFontSize] = useState(DEFAULT_FONT_SIZE_PX);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [showAccessibilityPanel, setShowAccessibilityPanel] = useState(false);
 
   // Refs
-  const focusTrapReference = useRef(new FocusTrap());
-  const voiceProcessorReference = useRef(new VoiceCommandProcessor());
-  const keyboardShortcutsReference = useRef(new Map<string, () => void>());
-  const liveRegionReference = useRef<HTMLDivElement>(null);
+  const focusTrapRef = useRef(new FocusTrap());
+  const voiceProcessorRef = useRef(new VoiceCommandProcessor());
+  const keyboardShortcutsRef = useRef(new Map<string, () => void>());
+  const liveRegionRef = useRef<HTMLDivElement>(null);
 
-  // Screen reader detection
+  // Screen reader detection - re-checked on resize since some screen readers only become detectable once voices load
   useEffect(() => {
-    const detectScreenReader = () => {
-      // Basic detection - check for common screen reader indicators
-      const hasScreenReader =
-        window.speechSynthesis?.getVoices().length > 0 ||
-        navigator.userAgent.includes('NVDA') ||
-        navigator.userAgent.includes('JAWS') ||
-        navigator.userAgent.includes('VoiceOver');
-
-      setIsScreenReaderActive(hasScreenReader);
-    };
-
-    detectScreenReader();
-    window.addEventListener('resize', detectScreenReader);
-    return () => window.removeEventListener('resize', detectScreenReader);
+    const handleResize = () => { setIsScreenReaderActive(detectScreenReaderStatus()); };
+    window.addEventListener('resize', handleResize);
+    return () => { window.removeEventListener('resize', handleResize); };
   }, []);
 
   // Screen reader announcements
   const announce = useCallback((message: string, priority: "polite" | "assertive" = "polite") => {
-    if (!liveRegionReference.current) return;
+    if (!liveRegionRef.current) return;
 
     // Create temporary announcement element
     const announcement = document.createElement('div');
@@ -354,7 +360,7 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
     // Remove after announcement
     setTimeout(() => {
       announcement.remove();
-    }, 1000);
+    }, ANNOUNCEMENT_CLEANUP_DELAY_MS);
   }, []);
 
   // Focus management
@@ -363,7 +369,8 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
         'a[href], button:not([disabled]), textarea:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
       )];
 
-    const currentIndex = focusableElements.indexOf(document.activeElement as HTMLElement);
+    const activeElement = document.activeElement;
+    const currentIndex = isHTMLElement(activeElement) ? focusableElements.indexOf(activeElement) : -1;
     const nextIndex = (currentIndex + 1) % focusableElements.length;
     focusableElements[nextIndex]?.focus();
   }, []);
@@ -373,17 +380,18 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
         'a[href], button:not([disabled]), textarea:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
       )];
 
-    const currentIndex = focusableElements.indexOf(document.activeElement as HTMLElement);
+    const activeElement = document.activeElement;
+    const currentIndex = isHTMLElement(activeElement) ? focusableElements.indexOf(activeElement) : -1;
     const previousIndex = currentIndex <= 0 ? focusableElements.length - 1 : currentIndex - 1;
     focusableElements[previousIndex]?.focus();
   }, []);
 
   const trapFocus = useCallback((element: HTMLElement) => {
-    focusTrapReference.current.trap(element);
+    focusTrapRef.current.trap(element);
   }, []);
 
   const releaseFocus = useCallback(() => {
-    focusTrapReference.current.release();
+    focusTrapRef.current.release();
   }, []);
 
   // Visual accommodations
@@ -392,58 +400,23 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
   }, []);
 
   const increaseFontSize = useCallback(() => {
-    setFontSize(previous => Math.min(previous + 2, 24));
+    setFontSize(previous => Math.min(previous + FONT_SIZE_STEP_PX, MAX_FONT_SIZE_PX));
   }, []);
 
   const decreaseFontSize = useCallback(() => {
-    setFontSize(previous => Math.max(previous - 2, 12));
+    setFontSize(previous => Math.max(previous - FONT_SIZE_STEP_PX, MIN_FONT_SIZE_PX));
   }, []);
 
   // Keyboard shortcuts
   const registerShortcut = useCallback((key: string, action: () => void) => {
-    keyboardShortcutsReference.current.set(key, action);
+    keyboardShortcutsRef.current.set(key, action);
   }, []);
 
   const unregisterShortcut = useCallback((key: string) => {
-    keyboardShortcutsReference.current.delete(key);
+    keyboardShortcutsRef.current.delete(key);
   }, []);
 
   // Voice commands
-  const toggleVoice = useCallback(() => {
-    if (!voiceProcessorReference.current.isSupported) {
-      announce('Voice commands are not supported in this browser');
-      return;
-    }
-
-    if (voiceEnabled) {
-      stopVoiceRecognition();
-    } else {
-      startVoiceRecognition();
-    }
-  }, [voiceEnabled, announce]);
-
-  const startVoiceRecognition = useCallback(() => {
-    if (!voiceProcessorReference.current.isSupported) return;
-
-    try {
-      voiceProcessorReference.current.start((command: string) => {
-        announce(`Voice command: ${command}`, 'assertive');
-        handleVoiceCommand(command);
-      });
-      setVoiceEnabled(true);
-      announce('Voice commands activated', 'assertive');
-    } catch (error) {
-      console.error('Failed to start voice recognition:', error);
-      announce('Failed to start voice recognition', 'assertive');
-    }
-  }, []);
-
-  const stopVoiceRecognition = useCallback(() => {
-    voiceProcessorReference.current.stop();
-    setVoiceEnabled(false);
-    announce('Voice commands deactivated', 'assertive');
-  }, []);
-
   const handleVoiceCommand = useCallback((command: string) => {
     // Simple voice command processing
     const commands: Record<string, () => void> = {
@@ -452,8 +425,8 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
       'increase font size': increaseFontSize,
       'decrease font size': decreaseFontSize,
       'toggle high contrast': toggleHighContrast,
-      'help': () => setShowAccessibilityPanel(true),
-      'close': () => setShowAccessibilityPanel(false)
+      'help': () => { setShowAccessibilityPanel(true); },
+      'close': () => { setShowAccessibilityPanel(false); }
     };
 
     for (const [keyword, action] of Object.entries(commands)) {
@@ -464,7 +437,42 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
     }
 
     announce('Command not recognized');
-  }, [focusNext, focusPrevious, increaseFontSize, decreaseFontSize, toggleHighContrast]);
+  }, [focusNext, focusPrevious, increaseFontSize, decreaseFontSize, toggleHighContrast, announce]);
+
+  const startVoiceRecognition = useCallback(() => {
+    if (!voiceProcessorRef.current.isSupported) return;
+
+    try {
+      voiceProcessorRef.current.start((command: string) => {
+        announce(`Voice command: ${command}`, 'assertive');
+        handleVoiceCommand(command);
+      });
+      setVoiceEnabled(true);
+      announce('Voice commands activated', 'assertive');
+    } catch (error) {
+      console.error('Failed to start voice recognition:', error);
+      announce('Failed to start voice recognition', 'assertive');
+    }
+  }, [announce, handleVoiceCommand]);
+
+  const stopVoiceRecognition = useCallback(() => {
+    voiceProcessorRef.current.stop();
+    setVoiceEnabled(false);
+    announce('Voice commands deactivated', 'assertive');
+  }, [announce]);
+
+  const toggleVoice = useCallback(() => {
+    if (!voiceProcessorRef.current.isSupported) {
+      announce('Voice commands are not supported in this browser');
+      return;
+    }
+
+    if (voiceEnabled) {
+      stopVoiceRecognition();
+    } else {
+      startVoiceRecognition();
+    }
+  }, [voiceEnabled, announce, startVoiceRecognition, stopVoiceRecognition]);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -498,7 +506,7 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
 
       // Check registered shortcuts
       const shortcutKey = `${e.altKey ? 'alt+' : ''}${e.ctrlKey ? 'ctrl+' : ''}${e.shiftKey ? 'shift+' : ''}${e.key}`;
-      const action = keyboardShortcutsReference.current.get(shortcutKey);
+      const action = keyboardShortcutsRef.current.get(shortcutKey);
       if (action) {
         e.preventDefault();
         action();
@@ -506,12 +514,12 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
     };
 
     document.addEventListener('keydown', handleKeydown);
-    return () => document.removeEventListener('keydown', handleKeydown);
+    return () => { document.removeEventListener('keydown', handleKeydown); };
   }, [toggleHighContrast, increaseFontSize, decreaseFontSize, toggleVoice]);
 
   // Apply visual accommodations
   useEffect(() => {
-    document.documentElement.style.fontSize = `${fontSize}px`;
+    document.documentElement.style.fontSize = `${String(fontSize)}px`;
     return () => {
       document.documentElement.style.fontSize = '';
     };
@@ -538,7 +546,7 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
     fontSize,
     increaseFontSize,
     decreaseFontSize,
-    keyboardShortcuts: keyboardShortcutsReference.current,
+    keyboardShortcuts: keyboardShortcutsRef.current,
     registerShortcut,
     unregisterShortcut,
     voiceEnabled,
@@ -571,7 +579,7 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
 
       {/* Screen reader live regions */}
       <div
-        ref={liveRegionReference}
+        ref={liveRegionRef}
         aria-live="polite"
         aria-atomic="true"
         style={{
@@ -597,7 +605,7 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
             size="sm"
             variant="light"
             leftSection={<IconAccessible size={16} />}
-            onClick={() => setShowAccessibilityPanel(!showAccessibilityPanel)}
+            onClick={() => { setShowAccessibilityPanel(!showAccessibilityPanel); }}
             aria-label="Accessibility options"
             aria-expanded={showAccessibilityPanel}
           >
@@ -624,7 +632,7 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
                   <ActionIcon
                     size="sm"
                     variant="subtle"
-                    onClick={() => setShowAccessibilityPanel(false)}
+                    onClick={() => { setShowAccessibilityPanel(false); }}
                     aria-label="Close accessibility panel"
                   >
                     ×
@@ -664,7 +672,7 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
                       size="sm"
                       variant="outline"
                       onClick={decreaseFontSize}
-                      disabled={fontSize <= 12}
+                      disabled={fontSize <= MIN_FONT_SIZE_PX}
                       aria-label="Decrease font size"
                     >
                       <IconZoomOut size={14} />
@@ -673,7 +681,7 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
                       size="sm"
                       variant="outline"
                       onClick={increaseFontSize}
-                      disabled={fontSize >= 24}
+                      disabled={fontSize >= MAX_FONT_SIZE_PX}
                       aria-label="Increase font size"
                     >
                       <IconZoomIn size={14} />
@@ -682,7 +690,7 @@ export const AccessibilityProvider = ({ children }: AccessibilityProviderPropert
                 </Group>
 
                 {/* Voice commands */}
-                {voiceProcessorReference.current.isSupported && (
+                {voiceProcessorRef.current.isSupported && (
                   <Group justify="space-between" align="center">
                     <Text size="xs">Voice Commands</Text>
                     <ActionIcon

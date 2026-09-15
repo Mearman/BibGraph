@@ -1,6 +1,5 @@
 /**
  * Entity Type Breakdown component for displaying entity type distribution
- * @module components/catalogue/cache-tier/EntityTypeBreakdown
  */
 
 import type { CachedEntityEntry } from "@bibgraph/client/internal/static-data-provider";
@@ -20,6 +19,33 @@ import { getEntityTypeColor, groupByEntityType } from "./cache-tier-utils";
 import { CachedEntityTable } from "./CachedEntityTable";
 import { EntityTypeBadge } from "./EntityTypeBadge";
 
+interface EntityTypeGridProperties {
+  entityTypeCounts: EntityTypeCount[];
+}
+
+/**
+ * Displays a grid of entity type counts
+ */
+const EntityTypeGrid = ({ entityTypeCounts }: EntityTypeGridProperties) => {
+  return (
+    <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="xs">
+      {entityTypeCounts.map(({ entityType, count }) => (
+        <Paper key={entityType} style={{ border: BORDER_STYLE_GRAY_3 }} p="xs" radius="sm">
+          <Group gap="xs">
+            <EntityTypeBadge
+              entityType={entityType}
+              color={getEntityTypeColor(entityType)}
+              variant="filled"
+              count={count}
+            />
+            <Text size="xs" tt="capitalize">{entityType}</Text>
+          </Group>
+        </Paper>
+      ))}
+    </SimpleGrid>
+  );
+};
+
 interface EntityTypeBreakdownProperties {
   entities: CachedEntityEntry[];
   showSize?: boolean;
@@ -28,10 +54,6 @@ interface EntityTypeBreakdownProperties {
 
 /**
  * Displays an accordion with entity type breakdown and recent entities table
- * @param root0
- * @param root0.entities
- * @param root0.showSize
- * @param root0.showAccessedAt
  */
 export const EntityTypeBreakdown = ({
   entities,
@@ -71,34 +93,5 @@ export const EntityTypeBreakdown = ({
         </Accordion.Panel>
       </Accordion.Item>
     </Accordion>
-  );
-};
-
-interface EntityTypeGridProperties {
-  entityTypeCounts: EntityTypeCount[];
-}
-
-/**
- * Displays a grid of entity type counts
- * @param root0
- * @param root0.entityTypeCounts
- */
-const EntityTypeGrid = ({ entityTypeCounts }: EntityTypeGridProperties) => {
-  return (
-    <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="xs">
-      {entityTypeCounts.map(({ entityType, count }) => (
-        <Paper key={entityType} style={{ border: BORDER_STYLE_GRAY_3 }} p="xs" radius="sm">
-          <Group gap="xs">
-            <EntityTypeBadge
-              entityType={entityType}
-              color={getEntityTypeColor(entityType)}
-              variant="filled"
-              count={count}
-            />
-            <Text size="xs" tt="capitalize">{entityType}</Text>
-          </Group>
-        </Paper>
-      ))}
-    </SimpleGrid>
   );
 };

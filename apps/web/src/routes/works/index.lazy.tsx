@@ -7,42 +7,50 @@ import { useState } from "react";
 import { EntityListWithQueryBookmarking } from "@/components/EntityListWithQueryBookmarking";
 import type { TableViewMode } from "@/components/TableViewModeToggle";
 import type { ColumnConfig } from "@/components/types";
-import type { OpenAlexSearchParams } from "@/lib/route-schemas";
 import { convertOpenAlexToInternalLink } from "@/utils/openalex-link-conversion";
+
+const isWork = (value: unknown): value is Work => (
+  typeof value === "object" &&
+  value !== null &&
+  "id" in value &&
+  typeof value.id === "string" &&
+  "display_name" in value &&
+  typeof value.display_name === "string"
+);
 
 const worksColumns: ColumnConfig[] = [
   {
     key: "display_name",
     header: "Title",
     render: (_value: unknown, row: unknown) => {
-      const work = row as Work;
-      const workUrl = `#${convertOpenAlexToInternalLink(work.id).internalPath}`;
+      if (!isWork(row)) return null;
+      const workUrl = `#${convertOpenAlexToInternalLink(row.id).internalPath}`;
       if (workUrl) {
         return (
           <Anchor
             href={workUrl}
             style={{ textDecoration: "none", color: "inherit" }}
           >
-            {work.display_name}
+            {row.display_name}
           </Anchor>
         );
       }
-      return work.display_name;
+      return row.display_name;
     },
   },
   {
     key: "authorships",
     header: "Authors",
     render: (_value: unknown, row: unknown) => {
-      const work = row as Work;
-      const { authorships } = work;
+      if (!isWork(row)) return null;
+      const { authorships } = row;
       if (!authorships || authorships.length === 0) return "Unknown";
 
       return (
         <>
           {authorships.map((authorship, index) => {
             const { author } = authorship;
-            if (!author?.id) return null;
+            if (author.id === undefined) return null;
             const authorUrl = `#${convertOpenAlexToInternalLink(author.id).internalPath}`;
 
             return (
@@ -69,48 +77,58 @@ const worksColumns: ColumnConfig[] = [
     key: "primary_location",
     header: "Source",
     render: (_value: unknown, row: unknown) => {
-      const work = row as Work;
-      const { primary_location } = work;
-      if (!primary_location?.source?.display_name) return "Unknown";
+      if (!isWork(row)) return null;
+      const primaryLocation: unknown = row.primary_location;
+      if (typeof primaryLocation !== "object" || primaryLocation === null || !("source" in primaryLocation)) {
+        return "Unknown";
+      }
+      const { source } = primaryLocation;
+      if (
+        typeof source !== "object" || source === null ||
+        !("id" in source) || typeof source.id !== "string" ||
+        !("display_name" in source) || typeof source.display_name !== "string"
+      ) {
+        return "Unknown";
+      }
 
-      const sourceUrl = `#${convertOpenAlexToInternalLink(primary_location.source.id).internalPath}`;
+      const sourceUrl = `#${convertOpenAlexToInternalLink(source.id).internalPath}`;
       if (sourceUrl) {
         return (
           <Anchor
             href={sourceUrl}
             style={{ textDecoration: "none", color: "inherit" }}
           >
-            {primary_location.source.display_name}
+            {source.display_name}
           </Anchor>
         );
       }
-      return primary_location.source.display_name;
+      return source.display_name;
     },
   },
   {
     key: "cited_by_count",
     header: "Citations",
     render: (_value: unknown, row: unknown) => {
-      const work = row as Work;
-      return work.cited_by_count?.toLocaleString() || "0";
+      if (!isWork(row)) return null;
+      return row.cited_by_count.toLocaleString();
     },
   },
   {
     key: "open_access",
     header: "Access",
     render: (_value: unknown, row: unknown) => {
-      const work = row as Work;
-      return work.open_access?.is_oa ? "Open" : "Closed";
+      if (!isWork(row)) return null;
+      return row.open_access?.is_oa === true ? "Open" : "Closed";
     },
   },
 ];
 
 const WorksListRoute = () => {
-  const search = useSearch({ from: "/works/" }) as OpenAlexSearchParams;
+  const search = useSearch({ from: "/works/" });
   const [viewMode, setViewMode] = useState<TableViewMode>("table");
 
   // Parse filter string into filter object if present
-  const urlFilters = search.filter
+  const urlFilters = search.filter !== undefined && search.filter !== ''
     ? createFilterBuilder().parseFilterString(search.filter)
     : undefined;
 

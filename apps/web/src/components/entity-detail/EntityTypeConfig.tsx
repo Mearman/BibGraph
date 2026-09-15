@@ -33,7 +33,6 @@ const ENTITY_MANTINE_COLORS: Record<EntityType, string> = {
 /**
  * Get Mantine color name for an entity type
  * Used for Badge, Loader, Progress, and other Mantine components
- * @param entityType
  */
 export const getMantineColor = (entityType: EntityType): string => {
   return ENTITY_MANTINE_COLORS[entityType] || 'blue';

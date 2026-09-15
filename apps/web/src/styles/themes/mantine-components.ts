@@ -1,6 +1,6 @@
-// Mantine-native component overrides
-// These components explicitly reset styles that might persist from other themes (radix, shadcn)
-// All values use Mantine CSS variables for proper theme integration
+import { Card } from '@mantine/core'
+
+// Mantine-native component overrides These components explicitly reset styles that might persist from other themes (radix, shadcn) All values use Mantine CSS variables for proper theme integration
 
 export const mantineComponents = {
   // Reset Button styles to Mantine defaults
@@ -26,32 +26,19 @@ export const mantineComponents = {
   },
 
   // Reset Card styles to Mantine defaults
-  Card: {
-    vars: (theme, properties) => {
-      const variant = properties.variant ?? 'default'
-
-      return {
-        root: {
-          '--card-bg': 'var(--mantine-color-body)',
-          '--card-border-color': 'var(--mantine-color-default-border)',
-          '--card-shadow': theme.shadows.sm,
-          '--card-radius': 'var(--mantine-radius-default)',
-          '--card-padding': variant === 'compact' ? 'var(--mantine-spacing-md)' : 'var(--mantine-spacing-xl)',
-        },
-      }
-    },
-    styles: {
+  Card: Card.extend({
+    styles: (theme) => ({
       root: {
-        backgroundColor: 'var(--card-bg)',
-        border: '1px solid var(--card-border-color)',
-        boxShadow: 'var(--card-shadow)',
-        borderRadius: 'var(--card-radius)',
-        padding: 'var(--card-padding)',
+        backgroundColor: 'var(--mantine-color-body)',
+        border: '1px solid var(--mantine-color-default-border)',
+        boxShadow: theme.shadows.sm,
+        borderRadius: 'var(--mantine-radius-default)',
+        padding: 'var(--mantine-spacing-xl)',
         position: 'relative',
         overflow: 'hidden',
       },
-    },
-  },
+    }),
+  }),
 
   // Reset Input styles to Mantine defaults
   Input: {
@@ -140,12 +127,6 @@ export const mantineComponents = {
 
   // Reset Paper styles to Mantine defaults
   Paper: {
-    vars: (theme) => ({
-      root: {
-        'paper-bg': 'var(--mantine-color-body)',
-        'paper-shadow': theme.shadows.sm,
-      },
-    }),
     styles: {
       root: {
         backgroundColor: 'var(--mantine-color-body)',
@@ -157,12 +138,6 @@ export const mantineComponents = {
 
   // Reset Modal styles to Mantine defaults
   Modal: {
-    vars: (theme) => ({
-      content: {
-        'modal-bg': 'var(--mantine-color-body)',
-        'modal-shadow': theme.shadows.xl,
-      },
-    }),
     styles: {
       content: {
         backgroundColor: 'var(--mantine-color-body)',
@@ -174,12 +149,6 @@ export const mantineComponents = {
 
   // Reset Drawer styles to Mantine defaults
   Drawer: {
-    vars: (theme) => ({
-      content: {
-        'drawer-bg': 'var(--mantine-color-body)',
-        'drawer-shadow': theme.shadows.lg,
-      },
-    }),
     styles: {
       content: {
         backgroundColor: 'var(--mantine-color-body)',
@@ -191,12 +160,6 @@ export const mantineComponents = {
 
   // Reset Popover styles to Mantine defaults
   Popover: {
-    vars: (theme) => ({
-      dropdown: {
-        'popover-bg': 'var(--mantine-color-body)',
-        'popover-shadow': theme.shadows.md,
-      },
-    }),
     styles: {
       dropdown: {
         backgroundColor: 'var(--mantine-color-body)',

@@ -4,13 +4,12 @@
  * Provides a small overview map for large graph navigation.
  * Shows viewport rectangle and allows click-to-pan functionality.
  * Automatically shows when graph has more than 100 nodes.
- *
- * @module components/graph/GraphMiniMap
  */
 
 import type { GraphNode } from '@bibgraph/types';
-import { Box, BoxProps } from '@mantine/core';
-import { useEffect, useRef, useState } from 'react';
+import type { BoxProps } from '@mantine/core';
+import { Box } from '@mantine/core';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const MIN_NODES_TO_SHOW = 100;
 const MINimap_SIZE = 150;
@@ -45,14 +44,6 @@ interface GraphMiniMapProperties extends Omit<BoxProps, 'children'> {
 
 /**
  * Graph Mini-Map Component
- * @param root0
- * @param root0.nodes
- * @param root0.containerWidth
- * @param root0.containerHeight
- * @param root0.zoom
- * @param root0.panX
- * @param root0.panY
- * @param root0.onPan
  */
 export const GraphMiniMap: React.FC<GraphMiniMapProperties> = ({
   nodes,
@@ -64,7 +55,7 @@ export const GraphMiniMap: React.FC<GraphMiniMapProperties> = ({
   onPan,
   ...boxProps
 }) => {
-  const canvasReference = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isHovered, setIsHovered] = useState(false);
 
   // Calculate node bounds
@@ -79,8 +70,8 @@ export const GraphMiniMap: React.FC<GraphMiniMapProperties> = ({
     let maxY = -Infinity;
 
     for (const node of nodes) {
-      const x = node.x ?? 0;
-      const y = node.y ?? 0;
+      const x = node.x;
+      const y = node.y;
       minX = Math.min(minX, x);
       maxX = Math.max(maxX, x);
       minY = Math.min(minY, y);
@@ -109,16 +100,16 @@ export const GraphMiniMap: React.FC<GraphMiniMapProperties> = ({
   const viewportWidthInGraph = containerWidth / zoom;
   const viewportHeightInGraph = containerHeight / zoom;
 
-  const viewportRect = {
+  const viewportRect = useMemo(() => ({
     x: (panX - viewportWidthInGraph / 2 - nodeBounds.minX) * scale,
     y: (panY - viewportHeightInGraph / 2 - nodeBounds.minY) * scale,
     width: viewportWidthInGraph * scale,
     height: viewportHeightInGraph * scale,
-  };
+  }), [panX, panY, viewportWidthInGraph, viewportHeightInGraph, nodeBounds, scale]);
 
   // Render mini-map
   useEffect(() => {
-    const canvas = canvasReference.current;
+    const canvas = canvasRef.current;
     if (!canvas) return;
 
     const context = canvas.getContext('2d');
@@ -174,24 +165,26 @@ export const GraphMiniMap: React.FC<GraphMiniMapProperties> = ({
   return (
     <Box
       {...boxProps}
-      style={{
-        position: 'absolute',
-        bottom: 16,
-        right: 16,
-        backgroundColor: 'white',
-        border: '1px solid #dee2e6',
-        borderRadius: '4px',
-        padding: '4px',
-        boxShadow: isHovered ? '0 4px 12px rgba(0,0,0,0.15)' : '0 2px 4px rgba(0,0,0,0.1)',
-        transition: 'box-shadow 0.2s',
-        zIndex: 100,
-        ...boxProps?.style,
-      }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      style={[
+        {
+          position: 'absolute',
+          bottom: 16,
+          right: 16,
+          backgroundColor: 'white',
+          border: '1px solid #dee2e6',
+          borderRadius: '4px',
+          padding: '4px',
+          boxShadow: isHovered ? '0 4px 12px rgba(0,0,0,0.15)' : '0 2px 4px rgba(0,0,0,0.1)',
+          transition: 'box-shadow 0.2s',
+          zIndex: 100,
+        },
+        boxProps.style,
+      ]}
+      onMouseEnter={() => { setIsHovered(true); }}
+      onMouseLeave={() => { setIsHovered(false); }}
     >
       <canvas
-        ref={canvasReference}
+        ref={canvasRef}
         width={MINimap_SIZE}
         height={MINimap_SIZE}
         onClick={handleCanvasClick}

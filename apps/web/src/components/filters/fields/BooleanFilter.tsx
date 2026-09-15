@@ -32,11 +32,11 @@ export const BooleanFilter = ({
       compact={compact}
       fieldId={fieldId}
     >
-      {(properties: BaseFilterRenderProps<boolean>) => (
+      {(properties: Readonly<BaseFilterRenderProps<boolean>>) => (
         <Switch
           id={properties.fieldId}
           checked={properties.value}
-          onChange={(event) => properties.onChange(event.currentTarget.checked)}
+          onChange={(event) => { properties.onChange(event.currentTarget.checked); }}
           disabled={properties.disabled}
           size={properties.compact ? "xs" : "sm"}
           style={{ marginTop: "4px" }}

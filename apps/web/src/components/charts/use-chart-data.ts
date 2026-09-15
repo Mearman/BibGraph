@@ -11,11 +11,10 @@ import type { DatasetPerformanceData, ScatterPlotPoint } from "./responsive-char
 
 /**
  * Hook to transform comparison results into performance chart data
- *
  * @param comparisonResults - Raw comparison results from evaluation
  * @returns Processed data array and computed max value for scaling
  */
-export const usePerformanceChartData = (comparisonResults: ComparisonResults[]) => {
+export const usePerformanceChartData = (comparisonResults: readonly ComparisonResults[]) => {
   const chartData = useMemo(() => {
     return comparisonResults.map(
       (result): DatasetPerformanceData => ({
@@ -45,11 +44,10 @@ export const usePerformanceChartData = (comparisonResults: ComparisonResults[]) 
 
 /**
  * Hook to transform comparison results into scatter plot data
- *
  * @param comparisonResults - Raw comparison results from evaluation
  * @returns Processed scatter plot point array
  */
-export const useScatterPlotData = (comparisonResults: ComparisonResults[]) => {
+export const useScatterPlotData = (comparisonResults: readonly ComparisonResults[]) => {
   const plotData = useMemo(() => {
     return comparisonResults.map((result, index): ScatterPlotPoint => ({
       id: index,

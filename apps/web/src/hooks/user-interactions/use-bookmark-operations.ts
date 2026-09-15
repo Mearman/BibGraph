@@ -2,7 +2,7 @@
  * Hook for bookmark operations (add, remove, update, search)
  */
 
-import type { EntityType } from "@bibgraph/types";
+import { isEntityType } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils/logger";
 import type { CatalogueEntity } from "@bibgraph/utils/storage/catalogue-db";
 import {
@@ -40,9 +40,9 @@ export interface UseBookmarkOperationsReturn {
   unbookmarkEntity: () => Promise<void>;
   unbookmarkSearch: () => Promise<void>;
   unbookmarkList: () => Promise<void>;
-  updateBookmark: (updates: Partial<Pick<CatalogueEntity, "notes">>) => Promise<void>;
+  updateBookmark: (updates: Readonly<Partial<Pick<CatalogueEntity, "notes">>>) => Promise<void>;
   searchBookmarks: (query: string) => Promise<CatalogueEntity[]>;
-  bulkRemoveBookmarks: (bookmarkRecordIds: string[]) => Promise<BulkRemoveResult>;
+  bulkRemoveBookmarks: (bookmarkRecordIds: readonly string[]) => Promise<BulkRemoveResult>;
 }
 
 export const useBookmarkOperations = ({
@@ -60,18 +60,20 @@ export const useBookmarkOperations = ({
 
   const bookmarkEntity = useCallback(
     async ({ title: _title, notes, tags }: BookmarkEntityParameters) => {
-      if (!entityId || !entityType) {
+      if (entityId === undefined || entityType === undefined) {
         throw new Error("Entity ID and type are required to bookmark");
       }
+      if (!isEntityType(entityType)) {
+        throw new Error(`Invalid entity type: ${entityType}`);
+      }
 
-      const wasBookmarked = isBookmarked;
       setIsBookmarked(true);
 
       try {
         await storageProvider.addBookmark({
-          entityType: entityType as EntityType,
+          entityType,
           entityId: entityId,
-          notes: tags ? `${notes || ""}\n\nTags: ${tags.join(", ")}` : notes,
+          notes: tags ? `${notes ?? ""}\n\nTags: ${tags.join(", ")}` : notes,
         });
 
         showNotification({
@@ -82,7 +84,7 @@ export const useBookmarkOperations = ({
 
         await refreshData();
       } catch (error) {
-        setIsBookmarked(wasBookmarked);
+        setIsBookmarked(isBookmarked);
 
         logger.error(USER_INTERACTIONS_LOGGER_CONTEXT, "Failed to bookmark entity", {
           entityId,
@@ -103,11 +105,10 @@ export const useBookmarkOperations = ({
   );
 
   const unbookmarkEntity = useCallback(async () => {
-    if (!entityId || !entityType) {
+    if (entityId === undefined || entityType === undefined) {
       throw new Error("Entity ID and type are required to unbookmark");
     }
 
-    const wasBookmarked = isBookmarked;
     setIsBookmarked(false);
 
     try {
@@ -116,7 +117,7 @@ export const useBookmarkOperations = ({
         (b) => b.entityType === entityType && b.entityId === entityId,
       );
 
-      if (bookmark?.id) {
+      if (bookmark?.id !== undefined) {
         await storageProvider.removeBookmark(bookmark.id);
 
         showNotification({
@@ -128,7 +129,7 @@ export const useBookmarkOperations = ({
         await refreshData();
       }
     } catch (error) {
-      setIsBookmarked(wasBookmarked);
+      setIsBookmarked(isBookmarked);
 
       logger.error(USER_INTERACTIONS_LOGGER_CONTEXT, "Failed to unbookmark entity", {
         entityId,
@@ -147,14 +148,14 @@ export const useBookmarkOperations = ({
   }, [entityId, entityType, refreshData, isBookmarked, showNotification, setIsBookmarked, storageProvider]);
 
   const bookmarkSearch = useCallback(
-    async ({ title, searchQuery, filters, notes, tags }: BookmarkSearchParameters) => {
+    async ({ title, searchQuery: searchQueryParameter, filters: filtersParameter, notes, tags }: BookmarkSearchParameters) => {
       try {
-        const searchId = `search-${searchQuery}-${JSON.stringify(filters || {})}`;
+        const searchId = `search-${searchQueryParameter}-${JSON.stringify(filtersParameter ?? {})}`;
 
         await storageProvider.addBookmark({
           entityType: "works",
           entityId: searchId,
-          notes: `Title: ${title}\n\nSearch Query: ${searchQuery}\n${filters ? `Filters: ${JSON.stringify(filters, null, 2)}` : ""}${notes ? `\n\nNotes: ${notes}` : ""}${tags ? `\n\nTags: ${tags.join(", ")}` : ""}`,
+          notes: `Title: ${title}\n\nSearch Query: ${searchQueryParameter}\n${filtersParameter ? `Filters: ${JSON.stringify(filtersParameter, null, 2)}` : ""}${notes !== undefined ? `\n\nNotes: ${notes}` : ""}${tags ? `\n\nTags: ${tags.join(", ")}` : ""}`,
         });
 
         setIsBookmarked(true);
@@ -168,8 +169,8 @@ export const useBookmarkOperations = ({
         await refreshData();
       } catch (error) {
         logger.error(USER_INTERACTIONS_LOGGER_CONTEXT, "Failed to bookmark search", {
-          searchQuery,
-          filters,
+          searchQuery: searchQueryParameter,
+          filters: filtersParameter,
           error,
         });
 
@@ -186,14 +187,14 @@ export const useBookmarkOperations = ({
   );
 
   const bookmarkList = useCallback(
-    async ({ title, url, notes, tags }: BookmarkListParameters) => {
+    async ({ title, url: urlParameter, notes, tags }: BookmarkListParameters) => {
       try {
-        const listId = `list-${url}`;
+        const listId = `list-${urlParameter}`;
 
         await storageProvider.addBookmark({
           entityType: "works",
           entityId: listId,
-          notes: `Title: ${title}\n\n${tags ? `${notes || ""}\n\nTags: ${tags.join(", ")}` : notes}`,
+          notes: `Title: ${title}\n\n${tags ? `${notes ?? ""}\n\nTags: ${tags.join(", ")}` : (notes ?? "")}`,
         });
 
         setIsBookmarked(true);
@@ -207,7 +208,7 @@ export const useBookmarkOperations = ({
         await refreshData();
       } catch (error) {
         logger.error(USER_INTERACTIONS_LOGGER_CONTEXT, "Failed to bookmark list", {
-          url,
+          url: urlParameter,
           error,
         });
 
@@ -224,19 +225,18 @@ export const useBookmarkOperations = ({
   );
 
   const unbookmarkSearch = useCallback(async () => {
-    if (!searchQuery) {
+    if (searchQuery === undefined) {
       throw new Error("Search query is required to unbookmark");
     }
 
-    const wasBookmarked = isBookmarked;
     setIsBookmarked(false);
 
     try {
       const allBookmarks = await storageProvider.getBookmarks();
-      const searchId = `search-${searchQuery}-${JSON.stringify(filters || {})}`;
+      const searchId = `search-${searchQuery}-${JSON.stringify(filters ?? {})}`;
       const bookmark = allBookmarks.find((b) => b.entityId === searchId);
 
-      if (bookmark?.id) {
+      if (bookmark?.id !== undefined) {
         await storageProvider.removeBookmark(bookmark.id);
 
         showNotification({
@@ -248,7 +248,7 @@ export const useBookmarkOperations = ({
         await refreshData();
       }
     } catch (error) {
-      setIsBookmarked(wasBookmarked);
+      setIsBookmarked(isBookmarked);
 
       logger.error(USER_INTERACTIONS_LOGGER_CONTEXT, "Failed to unbookmark search", {
         searchQuery,
@@ -267,11 +267,10 @@ export const useBookmarkOperations = ({
   }, [searchQuery, filters, refreshData, isBookmarked, showNotification, setIsBookmarked, storageProvider]);
 
   const unbookmarkList = useCallback(async () => {
-    if (!url) {
+    if (url === undefined) {
       throw new Error("URL is required to unbookmark list");
     }
 
-    const wasBookmarked = isBookmarked;
     setIsBookmarked(false);
 
     try {
@@ -279,7 +278,7 @@ export const useBookmarkOperations = ({
       const listId = `list-${url}`;
       const bookmark = allBookmarks.find((b) => b.entityId === listId);
 
-      if (bookmark?.id) {
+      if (bookmark?.id !== undefined) {
         await storageProvider.removeBookmark(bookmark.id);
 
         showNotification({
@@ -291,7 +290,7 @@ export const useBookmarkOperations = ({
         await refreshData();
       }
     } catch (error) {
-      setIsBookmarked(wasBookmarked);
+      setIsBookmarked(isBookmarked);
 
       logger.error(USER_INTERACTIONS_LOGGER_CONTEXT, "Failed to unbookmark list", {
         url,
@@ -309,8 +308,8 @@ export const useBookmarkOperations = ({
   }, [url, refreshData, isBookmarked, showNotification, setIsBookmarked, storageProvider]);
 
   const updateBookmark = useCallback(
-    async (updates: Partial<Pick<CatalogueEntity, "notes">>) => {
-      if (!entityId || !entityType) {
+    async (updates: Readonly<Partial<Pick<CatalogueEntity, "notes">>>) => {
+      if (entityId === undefined || entityType === undefined) {
         throw new Error("Entity ID and type are required to update bookmark");
       }
 
@@ -320,7 +319,7 @@ export const useBookmarkOperations = ({
           (b) => b.entityType === entityType && b.entityId === entityId,
         );
 
-        if (bookmark?.id) {
+        if (bookmark?.id !== undefined) {
           await storageProvider.updateList(SPECIAL_LIST_IDS.BOOKMARKS, {});
           await refreshData();
         }
@@ -345,7 +344,7 @@ export const useBookmarkOperations = ({
 
         return allBookmarks.filter(
           (bookmark) =>
-            bookmark.notes?.toLowerCase().includes(lowercaseQuery) ||
+            (bookmark.notes?.toLowerCase().includes(lowercaseQuery) ?? false) ||
             bookmark.entityId.toLowerCase().includes(lowercaseQuery),
         );
       } catch (error) {
@@ -360,7 +359,7 @@ export const useBookmarkOperations = ({
   );
 
   const bulkRemoveBookmarks = useCallback(
-    async (bookmarkRecordIds: string[]): Promise<BulkRemoveResult> => {
+    async (bookmarkRecordIds: readonly string[]): Promise<BulkRemoveResult> => {
       let success = 0;
       let failed = 0;
 
@@ -390,7 +389,7 @@ export const useBookmarkOperations = ({
 
         showNotification({
           title: "Success",
-          message: `Removed ${success} bookmark${success !== 1 ? "s" : ""}${failed > 0 ? ` (${failed} failed)` : ""}`,
+          message: `Removed ${String(success)} bookmark${success !== 1 ? "s" : ""}${failed > 0 ? ` (${String(failed)} failed)` : ""}`,
           category: "success",
         });
 

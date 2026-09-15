@@ -1,10 +1,7 @@
 /**
  * Graph Annotation Layer
  *
- * Renders annotations as an SVG overlay on the graph canvas.
- * Supports text labels, shapes (rectangles, circles), and freehand drawings.
- *
- * @module components/graph/annotations/GraphAnnotationLayer
+ * Renders annotations as an SVG overlay on the graph canvas. Supports text labels, shapes (rectangles, circles), and freehand drawings.
  */
 
 import type { GraphAnnotationStorage } from '@bibgraph/utils';
@@ -17,13 +14,17 @@ const DEFAULT_TEXT_COLOR = '#000000';
 const DEFAULT_BG_COLOR = '#ffff00';
 const DEFAULT_BORDER_COLOR = '#ff0000';
 const DEFAULT_STROKE_COLOR = '#000000';
+const DEFAULT_TEXT_BOX_FONT_SIZE = 20;
+const TEXT_LABEL_CHAR_WIDTH_PX = 8;
+const TEXT_LABEL_MIN_WIDTH_PX = 50;
+const TEXT_LABEL_MIN_HEIGHT_PX = 30;
+const DEFAULT_TEXT_RENDER_FONT_SIZE = 14;
 
 /**
  * Convert storage annotation to display annotation
- * @param storage
  */
 const storageToAnnotation = (storage: GraphAnnotationStorage): AnyAnnotation => {
-  if (!storage.id) {
+  if (storage.id === undefined || storage.id === '') {
     throw new Error('Annotation storage must have an id');
   }
 
@@ -47,7 +48,7 @@ const storageToAnnotation = (storage: GraphAnnotationStorage): AnyAnnotation => 
         fontSize: storage.fontSize,
         backgroundColor: storage.backgroundColor,
         nodeId: storage.nodeId,
-      } as AnyAnnotation;
+      };
 
     case 'rectangle':
       return {
@@ -60,7 +61,7 @@ const storageToAnnotation = (storage: GraphAnnotationStorage): AnyAnnotation => 
         borderColor: storage.borderColor,
         fillColor: storage.fillColor,
         borderWidth: storage.borderWidth,
-      } as AnyAnnotation;
+      };
 
     case 'circle':
       return {
@@ -72,7 +73,7 @@ const storageToAnnotation = (storage: GraphAnnotationStorage): AnyAnnotation => 
         borderColor: storage.borderColor,
         fillColor: storage.fillColor,
         borderWidth: storage.borderWidth,
-      } as AnyAnnotation;
+      };
 
     case 'drawing':
       return {
@@ -82,7 +83,10 @@ const storageToAnnotation = (storage: GraphAnnotationStorage): AnyAnnotation => 
         strokeColor: storage.strokeColor,
         strokeWidth: storage.strokeWidth,
         closed: storage.closed,
-      } as AnyAnnotation;
+      };
+
+    default:
+      return storage.type satisfies never;
   }
 };
 
@@ -94,8 +98,6 @@ interface AnnotationLayerProperties {
 
 /**
  * Render a single annotation
- * @param root0
- * @param root0.annotation
  */
 const RenderAnnotation = ({ annotation }: { annotation: AnyAnnotation }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -104,20 +106,19 @@ const RenderAnnotation = ({ annotation }: { annotation: AnyAnnotation }) => {
 
   switch (annotation.type) {
     case 'text': {
-      const textAnn = annotation as Extract<AnyAnnotation, { type: 'text' }>;
       return (
         <g
-          transform={`translate(${textAnn.x}, ${textAnn.y})`}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
+          transform={`translate(${String(annotation.x)}, ${String(annotation.y)})`}
+          onMouseEnter={() => { setIsHovered(true); }}
+          onMouseLeave={() => { setIsHovered(false); }}
           style={{ cursor: 'move' }}
         >
           <rect
             x={-10}
-            y={-(textAnn.fontSize ?? 20)}
-            width={Math.max(textAnn.content.length * 8, 50)}
-            height={Math.max(textAnn.fontSize ?? 20, 30)}
-            fill={textAnn.backgroundColor ?? DEFAULT_BG_COLOR}
+            y={-(annotation.fontSize ?? DEFAULT_TEXT_BOX_FONT_SIZE)}
+            width={Math.max(annotation.content.length * TEXT_LABEL_CHAR_WIDTH_PX, TEXT_LABEL_MIN_WIDTH_PX)}
+            height={Math.max(annotation.fontSize ?? DEFAULT_TEXT_BOX_FONT_SIZE, TEXT_LABEL_MIN_HEIGHT_PX)}
+            fill={annotation.backgroundColor ?? DEFAULT_BG_COLOR}
             stroke={isHovered ? '#666' : 'none'}
             strokeWidth={1}
             opacity={0.9}
@@ -126,72 +127,69 @@ const RenderAnnotation = ({ annotation }: { annotation: AnyAnnotation }) => {
           <text
             x={0}
             y={0}
-            fontSize={textAnn.fontSize ?? 14}
+            fontSize={annotation.fontSize ?? DEFAULT_TEXT_RENDER_FONT_SIZE}
             fill={DEFAULT_TEXT_COLOR}
             style={{
               fontFamily: 'sans-serif',
               pointerEvents: 'none',
             }}
           >
-            {textAnn.content}
+            {annotation.content}
           </text>
         </g>
       );
     }
 
     case 'rectangle': {
-      const rectAnn = annotation as Extract<AnyAnnotation, { type: 'rectangle' }>;
       return (
         <rect
-          x={rectAnn.x}
-          y={rectAnn.y}
-          width={rectAnn.width}
-          height={rectAnn.height}
-          fill={rectAnn.fillColor ?? 'rgba(255, 0, 0, 0.1)'}
-          stroke={rectAnn.borderColor ?? DEFAULT_BORDER_COLOR}
-          strokeWidth={rectAnn.borderWidth ?? 2}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
+          x={annotation.x}
+          y={annotation.y}
+          width={annotation.width}
+          height={annotation.height}
+          fill={annotation.fillColor ?? 'rgba(255, 0, 0, 0.1)'}
+          stroke={annotation.borderColor ?? DEFAULT_BORDER_COLOR}
+          strokeWidth={annotation.borderWidth ?? 2}
+          onMouseEnter={() => { setIsHovered(true); }}
+          onMouseLeave={() => { setIsHovered(false); }}
           style={{ cursor: 'move' }}
         />
       );
     }
 
     case 'circle': {
-      const circleAnn = annotation as Extract<AnyAnnotation, { type: 'circle' }>;
       return (
         <circle
-          cx={circleAnn.x}
-          cy={circleAnn.y}
-          r={circleAnn.radius}
-          fill={circleAnn.fillColor ?? 'rgba(255, 0, 0, 0.1)'}
-          stroke={circleAnn.borderColor ?? DEFAULT_BORDER_COLOR}
-          strokeWidth={circleAnn.borderWidth ?? 2}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
+          cx={annotation.x}
+          cy={annotation.y}
+          r={annotation.radius}
+          fill={annotation.fillColor ?? 'rgba(255, 0, 0, 0.1)'}
+          stroke={annotation.borderColor ?? DEFAULT_BORDER_COLOR}
+          strokeWidth={annotation.borderWidth ?? 2}
+          onMouseEnter={() => { setIsHovered(true); }}
+          onMouseLeave={() => { setIsHovered(false); }}
           style={{ cursor: 'move' }}
         />
       );
     }
 
     case 'drawing': {
-      const drawingAnn = annotation as Extract<AnyAnnotation, { type: 'drawing' }>;
-      if (drawingAnn.points.length < 2) return null;
+      if (annotation.points.length < 2) return null;
 
-      const pathData = drawingAnn.closed
-        ? `M ${drawingAnn.points.map(p => `${p.x} ${p.y}`).join(' L ')} Z`
-        : `M ${drawingAnn.points.map(p => `${p.x} ${p.y}`).join(' L ')}`;
+      const pathData = annotation.closed === true
+        ? `M ${annotation.points.map(p => `${String(p.x)} ${String(p.y)}`).join(' L ')} Z`
+        : `M ${annotation.points.map(p => `${String(p.x)} ${String(p.y)}`).join(' L ')}`;
 
       return (
         <path
           d={pathData}
-          fill={drawingAnn.closed ? (drawingAnn.color ?? 'rgba(0, 0, 255, 0.1)') : 'none'}
-          stroke={drawingAnn.strokeColor ?? DEFAULT_STROKE_COLOR}
-          strokeWidth={drawingAnn.strokeWidth ?? 2}
+          fill={annotation.closed === true ? (annotation.color ?? 'rgba(0, 0, 255, 0.1)') : 'none'}
+          stroke={annotation.strokeColor ?? DEFAULT_STROKE_COLOR}
+          strokeWidth={annotation.strokeWidth ?? 2}
           strokeLinecap="round"
           strokeLinejoin="round"
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
+          onMouseEnter={() => { setIsHovered(true); }}
+          onMouseLeave={() => { setIsHovered(false); }}
           style={{ cursor: 'move' }}
         />
       );
@@ -206,10 +204,6 @@ const RenderAnnotation = ({ annotation }: { annotation: AnyAnnotation }) => {
  * Annotation Layer Component
  *
  * Renders all visible annotations as an SVG overlay
- * @param root0
- * @param root0.annotations
- * @param root0.width
- * @param root0.height
  */
 export const GraphAnnotationLayer: React.FC<AnnotationLayerProperties> = ({
   annotations,

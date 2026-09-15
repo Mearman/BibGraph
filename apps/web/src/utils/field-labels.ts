@@ -127,7 +127,6 @@ const FIELD_LABELS: Record<string, string> = {
 /**
  * Convert an API field name to a human-readable label.
  * Uses the predefined mapping or falls back to automatic formatting.
- *
  * @param key - The API field name (e.g., "2yr_mean_citedness", "cited_by_count")
  * @returns Human-readable label (e.g., "2-Year Mean Citedness", "Times Cited")
  */
@@ -158,7 +157,6 @@ export const humanizeFieldName = (key: string): string => {
 
 /**
  * Get label for a field, with optional custom overrides.
- *
  * @param key - The API field name
  * @param customLabels - Optional custom label overrides
  * @returns Human-readable label

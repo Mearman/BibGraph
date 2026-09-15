@@ -35,7 +35,9 @@ export const EntityFilters = ({
       <TextInput
         placeholder="Search entities..."
         value={searchQuery}
-        onChange={(e) => onSearchChange(e.target.value)}
+        onChange={(e) => {
+          onSearchChange(e.target.value);
+        }}
         leftSection={<IconSearch size={ICON_SIZE.MD} />}
         flex={1}
         aria-label="Search entities by ID or notes"
@@ -43,7 +45,9 @@ export const EntityFilters = ({
 
       <Select
         value={filterType}
-        onChange={(value) => onFilterTypeChange(value || "all")}
+        onChange={(value) => {
+          onFilterTypeChange(value ?? "all");
+        }}
         data={[
           { value: "all", label: "All Types" },
           ...entityTypes.map((type) => ({ value: type, label: type })),
@@ -54,7 +58,9 @@ export const EntityFilters = ({
 
       <Select
         value={sortBy}
-        onChange={(value) => onSortChange((value || "position") as SortOption)}
+        onChange={(value) => {
+          onSortChange(value ?? "position");
+        }}
         data={[
           { value: "position", label: "Order" },
           { value: "entityId", label: "Entity ID" },

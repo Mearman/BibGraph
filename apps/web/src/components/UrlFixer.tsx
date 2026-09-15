@@ -1,9 +1,14 @@
 import { logger } from "@bibgraph/utils/logger";
 import { useEffect } from 'react';
 
+// Re-run delays (ms) for catching URL-fixing timing issues after router/history updates settle.
+const URL_FIX_RETRY_DELAY_1_MS = 100;
+const URL_FIX_RETRY_DELAY_2_MS = 500;
+const URL_FIX_RETRY_DELAY_3_MS = 1000;
+const URL_FIX_RETRY_DELAY_4_MS = 2000;
+
 /**
- * Component that fixes URL display issues immediately when mounted.
- * Handles both double hash issues and collapsed protocol slashes.
+ * Component that fixes URL display issues immediately when mounted. Handles both double hash issues and collapsed protocol slashes.
  */
 export const UrlFixer = () => {
   useEffect(() => {
@@ -39,9 +44,17 @@ export const UrlFixer = () => {
     fixUrl();
 
     // Also run after short delays to catch any timing issues
-    const timeouts = [100, 500, 1000, 2000].map(delay => setTimeout(fixUrl, delay));
+    const timeoutId1 = setTimeout(fixUrl, URL_FIX_RETRY_DELAY_1_MS);
+    const timeoutId2 = setTimeout(fixUrl, URL_FIX_RETRY_DELAY_2_MS);
+    const timeoutId3 = setTimeout(fixUrl, URL_FIX_RETRY_DELAY_3_MS);
+    const timeoutId4 = setTimeout(fixUrl, URL_FIX_RETRY_DELAY_4_MS);
 
-    return () => timeouts.forEach(clearTimeout);
+    return () => {
+      clearTimeout(timeoutId1);
+      clearTimeout(timeoutId2);
+      clearTimeout(timeoutId3);
+      clearTimeout(timeoutId4);
+    };
   }, []);
 
   // This component doesn't render anything

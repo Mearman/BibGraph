@@ -27,19 +27,11 @@ export class NavigationHelper {
 	}
 
 	/**
-	 * Wait for TanStack Router to be ready.
-	 * Checks for __tanstack_router__ on window object.
+	 * Wait for TanStack Router to be ready. Checks for __TSR_ROUTER__ on window object.
 	 */
 	async waitForRouterReady(): Promise<void> {
 		await this.page.waitForFunction(
-			() => {
-				return (
-					typeof window !== 'undefined' &&
-					'__tanstack_router__' in window &&
-					window.__tanstack_router__ !== null &&
-					window.__tanstack_router__ !== undefined
-				);
-			},
+			() => typeof window !== 'undefined' && window.__TSR_ROUTER__ !== undefined,
 			{ timeout: 10_000 }
 		);
 	}
@@ -75,15 +67,11 @@ export class NavigationHelper {
 	 */
 	async waitForNavigation(timeout = 10_000): Promise<void> {
 		await this.page.waitForFunction(
-			() => {
-				// Check router is ready and document is in ready state
-				return (
-					typeof window !== 'undefined' &&
-					'__tanstack_router__' in window &&
-					window.__tanstack_router__ !== null &&
-					document.readyState === 'complete'
-				);
-			},
+			// Check router is ready and document is in ready state
+			() =>
+				typeof window !== 'undefined' &&
+				window.__TSR_ROUTER__ !== undefined &&
+				document.readyState === 'complete',
 			{ timeout }
 		);
 	}
@@ -92,7 +80,6 @@ export class NavigationHelper {
 /**
  * Singleton pattern factory for NavigationHelper.
  * Usage: const nav = navigationHelper(page);
- * @param page
  */
 export const navigationHelper = (page: Page): NavigationHelper =>
 	new NavigationHelper(page);

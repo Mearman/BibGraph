@@ -37,6 +37,7 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { ICON_SIZE } from "@/config/style-constants";
@@ -59,10 +60,14 @@ const SECTION_PRIORITY: Record<string, number> = {
   Other: 7,
 };
 
+// Sort weight for a section name with no entry in SECTION_PRIORITY, placing it after every known section.
+const UNKNOWN_SECTION_PRIORITY = 99;
+
 /**
-Section icons mapping
+Section icons mapping. Partial because `name` is derived from a dynamically-built
+groups object, so TypeScript cannot guarantee every section name has a dedicated icon.
  */
-const SECTION_ICONS: Record<string, import("react").ReactNode> = {
+const SECTION_ICONS: Partial<Record<string, ReactNode>> = {
   "Basic Information": <IconInfoCircle size={ICON_SIZE.MD} />,
   "Identifiers": <IconKey size={ICON_SIZE.MD} />,
   "Metrics": <IconChartBar size={ICON_SIZE.MD} />,
@@ -76,7 +81,18 @@ const SECTION_ICONS: Record<string, import("react").ReactNode> = {
 // Value Rendering
 // ============================================================================
 
-const renderPrimitiveValue = (value: unknown, fieldName?: string): import("react").ReactNode => {
+/**
+ * Narrows an unknown value to a plain, non-array object.
+ */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * Narrows an unknown value to an array of unknown elements. `Array.isArray` itself is typed as `(arg: any) => arg is any[]`, so this wrapper is needed to keep the narrowed element type as `unknown` instead of silently reintroducing `any`.
+ */
+const isUnknownArray = (value: unknown): value is unknown[] => Array.isArray(value);
+
+const renderPrimitiveValue = (value: unknown, fieldName?: string): ReactNode => {
   // Don't render null/undefined - these fields will be filtered out
   if (value === null || value === undefined) {
     return null;
@@ -165,7 +181,7 @@ const renderPrimitiveValue = (value: unknown, fieldName?: string): import("react
     return <Text size="sm">{decodeHtmlEntities(value)}</Text>;
   }
 
-  return <Text c="dimmed" fs="italic" size="sm">{String(value)}</Text>;
+  return <Text c="dimmed" fs="italic" size="sm">{JSON.stringify(value)}</Text>;
 };
 
 // ============================================================================
@@ -174,21 +190,20 @@ const renderPrimitiveValue = (value: unknown, fieldName?: string): import("react
 
 interface SectionData {
   name: string;
-  fields: Array<{ key: string; value: unknown }>;
-  icon: import("react").ReactNode;
+  fields: { key: string; value: unknown }[];
+  icon: ReactNode;
 }
 
 /**
  * Check if a value should be displayed (not null, undefined, empty string, empty array, or empty object)
- * @param value
  */
 const isDisplayableValue = (value: unknown): boolean => {
   if (value === null || value === undefined) return false;
   if (typeof value === "string" && value.trim() === "") return false;
   if (Array.isArray(value) && value.length === 0) return false;
   // Check if object has any displayable properties
-  if (typeof value === "object" && !Array.isArray(value)) {
-    const entries = Object.entries(value as Record<string, unknown>);
+  if (isRecord(value)) {
+    const entries = Object.entries(value);
     if (entries.length === 0) return false;
     // Recursively check if any property is displayable
     return entries.some(([, value_]) => isDisplayableValue(value_));
@@ -239,10 +254,10 @@ const groupFields = (data: Record<string, unknown>): SectionData[] => {
   // Preprocess: Remove redundant ids.openalex if it matches the main id field
   const mainId = typeof data.id === "string" ? data.id.toLowerCase() : null;
   const processedData = { ...data };
-  if (processedData.ids && typeof processedData.ids === "object" && mainId) {
-    const ids = processedData.ids as Record<string, unknown>;
+  if (isRecord(processedData.ids) && mainId !== null) {
+    const ids = processedData.ids;
     const openalexId = typeof ids.openalex === "string" ? ids.openalex.toLowerCase() : null;
-    if (openalexId && mainId.includes(openalexId.split("/").pop() ?? "")) {
+    if (openalexId !== null && mainId.includes(openalexId.split("/").pop() ?? "")) {
       // Create a copy and remove openalex from ids since it's redundant with main id
       const remainingIds = { ...ids };
       delete remainingIds.openalex;
@@ -266,17 +281,18 @@ const groupFields = (data: Record<string, unknown>): SectionData[] => {
   ) {
     // Extract institution IDs from affiliations
     const affiliationIds = new Set(
-      (processedData.affiliations as Array<Record<string, unknown>>)
-        .map(aff => {
-          const inst = aff.institution as Record<string, unknown> | undefined;
-          return inst?.id;
+      processedData.affiliations
+        .map((aff) => {
+          if (!isRecord(aff)) return undefined;
+          const inst = aff.institution;
+          return isRecord(inst) ? inst.id : undefined;
         })
         .filter(Boolean)
     );
 
     // Check if all last_known_institutions are already in affiliations
-    const lastKnownIds = (processedData.last_known_institutions as Array<Record<string, unknown>>)
-      .map(inst => inst.id)
+    const lastKnownIds = processedData.last_known_institutions
+      .map((inst) => (isRecord(inst) ? inst.id : undefined))
       .filter(Boolean);
 
     const isAllLastKnownInAffiliations = lastKnownIds.length > 0 &&
@@ -303,29 +319,29 @@ const groupFields = (data: Record<string, unknown>): SectionData[] => {
 
     const lowerKey = key.toLowerCase();
     if (identifierKeys.some(k => lowerKey.includes(k))) {
-      groups["Identifiers"][key] = value;
+      groups.Identifiers[key] = value;
     } else if (metricKeys.some(k => lowerKey.includes(k))) {
-      groups["Metrics"][key] = value;
+      groups.Metrics[key] = value;
     } else if (relationshipKeys.some(k => lowerKey.includes(k))) {
-      groups["Relationships"][key] = value;
+      groups.Relationships[key] = value;
     } else if (dateKeys.some(k => lowerKey.includes(k))) {
-      groups["Dates"][key] = value;
+      groups.Dates[key] = value;
     } else if (geoKeys.some(k => lowerKey.includes(k))) {
       groups["Locations & Geo"][key] = value;
     } else if (basicKeys.some(k => lowerKey.includes(k))) {
       groups["Basic Information"][key] = value;
     } else {
-      groups["Other"][key] = value;
+      groups.Other[key] = value;
     }
   }
 
   // Convert to SectionData array, sorted by priority
   return Object.entries(groups)
     .filter(([, fields]) => Object.keys(fields).length > 0)
-    .sort(([a], [b]) => (SECTION_PRIORITY[a] ?? 99) - (SECTION_PRIORITY[b] ?? 99))
+    .sort(([a], [b]) => (SECTION_PRIORITY[a] ?? UNKNOWN_SECTION_PRIORITY) - (SECTION_PRIORITY[b] ?? UNKNOWN_SECTION_PRIORITY))
     .map(([name, fields]) => ({
       name,
-      icon: SECTION_ICONS[name] || <IconFile size={ICON_SIZE.MD} />,
+      icon: SECTION_ICONS[name] !== undefined ? SECTION_ICONS[name] : <IconFile size={ICON_SIZE.MD} />,
       fields: Object.entries(fields).map(([key, value]) => ({ key, value })),
     }));
 };
@@ -334,7 +350,7 @@ const groupFields = (data: Record<string, unknown>): SectionData[] => {
 // Value Content Renderer
 // ============================================================================
 
-const renderValueContent = (value: unknown, fieldName?: string): import("react").ReactNode => {
+const renderValueContent = (value: unknown, fieldName?: string): ReactNode => {
   // Primitives
   if (value === null || value === undefined || typeof value === "boolean" ||
       typeof value === "number" || typeof value === "string") {
@@ -342,7 +358,7 @@ const renderValueContent = (value: unknown, fieldName?: string): import("react")
   }
 
   // Arrays - don't render empty arrays
-  if (Array.isArray(value)) {
+  if (isUnknownArray(value)) {
     if (value.length === 0) {
       return null;
     }
@@ -380,17 +396,15 @@ const renderValueContent = (value: unknown, fieldName?: string): import("react")
     // Object arrays - vertical list
     // Deduplicate arrays of objects by 'id' field if present
     let itemsToRender = value;
-    if (value.length > 0 && typeof value[0] === "object" && value[0] !== null) {
-      const firstItem = value[0] as Record<string, unknown>;
-      if ("id" in firstItem) {
-        const seenIds = new Set<unknown>();
-        itemsToRender = value.filter((item) => {
-          const itemObject = item as Record<string, unknown>;
-          if (seenIds.has(itemObject.id)) return false;
-          seenIds.add(itemObject.id);
-          return true;
-        });
-      }
+    const firstItem = value[0];
+    if (isRecord(firstItem) && "id" in firstItem) {
+      const seenIds = new Set<unknown>();
+      itemsToRender = value.filter((item) => {
+        if (!isRecord(item)) return true;
+        if (seenIds.has(item.id)) return false;
+        seenIds.add(item.id);
+        return true;
+      });
     }
 
     return (
@@ -412,8 +426,8 @@ const renderValueContent = (value: unknown, fieldName?: string): import("react")
   }
 
   // Objects - key-value pairs
-  if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>)
+  if (isRecord(value)) {
+    const entries = Object.entries(value)
       .filter(([, value_]) => isDisplayableValue(value_));
     if (entries.length === 0) {
       return null;
@@ -435,7 +449,7 @@ const renderValueContent = (value: unknown, fieldName?: string): import("react")
     );
   }
 
-  return <Text c="dimmed" fs="italic" size="sm">{String(value)}</Text>;
+  return <Text c="dimmed" fs="italic" size="sm">{JSON.stringify(value)}</Text>;
 };
 
 // ============================================================================
@@ -477,12 +491,12 @@ export const EntityDataDisplay = ({ data, title }: EntityDataDisplayProperties) 
 
   // Version comparison for Works
   const workId = typeof data.id === 'string' && data.id.startsWith('W') ? data.id : undefined;
-  const shouldShowComparison = Boolean(workId && isDataVersionSelectorVisible());
+  const shouldShowComparison = workId !== undefined && isDataVersionSelectorVisible();
   const { comparison } = useVersionComparison(workId, shouldShowComparison);
 
   return (
     <Stack gap="lg">
-      {title && (
+      {title !== undefined && title !== "" && (
         <Title order={2}>{title}</Title>
       )}
 
@@ -502,7 +516,7 @@ export const EntityDataDisplay = ({ data, title }: EntityDataDisplayProperties) 
           <Paper key={section.name} withBorder p="md" radius="md">
             {/* Clickable section header */}
             <UnstyledButton
-              onClick={() => toggleSection(section.name)}
+              onClick={() => { toggleSection(section.name); }}
               style={{ width: '100%' }}
               mb="sm"
             >
