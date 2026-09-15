@@ -119,7 +119,7 @@ vitest.config.*.timestamp*
 output.json
 
 # ESLint cache files
-**/.eslintcache/
+**/.eslintcache
 
 # Nx local cache files
 nx-local-cache.json
