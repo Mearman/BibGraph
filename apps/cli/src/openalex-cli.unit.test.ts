@@ -2,8 +2,11 @@
  * Unit tests for OpenAlex CLI
  */
 
- 
+
 // Import order is intentional: vitest must be imported first for mocking setup
+import type * as FsPromisesModule from "node:fs/promises"
+
+import type * as LoggerModule from "@bibgraph/utils/logger"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 // Test constants
@@ -14,13 +17,15 @@ const TEST_AUTHOR_ID_2 = "A987654321"
 const INDEX_SUFFIX = "index.json"
 const AUTHOR_1_FILE = `${TEST_AUTHOR_ID_1}.json`
 const AUTHOR_2_FILE = `${TEST_AUTHOR_ID_2}.json`
-const INDEX_FILE = INDEX_SUFFIX
 const AUTHORS_INDEX_FILE = `authors/${INDEX_SUFFIX}`
 const WORKS_INDEX_FILE = `works/${INDEX_SUFFIX}`
 
 // Timestamp constants for repeated strings
 const TEST_TIMESTAMP_1 = "2025-09-19T16:29:25.530Z"
 const TEST_TIMESTAMP_2 = "2025-09-19T16:29:25.658Z"
+
+// errno value Node.js uses for ENOENT (file/directory not found)
+const ENOENT_ERRNO = -2
 
 // Helper class for Node.js-style errors in tests
 class NodeJSError extends Error {
@@ -42,21 +47,19 @@ class NodeJSError extends Error {
 // type _InvalidEntityType = string & { readonly __invalid: unique symbol }
 
 vi.mock("fs/promises", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("fs/promises")>()
+	const actual = await importOriginal<typeof FsPromisesModule>()
 
 	// Mock the fs/promises module with spy functions that prevent real operations
-	const mockWriteFile = async ({ path, data }: { path: string; data: string | Buffer }) => {
+	const mockWriteFile = ({ path, data }: { path: string; data: string | Buffer }) => {
 		// Log the write attempt but don't actually write to filesystem
-		console.log(`[MOCK] Would write to: ${path} (${data.length} bytes)`)
+		console.log(`[MOCK] Would write to: ${path} (${data.length.toString()} bytes)`)
 	}
 
 	return {
 		...actual,
-		readFile: vi.fn().mockImplementation(async (path: string) => {
+		readFile: vi.fn().mockImplementation((path: string) => {
 			// Return mock data for specific expected paths
-			const pathString = path
-
-			if (pathString.includes(AUTHOR_2_FILE)) {
+			if (path.includes(AUTHOR_2_FILE)) {
 				return JSON.stringify({
 					id: "https://openalex.org/A987654321",
 					display_name: "Test Author Two",
@@ -64,7 +67,7 @@ vi.mock("fs/promises", async (importOriginal) => {
 				})
 			}
 
-			if (pathString.includes(AUTHOR_1_FILE)) {
+			if (path.includes(AUTHOR_1_FILE)) {
 				return JSON.stringify({
 					id: "https://openalex.org/A123456789",
 					display_name: "Test Author One",
@@ -72,7 +75,7 @@ vi.mock("fs/promises", async (importOriginal) => {
 				})
 			}
 
-			if (pathString.includes(INDEX_FILE)) {
+			if (path.includes(INDEX_SUFFIX)) {
 				return JSON.stringify({
 					"https://api.openalex.org/authors/A123456789": {
 						$ref: "./https%3A%2F%2Fapi%2Eopenalex%2Eorg%2Fauthors%2FA123456789.json",
@@ -89,48 +92,44 @@ vi.mock("fs/promises", async (importOriginal) => {
 
 			// For any other path, throw ENOENT to simulate file not found
 			throw new NodeJSError(
-				`ENOENT: no such file or directory, open '${pathString}'`,
+				`ENOENT: no such file or directory, open '${path}'`,
 				"ENOENT",
-				-2,
+				ENOENT_ERRNO,
 				"open",
-				pathString
+				path
 			)
 		}),
-		access: vi.fn().mockImplementation(async (path: string) => {
-			const pathString = path
-
+		access: vi.fn().mockImplementation((path: string) => {
 			// Allow access to expected test files
 			if (
-				pathString.includes("A987654321.json") ||
-				pathString.includes("A123456789.json") ||
-				pathString.includes("index.json")
+				path.includes("A987654321.json") ||
+				path.includes("A123456789.json") ||
+				path.includes("index.json")
 			) {
 				return // Success
 			}
 
 			// For any other path, throw ENOENT
 			throw new NodeJSError(
-				`ENOENT: no such file or directory, access '${pathString}'`,
+				`ENOENT: no such file or directory, access '${path}'`,
 				"ENOENT",
-				-2,
+				ENOENT_ERRNO,
 				"access",
-				pathString
+				path
 			)
 		}),
 		writeFile: vi.fn().mockImplementation(mockWriteFile),
-		mkdir: vi.fn().mockImplementation(async (path: string): Promise<string | undefined> => {
+		mkdir: vi.fn().mockImplementation((path: string): string | undefined => {
 			// Log the mkdir attempt but don't actually create directories
 			console.log(`[MOCK] Would create directory: ${path}`)
 			return undefined
 		}),
-		stat: vi.fn().mockImplementation(async (path: string) => {
-			const pathString = path
-
+		stat: vi.fn().mockImplementation((path: string) => {
 			// Allow stat for test files
 			if (
-				pathString.includes("A987654321.json") ||
-				pathString.includes("A123456789.json") ||
-				pathString.includes("index.json")
+				path.includes("A987654321.json") ||
+				path.includes("A123456789.json") ||
+				path.includes("index.json")
 			) {
 				return {
 					isFile: () => true,
@@ -143,11 +142,11 @@ vi.mock("fs/promises", async (importOriginal) => {
 
 			// For other paths, throw ENOENT
 			throw new NodeJSError(
-				`ENOENT: no such file or directory, stat '${pathString}'`,
+				`ENOENT: no such file or directory, stat '${path}'`,
 				"ENOENT",
-				-2,
+				ENOENT_ERRNO,
 				"stat",
-				pathString
+				path
 			)
 		}),
 		readdir: vi.fn().mockResolvedValue([]),
@@ -160,7 +159,7 @@ globalThis.fetch = vi.fn()
 // Mock logger - must match the import path used below
 // Use importOriginal to preserve all exports while only mocking the logger functions
 vi.mock("@bibgraph/utils/logger", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("@bibgraph/utils/logger")>()
+	const actual = await importOriginal<typeof LoggerModule>()
 	return {
 		...actual,
 		logger: {
@@ -181,26 +180,17 @@ import { OpenAlexCLI } from "./openalex-cli-class.js"
 describe("OpenAlexCLI", () => {
 	let cli: OpenAlexCLI
 
-	beforeEach(async () => {
-		// Clear all mocks
-		vi.clearAllMocks()
-		// Use default data path
-		cli = new OpenAlexCLI()
-
-		// Set up test data files for predictable test results
-		await setupTestData()
-	})
-
-	const setupTestData = async () => {
+	const setupTestData = () => {
 		// Ensure writeFile and mkdir never actually write to filesystem
 		vi.mocked(writeFile).mockImplementation(async () => {
 			// Silently succeed but don't write to real filesystem
-			return
+			await Promise.resolve()
 		})
 
 		vi.mocked(mkdir).mockImplementation(async () => {
 			// Silently succeed but don't create real directories
-			return void 0
+			await Promise.resolve()
+			return undefined
 		})
 
 		// Set up mock data for consistent tests
@@ -262,51 +252,61 @@ describe("OpenAlexCLI", () => {
 
 		// Mock file reads to return our test data, preventing real filesystem access
 		vi.mocked(readFile).mockImplementation(async (path: string) => {
-			const pathString = path
+			await Promise.resolve()
 
 			// Mock index files
-			if (pathString.includes(AUTHORS_INDEX_FILE)) {
+			if (path.includes(AUTHORS_INDEX_FILE)) {
 				return JSON.stringify(mockAuthorsIndex)
 			}
-			if (pathString.includes(WORKS_INDEX_FILE)) {
+			if (path.includes(WORKS_INDEX_FILE)) {
 				return JSON.stringify(mockWorksIndex)
 			}
 
 			// Mock individual author files
-			if (pathString.includes(AUTHOR_1_FILE)) {
+			if (path.includes(AUTHOR_1_FILE)) {
 				return JSON.stringify(mockAuthor1)
 			}
-			if (pathString.includes(AUTHOR_2_FILE)) {
+			if (path.includes(AUTHOR_2_FILE)) {
 				return JSON.stringify(mockAuthor2)
 			}
-			if (pathString.includes("A5025875274.json")) {
+			if (path.includes("A5025875274.json")) {
 				return JSON.stringify(mockAuthor3)
 			}
 
 			// For other paths, simulate file not found
-			throw new NodeJSError("ENOENT: no such file or directory", "ENOENT", -2, "access", "")
+			throw new NodeJSError("ENOENT: no such file or directory", "ENOENT", ENOENT_ERRNO, "access", "")
 		})
 
 		// Mock access function to control file existence checks
 		vi.mocked(access).mockImplementation(async (path: string) => {
-			const pathString = path
+			await Promise.resolve()
 
 			// Allow access to known entity type indexes
 			if (
-				pathString.includes(AUTHORS_INDEX_FILE) ||
-				pathString.includes(WORKS_INDEX_FILE) ||
-				pathString.includes("institutions/index.json") ||
-				pathString.includes("topics/index.json") ||
-				pathString.includes("publishers/index.json") ||
-				pathString.includes("funders/index.json")
+				path.includes(AUTHORS_INDEX_FILE) ||
+				path.includes(WORKS_INDEX_FILE) ||
+				path.includes("institutions/index.json") ||
+				path.includes("topics/index.json") ||
+				path.includes("publishers/index.json") ||
+				path.includes("funders/index.json")
 			) {
 				return // File exists
 			}
 
 			// Deny access to all other paths
-			throw new NodeJSError("ENOENT: no such file or directory", "ENOENT", -2, "access", "")
+			throw new NodeJSError("ENOENT: no such file or directory", "ENOENT", ENOENT_ERRNO, "access", "")
 		})
 	};
+
+	beforeEach(() => {
+		// Clear all mocks
+		vi.clearAllMocks()
+		// Use default data path
+		cli = new OpenAlexCLI()
+
+		// Set up test data files for predictable test results
+		setupTestData()
+	})
 
 	afterEach(() => {
 		vi.restoreAllMocks()
@@ -412,10 +412,10 @@ describe("OpenAlexCLI", () => {
 
 			vi.mocked(fetch).mockResolvedValue({
 				ok: true,
-				json: () => Promise.resolve(mockResponse),
-			} as Response)
+				json: vi.fn().mockResolvedValue(mockResponse),
+			} as unknown as Response)
 
-			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => { /* suppress console output during test */ })
 
 			const result = await cli.fetchFromAPI("authors", { per_page: 1 })
 
@@ -432,7 +432,7 @@ describe("OpenAlexCLI", () => {
 				statusText: "Not Found",
 			} as Response)
 
-			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => { /* suppress console output during test */ })
 
 			await expect(cli.fetchFromAPI("authors", {})).rejects.toThrow(
 				"API request failed: 404 Not Found"
@@ -444,7 +444,7 @@ describe("OpenAlexCLI", () => {
 		it("should handle network errors", async () => {
 			vi.mocked(fetch).mockRejectedValue(new Error("Network error"))
 
-			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => { /* suppress console output during test */ })
 
 			await expect(cli.fetchFromAPI("authors", {})).rejects.toThrow("Network error")
 
@@ -460,10 +460,11 @@ describe("OpenAlexCLI", () => {
 				display_name: "New Test Author",
 			}
 
-			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => { /* suppress console output during test */ })
 
 			// Mock the CLI method to prevent real file writes
 			const mockSaveEntityToCache = vi.spyOn(cli, "saveEntityToCache").mockImplementation(async () => {
+				await Promise.resolve()
 				console.log("[MOCK] saveEntityToCache called - preventing real file operations")
 			})
 
@@ -485,6 +486,7 @@ describe("OpenAlexCLI", () => {
 
 			// Mock the CLI method to prevent real file writes
 			const mockSaveEntityToCache = vi.spyOn(cli, "saveEntityToCache").mockImplementation(async () => {
+				await Promise.resolve()
 				console.log("[MOCK] saveEntityToCache called - preventing real file operations")
 			})
 
@@ -526,10 +528,10 @@ describe("OpenAlexCLI", () => {
 			// Mock successful API call for non-existent entity
 			vi.mocked(fetch).mockResolvedValue({
 				ok: true,
-				json: () => Promise.resolve(mockApiResponse),
-			} as Response)
+				json: vi.fn().mockResolvedValue(mockApiResponse),
+			} as unknown as Response)
 
-			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => { /* suppress console output during test */ })
 
 			const result = await cli.getEntityWithCache("authors", "A999999996", {
 				useCache: true,
@@ -558,10 +560,10 @@ describe("OpenAlexCLI", () => {
 			// Mock successful API call
 			vi.mocked(fetch).mockResolvedValue({
 				ok: true,
-				json: () => Promise.resolve(mockApiResponse),
-			} as Response)
+				json: vi.fn().mockResolvedValue(mockApiResponse),
+			} as unknown as Response)
 
-			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => { /* suppress console output during test */ })
 
 			const result = await cli.getEntityWithCache("authors", "A999999995", {
 				useCache: true,
@@ -590,7 +592,7 @@ describe("OpenAlexCLI", () => {
 		})
 
 		it("should return empty array when index not found", async () => {
-			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => { /* suppress console output during test */ })
 
 			// Use a non-existent entity type
 			const result = await cli.listEntities("nonexistent" as StaticEntityType)

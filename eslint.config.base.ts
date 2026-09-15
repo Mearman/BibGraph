@@ -360,6 +360,13 @@ export default tseslint.config([
             "exadev/barrel-policy": ["error", { mode: "siblings" }],
         },
     },
+    // TanStack Router's file-based routing requires the literal filename index.tsx for a directory's own route -- these are real route modules (JSX, createFileRoute(...) calls), never re-export barrels, but barrel-policy can't tell the difference from the filename alone. Renaming isn't an option here, unlike the barrel-vs-real-module ambiguity elsewhere in this config, since the router's own convention depends on the exact name.
+    {
+        files: ["apps/web/src/routes/**/index.tsx"],
+        rules: {
+            "exadev/barrel-policy": "off",
+        },
+    },
     // Configuration for test files (using vitest recommended)
     {
         files: ["**/*.{test,spec}.{ts,tsx}", "**/*.e2e.test.{ts,tsx}", "**/test/**/*.ts", "**/e2e/**/*.ts"],

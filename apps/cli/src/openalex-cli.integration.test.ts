@@ -119,37 +119,11 @@ describe("OpenAlexCLI Integration Tests", () => {
 			expect(typeof stats).toBe("object")
 			expect(Object.keys(stats).length).toBeGreaterThan(0)
 
-			// At least one entity type should have stats (validated by hasAnyData check)
-			const hasAnyStats = stats.authors || stats.works || stats.institutions
-			expect(hasAnyStats).toBeTruthy()
+			// getStatistics() guarantees every present entity type maps to a complete { count, lastModified } entry, so every value here is already valid.
+			const entityStats = Object.values(stats)
 
-			// Validate structure of returned stats (whichever entity types are present)
-			// Note: At least one entity type has stats (validated by hasAnyStats check above)
-
-			// For each present entity type, validate its structure
-			const validEntityStats = Object.values(stats).filter(
-				(entityStats) => entityStats !== null && entityStats !== undefined
-			)
-
-			// At least one entity type should have valid stats
-			expect(validEntityStats.length).toBeGreaterThan(0)
-
-			// Extract values that need validation
-			const countsToValidate = validEntityStats
-				.filter((entityStats) => "count" in entityStats && entityStats.count !== undefined)
-				.map((entityStats) => entityStats.count)
-
-			const lastModifiedToValidate = validEntityStats
-				.filter((entityStats) => "lastModified" in entityStats && entityStats.lastModified !== undefined)
-				.map((entityStats) => entityStats.lastModified)
-
-			// Validate all counts are non-negative (0 is valid for empty caches)
-			for (const count of countsToValidate) {
+			for (const { count, lastModified } of entityStats) {
 				expect(count).toBeGreaterThanOrEqual(0)
-			}
-
-			// Validate all lastModified values
-			for (const lastModified of lastModifiedToValidate) {
 				expect(typeof lastModified).toBe("string")
 			}
 		})
@@ -189,7 +163,7 @@ describe("OpenAlexCLI Integration Tests", () => {
 			const entities = await cli.listEntities("authors")
 			const authorId = entities[0]
 
-			const consoleSpy = vi.spyOn(console, "debug").mockImplementation(() => {})
+			const consoleSpy = vi.spyOn(console, "debug").mockImplementation(() => { /* suppress console output during test */ })
 
 			const result = await cli.getEntityWithCache("authors", authorId, {
 				useCache: true,
@@ -213,7 +187,7 @@ describe("OpenAlexCLI Integration Tests", () => {
 				return
 			}
 
-			const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+			const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => { /* suppress console output during test */ })
 
 			const result = await cli.getEntityWithCache("authors", "A9999999999", {
 				useCache: true,
@@ -249,10 +223,10 @@ describe("OpenAlexCLI Integration Tests", () => {
 
 			vi.mocked(fetch).mockResolvedValue({
 				ok: true,
-				json: () => Promise.resolve({ results: [mockEntity] }),
+				json: vi.fn().mockResolvedValue({ results: [mockEntity] }),
 			} as unknown as Response)
 
-			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => { /* suppress console output during test */ })
 
 			const result = await cli.getEntityWithCache("authors", authorId, {
 				useCache: false,
@@ -289,7 +263,7 @@ describe("OpenAlexCLI Integration Tests", () => {
 		it("should handle API fetch errors gracefully", async () => {
 			vi.mocked(fetch).mockRejectedValue(new Error("Network error"))
 
-			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => { /* suppress console output during test */ })
 
 			await expect(cli.fetchFromAPI("authors", {})).rejects.toThrow("Network error")
 
@@ -303,7 +277,7 @@ describe("OpenAlexCLI Integration Tests", () => {
 				statusText: "Not Found",
 			} as Response)
 
-			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+			const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => { /* suppress console output during test */ })
 
 			await expect(cli.fetchFromAPI("authors", {})).rejects.toThrow(
 				"API request failed: 404 Not Found"

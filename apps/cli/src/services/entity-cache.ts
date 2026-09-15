@@ -13,39 +13,44 @@ import { type StaticEntityType } from "../entity-detection.js"
 const LOG_CONTEXT_GENERAL = "EntityCacheService"
 
 /**
+ * Shape of a cached entity as stored on disk: an OpenAlex entity always has an `id` and `display_name`, plus arbitrary additional fields.
+ */
+interface CachedEntity {
+	id: string
+	display_name: string
+	[key: string]: unknown
+}
+
+/**
+ * Narrows an unknown parsed value to {@link CachedEntity}, verifying that both `id` and `display_name` are present and are strings.
+ */
+const isCachedEntity = (value: unknown): value is CachedEntity => {
+	if (typeof value !== "object" || value === null) {
+		return false
+	}
+	if (!("id" in value) || !("display_name" in value)) {
+		return false
+	}
+	return typeof value.id === "string" && typeof value.display_name === "string"
+}
+
+/**
  * Service for managing cached entity files
  */
 export class EntityCacheService {
-	constructor(private dataPath: string) {}
+	constructor(private readonly dataPath: string) {}
 
 	/**
 	 * Load entity from filesystem cache
-	 * @param entityType
-	 * @param entityId
 	 */
-	async loadEntity(
-		entityType: StaticEntityType,
-		entityId: string
-	): Promise<
-		| {
-				id: string
-				display_name: string
-				[key: string]: unknown
-		  }
-		| undefined
-	> {
+	async loadEntity(entityType: StaticEntityType, entityId: string): Promise<CachedEntity | undefined> {
 		try {
 			const filename = encodeURIComponent(entityId) + ".json"
 			const entityPath = join(this.dataPath, entityType, filename)
 
 			const content = await readFile(entityPath, "utf-8")
-			return JSON.parse(content) as
-				| {
-						id: string
-						display_name: string
-						[key: string]: unknown
-				  }
-				| undefined
+			const parsed: unknown = JSON.parse(content)
+			return isCachedEntity(parsed) ? parsed : undefined
 		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Entity not found in cache: ${entityType}/${entityId}`)
 			return undefined
@@ -54,44 +59,22 @@ export class EntityCacheService {
 
 	/**
 	 * Load entity from filesystem using unified index
-	 * @param entityType
-	 * @param entityId
 	 */
 	async loadUnifiedIndexForEntity(
 		entityType: StaticEntityType,
 		entityId: string
-	): Promise<
-		| {
-				id: string
-				display_name: string
-				[key: string]: unknown
-		  }
-		| undefined
-	> {
+	): Promise<CachedEntity | undefined> {
 		return this.loadEntity(entityType, entityId)
 	}
 
 	/**
 	 * Load entity directly from file path
-	 * @param filePath
 	 */
-	async loadEntityFromFile(filePath: string): Promise<
-		| {
-				id: string
-				display_name: string
-				[key: string]: unknown
-		  }
-		| undefined
-	> {
+	async loadEntityFromFile(filePath: string): Promise<CachedEntity | undefined> {
 		try {
 			const content = await readFile(filePath, "utf-8")
-			return JSON.parse(content) as
-				| {
-						id: string
-						display_name: string
-						[key: string]: unknown
-				  }
-				| undefined
+			const parsed: unknown = JSON.parse(content)
+			return isCachedEntity(parsed) ? parsed : undefined
 		} catch {
 			logger.debug(LOG_CONTEXT_GENERAL, `Failed to load entity from file: ${filePath}`)
 			return undefined
@@ -100,7 +83,6 @@ export class EntityCacheService {
 
 	/**
 	 * List all cached entities for a given entity type
-	 * @param entityType
 	 */
 	async listEntities(entityType: StaticEntityType): Promise<string[]> {
 		try {
@@ -127,32 +109,17 @@ export class EntityCacheService {
 
 	/**
 	 * Search entities by name in cache
-	 * @param entityType
-	 * @param searchTerm
 	 */
-	async searchEntities(entityType: StaticEntityType, searchTerm: string): Promise<
-		{
-			id: string
-			display_name: string
-			[key: string]: unknown
-		}[]
-	> {
+	async searchEntities(entityType: StaticEntityType, searchTerm: string): Promise<CachedEntity[]> {
 		const entityIds = await this.listEntities(entityType)
-		const results: {
-			id: string
-			display_name: string
-			[key: string]: unknown
-		}[] = []
+		const results: CachedEntity[] = []
 
 		const lowerSearchTerm = searchTerm.toLowerCase()
 
 		for (const entityId of entityIds) {
 			const entity = await this.loadEntity(entityType, entityId)
-			if (entity) {
-				const displayName = entity.display_name ?? ""
-				if (displayName.toLowerCase().includes(lowerSearchTerm)) {
-					results.push(entity)
-				}
+			if (entity?.display_name.toLowerCase().includes(lowerSearchTerm) === true) {
+				results.push(entity)
 			}
 		}
 
@@ -161,7 +128,6 @@ export class EntityCacheService {
 
 	/**
 	 * Calculate size of entity directory in bytes
-	 * @param entityType
 	 */
 	async calculateEntityDirectorySize(entityType: string): Promise<number> {
 		try {

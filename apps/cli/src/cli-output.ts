@@ -6,60 +6,63 @@ import { QueryResultSchema } from "./cli-schemas.js"
 import type { EntityOutputParams as EntityOutputParameters, EntitySummary, EntitySummaryPrintParams as EntitySummaryPrintParameters, QueryResultOutputParams as QueryResultOutputParameters } from "./cli-types.js"
 
 /**
- * Print author-specific summary fields
- * @param entity
+Maximum number of query results printed in the console summary before results are elided.
  */
-export const printAuthorSummary = (entity: EntitySummary): void => {
+const MAX_QUERY_RESULT_PREVIEW = 10
+/**
+Width, in characters, that query result row numbers are padded to.
+ */
+const QUERY_RESULT_ROW_NUMBER_WIDTH = 3
+
+/**
+ * Print author-specific summary fields
+ */
+export const printAuthorSummary = (entity: Readonly<EntitySummary>): void => {
 	if ("works_count" in entity) {
-		const worksCount = typeof entity["works_count"] === "number" ? entity["works_count"] : "Unknown"
+		const worksCount = typeof entity.works_count === "number" ? entity.works_count : "Unknown"
 		console.log(`Works Count: ${worksCount.toString()}`)
 	}
 
-	const citedBy = typeof entity["cited_by_count"] === "number" ? entity["cited_by_count"] : 0
+	const citedBy = typeof entity.cited_by_count === "number" ? entity.cited_by_count : 0
 	console.log(`Cited By Count: ${citedBy.toString()}`)
 }
 
 /**
  * Print work-specific summary fields
- * @param entity
  */
-export const printWorkSummary = (entity: EntitySummary): void => {
+export const printWorkSummary = (entity: Readonly<EntitySummary>): void => {
 	if ("publication_year" in entity) {
 		const pubYear =
-			typeof entity["publication_year"] === "number" ? entity["publication_year"] : "Unknown"
+			typeof entity.publication_year === "number" ? entity.publication_year : "Unknown"
 		console.log(`Publication Year: ${pubYear.toString()}`)
 	}
 
-	const citedBy = typeof entity["cited_by_count"] === "number" ? entity["cited_by_count"] : 0
+	const citedBy = typeof entity.cited_by_count === "number" ? entity.cited_by_count : 0
 	console.log(`Cited By Count: ${citedBy.toString()}`)
 }
 
 /**
  * Print institution-specific summary fields
- * @param entity
  */
-export const printInstitutionSummary = (entity: EntitySummary): void => {
+export const printInstitutionSummary = (entity: Readonly<EntitySummary>): void => {
 	if ("works_count" in entity) {
-		const worksCount = typeof entity["works_count"] === "number" ? entity["works_count"] : "Unknown"
+		const worksCount = typeof entity.works_count === "number" ? entity.works_count : "Unknown"
 		console.log(`Works Count: ${worksCount.toString()}`)
 	}
 
 	const country =
-		"country_code" in entity && typeof entity["country_code"] === "string"
-			? entity["country_code"]
+		"country_code" in entity && typeof entity.country_code === "string"
+			? entity.country_code
 			: "Unknown"
 	console.log(`Country: ${country}`)
 }
 
 /**
  * Print entity summary to console
- * @param root0
- * @param root0.entity
- * @param root0.entityType
  */
 export const printEntitySummary = ({ entity, entityType }: EntitySummaryPrintParameters): void => {
-	console.log(`\n${entityType.toUpperCase()}: ${entity.display_name}`)
-	console.log(`ID: ${entity.id}`)
+	console.log(`\n${entityType.toUpperCase()}: ${entity.display_name ?? "Unknown"}`)
+	console.log(`ID: ${entity.id ?? "Unknown"}`)
 
 	// Entity-specific summary fields
 	switch (entityType) {
@@ -80,10 +83,6 @@ export const printEntitySummary = ({ entity, entityType }: EntitySummaryPrintPar
 
 /**
  * Output query result to console
- * @param root0
- * @param root0.result
- * @param root0.staticEntityType
- * @param root0.format
  */
 export const outputQueryResult = ({
 	result,
@@ -102,13 +101,13 @@ export const outputQueryResult = ({
 			console.log(`Returned: ${apiResult.results.length.toString()}`)
 
 			if (apiResult.results.length > 0) {
-				apiResult.results.slice(0, 10).forEach((item, index: number) => {
+				apiResult.results.slice(0, MAX_QUERY_RESULT_PREVIEW).forEach((item, index: number) => {
 					const displayName = item.display_name ?? item.id ?? `Item ${(index + 1).toString()}`
-					console.log(`${(index + 1).toString().padStart(3)}: ${displayName}`)
+					console.log(`${(index + 1).toString().padStart(QUERY_RESULT_ROW_NUMBER_WIDTH)}: ${displayName}`)
 				})
 
-				if (apiResult.results.length > 10) {
-					console.log(`... and ${(apiResult.results.length - 10).toString()} more`)
+				if (apiResult.results.length > MAX_QUERY_RESULT_PREVIEW) {
+					console.log(`... and ${(apiResult.results.length - MAX_QUERY_RESULT_PREVIEW).toString()} more`)
 				}
 			}
 		} else {
@@ -119,11 +118,6 @@ export const outputQueryResult = ({
 
 /**
  * Output entity to console
- * @param root0
- * @param root0.entity
- * @param root0.staticEntityType
- * @param root0.format
- * @param root0.pretty
  */
 export const outputEntity = ({
 	entity,
@@ -132,7 +126,7 @@ export const outputEntity = ({
 	pretty,
 }: EntityOutputParameters): void => {
 	if (format === "json") {
-		console.log(JSON.stringify(entity, null, pretty ? 2 : 0))
+		console.log(JSON.stringify(entity, null, pretty === true ? 2 : 0))
 	} else {
 		printEntitySummary({ entity, entityType: staticEntityType })
 	}

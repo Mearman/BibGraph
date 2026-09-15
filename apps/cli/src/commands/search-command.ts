@@ -7,12 +7,19 @@ import type { Command } from "commander"
 import { FORMAT_OPTION, FORMAT_TABLE_DESC, LIMIT_OPTION, LIMIT_RESULTS_DESC } from "../cli-options.js"
 import { SearchCommandOptionsSchema,StaticEntityTypeSchema } from "../cli-schemas.js"
 import { SUPPORTED_ENTITIES } from "../entity-detection.js"
-import { OpenAlexCLI } from "../openalex-cli-class.js"
+import type { OpenAlexCLI } from "../openalex-cli-class.js"
+
+/**
+Default number of search results returned when no `--limit` option is provided.
+ */
+const DEFAULT_SEARCH_RESULT_LIMIT = 10
+/**
+Width, in characters, that search result row numbers are padded to.
+ */
+const SEARCH_ROW_NUMBER_WIDTH = 3
 
 /**
  * Register search command with program
- * @param program
- * @param cli
  */
 export const registerSearchCommand = (program: Command, cli: OpenAlexCLI): void => {
 	program
@@ -40,7 +47,7 @@ export const registerSearchCommand = (program: Command, cli: OpenAlexCLI): void 
 			const validatedOptions = optionsValidation.data
 			const results = await cli.searchEntities(staticEntityType, searchTerm)
 			const limit =
-				typeof validatedOptions.limit === "string" ? Number(validatedOptions.limit) : 10
+				typeof validatedOptions.limit === "string" ? Number(validatedOptions.limit) : DEFAULT_SEARCH_RESULT_LIMIT
 			const limitedResults = results.slice(0, limit)
 
 			if (validatedOptions.format === "json") {
@@ -50,7 +57,7 @@ export const registerSearchCommand = (program: Command, cli: OpenAlexCLI): void 
 					`\nSearch results for "${searchTerm}" in ${entityType} (${limitedResults.length.toString()}/${results.length.toString()}):`
 				)
 				for (const [index, entity] of limitedResults.entries()) {
-					console.log(`${(index + 1).toString().padStart(3)}: ${entity.display_name} (${entity.id})`)
+					console.log(`${(index + 1).toString().padStart(SEARCH_ROW_NUMBER_WIDTH)}: ${entity.display_name} (${entity.id})`)
 				}
 			}
 		})

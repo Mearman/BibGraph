@@ -12,12 +12,35 @@ import {
 } from "../cli-schemas.js"
 import type { StaticEntityType } from "../entity-detection.js"
 import { SUPPORTED_ENTITIES } from "../entity-detection.js"
-import { OpenAlexCLI } from "../openalex-cli-class.js"
+import type { OpenAlexCLI } from "../openalex-cli-class.js"
+
+/**
+Width, in characters, of the divider line printed under a static-command header.
+ */
+const STATIC_DIVIDER_WIDTH = 50
+/**
+Width, in characters, that an entity-type column is padded to.
+ */
+const ENTITY_TYPE_COLUMN_WIDTH = 12
+/**
+Width, in characters, that an entity-count column is padded to.
+ */
+const ENTITY_COUNT_COLUMN_WIDTH = 4
+/**
+Multiplier used to convert a 0-1 cache-hit ratio into a percentage.
+ */
+const PERCENTAGE_MULTIPLIER = 100
+/**
+Maximum number of identified gaps previewed before eliding the rest.
+ */
+const MAX_GAPS_PREVIEW = 5
+/**
+Maximum number of generation errors previewed before eliding the rest.
+ */
+const MAX_ERRORS_PREVIEW = 3
 
 /**
  * Register static:analyze command
- * @param program
- * @param cli
  */
 export const registerStaticAnalyzeCommand = (program: Command, cli: OpenAlexCLI): void => {
 	program
@@ -38,15 +61,15 @@ export const registerStaticAnalyzeCommand = (program: Command, cli: OpenAlexCLI)
 				console.log(JSON.stringify(analysis, null, 2))
 			} else {
 				console.log("\nStatic Data Cache Analysis:")
-				console.log("=".repeat(50))
+				console.log("=".repeat(STATIC_DIVIDER_WIDTH))
 
 				console.log("Entity Type Distribution:")
 				for (const [type, count] of Object.entries(analysis.entityDistribution)) {
-					console.log(`  ${type.padEnd(12)}: ${count.toString().padStart(4)} entities`)
+					console.log(`  ${type.padEnd(ENTITY_TYPE_COLUMN_WIDTH)}: ${count.toString().padStart(ENTITY_COUNT_COLUMN_WIDTH)} entities`)
 				}
 
 				console.log(`\nTotal Static Entities: ${analysis.totalEntities.toString()}`)
-				console.log(`Cache Hit Potential: ${(analysis.cacheHitPotential * 100).toFixed(1)}%`)
+				console.log(`Cache Hit Potential: ${(analysis.cacheHitPotential * PERCENTAGE_MULTIPLIER).toFixed(1)}%`)
 				console.log(
 					`Recommended for Generation: ${analysis.recommendedForGeneration.length.toString()} entity types`
 				)
@@ -57,11 +80,11 @@ export const registerStaticAnalyzeCommand = (program: Command, cli: OpenAlexCLI)
 
 				if (analysis.gaps.length > 0) {
 					console.log(`\nIdentified Gaps: ${analysis.gaps.length.toString()}`)
-					for (const [index, gap] of analysis.gaps.slice(0, 5).entries()) {
+					for (const [index, gap] of analysis.gaps.slice(0, MAX_GAPS_PREVIEW).entries()) {
 						console.log(`  ${(index + 1).toString().padStart(2)}: ${gap}`)
 					}
-					if (analysis.gaps.length > 5) {
-						console.log(`     +${(analysis.gaps.length - 5).toString()} more gaps identified`)
+					if (analysis.gaps.length > MAX_GAPS_PREVIEW) {
+						console.log(`     +${(analysis.gaps.length - MAX_GAPS_PREVIEW).toString()} more gaps identified`)
 					}
 				}
 			}
@@ -70,8 +93,6 @@ export const registerStaticAnalyzeCommand = (program: Command, cli: OpenAlexCLI)
 
 /**
  * Register static:generate command
- * @param program
- * @param cli
  */
 export const registerStaticGenerateCommand = (program: Command, cli: OpenAlexCLI): void => {
 	program
@@ -90,7 +111,7 @@ export const registerStaticGenerateCommand = (program: Command, cli: OpenAlexCLI
 			const validatedOptions = optionsValidation.data
 			let entityType: StaticEntityType | undefined
 
-			if (validatedOptions.entityType) {
+			if (validatedOptions.entityType !== undefined && validatedOptions.entityType !== "") {
 				const entityTypeValidation = StaticEntityTypeSchema.safeParse(validatedOptions.entityType)
 				if (!entityTypeValidation.success) {
 					console.error(`Unsupported entity type: ${validatedOptions.entityType}`)
@@ -100,35 +121,37 @@ export const registerStaticGenerateCommand = (program: Command, cli: OpenAlexCLI
 				entityType = entityTypeValidation.data
 			}
 
+			const isDryRun = validatedOptions.dryRun === true
+
 			const result = await cli.generateStaticDataFromPatterns(entityType, {
-				dryRun: !!validatedOptions.dryRun,
-				force: !!validatedOptions.force,
+				dryRun: isDryRun,
+				force: validatedOptions.force === true,
 			})
 
-			console.log(`\nStatic Data Generation ${validatedOptions.dryRun ? "(Dry Run)" : "Completed"}:`)
-			console.log("=".repeat(50))
+			console.log(`\nStatic Data Generation ${isDryRun ? "(Dry Run)" : "Completed"}:`)
+			console.log("=".repeat(STATIC_DIVIDER_WIDTH))
 
 			console.log(
-				`Files ${validatedOptions.dryRun ? "would be" : ""} processed: ${result.filesProcessed.toString()}`
+				`Files ${isDryRun ? "would be" : ""} processed: ${result.filesProcessed.toString()}`
 			)
 			console.log(
-				`Entities ${validatedOptions.dryRun ? "would be" : ""} cached: ${result.entitiesCached.toString()}`
+				`Entities ${isDryRun ? "would be" : ""} cached: ${result.entitiesCached.toString()}`
 			)
 			console.log(
-				`Queries ${validatedOptions.dryRun ? "would be" : ""} cached: ${result.queriesCached.toString()}`
+				`Queries ${isDryRun ? "would be" : ""} cached: ${result.queriesCached.toString()}`
 			)
 
 			if (result.errors.length > 0) {
 				console.log(`\nErrors encountered: ${result.errors.length.toString()}`)
-				for (const [index, error] of result.errors.slice(0, 3).entries()) {
+				for (const [index, error] of result.errors.slice(0, MAX_ERRORS_PREVIEW).entries()) {
 					console.log(`  ${(index + 1).toString().padStart(2)}: ${error}`)
 				}
-				if (result.errors.length > 3) {
-					console.log(`     +${(result.errors.length - 3).toString()} more errors`)
+				if (result.errors.length > MAX_ERRORS_PREVIEW) {
+					console.log(`     +${(result.errors.length - MAX_ERRORS_PREVIEW).toString()} more errors`)
 				}
 			}
 
-			if (!validatedOptions.dryRun && result.filesProcessed > 0) {
+			if (!isDryRun && result.filesProcessed > 0) {
 				console.log(`\nStatic data cache updated. Run 'pnpm cli static:analyze' to verify.`)
 			}
 		})
@@ -136,8 +159,6 @@ export const registerStaticGenerateCommand = (program: Command, cli: OpenAlexCLI
 
 /**
  * Register all static commands
- * @param program
- * @param cli
  */
 export const registerStaticCommands = (program: Command, cli: OpenAlexCLI): void => {
 	registerStaticAnalyzeCommand(program, cli)

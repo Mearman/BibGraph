@@ -13,18 +13,52 @@ import { type StaticEntityType } from "../entity-detection.js"
 
 const LOG_CONTEXT_GENERAL = "StaticDataGeneratorService"
 
+const DEFAULT_ENTITY_TYPES: StaticEntityType[] = ["authors", "works", "institutions", "topics", "publishers", "funders"]
+const DEFAULT_SAMPLE_SIZE = 100
+const DEFAULT_BATCH_SIZE = 10
+
+/**
+ * A single entity summary as returned within an OpenAlex list response's `results` array.
+ */
+interface OpenAlexApiEntitySummary {
+	id: string
+}
+
+/**
+ * Shape of an OpenAlex list endpoint's JSON response, narrowed to the fields this service reads.
+ */
+interface OpenAlexApiListResponse {
+	results: OpenAlexApiEntitySummary[]
+}
+
+const isOpenAlexApiEntitySummary = (value: unknown): value is OpenAlexApiEntitySummary => {
+	if (typeof value !== "object" || value === null) {
+		return false
+	}
+	if (!("id" in value)) {
+		return false
+	}
+	return typeof value.id === "string"
+}
+
+const isOpenAlexApiListResponse = (value: unknown): value is OpenAlexApiListResponse => {
+	if (typeof value !== "object" || value === null) {
+		return false
+	}
+	if (!("results" in value) || !Array.isArray(value.results)) {
+		return false
+	}
+	return value.results.every(isOpenAlexApiEntitySummary)
+}
+
 /**
  * Service for generating static data from usage patterns
  */
 export class StaticDataGeneratorService {
-	constructor(private dataPath: string) {}
+	constructor(private readonly dataPath: string) {}
 
 	/**
 	 * Generate static data from detected patterns
-	 * @param options
-	 * @param options.entityTypes
-	 * @param options.sampleSize
-	 * @param options.batchSize
 	 */
 	async generateStaticDataFromPatterns(options: {
 		entityTypes?: StaticEntityType[]
@@ -35,9 +69,9 @@ export class StaticDataGeneratorService {
 		totalCached: number
 		entityTypeCounts: Record<string, number>
 	}> {
-		const entityTypes = options.entityTypes ?? (["authors", "works", "institutions", "topics", "publishers", "funders"] as StaticEntityType[])
-		const sampleSize = options.sampleSize ?? 100
-		const batchSize = options.batchSize ?? 10
+		const entityTypes = options.entityTypes ?? DEFAULT_ENTITY_TYPES
+		const sampleSize = options.sampleSize ?? DEFAULT_SAMPLE_SIZE
+		const batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE
 
 		let totalProcessed = 0
 		let totalCached = 0
@@ -60,9 +94,6 @@ export class StaticDataGeneratorService {
 
 	/**
 	 * Process entity type for static data generation
-	 * @param entityType
-	 * @param sampleSize
-	 * @param batchSize
 	 */
 	private async processEntityTypeForGeneration(
 		entityType: StaticEntityType,
@@ -90,9 +121,6 @@ export class StaticDataGeneratorService {
 
 	/**
 	 * Process well-populated entities (high completeness score)
-	 * @param entityType
-	 * @param sampleSize
-	 * @param batchSize
 	 */
 	private async processWellPopulatedEntities(
 		entityType: StaticEntityType,
@@ -127,9 +155,6 @@ export class StaticDataGeneratorService {
 
 	/**
 	 * Process individual entity for caching
-	 * @param entityType
-	 * @param filter
-	 * @param count
 	 */
 	private async processEntityForCaching(
 		entityType: StaticEntityType,
@@ -144,15 +169,15 @@ export class StaticDataGeneratorService {
 
 		try {
 			// Use cachedOpenAlex API instead of non-existent getEntityList
-			const url = `https://api.openalex.org/${entityType}?filter=${encodeURIComponent(filter)}&per_page=${count}`
+			const url = `https://api.openalex.org/${entityType}?filter=${encodeURIComponent(filter)}&per_page=${String(count)}`
 			const response = await fetch(url)
 
 			if (!response.ok) {
 				throw new Error(`API request failed: ${response.statusText}`)
 			}
 
-			const data = await response.json()
-			const results = data.results ?? []
+			const data: unknown = await response.json()
+			const results = isOpenAlexApiListResponse(data) ? data.results : []
 
 			for (const entity of results) {
 				processed++
@@ -171,8 +196,6 @@ export class StaticDataGeneratorService {
 
 	/**
 	 * Fetch entity and save to cache
-	 * @param entityType
-	 * @param entityId
 	 */
 	private async fetchEntityForCaching(entityType: StaticEntityType, entityId: string): Promise<boolean> {
 		try {
@@ -201,8 +224,6 @@ export class StaticDataGeneratorService {
 
 	/**
 	 * Process popular collections (cited works, related authors, etc.)
-	 * @param entityType
-	 * @param count
 	 */
 	private async processPopularCollections(
 		entityType: StaticEntityType,
@@ -231,7 +252,6 @@ export class StaticDataGeneratorService {
 
 	/**
 	 * Get completeness filters for entity type
-	 * @param entityType
 	 */
 	private getCompletenessFilters(entityType: StaticEntityType): string[] {
 		const filters: Record<StaticEntityType, string[]> = {
@@ -243,12 +263,11 @@ export class StaticDataGeneratorService {
 			funders: [],
 		}
 
-		return filters[entityType] ?? []
+		return filters[entityType]
 	}
 
 	/**
 	 * Get popular collection filters for entity type
-	 * @param entityType
 	 */
 	private getPopularCollectionFilters(entityType: StaticEntityType): string[] {
 		const filters: Record<StaticEntityType, string[]> = {
@@ -260,6 +279,6 @@ export class StaticDataGeneratorService {
 			funders: [],
 		}
 
-		return filters[entityType] ?? []
+		return filters[entityType]
 	}
 }

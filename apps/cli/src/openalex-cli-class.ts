@@ -6,7 +6,7 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import { cachedOpenAlex, CachedOpenAlexClient } from "@bibgraph/client/cached-client"
+import { cachedOpenAlex, type CachedOpenAlexClient } from "@bibgraph/client/cached-client"
 import { logError, logger } from "@bibgraph/utils/logger"
 import { getStaticDataCachePath } from "@bibgraph/utils/static-data/cache"
 
@@ -35,6 +35,14 @@ export interface CacheOptions {
 	saveToCache?: boolean
 }
 
+/**
+Reserved options for {@link OpenAlexCLI.generateStaticDataFromPatterns}; not yet consumed.
+ */
+export interface GenerateStaticDataFromPatternsOptions {
+	dryRun?: boolean
+	force?: boolean
+}
+
 // Constants
 const LOG_CONTEXT_GENERAL = "OpenAlexCLI"
 const LOG_CONTEXT_STATIC_CACHE = "StaticCache"
@@ -52,6 +60,14 @@ const FAILED_TO_SAVE_MESSAGE = "Failed to save entity to cache"
 const FAILED_TO_SAVE_QUERY_MESSAGE = "Failed to save query to cache"
 const FAILED_TO_FETCH_MESSAGE = "Failed to fetch"
 const API_REQUEST_FAILED = "API request failed"
+/**
+Default number of results per page when a query doesn't specify one.
+ */
+const DEFAULT_QUERY_PER_PAGE = 50
+/**
+Placeholder cache-hit potential reported when the underlying data has any entities at all (the real ratio isn't computed yet).
+ */
+const PLACEHOLDER_CACHE_HIT_POTENTIAL = 0.5
 
 const generateCanonicalEntityUrl = ({
 	entityType,
@@ -63,45 +79,71 @@ const generateCanonicalEntityUrl = ({
 	return `https://api.openalex.org/${entityType}/${entityId}`
 }
 
+/**
+Bit shift used by the DJB2-style hash's `hash * 32 - hash` step.
+ */
+const HASH_SHIFT_BITS = 5
+/**
+Radix used when converting the numeric content hash to a compact string.
+ */
+const HASH_STRING_RADIX = 36
+
 const generateContentHash = (content: string): string => {
 	let hash = 0
 	for (let index = 0; index < content.length; index++) {
 		const char = content.charCodeAt(index)
-		hash = (hash << 5) - hash + char
+		hash = (hash << HASH_SHIFT_BITS) - hash + char
 		hash &= hash
 	}
-	return hash.toString(36)
+	return hash.toString(HASH_STRING_RADIX)
 }
 
 // Type definitions for OpenAlex API response
-type OpenAlexEntity = {
+interface OpenAlexEntity {
 	id: string
 	display_name: string
+	[key: string]: unknown
 }
 
-type OpenAlexAPIResponse = {
+interface OpenAlexAPIResponse {
 	results: OpenAlexEntity[]
-	meta: {
-		count: number
-		page: number
-		per_page: number
-	}
 }
+
+/**
+ * Narrow an unknown value down to an {@link OpenAlexEntity} before trusting its shape.
+ */
+const isOpenAlexEntity = (value: unknown): value is OpenAlexEntity =>
+	typeof value === "object" &&
+	value !== null &&
+	"id" in value &&
+	"display_name" in value &&
+	typeof value.id === "string" &&
+	typeof value.display_name === "string"
+
+/**
+ * Narrow an unknown API response down to an {@link OpenAlexAPIResponse} before trusting its shape.
+ */
+const isOpenAlexAPIResponse = (value: unknown): value is OpenAlexAPIResponse =>
+	typeof value === "object" &&
+	value !== null &&
+	"results" in value &&
+	Array.isArray(value.results) &&
+	value.results.every(isOpenAlexEntity)
 
 /**
  * Main OpenAlex CLI class - orchestrates services for API, caching, and statistics
  */
 export class OpenAlexCLI {
 	private static instance: OpenAlexCLI | undefined
-	private dataPath: string
-	private cachedClient: CachedOpenAlexClient
+	private readonly dataPath: string
+	private readonly cachedClient: CachedOpenAlexClient
 
 	// Service instances
-	private entityCacheService: EntityCacheService
-	private queryCacheService: QueryCacheService
-	private indexManagementService: IndexManagementService
-	private statisticsService: StatisticsService
-	private staticDataGeneratorService: StaticDataGeneratorService
+	private readonly entityCacheService: EntityCacheService
+	private readonly queryCacheService: QueryCacheService
+	private readonly indexManagementService: IndexManagementService
+	private readonly statisticsService: StatisticsService
+	private readonly staticDataGeneratorService: StaticDataGeneratorService
 
 	constructor(dataPath?: string) {
 		this.dataPath = dataPath ?? getStaticDataCachePath()
@@ -117,19 +159,14 @@ export class OpenAlexCLI {
 
 	/**
 	 * Get singleton instance
-	 * @param dataPath
 	 */
 	static getInstance(dataPath?: string): OpenAlexCLI {
-		if (!OpenAlexCLI.instance) {
-			OpenAlexCLI.instance = new OpenAlexCLI(dataPath)
-		}
+		OpenAlexCLI.instance ??= new OpenAlexCLI(dataPath)
 		return OpenAlexCLI.instance
 	}
 
 	/**
 	 * Make API call to OpenAlex
-	 * @param entityType
-	 * @param options
 	 */
 	async fetchFromAPI(entityType: StaticEntityType, options: QueryOptions = {}): Promise<unknown> {
 		const url = this.buildQueryUrl(entityType, options)
@@ -151,28 +188,25 @@ export class OpenAlexCLI {
 
 	/**
 	 * Get entity by ID with cache control
-	 * @param entityType
-	 * @param entityId
-	 * @param cacheOptions
 	 */
 	async getEntityWithCache(
 		entityType: StaticEntityType,
 		entityId: string,
-		cacheOptions: CacheOptions
+		cacheOptions: Readonly<CacheOptions>
 	): Promise<{
 		id: string
 		display_name: string
 		[key: string]: unknown
 	} | null> {
 		// Try cache first if enabled
-		if (cacheOptions.useCache || cacheOptions.cacheOnly) {
+		if (cacheOptions.useCache === true || cacheOptions.cacheOnly === true) {
 			const cached = await this.entityCacheService.loadEntity(entityType, entityId)
 			if (cached) {
 				logger.debug(LOG_CONTEXT_GENERAL, `${CACHE_HIT_MESSAGE} ${entityType}/${entityId}`)
 				return cached
 			}
 
-			if (cacheOptions.cacheOnly) {
+			if (cacheOptions.cacheOnly === true) {
 				logger.warn(LOG_CONTEXT_GENERAL, `${CACHE_ONLY_MODE_MESSAGE} ${entityId} not found in cache`)
 				return null
 			}
@@ -185,24 +219,14 @@ export class OpenAlexCLI {
 				per_page: 1,
 			})
 
-			const results = (apiResult as OpenAlexAPIResponse | undefined)?.results
-			if (results && results.length > 0) {
-				const entity = results[0]
+			if (isOpenAlexAPIResponse(apiResult) && apiResult.results.length > 0) {
+				const entity = apiResult.results[0]
 
-				if (
-					entity &&
-					typeof entity === "object" &&
-					"id" in entity &&
-					"display_name" in entity &&
-					typeof entity.id === "string" &&
-					typeof entity.display_name === "string"
-				) {
-					if (cacheOptions.saveToCache) {
-						await this.saveEntityToCache(entityType, entity)
-					}
-
-					return entity
+				if (cacheOptions.saveToCache === true) {
+					await this.saveEntityToCache(entityType, entity)
 				}
+
+				return entity
 			}
 		} catch (error) {
 			logError(
@@ -218,10 +242,6 @@ export class OpenAlexCLI {
 
 	/**
 	 * Save entity to static cache and update unified index
-	 * @param entityType
-	 * @param entity
-	 * @param entity.id
-	 * @param entity.display_name
 	 */
 	async saveEntityToCache(
 		entityType: StaticEntityType,
@@ -261,7 +281,7 @@ export class OpenAlexCLI {
 					`${SKIPPED_ENTITY_MESSAGE} ${entityType}/${filename} ${NO_CONTENT_CHANGES_MESSAGE}`
 				)
 
-				if (existingEntry?.lastModified) {
+				if (existingEntry.lastModified !== "") {
 					await this.indexManagementService.updateUnifiedIndex(entityType, canonicalUrl, {
 						$ref: canonicalUrl,
 						lastModified: existingEntry.lastModified,
@@ -276,26 +296,23 @@ export class OpenAlexCLI {
 
 	/**
 	 * Query with cache control
-	 * @param entityType
-	 * @param queryOptions
-	 * @param cacheOptions
 	 */
 	async queryWithCache(
 		entityType: StaticEntityType,
 		queryOptions: QueryOptions,
-		cacheOptions: CacheOptions
+		cacheOptions: Readonly<CacheOptions>
 	): Promise<unknown> {
 		const url = this.buildQueryUrl(entityType, queryOptions)
 
 		// Try cache first if enabled
-		if (cacheOptions.useCache || cacheOptions.cacheOnly) {
+		if (cacheOptions.useCache === true || cacheOptions.cacheOnly === true) {
 			const cached = await this.queryCacheService.loadQuery(entityType, url)
-			if (cached) {
+			if (cached !== null && cached !== undefined) {
 				logger.debug(LOG_CONTEXT_GENERAL, QUERY_CACHE_HIT_MESSAGE)
 				return cached
 			}
 
-			if (cacheOptions.cacheOnly) {
+			if (cacheOptions.cacheOnly === true) {
 				logger.warn(LOG_CONTEXT_GENERAL, CACHE_ONLY_QUERY_MESSAGE)
 				return null
 			}
@@ -305,7 +322,7 @@ export class OpenAlexCLI {
 		try {
 			const apiResult = await this.fetchFromAPI(entityType, queryOptions)
 
-			if (cacheOptions.saveToCache) {
+			if (cacheOptions.saveToCache === true) {
 				await this.saveQueryToCache(entityType, url, apiResult)
 			}
 
@@ -318,9 +335,6 @@ export class OpenAlexCLI {
 
 	/**
 	 * Save query result to cache
-	 * @param entityType
-	 * @param url
-	 * @param result
 	 */
 	async saveQueryToCache(entityType: StaticEntityType, url: string, result: unknown): Promise<void> {
 		try {
@@ -354,18 +368,16 @@ export class OpenAlexCLI {
 
 	/**
 	 * Build query URL from options
-	 * @param entityType
-	 * @param options
 	 */
 	buildQueryUrl(entityType: StaticEntityType, options: QueryOptions = {}): string {
 		const baseUrl = `https://api.openalex.org/${entityType}`
 		const parameters = new URLSearchParams()
 
-		if (options.search) {
+		if (options.search !== undefined && options.search !== "") {
 			parameters.append("search", options.search)
 		}
 
-		if (options.filter) {
+		if (options.filter !== undefined && options.filter !== "") {
 			parameters.append("filter", options.filter)
 		}
 
@@ -373,13 +385,13 @@ export class OpenAlexCLI {
 			parameters.append("select", options.select.join(","))
 		}
 
-		if (options.sort) {
+		if (options.sort !== undefined && options.sort !== "") {
 			parameters.append("sort", options.sort)
 		}
 
-		parameters.append("per_page", (options.per_page ?? 50).toString())
+		parameters.append("per_page", (options.per_page ?? DEFAULT_QUERY_PER_PAGE).toString())
 
-		if (options.page) {
+		if (options.page !== undefined && options.page !== 0) {
 			parameters.append("page", options.page.toString())
 		}
 
@@ -391,7 +403,6 @@ export class OpenAlexCLI {
 
 	/**
 	 * Check if static data exists for entity type
-	 * @param entityType
 	 */
 	async hasStaticData(entityType: StaticEntityType): Promise<boolean> {
 		return this.indexManagementService.hasStaticData(entityType)
@@ -399,7 +410,6 @@ export class OpenAlexCLI {
 
 	/**
 	 * Load index for entity type
-	 * @param entityType
 	 */
 	async loadIndex(entityType: StaticEntityType) {
 		return this.indexManagementService.loadIndex(entityType)
@@ -407,8 +417,6 @@ export class OpenAlexCLI {
 
 	/**
 	 * Get entity summary from index (single entity)
-	 * @param entityType
-	 * @param entityId
 	 */
 	async getEntitySummary(entityType: StaticEntityType, entityId: string) {
 		return this.indexManagementService.getEntitySummary(entityType, entityId)
@@ -417,7 +425,6 @@ export class OpenAlexCLI {
 	/**
 	 * Get entity type overview with count and entity list
 	 * Used for CLI stats and overview commands
-	 * @param entityType
 	 */
 	async getEntityTypeOverview(
 		entityType: StaticEntityType
@@ -436,7 +443,6 @@ export class OpenAlexCLI {
 
 	/**
 	 * Load unified index for entity type
-	 * @param entityType
 	 */
 	async loadUnifiedIndex(entityType: StaticEntityType) {
 		return this.indexManagementService.loadUnifiedIndex(entityType)
@@ -444,7 +450,6 @@ export class OpenAlexCLI {
 
 	/**
 	 * List all cached entities for entity type
-	 * @param entityType
 	 */
 	async listEntities(entityType: StaticEntityType): Promise<string[]> {
 		return this.entityCacheService.listEntities(entityType)
@@ -452,8 +457,6 @@ export class OpenAlexCLI {
 
 	/**
 	 * Load entity from cache
-	 * @param entityType
-	 * @param entityId
 	 */
 	async loadEntity(
 		entityType: StaticEntityType,
@@ -465,8 +468,6 @@ export class OpenAlexCLI {
 
 	/**
 	 * Search entities by name in cache
-	 * @param entityType
-	 * @param searchTerm
 	 */
 	async searchEntities(entityType: StaticEntityType, searchTerm: string) {
 		return this.entityCacheService.searchEntities(entityType, searchTerm)
@@ -474,7 +475,6 @@ export class OpenAlexCLI {
 
 	/**
 	 * List all cached queries for entity type
-	 * @param entityType
 	 */
 	async listCachedQueries(entityType: StaticEntityType) {
 		return this.queryCacheService.listCachedQueries(entityType)
@@ -482,7 +482,7 @@ export class OpenAlexCLI {
 
 	/**
 	 * Get comprehensive cache statistics
-	 * Returns data in format: { [entityType]: { count: number, lastModified: string } }
+	 * Returns data in format: `{ [entityType]: { count: number, lastModified: string } }`
 	 */
 	async getStatistics(): Promise<Record<string, { count: number; lastModified: string }>> {
 		const stats = await this.statisticsService.getStatistics()
@@ -533,7 +533,7 @@ export class OpenAlexCLI {
 		return {
 			entityDistribution,
 			totalEntities: stats.totalEntities,
-			cacheHitPotential: stats.totalEntities > 0 ? 0.5 : 0,
+			cacheHitPotential: stats.totalEntities > 0 ? PLACEHOLDER_CACHE_HIT_POTENTIAL : 0,
 			recommendedForGeneration: stats.entityTypes.length === 0 ? [...SUPPORTED_ENTITIES] : [],
 			gaps: [],
 		}
@@ -556,11 +556,11 @@ export class OpenAlexCLI {
 	/**
 	 * Get well-populated entities
 	 */
-	async getWellPopulatedEntities(): Promise<Array<{
+	getWellPopulatedEntities(): {
 		entityId: string
 		fieldCount: number
 		fields: string[]
-	}>> {
+	}[] {
 		// Return empty array as this is a placeholder for the CLI
 		return []
 	}
@@ -568,31 +568,23 @@ export class OpenAlexCLI {
 	/**
 	 * Get popular collections
 	 */
-	async getPopularCollections(): Promise<Array<{
+	getPopularCollections(): {
 		queryKey: string
 		entityCount: number
 		pageCount: number
-	}>> {
+	}[] {
 		// Return empty array as this is a placeholder for the CLI
 		return []
 	}
 
 	/**
 	 * Generate static data from detected patterns
-	 * @param entityType Optional specific entity type
-	 * @param options Generation options
-	 * @param options.dryRun
-	 * @param options.force
-	 * @param _options
-	 * @param _options.dryRun
-	 * @param _options.force
+	 * @param entityType - Optional specific entity type
+	 * @param _options - Generation options (currently unused; reserved for dry-run/force support)
 	 */
 	async generateStaticDataFromPatterns(
 		entityType?: StaticEntityType,
-		_options?: {
-			dryRun?: boolean
-			force?: boolean
-		}
+		_options?: GenerateStaticDataFromPatternsOptions
 	): Promise<{
 		filesProcessed: number
 		entitiesCached: number

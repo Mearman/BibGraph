@@ -67,9 +67,39 @@ const PRODUCTION_CLEAR_ERROR = "Cannot clear static cache in production mode"
 const VALIDATION_FAILED_MESSAGE = "Cache validation failed"
 const STATISTICS_FAILED_MESSAGE = "Failed to get cache statistics"
 
+/**
+ * Narrow a possibly-incomplete per-entity-type record down to a record that is guaranteed to hold every {@link StaticEntityType} key.
+ */
+const isCompleteEntityDistribution = (
+	distribution: Readonly<Partial<Record<StaticEntityType, number>>>
+): distribution is Record<StaticEntityType, number> => {
+	return SUPPORTED_ENTITIES.every((entityType) => entityType in distribution)
+}
+
+/**
+ * Build a {@link Record} covering every {@link StaticEntityType}, initialised to zero.
+ */
+const createEmptyEntityDistribution = (): Record<StaticEntityType, number> => {
+	const distribution: Partial<Record<StaticEntityType, number>> = {}
+	for (const entityType of SUPPORTED_ENTITIES) {
+		distribution[entityType] = 0
+	}
+	if (!isCompleteEntityDistribution(distribution)) {
+		throw new Error("Failed to initialise entity distribution for all supported entity types")
+	}
+	return distribution
+}
+
+/**
+ * Narrow a JSON-parsed value down to a plain record before indexing into it.
+ */
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+	return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
 export class StaticCacheManager {
 	private config: StaticCacheConfig
-	private projectRoot: string
+	private readonly projectRoot: string
 
 	constructor(config?: Partial<StaticCacheConfig>) {
 		// Detect environment
@@ -119,7 +149,7 @@ export class StaticCacheManager {
 		const stats: CacheStatistics = {
 			mode: this.config.mode,
 			totalEntities: 0,
-			entityDistribution: {} as Record<StaticEntityType, number>,
+			entityDistribution: createEmptyEntityDistribution(),
 			totalSize: 0,
 			lastUpdated: new Date().toISOString(),
 			isHealthy: true,
@@ -160,7 +190,7 @@ export class StaticCacheManager {
 			isValid: true,
 			errors: [],
 			warnings: [],
-			entityCounts: {} as Record<StaticEntityType, number>,
+			entityCounts: createEmptyEntityDistribution(),
 			corruptedFiles: [],
 			missingIndexes: [],
 		}
@@ -184,9 +214,6 @@ export class StaticCacheManager {
 
 	/**
 	 * Validate a specific entity type
-	 * @param root0
-	 * @param root0.entityType
-	 * @param root0.result
 	 */
 	private async validateEntityType({
 		entityType,
@@ -220,7 +247,7 @@ export class StaticCacheManager {
 			// Validate index content
 			const indexContent = await readFile(indexPath, "utf-8")
 
-			const index: Record<string, unknown> = JSON.parse(indexContent)
+			const index: unknown = JSON.parse(indexContent)
 			const validation = UnifiedIndexSchema.safeParse(index)
 
 			if (validation.success) {
@@ -252,7 +279,6 @@ export class StaticCacheManager {
 
 	/**
 	 * Generate static cache from current data patterns
-	 * @param options
 	 */
 	async generateStaticCache(options: CacheGenerationOptions = {}): Promise<void> {
 		if (this.config.mode === "production") {
@@ -276,7 +302,7 @@ export class StaticCacheManager {
 				await this.generateEntityTypeCache({ entityType, options })
 			} catch (error) {
 				logError(logger, `Failed to generate cache for ${entityType}`, error, LOG_CONTEXT)
-				if (!options.force) {
+				if (options.force !== true) {
 					throw error
 				}
 			}
@@ -287,9 +313,6 @@ export class StaticCacheManager {
 
 	/**
 	 * Generate cache for a specific entity type
-	 * @param root0
-	 * @param root0.entityType
-	 * @param root0.options
 	 */
 	private async generateEntityTypeCache({
 		entityType,
@@ -304,7 +327,7 @@ export class StaticCacheManager {
 		// 3. Save them to static cache
 		// 4. Update indexes
 
-		if (options.dryRun) {
+		if (options.dryRun === true) {
 			logger.debug(LOG_CONTEXT, `DRY RUN: Would generate cache for ${entityType}`)
 			return
 		}
@@ -325,9 +348,8 @@ export class StaticCacheManager {
 
 	/**
 	 * Clear static cache data
-	 * @param entityTypes
 	 */
-	async clearStaticCache(entityTypes?: StaticEntityType[]): Promise<void> {
+	async clearStaticCache(entityTypes?: readonly StaticEntityType[]): Promise<void> {
 		if (this.config.mode === "production") {
 			throw new Error(PRODUCTION_CLEAR_ERROR)
 		}
@@ -355,7 +377,6 @@ export class StaticCacheManager {
 
 	/**
 	 * Get entity count for a specific type
-	 * @param entityType
 	 */
 	private async getEntityCount(entityType: StaticEntityType): Promise<number> {
 		if (this.config.mode === "production") {
@@ -366,8 +387,11 @@ export class StaticCacheManager {
 		try {
 			const indexPath = join(this.config.basePath, entityType, INDEX_FILENAME)
 			const indexContent = await readFile(indexPath, "utf-8")
-			const index = JSON.parse(indexContent) as Record<string, unknown>
-			return Object.keys(index).length
+			const parsed: unknown = JSON.parse(indexContent)
+			if (!isRecord(parsed)) {
+				return 0
+			}
+			return Object.keys(parsed).length
 		} catch {
 			return 0
 		}
@@ -399,7 +423,6 @@ export class StaticCacheManager {
 
 	/**
 	 * Calculate directory size recursively
-	 * @param dirPath
 	 */
 	private async getDirectorySize(dirPath: string): Promise<number> {
 		let totalSize = 0
@@ -429,9 +452,8 @@ export class StaticCacheManager {
 
 	/**
 	 * Update cache configuration
-	 * @param newConfig
 	 */
-	updateConfig(newConfig: Partial<StaticCacheConfig>): void {
+	updateConfig(newConfig: Readonly<Partial<StaticCacheConfig>>): void {
 		this.config = { ...this.config, ...newConfig }
 		logger.debug(LOG_CONTEXT, "Cache configuration updated", this.config)
 	}

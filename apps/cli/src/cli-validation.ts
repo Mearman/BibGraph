@@ -14,8 +14,12 @@ import { detectEntityType, SUPPORTED_ENTITIES, toStaticEntityType } from "./enti
 import type { CacheOptions, QueryOptions } from "./openalex-cli-class.js"
 
 /**
+Default number of results per page when no `--per-page` option is provided.
+ */
+const DEFAULT_PER_PAGE = 25
+
+/**
  * Validate and convert string to StaticEntityType
- * @param entityType
  */
 export const validateEntityType = (entityType: string): StaticEntityType => {
 	const entityTypeValidation = StaticEntityTypeSchema.safeParse(entityType)
@@ -29,7 +33,6 @@ export const validateEntityType = (entityType: string): StaticEntityType => {
 
 /**
  * Validate get command options
- * @param options
  */
 export const validateGetCommandOptions = (options: unknown): GetTypedCommandOptions => {
 	const optionsValidation = GetTypedCommandOptionsSchema.safeParse(options)
@@ -42,17 +45,15 @@ export const validateGetCommandOptions = (options: unknown): GetTypedCommandOpti
 
 /**
  * Build cache options from validated command options
- * @param validatedOptions
  */
-export const buildCacheOptions = (validatedOptions: GetTypedCommandOptions): CacheOptions => ({
-	useCache: !validatedOptions.noCache,
-	saveToCache: !validatedOptions.noSave,
+export const buildCacheOptions = (validatedOptions: Readonly<GetTypedCommandOptions>): CacheOptions => ({
+	useCache: validatedOptions.noCache !== true,
+	saveToCache: validatedOptions.noSave !== true,
 	cacheOnly: validatedOptions.cacheOnly ?? false,
 })
 
 /**
  * Detect and validate entity type from entity ID
- * @param entityId
  */
 export const detectAndValidateEntityType = (entityId: string): StaticEntityType => {
 	try {
@@ -65,13 +66,12 @@ export const detectAndValidateEntityType = (entityId: string): StaticEntityType 
 		)
 		console.error("Or full URLs like: https://openalex.org/A5017898742")
 		console.error(`Supported types: ${SUPPORTED_ENTITIES.join(", ")}`)
-		process.exit(1)
+		return process.exit(1)
 	}
 }
 
 /**
  * Validate fetch command options
- * @param options
  */
 export const validateFetchCommandOptions = (options: unknown): FetchCommandOptions => {
 	const optionsValidation = FetchCommandOptionsSchema.safeParse(options)
@@ -84,11 +84,10 @@ export const validateFetchCommandOptions = (options: unknown): FetchCommandOptio
 
 /**
  * Build query options from validated fetch command options
- * @param validatedOptions
  */
-export const buildQueryOptions = (validatedOptions: FetchCommandOptions): QueryOptions => {
+export const buildQueryOptions = (validatedOptions: Readonly<FetchCommandOptions>): QueryOptions => {
 	const perPage =
-		typeof validatedOptions.perPage === "string" ? Number(validatedOptions.perPage) : 25
+		typeof validatedOptions.perPage === "string" ? Number(validatedOptions.perPage) : DEFAULT_PER_PAGE
 	const page = typeof validatedOptions.page === "string" ? Number(validatedOptions.page) : 1
 
 	const queryOptions: QueryOptions = {
@@ -96,10 +95,10 @@ export const buildQueryOptions = (validatedOptions: FetchCommandOptions): QueryO
 		page,
 	}
 
-	if (validatedOptions.filter) queryOptions.filter = validatedOptions.filter
-	if (validatedOptions.select)
+	if (validatedOptions.filter !== undefined && validatedOptions.filter !== "") queryOptions.filter = validatedOptions.filter
+	if (validatedOptions.select !== undefined && validatedOptions.select !== "")
 		queryOptions.select = validatedOptions.select.split(",").map((s) => s.trim())
-	if (validatedOptions.sort) queryOptions.sort = validatedOptions.sort
+	if (validatedOptions.sort !== undefined && validatedOptions.sort !== "") queryOptions.sort = validatedOptions.sort
 
 	return queryOptions
 }
