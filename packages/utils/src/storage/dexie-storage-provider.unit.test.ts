@@ -3,6 +3,7 @@
  * Tests use InMemoryStorageProvider for fast, isolated test execution
  */
 
+import { GRAPH_LIST_CONFIG } from '@bibgraph/types';
 import { afterEach,beforeEach, describe, expect, it } from 'vitest';
 
 import { SPECIAL_LIST_IDS } from './catalogue-db/index.js';
@@ -10,13 +11,16 @@ import type { CatalogueStorageProvider } from './catalogue-storage-provider.js';
 import { InMemoryStorageProvider } from './in-memory-storage-provider.js';
 
 // Helper function for delays in tests
-const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = async (ms: number): Promise<void> => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+// Minimum delay used to guarantee a measurable timestamp difference between two Date.now() reads
+const TIMESTAMP_DELAY_MS = 10;
 
 // Helper function to create work nodes for testing
 const createWorkNode = (_: unknown, index: number) => ({
-	entityId: `W${index}`,
+	entityId: `W${String(index)}`,
 	entityType: 'works' as const,
-	label: `Work ${index}`,
+	label: `Work ${String(index)}`,
 	provenance: 'user' as const,
 });
 
@@ -207,22 +211,18 @@ describe('Bookmark Storage Operations', () => {
 		it('should retrieve all bookmarks', async () => {
 			await provider.initializeSpecialLists();
 
-			await provider.addBookmark({
-				entityType: 'works',
-				entityId: 'W1',
-			});
-			await provider.addBookmark({
-				entityType: 'authors',
-				entityId: 'A1',
-			});
-			await provider.addBookmark({
-				entityType: 'topics',
-				entityId: 'T1',
-			});
+			const bookmarksAdded = [
+				{ entityType: 'works', entityId: 'W1' },
+				{ entityType: 'authors', entityId: 'A1' },
+				{ entityType: 'topics', entityId: 'T1' },
+			] as const;
+			for (const bookmark of bookmarksAdded) {
+				await provider.addBookmark(bookmark);
+			}
 
 			const bookmarks = await provider.getBookmarks();
 
-			expect(bookmarks).toHaveLength(3);
+			expect(bookmarks).toHaveLength(bookmarksAdded.length);
 			expect(bookmarks.map((b) => b.entityId)).toEqual(['W1', 'A1', 'T1']);
 		});
 
@@ -431,7 +431,8 @@ describe('Bookmark Storage Operations', () => {
 		it('should handle very long notes', async () => {
 			await provider.initializeSpecialLists();
 
-			const longNotes = 'A'.repeat(1000);
+			const longNotesLength = 1000;
+			const longNotes = 'A'.repeat(longNotesLength);
 
 			await provider.addBookmark({
 				entityType: 'works',
@@ -443,7 +444,7 @@ describe('Bookmark Storage Operations', () => {
 			expect(bookmarks[0].entityType).toBe('works');
 			expect(bookmarks[0].entityId).toBe('W888');
 			expect(bookmarks[0].notes).toBe(longNotes);
-			expect(bookmarks[0].notes?.length).toBeGreaterThanOrEqual(1000);
+			expect(bookmarks[0].notes?.length).toBeGreaterThanOrEqual(longNotesLength);
 		});
 	});
 
@@ -456,7 +457,7 @@ describe('Bookmark Storage Operations', () => {
 			).rejects.toThrow('Cannot delete special system list');
 		});
 
-		it('should identify bookmarks list as special system list', async () => {
+		it('should identify bookmarks list as special system list', () => {
 			const isSpecial = provider.isSpecialList(SPECIAL_LIST_IDS.BOOKMARKS);
 
 			expect(isSpecial).toBe(true);
@@ -485,7 +486,7 @@ describe('Bookmark Storage Operations', () => {
 			const beforeTimestamp = beforeList?.updatedAt;
 
 			// Wait a moment to ensure timestamp difference
-			await new Promise((resolve) => setTimeout(resolve, 10));
+			await delay(TIMESTAMP_DELAY_MS);
 
 			await provider.addBookmark({
 				entityType: 'works',
@@ -512,7 +513,7 @@ describe('Bookmark Storage Operations', () => {
 			const beforeTimestamp = beforeList?.updatedAt;
 
 			// Wait a moment to ensure timestamp difference
-			await new Promise((resolve) => setTimeout(resolve, 10));
+			await delay(TIMESTAMP_DELAY_MS);
 
 			await provider.removeBookmark(entityRecordId);
 
@@ -578,39 +579,20 @@ describe('Bookmark Storage Operations', () => {
 			it('should parse provenance correctly from all types', async () => {
 				await provider.initializeSpecialLists();
 
-				await provider.addToGraphList({
-					entityId: 'W1',
-					entityType: 'works',
-					label: 'User Added',
-					provenance: 'user',
-				});
-
-				await provider.addToGraphList({
-					entityId: 'W2',
-					entityType: 'works',
-					label: 'From Collection',
-					provenance: 'collection-load',
-				});
-
-				await provider.addToGraphList({
-					entityId: 'W3',
-					entityType: 'works',
-					label: 'Expanded',
-					provenance: 'expansion',
-				});
-
-				await provider.addToGraphList({
-					entityId: 'W4',
-					entityType: 'works',
-					label: 'Auto',
-					provenance: 'auto-population',
-				});
+				const nodesAdded = [
+					{ entityId: 'W1', entityType: 'works', label: 'User Added', provenance: 'user' },
+					{ entityId: 'W2', entityType: 'works', label: 'From Collection', provenance: 'collection-load' },
+					{ entityId: 'W3', entityType: 'works', label: 'Expanded', provenance: 'expansion' },
+					{ entityId: 'W4', entityType: 'works', label: 'Auto', provenance: 'auto-population' },
+				] as const;
+				for (const node of nodesAdded) {
+					await provider.addToGraphList(node);
+				}
 
 				const nodes = await provider.getGraphList();
 
-				expect(nodes).toHaveLength(4);
+				expect(nodes).toHaveLength(nodesAdded.length);
 
-				 
 				const toMapEntry = (n: typeof nodes[0]) => [n.entityId, n] as const;
 				const nodeMap = new Map(nodes.map(toMapEntry));
 
@@ -654,28 +636,28 @@ describe('Bookmark Storage Operations', () => {
 				expect(nodes[0].entityId).toBe('A456');
 			});
 
-			it('should enforce size limit of 1000 nodes', async () => {
+			it(`should enforce size limit of ${String(GRAPH_LIST_CONFIG.MAX_SIZE)} nodes`, async () => {
 				await provider.initializeSpecialLists();
 
-				// Add 1000 nodes
-				for (let index = 0; index < 1000; index++) {
+				// Fill the graph list up to its configured maximum size
+				for (let index = 0; index < GRAPH_LIST_CONFIG.MAX_SIZE; index++) {
 					await provider.addToGraphList({
-						entityId: `W${index}`,
+						entityId: `W${String(index)}`,
 						entityType: 'works',
-						label: `Work ${index}`,
+						label: `Work ${String(index)}`,
 						provenance: 'user',
 					});
 				}
 
-				// 1001st node should throw error
+				// The node past the configured maximum should throw an error
 				await expect(
 					provider.addToGraphList({
-						entityId: 'W1000',
+						entityId: `W${String(GRAPH_LIST_CONFIG.MAX_SIZE)}`,
 						entityType: 'works',
 						label: 'Exceeds Limit',
 						provenance: 'user',
 					})
-				).rejects.toThrow('Graph list size limit reached (1000 nodes)');
+				).rejects.toThrow(`Graph list size limit reached (${String(GRAPH_LIST_CONFIG.MAX_SIZE)} nodes)`);
 			});
 
 			it('should update existing node provenance and timestamp', async () => {
@@ -692,7 +674,7 @@ describe('Bookmark Storage Operations', () => {
 				const initialTimestamp = nodesInitial[0].addedAt;
 
 				// Wait to ensure timestamp difference
-				await delay(10);
+				await delay(TIMESTAMP_DELAY_MS);
 
 				// Add same node with different provenance
 				await provider.addToGraphList({
@@ -806,28 +788,18 @@ describe('Bookmark Storage Operations', () => {
 			it('should return correct count of nodes', async () => {
 				await provider.initializeSpecialLists();
 
-				await provider.addToGraphList({
-					entityId: 'W1',
-					entityType: 'works',
-					label: 'Work 1',
-					provenance: 'user',
-				});
-				await provider.addToGraphList({
-					entityId: 'W2',
-					entityType: 'works',
-					label: 'Work 2',
-					provenance: 'user',
-				});
-				await provider.addToGraphList({
-					entityId: 'A1',
-					entityType: 'authors',
-					label: 'Author 1',
-					provenance: 'user',
-				});
+				const nodesAdded = [
+					{ entityId: 'W1', entityType: 'works', label: 'Work 1', provenance: 'user' },
+					{ entityId: 'W2', entityType: 'works', label: 'Work 2', provenance: 'user' },
+					{ entityId: 'A1', entityType: 'authors', label: 'Author 1', provenance: 'user' },
+				] as const;
+				for (const node of nodesAdded) {
+					await provider.addToGraphList(node);
+				}
 
 				const size = await provider.getGraphListSize();
 
-				expect(size).toBe(3);
+				expect(size).toBe(nodesAdded.length);
 			});
 		});
 
@@ -860,7 +832,7 @@ describe('Bookmark Storage Operations', () => {
 			it('should add multiple nodes in batch', async () => {
 				await provider.initializeSpecialLists();
 
-				const ids = await provider.batchAddToGraphList([
+				const nodesToAdd = [
 					{
 						entityId: 'W1',
 						entityType: 'works',
@@ -879,12 +851,13 @@ describe('Bookmark Storage Operations', () => {
 						label: 'Author 1',
 						provenance: 'collection-load',
 					},
-				]);
+				] as const;
+				const ids = await provider.batchAddToGraphList(nodesToAdd);
 
-				expect(ids).toHaveLength(3);
+				expect(ids).toHaveLength(nodesToAdd.length);
 
 				const nodes = await provider.getGraphList();
-				expect(nodes).toHaveLength(3);
+				expect(nodes).toHaveLength(nodesToAdd.length);
 			});
 
 			it('should stop adding when reaching size limit', async () => {
@@ -931,7 +904,7 @@ describe('Bookmark Storage Operations', () => {
 				expect(ids).toHaveLength(2); // Only 2 added
 
 				const size = await provider.getGraphListSize();
-				expect(size).toBe(1000); // Exactly at limit
+				expect(size).toBe(GRAPH_LIST_CONFIG.MAX_SIZE); // Exactly at limit
 			});
 		});
 
@@ -969,31 +942,21 @@ describe('Bookmark Storage Operations', () => {
 			it('should not remove user/expansion/collection-load nodes', async () => {
 				await provider.initializeSpecialLists();
 
-				await provider.addToGraphList({
-					entityId: 'W1',
-					entityType: 'works',
-					label: 'User',
-					provenance: 'user',
-				});
-				await provider.addToGraphList({
-					entityId: 'W2',
-					entityType: 'works',
-					label: 'Expansion',
-					provenance: 'expansion',
-				});
-				await provider.addToGraphList({
-					entityId: 'W3',
-					entityType: 'works',
-					label: 'Collection',
-					provenance: 'collection-load',
-				});
+				const nodesAdded = [
+					{ entityId: 'W1', entityType: 'works', label: 'User', provenance: 'user' },
+					{ entityId: 'W2', entityType: 'works', label: 'Expansion', provenance: 'expansion' },
+					{ entityId: 'W3', entityType: 'works', label: 'Collection', provenance: 'collection-load' },
+				] as const;
+				for (const node of nodesAdded) {
+					await provider.addToGraphList(node);
+				}
 
 				const result = await provider.pruneGraphList();
 
 				expect(result.removedCount).toBe(0);
 
 				const nodes = await provider.getGraphList();
-				expect(nodes).toHaveLength(3);
+				expect(nodes).toHaveLength(nodesAdded.length);
 			});
 		});
 	});

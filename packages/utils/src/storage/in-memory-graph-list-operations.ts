@@ -18,11 +18,10 @@ import type { InMemoryStorage } from './in-memory-storage-types.js';
 /**
  * Parse provenance from notes field
  * Format: "provenance:TYPE|label:LABEL"
- * @param notes
  */
 const parseProvenance = (notes: string | undefined): GraphListNode['provenance'] => {
-	if (!notes) return 'user';
-	const match = notes.match(/^provenance:([^|]+)/);
+	if (notes === undefined || notes === '') return 'user';
+	const match = /^provenance:([^|]+)/.exec(notes);
 	if (match) {
 		const prov = match[1];
 		if (
@@ -40,18 +39,15 @@ const parseProvenance = (notes: string | undefined): GraphListNode['provenance']
 /**
  * Serialize provenance and label into notes field
  * Format: "provenance:TYPE|label:LABEL"
- * @param provenance
- * @param label
  */
 const serializeProvenanceWithLabel = (provenance: string, label: string): string => `provenance:${provenance}|label:${label}`;
 
 /**
  * Extract label from notes field
- * @param notes
  */
 const extractLabel = (notes: string | undefined): string => {
-	if (!notes) return '';
-	const labelMatch = notes.match(/\|label:(.+)$/);
+	if (notes === undefined || notes === '') return '';
+	const labelMatch = /\|label:(.+)$/.exec(notes);
 	if (labelMatch) {
 		return labelMatch[1];
 	}
@@ -62,16 +58,15 @@ const extractLabel = (notes: string | undefined): string => {
 
 /**
  * Get all nodes in the graph list
- * @param storage
  */
 export const getGraphList = (storage: InMemoryStorage): GraphListNode[] => {
 	initializeSpecialLists(storage);
 	const entities = getListEntities(storage, SPECIAL_LIST_IDS.GRAPH);
 
 	return entities
-		.filter((entity) => entity.id !== undefined)
+		.filter((entity): entity is CatalogueEntity & { id: string } => entity.id !== undefined)
 		.map((entity) => ({
-			id: entity.id as string,
+			id: entity.id,
 			entityId: entity.entityId,
 			entityType: entity.entityType,
 			label: extractLabel(entity.notes),
@@ -81,17 +76,24 @@ export const getGraphList = (storage: InMemoryStorage): GraphListNode[] => {
 };
 
 /**
- * Add a node to the graph list
- * @param storage
- * @param params
+ * Get the current size of the graph list
  */
-export const addToGraphList = (storage: InMemoryStorage, params: AddToGraphListParams): string => {
+export const getGraphListSize = (storage: InMemoryStorage): number => {
+	initializeSpecialLists(storage);
+	const entities = getListEntities(storage, SPECIAL_LIST_IDS.GRAPH);
+	return entities.length;
+};
+
+/**
+ * Add a node to the graph list
+ */
+export const addToGraphList = (storage: InMemoryStorage, params: Readonly<AddToGraphListParams>): string => {
 	initializeSpecialLists(storage);
 
 	// Check size limit
 	const currentSize = getGraphListSize(storage);
 	if (currentSize >= GRAPH_LIST_CONFIG.MAX_SIZE) {
-		throw new Error(`Graph list size limit reached (${GRAPH_LIST_CONFIG.MAX_SIZE} nodes)`);
+		throw new Error(`Graph list size limit reached (${String(GRAPH_LIST_CONFIG.MAX_SIZE)} nodes)`);
 	}
 
 	// Check if entity already exists in graph list
@@ -102,7 +104,7 @@ export const addToGraphList = (storage: InMemoryStorage, params: AddToGraphListP
 			entity.entityId === params.entityId
 		) {
 			// Update provenance and timestamp if exists
-			if (!entity.id) {
+			if (entity.id === undefined) {
 				continue;
 			}
 			const updatedEntity: CatalogueEntity = {
@@ -127,8 +129,6 @@ export const addToGraphList = (storage: InMemoryStorage, params: AddToGraphListP
 
 /**
  * Remove a node from the graph list by entityId
- * @param storage
- * @param entityId
  */
 export const removeFromGraphList = (storage: InMemoryStorage, entityId: string): void => {
 	initializeSpecialLists(storage);
@@ -142,7 +142,7 @@ export const removeFromGraphList = (storage: InMemoryStorage, entityId: string):
 		}
 	}
 
-	if (!entityRecordId) {
+	if (entityRecordId === null) {
 		throw new Error(`Entity ${entityId} not found in graph list`);
 	}
 
@@ -151,7 +151,6 @@ export const removeFromGraphList = (storage: InMemoryStorage, entityId: string):
 
 /**
  * Clear all nodes from the graph list
- * @param storage
  */
 export const clearGraphList = (storage: InMemoryStorage): void => {
 	initializeSpecialLists(storage);
@@ -171,18 +170,7 @@ export const clearGraphList = (storage: InMemoryStorage): void => {
 };
 
 /**
- * Get the current size of the graph list
- * @param storage
- */
-export const getGraphListSize = (storage: InMemoryStorage): number => {
-	initializeSpecialLists(storage);
-	const entities = getListEntities(storage, SPECIAL_LIST_IDS.GRAPH);
-	return entities.length;
-};
-
-/**
  * Prune old auto-populated nodes
- * @param storage
  */
 export const pruneGraphList = (storage: InMemoryStorage): PruneGraphListResult => {
 	initializeSpecialLists(storage);
@@ -201,7 +189,7 @@ export const pruneGraphList = (storage: InMemoryStorage): PruneGraphListResult =
 
 	// Remove entities
 	for (const entity of entitiesToRemove) {
-		if (entity.id) {
+		if (entity.id !== undefined) {
 			storage.entities.delete(entity.id);
 		}
 	}
@@ -219,8 +207,6 @@ export const pruneGraphList = (storage: InMemoryStorage): PruneGraphListResult =
 
 /**
  * Check if an entity is in the graph list
- * @param storage
- * @param entityId
  */
 export const isInGraphList = (storage: InMemoryStorage, entityId: string): boolean => {
 	for (const entity of storage.entities.values()) {
@@ -233,10 +219,8 @@ export const isInGraphList = (storage: InMemoryStorage, entityId: string): boole
 
 /**
  * Batch add nodes to graph list
- * @param storage
- * @param nodes
  */
-export const batchAddToGraphList = (storage: InMemoryStorage, nodes: AddToGraphListParams[]): string[] => {
+export const batchAddToGraphList = (storage: InMemoryStorage, nodes: readonly AddToGraphListParams[]): string[] => {
 	initializeSpecialLists(storage);
 
 	const addedIds: string[] = [];
@@ -259,7 +243,7 @@ export const batchAddToGraphList = (storage: InMemoryStorage, nodes: AddToGraphL
 			) {
 				isExists = true;
 				// Update provenance and timestamp
-				if (entity.id) {
+				if (entity.id !== undefined) {
 					const updatedEntity: CatalogueEntity = {
 						...entity,
 						addedAt: new Date(),

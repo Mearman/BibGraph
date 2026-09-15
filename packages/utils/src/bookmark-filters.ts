@@ -29,9 +29,9 @@ import type { Bookmark, EntityType } from "@bibgraph/types";
  * // Returns bookmarks with "machine learning" in title, notes, tags, or entity type
  * ```
  */
-export const filterBySearch = (bookmarks: Bookmark[], searchQuery: string): Bookmark[] => {
+export const filterBySearch = (bookmarks: readonly Bookmark[], searchQuery: string): Bookmark[] => {
 	if (!searchQuery || searchQuery.trim() === "") {
-		return bookmarks;
+		return [...bookmarks];
 	}
 
 	const query = searchQuery.toLowerCase().trim();
@@ -43,12 +43,12 @@ export const filterBySearch = (bookmarks: Bookmark[], searchQuery: string): Book
 		}
 
 		// Search in notes
-		if (bookmark.notes && bookmark.notes.toLowerCase().includes(query)) {
+		if (bookmark.notes?.toLowerCase().includes(query) === true) {
 			return true;
 		}
 
 		// Search in tags
-		if (bookmark.metadata.tags?.some((tag) => tag.toLowerCase().includes(query))) {
+		if (bookmark.metadata.tags?.some((tag) => tag.toLowerCase().includes(query)) === true) {
 			return true;
 		}
 
@@ -72,9 +72,9 @@ export const filterBySearch = (bookmarks: Bookmark[], searchQuery: string): Book
  * // Returns only author bookmarks
  * ```
  */
-export const filterByEntityType = (bookmarks: Bookmark[], entityType: EntityType | null): Bookmark[] => {
+export const filterByEntityType = (bookmarks: readonly Bookmark[], entityType: EntityType | null): Bookmark[] => {
 	if (!entityType) {
-		return bookmarks;
+		return [...bookmarks];
 	}
 
 	return bookmarks.filter((bookmark) => bookmark.entityType === entityType);
@@ -97,13 +97,17 @@ export const filterByEntityType = (bookmarks: Bookmark[], entityType: EntityType
  * const results = filterByTags(bookmarks, ["ai", "research"], true);
  * ```
  */
-export const filterByTags = (bookmarks: Bookmark[], tags: string[], matchAll = false): Bookmark[] => {
-	if (!tags || tags.length === 0) {
-		return bookmarks;
+export const filterByTags = (
+	bookmarks: readonly Bookmark[],
+	tags: readonly string[],
+	matchAll = false
+): Bookmark[] => {
+	if (tags.length === 0) {
+		return [...bookmarks];
 	}
 
 	return bookmarks.filter((bookmark) => {
-		const bookmarkTags = bookmark.metadata.tags || [];
+		const bookmarkTags = bookmark.metadata.tags ?? [];
 
 		if (matchAll) {
 			// AND logic: bookmark must have ALL specified tags
@@ -119,6 +123,31 @@ export const filterByTags = (bookmarks: Bookmark[], tags: string[], matchAll = f
 };
 
 /**
+ * Options controlling how {@link applyFilters} narrows a bookmark list
+ */
+export interface ApplyFiltersOptions {
+	/**
+	 * Search query string to filter by
+	 */
+	searchQuery?: string;
+
+	/**
+	 * Entity type to filter by (null or omitted matches all)
+	 */
+	entityType?: EntityType | null;
+
+	/**
+	 * Array of tag names to filter by
+	 */
+	tags?: string[];
+
+	/**
+	 * If true, requires ALL tags to match (AND logic); otherwise ANY tag matches (OR logic)
+	 */
+	matchAllTags?: boolean;
+}
+
+/**
  * Apply multiple filters to bookmarks in sequence
  *
  * Filters are applied in order:
@@ -127,10 +156,6 @@ export const filterByTags = (bookmarks: Bookmark[], tags: string[], matchAll = f
  * 3. Tag filter
  * @param bookmarks - Array of bookmarks to filter
  * @param options - Filter options
- * @param options.searchQuery
- * @param options.entityType
- * @param options.tags
- * @param options.matchAllTags
  * @returns Filtered array of bookmarks
  * @example
  * ```typescript
@@ -142,16 +167,14 @@ export const filterByTags = (bookmarks: Bookmark[], tags: string[], matchAll = f
  * });
  * ```
  */
-export const applyFilters = (bookmarks: Bookmark[], options: {
-		searchQuery?: string;
-		entityType?: EntityType | null;
-		tags?: string[];
-		matchAllTags?: boolean;
-	}): Bookmark[] => {
-	let result = bookmarks;
+export const applyFilters = (
+	bookmarks: readonly Bookmark[],
+	options: Readonly<ApplyFiltersOptions>
+): Bookmark[] => {
+	let result: Bookmark[] = [...bookmarks];
 
 	// Apply search filter
-	if (options.searchQuery) {
+	if (options.searchQuery !== undefined && options.searchQuery !== "") {
 		result = filterBySearch(result, options.searchQuery);
 	}
 

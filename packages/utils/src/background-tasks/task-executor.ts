@@ -3,7 +3,6 @@
  *
  * Unified interface for executing background tasks with pluggable strategies.
  * Automatically falls back to supported strategies if preferred is unavailable.
- * @module utils/background-tasks/task-executor
  */
 
 import { IdleCallbackStrategy } from './idle-strategy';
@@ -16,12 +15,18 @@ import type {
   BackgroundTaskStrategy,
   ProgressCallback,
 } from './types';
+import { isSignalAborted } from './types';
 import { WorkerStrategy } from './worker-strategy';
 
 /**
- * Default fallback chain: scheduler -> idle -> sync
+ * Default fallback chain: scheduler -\> idle -\> sync
  */
 const DEFAULT_FALLBACK_CHAIN: BackgroundStrategy[] = ['scheduler', 'idle', 'sync'];
+
+/**
+ * How often to yield to the main thread while fetching on it, in requests
+ */
+const YIELD_EVERY_N_REQUESTS = 5;
 
 /**
  * Synchronous strategy for when no background processing is available/wanted
@@ -39,7 +44,7 @@ class SyncStrategy implements BackgroundTaskStrategy {
   ): Promise<BackgroundTaskResult<T>> {
     const startTime = performance.now();
 
-    if (options?.signal?.aborted) {
+    if (options?.signal?.aborted === true) {
       return { success: false, cancelled: true, executionTime: 0 };
     }
 
@@ -60,20 +65,21 @@ class SyncStrategy implements BackgroundTaskStrategy {
   }
 
   async processBatch<T, R>(
-    items: T[],
+    items: readonly T[],
     processor: (item: T) => R | Promise<R>,
     options?: BackgroundTaskOptions & { onProgress?: ProgressCallback }
   ): Promise<BackgroundTaskResult<R[]>> {
     const startTime = performance.now();
     const results: R[] = [];
 
-    if (options?.signal?.aborted) {
+    if (options?.signal?.aborted === true) {
       return { success: false, cancelled: true, executionTime: 0 };
     }
 
     try {
       for (let index = 0; index < items.length; index++) {
-        if (options?.signal?.aborted) {
+        // Via isSignalAborted so this is a fresh expression: an earlier identical check narrows this same readonly property, and TypeScript persists that narrowing across loop iterations even though AbortSignal.aborted is live external state that can flip between them.
+        if (isSignalAborted(options?.signal)) {
           return {
             success: false,
             data: results,
@@ -129,9 +135,9 @@ class SyncStrategy implements BackgroundTaskStrategy {
  * ```
  */
 export class BackgroundTaskExecutor {
-  private strategies: Map<BackgroundStrategy, BackgroundTaskStrategy>;
+  private readonly strategies: Map<BackgroundStrategy, BackgroundTaskStrategy>;
   private activeStrategy: BackgroundTaskStrategy;
-  private config: BackgroundTaskExecutorConfig;
+  private readonly config: BackgroundTaskExecutorConfig;
 
   constructor(config?: Partial<BackgroundTaskExecutorConfig>) {
     this.config = {
@@ -154,19 +160,18 @@ export class BackgroundTaskExecutor {
 
   /**
    * Select best available strategy
-   * @param preferred
    */
   private selectStrategy(preferred: BackgroundStrategy): BackgroundTaskStrategy {
     // Try preferred first
     const preferredStrategy = this.strategies.get(preferred);
-    if (preferredStrategy?.isSupported()) {
+    if (preferredStrategy?.isSupported() === true) {
       return preferredStrategy;
     }
 
     // Try fallback chain
     for (const fallback of this.config.fallbackChain ?? DEFAULT_FALLBACK_CHAIN) {
       const strategy = this.strategies.get(fallback);
-      if (strategy?.isSupported()) {
+      if (strategy?.isSupported() === true) {
         return strategy;
       }
     }
@@ -189,7 +194,7 @@ export class BackgroundTaskExecutor {
   /**
    * Get all available strategies and their support status
    */
-  getStrategies(): Array<{ name: BackgroundStrategy; supported: boolean; active: boolean }> {
+  getStrategies(): { name: BackgroundStrategy; supported: boolean; active: boolean }[] {
     return [...this.strategies].map(([name, strategy]) => ({
       name,
       supported: strategy.isSupported(),
@@ -199,12 +204,11 @@ export class BackgroundTaskExecutor {
 
   /**
    * Switch to a different strategy
-   * @param strategy
    * @returns true if switch was successful, false if strategy not supported
    */
   setStrategy(strategy: BackgroundStrategy): boolean {
     const newStrategy = this.strategies.get(strategy);
-    if (!newStrategy?.isSupported()) {
+    if (newStrategy?.isSupported() !== true) {
       return false;
     }
     this.activeStrategy = newStrategy;
@@ -213,8 +217,6 @@ export class BackgroundTaskExecutor {
 
   /**
    * Execute a single task in the background
-   * @param task
-   * @param options
    */
   async execute<T>(
     task: () => T | Promise<T>,
@@ -226,12 +228,9 @@ export class BackgroundTaskExecutor {
 
   /**
    * Process items in batches with background scheduling
-   * @param items
-   * @param processor
-   * @param options
    */
   async processBatch<T, R>(
-    items: T[],
+    items: readonly T[],
     processor: (item: T) => R | Promise<R>,
     options?: BackgroundTaskOptions & { onProgress?: ProgressCallback }
   ): Promise<BackgroundTaskResult<R[]>> {
@@ -241,22 +240,21 @@ export class BackgroundTaskExecutor {
 
   /**
    * Execute batch fetch in worker (only available with worker strategy)
-   * @param requests
-   * @param options
    */
-  async fetchBatchInWorker<T>(
-    requests: Array<{ url: string; options?: RequestInit; id: string }>,
+  async fetchBatchInWorker(
+    requests: readonly { url: string; options?: RequestInit; id: string }[],
     options?: BackgroundTaskOptions & { onProgress?: ProgressCallback }
-  ): Promise<BackgroundTaskResult<Map<string, { success: boolean; data?: T; error?: string }>>> {
-    const workerStrategy = this.strategies.get('worker') as WorkerStrategy;
+  ): Promise<BackgroundTaskResult<Map<string, { success: boolean; data?: unknown; error?: string }>>> {
+    const rawStrategy = this.strategies.get('worker');
+    const workerStrategy = rawStrategy instanceof WorkerStrategy ? rawStrategy : undefined;
 
-    if (!workerStrategy?.isSupported()) {
+    if (workerStrategy?.isSupported() !== true) {
       // Fallback: execute fetches on main thread with yielding
-      const results = new Map<string, { success: boolean; data?: T; error?: string }>();
+      const results = new Map<string, { success: boolean; data?: unknown; error?: string }>();
       const startTime = performance.now();
 
       for (let index = 0; index < requests.length; index++) {
-        if (options?.signal?.aborted) {
+        if (options?.signal?.aborted === true) {
           return {
             success: false,
             data: results,
@@ -269,7 +267,7 @@ export class BackgroundTaskExecutor {
         try {
           const response = await fetch(request.url, request.options);
           if (response.ok) {
-            const data = await response.json();
+            const data: unknown = await response.json();
             results.set(request.id, { success: true, data });
           } else {
             results.set(request.id, { success: false, error: response.statusText });
@@ -281,9 +279,9 @@ export class BackgroundTaskExecutor {
           });
         }
 
-        // Yield every 5 requests
-        if ((index + 1) % 5 === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 0));
+        // Yield every YIELD_EVERY_N_REQUESTS requests
+        if ((index + 1) % YIELD_EVERY_N_REQUESTS === 0) {
+          await new Promise((resolve) => { setTimeout(resolve, 0); });
           options?.onProgress?.(index + 1, requests.length);
         }
       }
@@ -295,7 +293,7 @@ export class BackgroundTaskExecutor {
       };
     }
 
-    return workerStrategy.fetchBatch<T>(requests, options);
+    return workerStrategy.fetchBatch(requests, options);
   }
 
   /**
@@ -311,8 +309,8 @@ export class BackgroundTaskExecutor {
   dispose(): void {
     this.strategies.forEach((strategy) => {
       strategy.cancelAll();
-      if ('terminate' in strategy && typeof strategy.terminate === 'function') {
-        (strategy as WorkerStrategy).terminate();
+      if (strategy instanceof WorkerStrategy) {
+        strategy.terminate();
       }
     });
   }
@@ -327,15 +325,12 @@ let defaultExecutor: BackgroundTaskExecutor | null = null;
  * Get or create the default background task executor
  */
 export const getBackgroundTaskExecutor = (): BackgroundTaskExecutor => {
-  if (!defaultExecutor) {
-    defaultExecutor = new BackgroundTaskExecutor();
-  }
+  defaultExecutor ??= new BackgroundTaskExecutor();
   return defaultExecutor;
 };
 
 /**
  * Configure the default executor
- * @param config
  */
 export const configureBackgroundTaskExecutor = (config: Partial<BackgroundTaskExecutorConfig>): BackgroundTaskExecutor => {
   if (defaultExecutor) {

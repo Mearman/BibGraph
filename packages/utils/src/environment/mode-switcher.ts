@@ -7,15 +7,14 @@
 
 import { logger } from "../logger.js"
 import { type CacheConfig,CacheConfigFactory } from "./cache-config.js"
-import {
-	CacheBackendType,
+import type {
 	CacheOperation,
 	CachePriority,
 	CacheStrategy,
-	type CacheStrategyConfig,
-	CacheStrategySelector,
-} from "./cache-strategies.js"
+	CacheStrategyConfig} from "./cache-strategies.js";
+import { CacheBackendType, CacheStrategySelector } from "./cache-strategies.js";
 import { type BuildContext,EnvironmentDetector, EnvironmentMode } from "./environment-detector.js"
+import { BYTES_PER_GB, MS_PER_SECOND } from "./size-and-time-units.js"
 
 
 /**
@@ -86,22 +85,159 @@ export interface RuntimeEnvironmentConfig {
 	timestamp: number
 }
 
+let currentRuntimeConfig: RuntimeEnvironmentConfig | undefined
+let configListeners: ((config: RuntimeEnvironmentConfig) => void)[] = []
+
+/**
+ * Create environment context with potential overrides
+ */
+const createEnvironmentContext = (options: Readonly<ModeOptions>): BuildContext => {
+	let context = EnvironmentDetector.getBuildContext()
+
+	// Apply force mode override
+	if (options.forceMode) {
+		const forcedMode = options.forceMode
+		context = {
+			...context,
+			isDevelopment: forcedMode === "development",
+			isProduction: forcedMode === "production",
+			isTest: forcedMode === "test",
+			mode:
+				forcedMode === "development"
+					? EnvironmentMode.DEVELOPMENT
+					: (forcedMode === "production"
+						? EnvironmentMode.PRODUCTION
+						: EnvironmentMode.TEST),
+		}
+	}
+
+	return context
+}
+
+/**
+ * Create cache configuration based on context and options
+ */
+const createCacheConfiguration = ({
+	context,
+	options,
+}: Readonly<{
+	context: BuildContext
+	options: ModeOptions
+}>): CacheConfig => {
+	const config: CacheConfig = options.useCase ? CacheConfigFactory.createOptimizedConfig({
+			useCase: options.useCase,
+			context,
+		}) : CacheConfigFactory.createCacheConfig(context);
+
+	// Apply option overrides
+	if (options.maxCacheSize !== undefined) {
+		config.storage.maxSize = options.maxCacheSize
+	}
+
+	if (options.ttl !== undefined) {
+		config.storage.expirationTime = options.ttl
+	}
+
+	if (options.debug !== undefined) {
+		config.storage.debug = options.debug
+	}
+
+	return config
+}
+
+/**
+ * Select cache strategy based on context and options
+ */
+const selectCacheStrategy = ({
+	context,
+	options,
+}: Readonly<{
+	context: BuildContext
+	options: ModeOptions
+}>): CacheStrategy => {
+	if (options.cacheStrategy !== undefined) {
+		return options.cacheStrategy
+	}
+
+	return CacheStrategySelector.selectStrategy({
+		context,
+		options: {
+			useCase: options.useCase,
+			offline: options.offline,
+			debug: options.debug,
+		},
+	})
+}
+
+/**
+ * Create strategy configuration with overrides
+ */
+const createStrategyConfiguration = ({
+	strategy,
+	options,
+}: Readonly<{
+	strategy: CacheStrategy
+	options: ModeOptions
+}>): CacheStrategyConfig => {
+	let config = CacheStrategySelector.getStrategyConfig(strategy)
+
+	// Apply option overrides
+	if (options.storageType !== undefined) {
+		config = {
+			...config,
+			storageType: options.storageType,
+		}
+	}
+
+	if (options.maxCacheSize !== undefined) {
+		config = {
+			...config,
+			maxSize: options.maxCacheSize,
+		}
+	}
+
+	if (options.ttl !== undefined) {
+		config = {
+			...config,
+			ttl: options.ttl,
+		}
+	}
+
+	if (options.debug !== undefined) {
+		config = {
+			...config,
+			debug: options.debug,
+		}
+	}
+
+	return config
+}
+
+/**
+ * Notify all listeners of configuration changes
+ */
+const notifyListeners = (config: Readonly<RuntimeEnvironmentConfig>): void => {
+	for (const listener of configListeners) {
+		try {
+			listener(config)
+		} catch (error) {
+			logger.error("mode-switcher", "Error in mode switcher listener:", error)
+		}
+	}
+}
+
 /**
  * Mode switcher for dynamic environment configuration
  */
-export class ModeSwitcher {
-	private static _currentConfig: RuntimeEnvironmentConfig | undefined
-	private static _listeners: Array<(config: RuntimeEnvironmentConfig) => void> = []
-
+export const ModeSwitcher = {
 	/**
 	 * Initialize mode switcher with optional overrides
-	 * @param options
 	 */
-	static initialize(options: ModeOptions = {}): RuntimeEnvironmentConfig {
-		const context = this.createEnvironmentContext(options)
-		const cacheConfig = this.createCacheConfiguration({ context, options })
-		const strategy = this.selectCacheStrategy({ context, options })
-		const strategyConfig = this.createStrategyConfiguration({
+	initialize: (options: Readonly<ModeOptions> = {}): RuntimeEnvironmentConfig => {
+		const context = createEnvironmentContext(options)
+		const cacheConfig = createCacheConfiguration({ context, options })
+		const strategy = selectCacheStrategy({ context, options })
+		const strategyConfig = createStrategyConfiguration({
 			strategy,
 			options,
 		})
@@ -115,101 +251,94 @@ export class ModeSwitcher {
 			timestamp: Date.now(),
 		}
 
-		this._currentConfig = config
-		this.notifyListeners(config)
+		currentRuntimeConfig = config
+		notifyListeners(config)
 
 		return config
-	}
+	},
 
 	/**
 	 * Get current runtime configuration
 	 */
-	static getCurrentConfig(): RuntimeEnvironmentConfig {
-		if (!this._currentConfig) {
-			return this.initialize()
+	getCurrentConfig: (): RuntimeEnvironmentConfig => {
+		if (currentRuntimeConfig === undefined) {
+			return ModeSwitcher.initialize()
 		}
-		return this._currentConfig
-	}
+		return currentRuntimeConfig
+	},
 
 	/**
 	 * Reconfigure with new options
-	 * @param options
 	 */
-	static reconfigure(options: ModeOptions): RuntimeEnvironmentConfig {
-		return this.initialize(options)
-	}
+	reconfigure: (options: Readonly<ModeOptions>): RuntimeEnvironmentConfig => {
+		return ModeSwitcher.initialize(options)
+	},
 
 	/**
 	 * Switch to specific mode
-	 * @param mode
-	 * @param additionalOptions
 	 */
-	static switchToMode(
+	switchToMode: (
 		mode: "development" | "production" | "test",
-		additionalOptions: Omit<ModeOptions, "forceMode"> = {}
-	): RuntimeEnvironmentConfig {
-		return this.initialize({
+		additionalOptions: Readonly<Omit<ModeOptions, "forceMode">> = {}
+	): RuntimeEnvironmentConfig => {
+		return ModeSwitcher.initialize({
 			...additionalOptions,
 			forceMode: mode,
 		})
-	}
+	},
 
 	/**
 	 * Switch to research mode
-	 * @param options
 	 */
-	static switchToResearchMode(options: Omit<ModeOptions, "useCase"> = {}): RuntimeEnvironmentConfig {
-		return this.initialize({
+	switchToResearchMode: (options: Readonly<Omit<ModeOptions, "useCase">> = {}): RuntimeEnvironmentConfig => {
+		return ModeSwitcher.initialize({
 			...options,
 			useCase: "research",
 		})
-	}
+	},
 
 	/**
 	 * Switch to offline mode
-	 * @param options
 	 */
-	static switchToOfflineMode(options: Omit<ModeOptions, "offline"> = {}): RuntimeEnvironmentConfig {
-		return this.initialize({
+	switchToOfflineMode: (options: Readonly<Omit<ModeOptions, "offline">> = {}): RuntimeEnvironmentConfig => {
+		return ModeSwitcher.initialize({
 			...options,
 			offline: true,
 		})
-	}
+	},
 
 	/**
 	 * Switch to debug mode
-	 * @param options
 	 */
-	static switchToDebugMode(options: Omit<ModeOptions, "debug"> = {}): RuntimeEnvironmentConfig {
-		return this.initialize({
+	switchToDebugMode: (options: Readonly<Omit<ModeOptions, "debug">> = {}): RuntimeEnvironmentConfig => {
+		return ModeSwitcher.initialize({
 			...options,
 			debug: true,
 		})
-	}
+	},
 
 	/**
 	 * Add configuration change listener
-	 * @param listener
 	 */
-	static addConfigListener(listener: (config: RuntimeEnvironmentConfig) => void): () => void {
-		this._listeners.push(listener)
+	addConfigListener: (listener: (config: RuntimeEnvironmentConfig) => void): () => void => {
+		configListeners.push(listener)
 		return () => {
-			const index = this._listeners.indexOf(listener)
+			const index = configListeners.indexOf(listener)
 			if (index !== -1) {
-				this._listeners.splice(index, 1)
+				configListeners.splice(index, 1)
 			}
 		}
-	}
+	},
 
 	/**
 	 * Get available modes for current context
 	 */
-	static getAvailableModes(): {
-		environments: Array<"development" | "production" | "test">
-		useCases: Array<"research" | "production" | "development" | "testing">
+	getAvailableModes: (): {
+		environments: ("development" | "production" | "test")[]
+		useCases: ("research" | "production" | "development" | "testing")[]
 		strategies: CacheStrategy[]
 		storageTypes: CacheBackendType[]
-	} {
+	} => {
 		const context = EnvironmentDetector.getBuildContext()
 		const strategies = CacheStrategySelector.getAvailableStrategies(context)
 
@@ -224,37 +353,36 @@ export class ModeSwitcher {
 				CacheBackendType.STATIC_FILE,
 			],
 		}
-	}
+	},
 
 	/**
 	 * Validate configuration compatibility
-	 * @param options
 	 */
-	static validateConfiguration(options: ModeOptions): {
+	validateConfiguration: (options: Readonly<ModeOptions>): {
 		valid: boolean
 		errors: string[]
 		warnings: string[]
-	} {
+	} => {
 		const errors: string[] = []
 		const warnings: string[] = []
 
 		// Check for conflicting options
-		if (options.offline && options.useCase === "development") {
+		if (options.offline === true && options.useCase === "development") {
 			warnings.push("Offline mode in development may not work as expected")
 		}
 
 		// Check storage type compatibility
-		if (options.storageType === CacheBackendType.STATIC_FILE && !options.offline) {
+		if (options.storageType === CacheBackendType.STATIC_FILE && options.offline !== true) {
 			warnings.push("Static file storage works best in offline mode")
 		}
 
 		// Check cache size limits
-		if (options.maxCacheSize && options.maxCacheSize > 1024 * 1024 * 1024) {
+		if (options.maxCacheSize !== undefined && options.maxCacheSize > BYTES_PER_GB) {
 			warnings.push("Cache size over 1GB may impact performance")
 		}
 
 		// Check TTL values
-		if (options.ttl && options.ttl < 1000) {
+		if (options.ttl !== undefined && options.ttl < MS_PER_SECOND) {
 			warnings.push("TTL under 1 second may cause excessive cache thrashing")
 		}
 
@@ -263,18 +391,18 @@ export class ModeSwitcher {
 			errors,
 			warnings,
 		}
-	}
+	},
 
 	/**
 	 * Get performance metrics for current configuration
 	 */
-	static getPerformanceMetrics(): {
+	getPerformanceMetrics: (): {
 		configurationTime: number
 		cacheHitRate?: number
 		memoryUsage?: number
 		storageUsage?: number
-	} {
-		const config = this.getCurrentConfig()
+	} => {
+		const config = ModeSwitcher.getCurrentConfig()
 
 		return {
 			configurationTime: config.timestamp,
@@ -283,165 +411,16 @@ export class ModeSwitcher {
 			memoryUsage: undefined,
 			storageUsage: undefined,
 		}
-	}
-
-	/**
-	 * Create environment context with potential overrides
-	 * @param options
-	 */
-	private static createEnvironmentContext(options: ModeOptions): BuildContext {
-		let context = EnvironmentDetector.getBuildContext()
-
-		// Apply force mode override
-		if (options.forceMode) {
-			const forcedMode = options.forceMode
-			context = {
-				...context,
-				isDevelopment: forcedMode === "development",
-				isProduction: forcedMode === "production",
-				isTest: forcedMode === "test",
-				mode:
-					forcedMode === "development"
-						? EnvironmentMode.DEVELOPMENT
-						: (forcedMode === "production"
-							? EnvironmentMode.PRODUCTION
-							: EnvironmentMode.TEST),
-			}
-		}
-
-		return context
-	}
-
-	/**
-	 * Create cache configuration based on context and options
-	 * @param root0
-	 * @param root0.context
-	 * @param root0.options
-	 */
-	private static createCacheConfiguration({
-		context,
-		options,
-	}: {
-		context: BuildContext
-		options: ModeOptions
-	}): CacheConfig {
-		const config: CacheConfig = options.useCase ? CacheConfigFactory.createOptimizedConfig({
-				useCase: options.useCase,
-				context,
-			}) : CacheConfigFactory.createCacheConfig(context);
-
-		// Apply option overrides
-		if (options.maxCacheSize) {
-			config.storage.maxSize = options.maxCacheSize
-		}
-
-		if (options.ttl) {
-			config.storage.expirationTime = options.ttl
-		}
-
-		if (options.debug !== undefined) {
-			config.storage.debug = options.debug
-		}
-
-		return config
-	}
-
-	/**
-	 * Select cache strategy based on context and options
-	 * @param root0
-	 * @param root0.context
-	 * @param root0.options
-	 */
-	private static selectCacheStrategy({
-		context,
-		options,
-	}: {
-		context: BuildContext
-		options: ModeOptions
-	}): CacheStrategy {
-		if (options.cacheStrategy) {
-			return options.cacheStrategy
-		}
-
-		return CacheStrategySelector.selectStrategy({
-			context,
-			options: {
-				useCase: options.useCase,
-				offline: options.offline,
-				debug: options.debug,
-			},
-		})
-	}
-
-	/**
-	 * Create strategy configuration with overrides
-	 * @param root0
-	 * @param root0.strategy
-	 * @param root0.options
-	 */
-	private static createStrategyConfiguration({
-		strategy,
-		options,
-	}: {
-		strategy: CacheStrategy
-		options: ModeOptions
-	}): CacheStrategyConfig {
-		let config = CacheStrategySelector.getStrategyConfig(strategy)
-
-		// Apply option overrides
-		if (options.storageType) {
-			config = {
-				...config,
-				storageType: options.storageType,
-			}
-		}
-
-		if (options.maxCacheSize) {
-			config = {
-				...config,
-				maxSize: options.maxCacheSize,
-			}
-		}
-
-		if (options.ttl) {
-			config = {
-				...config,
-				ttl: options.ttl,
-			}
-		}
-
-		if (options.debug !== undefined) {
-			config = {
-				...config,
-				debug: options.debug,
-			}
-		}
-
-		return config
-	}
-
-	/**
-	 * Notify all listeners of configuration changes
-	 * @param config
-	 */
-	private static notifyListeners(config: RuntimeEnvironmentConfig): void {
-		for (const listener of this._listeners) {
-			try {
-				listener(config)
-			} catch (error) {
-				logger.error("mode-switcher", "Error in mode switcher listener:", error)
-			}
-		}
-	}
+	},
 
 	/**
 	 * Reset mode switcher state (useful for testing)
 	 */
-	static reset(): void {
-		this._currentConfig = undefined
-		this._listeners = []
+	reset: (): void => {
+		currentRuntimeConfig = undefined
+		configListeners = []
 		EnvironmentDetector.clearCache()
-	}
+	},
 }
 
 /**
@@ -450,10 +429,6 @@ export class ModeSwitcher {
 
 /**
  * Get current cache strategy
- * @param options
- * @param options.useCase
- * @param options.offline
- * @param options.debug
  */
 export const getCurrentCacheStrategy = (options?: {
 	useCase?: "research" | "production" | "development" | "testing"
@@ -487,7 +462,6 @@ export const getCurrentStrategyConfiguration = (): CacheStrategyConfig => {
 
 /**
  * Check if specific cache operation is supported
- * @param operation
  */
 export const isCacheOperationSupported = (operation: CacheOperation): boolean => {
 	const config = ModeSwitcher.getCurrentConfig()
@@ -517,24 +491,21 @@ export const getEnvironmentDescription = (): string => EnvironmentDetector.getEn
 
 /**
  * Initialize environment with research-optimized settings
- * @param options
  */
-export const initializeResearchEnvironment = (options: Omit<ModeOptions, "useCase"> = {}): RuntimeEnvironmentConfig => ModeSwitcher.switchToResearchMode(options);
+export const initializeResearchEnvironment = (options: Readonly<Omit<ModeOptions, "useCase">> = {}): RuntimeEnvironmentConfig => ModeSwitcher.switchToResearchMode(options);
 
 /**
  * Initialize environment with production-optimized settings
- * @param options
  */
-export const initializeProductionEnvironment = (options: Omit<ModeOptions, "useCase"> = {}): RuntimeEnvironmentConfig => ModeSwitcher.reconfigure({
+export const initializeProductionEnvironment = (options: Readonly<Omit<ModeOptions, "useCase">> = {}): RuntimeEnvironmentConfig => ModeSwitcher.reconfigure({
 		...options,
 		useCase: "production",
 	});
 
 /**
  * Initialize environment with development-optimized settings
- * @param options
  */
-export const initializeDevelopmentEnvironment = (options: Omit<ModeOptions, "useCase"> = {}): RuntimeEnvironmentConfig => ModeSwitcher.reconfigure({
+export const initializeDevelopmentEnvironment = (options: Readonly<Omit<ModeOptions, "useCase">> = {}): RuntimeEnvironmentConfig => ModeSwitcher.reconfigure({
 		...options,
 		useCase: "development",
 	});

@@ -6,6 +6,8 @@
 
 import { logger } from "../../logger.js"
 
+const HEX_RADIX = 16
+
 /**
  * Normalize query string for consistent filename generation
  *
@@ -14,7 +16,6 @@ import { logger } from "../../logger.js"
  * - Normalizes cursor values to "*" for consistency
  * - Sorts parameters alphabetically for deterministic ordering
  * - URL encodes parameter values for filesystem safety
- * @param queryString
  */
 export const normalizeQueryForFilename = (queryString: string): string => {
 	if (!queryString || queryString === "?") {
@@ -67,7 +68,6 @@ export const normalizeQueryForFilename = (queryString: string): string => {
  * 3. Provides unified encoding format across all special characters
  *
  * This is reversible and creates consistent filenames regardless of input format
- * @param filename
  */
 export const encodeFilename = (filename: string): string => {
 	if (typeof filename !== "string") {
@@ -90,7 +90,7 @@ export const encodeFilename = (filename: string): string => {
 		// Encodes: filesystem-unsafe (<>"|*?/\) + URL-special (:=%&+,)
 		return decoded.replaceAll(
 			/["%&*+,/:<=>?\\|]/g,
-			(char) => `__${char.charCodeAt(0).toString(16).toUpperCase()}__`
+			(char) => `__${char.charCodeAt(0).toString(HEX_RADIX).toUpperCase()}__`
 		)
 	} catch (error) {
 		// Fallback if decoding fails (e.g., malformed URL encoding)
@@ -101,7 +101,7 @@ export const encodeFilename = (filename: string): string => {
 		})
 		return filename.replaceAll(
 			/["*/<>?\\|]/g,
-			(char) => `__${char.charCodeAt(0).toString(16).toUpperCase()}__`
+			(char) => `__${char.charCodeAt(0).toString(HEX_RADIX).toUpperCase()}__`
 		)
 	}
 };
@@ -109,18 +109,16 @@ export const encodeFilename = (filename: string): string => {
 /**
  * Decode filename by converting hex codes back to original characters
  * Reverses the encoding done by encodeFilename
- * @param filename
  */
 export const decodeFilename = (filename: string): string => filename.replaceAll(/__([0-9A-F]+)__/g, (match, hex) => {
 	const hexString = String(hex)
-	const codePoint = Number.parseInt(hexString, 16)
+	const codePoint = Number.parseInt(hexString, HEX_RADIX)
 	return String.fromCharCode(codePoint)
 });
 
 /**
  * Convert query string to filesystem-safe filename
  * Combines normalization and encoding for cache file naming
- * @param queryString
  */
 export const queryToFilename = (queryString: string): string => {
 	if (!queryString) return ""
@@ -140,7 +138,6 @@ export const queryToFilename = (queryString: string): string => {
 /**
  * Convert filesystem filename back to query string
  * Reverses the queryToFilename transformation
- * @param filename
  */
 export const filenameToQuery = (filename: string): string => {
 	if (!filename) return ""

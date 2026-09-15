@@ -6,13 +6,10 @@
 /**
  * Generic query parameters interface
  */
-export interface QueryParams {
-	[key: string]: string | number | boolean | null | undefined | (string | number)[]
-}
+export type QueryParams = Record<string, string | number | boolean | null | undefined | (string | number)[]>;
 
 /**
  * Normalize a parameter value to a string for consistent cache keys
- * @param value
  */
 const normalizeParameterValue = (value: unknown): string => {
 	if (value === null || value === undefined) {
@@ -38,9 +35,6 @@ const normalizeParameterValue = (value: unknown): string => {
 
 /**
  * Create a deterministic cache key from query parameters
- * @param root0
- * @param root0.baseKey
- * @param root0.params
  */
 export const createQueryKey = ({
 	baseKey,
@@ -72,9 +66,6 @@ export const createQueryKey = ({
 
 /**
  * Create a cache key for a resource by ID
- * @param root0
- * @param root0.resourceType
- * @param root0.id
  */
 export const createResourceKey = ({
 	resourceType,
@@ -82,13 +73,10 @@ export const createResourceKey = ({
 }: {
 	resourceType: string
 	id: string | number
-}): string => `${resourceType}:${id}`;
+}): string => `${resourceType}:${String(id)}`;
 
 /**
  * Create a cache key for a collection query
- * @param root0
- * @param root0.resourceType
- * @param root0.params
  */
 export const createCollectionKey = ({
 	resourceType,
@@ -100,10 +88,6 @@ export const createCollectionKey = ({
 
 /**
  * Create a cache key for a search query
- * @param root0
- * @param root0.resourceType
- * @param root0.query
- * @param root0.params
  */
 export const createSearchKey = ({
 	resourceType,
@@ -123,7 +107,6 @@ export const createSearchKey = ({
 
 /**
  * Extract resource type from a cache key
- * @param cacheKey
  */
 export const extractResourceType = (cacheKey: string): string | null => {
 	const colonIndex = cacheKey.indexOf(":")
@@ -132,7 +115,6 @@ export const extractResourceType = (cacheKey: string): string | null => {
 
 /**
  * Extract ID from a resource cache key
- * @param cacheKey
  */
 export const extractResourceId = (cacheKey: string): string | null => {
 	const parts = cacheKey.split(":")
@@ -144,33 +126,26 @@ export const extractResourceId = (cacheKey: string): string | null => {
 
 /**
  * Check if a cache key represents a collection query
- * @param cacheKey
  */
 export const isCollectionKey = (cacheKey: string): boolean => cacheKey.includes(":collection");
 
 /**
  * Check if a cache key represents a search query
- * @param cacheKey
  */
 export const isSearchKey = (cacheKey: string): boolean => cacheKey.includes(":search");
 
 /**
  * Check if a cache key represents a single resource
- * @param cacheKey
  */
 export const isResourceKey = (cacheKey: string): boolean => !isCollectionKey(cacheKey) && !isSearchKey(cacheKey) && cacheKey.includes(":");
 
 /**
  * Generate a wildcard pattern for invalidating related cache entries
- * @param resourceType
  */
 export const createInvalidationPattern = (resourceType: string): string => `${resourceType}:*`;
 
 /**
  * Check if a cache key matches an invalidation pattern
- * @param root0
- * @param root0.cacheKey
- * @param root0.pattern
  */
 export const matchesPattern = ({
 	cacheKey,
@@ -188,24 +163,23 @@ export const matchesPattern = ({
 
 /**
  * Create a hash from query parameters for short cache keys
- * @param params
  */
+const HASH_SHIFT_BITS = 5;
+const HASH_RADIX = 36;
+
 export const hashParams = (params: QueryParams): string => {
 	const string_ = JSON.stringify(params, Object.keys(params).sort())
 	let hash = 0
 	for (let index = 0; index < string_.length; index++) {
 		const char = string_.charCodeAt(index)
-		hash = (hash << 5) - hash + char
+		hash = (hash << HASH_SHIFT_BITS) - hash + char
 		hash &= hash // Convert to 32bit integer
 	}
-	return Math.abs(hash).toString(36)
+	return Math.abs(hash).toString(HASH_RADIX)
 };
 
 /**
  * Create a short cache key using parameter hashing
- * @param root0
- * @param root0.baseKey
- * @param root0.params
  */
 export const createShortQueryKey = ({
 	baseKey,
@@ -226,7 +200,7 @@ export const createShortQueryKey = ({
  * Cache key builder class for fluent API
  */
 export class CacheKeyBuilder {
-	private parts: string[] = []
+	private readonly parts: string[] = []
 
 	constructor(baseKey: string) {
 		this.parts.push(baseKey)

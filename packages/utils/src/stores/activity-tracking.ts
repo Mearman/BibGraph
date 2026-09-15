@@ -34,15 +34,15 @@ export interface StatusTracking {
  * Activity store factory for creating standardized activity tracking stores
  */
 
+const PERCENTAGE_MULTIPLIER = 100
+
 /**
  * Progress tracking utilities
- * @param updateItem
- * @param completeItem
  */
 export const createProgressUpdater = (updateItem: (id: string, updates: Record<string, unknown>) => void, completeItem: (id: string, updates?: Record<string, unknown>) => void) => ({
-		updateProgress: (id: string, progress: ProgressTracking) => {
+		updateProgress: (id: string, progress: Readonly<ProgressTracking>) => {
 			const percentage =
-				progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0
+				progress.total > 0 ? Math.round((progress.completed / progress.total) * PERCENTAGE_MULTIPLIER) : 0
 
 			updateItem(id, {
 				progress: {

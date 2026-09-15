@@ -10,9 +10,10 @@ import { logger } from "../../logger.js"
 import { isCacheStorageType } from "./constants.js"
 import type { ParsedOpenAlexUrl } from "./types.js"
 
+const HEX_RADIX = 16
+
 /**
  * Parse OpenAlex URL into structured information
- * @param url
  */
 export const parseOpenAlexUrl = (url: string): ParsedOpenAlexUrl | null => {
 	if (typeof url !== "string" || url.trim().length === 0) {
@@ -99,7 +100,6 @@ export const parseOpenAlexUrl = (url: string): ParsedOpenAlexUrl | null => {
  * Remove sensitive parameters from URL query string for caching
  * Strips api_key and mailto parameters completely from the query
  * Handles both query-only strings (?param=value) and path+query strings (/path?param=value)
- * @param urlString
  */
 export const sanitizeUrlForCaching = (urlString: string): string => {
 	if (!urlString) return urlString
@@ -139,7 +139,6 @@ export const sanitizeUrlForCaching = (urlString: string): string => {
  * - Normalizes cursor values to "*" for pagination consistency
  * - Sorts parameters alphabetically for deterministic ordering
  * - URL encodes parameter values for filesystem safety
- * @param queryString
  */
 export const normalizeQueryForFilename = (queryString: string): string => {
 	if (!queryString || queryString === "?") {
@@ -192,7 +191,6 @@ export const normalizeQueryForFilename = (queryString: string): string => {
  * 3. Provides unified encoding format across all special characters
  *
  * This is reversible and creates consistent filenames regardless of input format
- * @param filename
  */
 export const encodeFilename = (filename: string): string => {
 	if (typeof filename !== "string") {
@@ -215,7 +213,7 @@ export const encodeFilename = (filename: string): string => {
 		// Encodes: filesystem-unsafe (<>"|*?/\) + URL-special (:=%&+,)
 		return decoded.replaceAll(
 			/["%&*+,/:<=>?\\|]/g,
-			(char) => `__${char.charCodeAt(0).toString(16).toUpperCase()}__`
+			(char) => `__${char.charCodeAt(0).toString(HEX_RADIX).toUpperCase()}__`
 		)
 	} catch (error) {
 		// Fallback if decoding fails (e.g., malformed URL encoding)
@@ -226,7 +224,7 @@ export const encodeFilename = (filename: string): string => {
 		})
 		return filename.replaceAll(
 			/["*/<>?\\|]/g,
-			(char) => `__${char.charCodeAt(0).toString(16).toUpperCase()}__`
+			(char) => `__${char.charCodeAt(0).toString(HEX_RADIX).toUpperCase()}__`
 		)
 	}
 };
@@ -234,10 +232,9 @@ export const encodeFilename = (filename: string): string => {
 /**
  * Decode filename by converting hex codes back to original characters
  * Reverses the encoding done by encodeFilename
- * @param filename
  */
 export const decodeFilename = (filename: string): string => filename.replaceAll(/__([0-9A-F]+)__/g, (match, hex) => {
 	const hexString = String(hex)
-	const codePoint = Number.parseInt(hexString, 16)
+	const codePoint = Number.parseInt(hexString, HEX_RADIX)
 	return String.fromCharCode(codePoint)
 });

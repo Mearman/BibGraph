@@ -124,7 +124,7 @@ export const createFilter = <T,>(config: FilterFieldConfig, initialValue: T, ini
 		},
 	});
 
-export const createEnumOptions = (options: FilterFieldOption[]): FilterFieldOption[] => options.map(option => ({
+export const createEnumOptions = (options: readonly FilterFieldOption[]): FilterFieldOption[] => options.map(option => ({
 		value: option.value,
 		label: option.label,
 		description: option.description,

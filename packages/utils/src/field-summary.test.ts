@@ -107,6 +107,7 @@ describe("generateFieldListPreview", () => {
 	})
 
 	it("should truncate with ellipsis when over max length", () => {
+		const MAX_LENGTH = 30
 		const longFieldList = [
 			"id",
 			"display_name",
@@ -114,14 +115,15 @@ describe("generateFieldListPreview", () => {
 			"cited_by_count",
 			"h_index",
 		]
-		const result = generateFieldListPreview(longFieldList, 30)
-		expect(result).toHaveLength(30)
+		const result = generateFieldListPreview(longFieldList, MAX_LENGTH)
+		expect(result).toHaveLength(MAX_LENGTH)
 		expect(result).toMatch(/\.\.\.$/)
 	})
 
 	it("should respect custom max length", () => {
-		const result = generateFieldListPreview(["id", "display_name"], 10)
-		expect(result).toHaveLength(10)
+		const MAX_LENGTH = 10
+		const result = generateFieldListPreview(["id", "display_name"], MAX_LENGTH)
+		expect(result).toHaveLength(MAX_LENGTH)
 		expect(result).toBe("id, dis...")
 	})
 })

@@ -40,13 +40,11 @@ export interface MigrationOptions {
  * This utility reads existing bookmarks that have URLs stored in the notes field,
  * detects the entity type and ID from the URLs, and updates them to use the
  * proper entity fields while preserving user notes.
- *
- * @param catalogueService - The catalogue service instance
- * @param storageProvider
+ * @param storageProvider - The catalogue service instance
  * @param options - Migration configuration options
  * @returns Migration result with statistics
  */
-export const migrateBookmarkUrls = async (storageProvider: DexieStorageProvider, options: MigrationOptions = {}): Promise<MigrationResult> => {
+export const migrateBookmarkUrls = async (storageProvider: DexieStorageProvider, options: Readonly<MigrationOptions> = {}): Promise<MigrationResult> => {
 	const { dryRun = false, deleteMigrated = false } = options
 
 	logger.info("bookmark-migration", "Starting bookmark migration", { dryRun, deleteMigrated })
@@ -63,7 +61,7 @@ export const migrateBookmarkUrls = async (storageProvider: DexieStorageProvider,
 		const bookmarks = await storageProvider.getBookmarks()
 		result.totalBookmarks = bookmarks.length
 
-		logger.info("bookmark-migration", `Processing ${bookmarks.length} bookmarks`)
+		logger.info("bookmark-migration", `Processing ${String(bookmarks.length)} bookmarks`)
 
 		for (const bookmark of bookmarks) {
 			try {
@@ -96,7 +94,7 @@ export const migrateBookmarkUrls = async (storageProvider: DexieStorageProvider,
 
 				if (!dryRun) {
 					// Extract user notes (remove URL part)
-					let userNotes = bookmark.notes || ""
+					let userNotes = bookmark.notes ?? ""
 					const urlIndex = userNotes.indexOf("URL:")
 					if (urlIndex !== -1) {
 						// Remove "URL: ..." and any preceding/trailing whitespace/newlines
@@ -135,7 +133,7 @@ export const migrateBookmarkUrls = async (storageProvider: DexieStorageProvider,
 
 			} catch (error) {
 				result.failed++
-				const errorMessage = `Error migrating bookmark ${bookmark.id}: ${error instanceof Error ? error.message : String(error)}`
+				const errorMessage = `Error migrating bookmark ${String(bookmark.id)}: ${error instanceof Error ? error.message : String(error)}`
 				result.errors.push(errorMessage)
 				logger.error("bookmark-migration", errorMessage)
 			}
@@ -158,25 +156,28 @@ export const migrateBookmarkUrls = async (storageProvider: DexieStorageProvider,
 };
 
 /**
- * Validates bookmark data integrity after migration
- *
- * @param catalogueService - The catalogue service instance
- * @param storageProvider
- * @returns Validation result with issues found
+ * Result of validating bookmark data integrity after migration
  */
-export const validateMigration = async (storageProvider: DexieStorageProvider): Promise<{
+export interface ValidationResult {
 	totalBookmarks: number
 	withEntityData: number
 	withLegacyUrls: number
 	withInvalidData: number
 	issues: string[]
-}> => {
-	const result = {
+}
+
+/**
+ * Validates bookmark data integrity after migration
+ * @param storageProvider - The catalogue service instance
+ * @returns Validation result with issues found
+ */
+export const validateMigration = async (storageProvider: DexieStorageProvider): Promise<ValidationResult> => {
+	const result: ValidationResult = {
 		totalBookmarks: 0,
 		withEntityData: 0,
 		withLegacyUrls: 0,
 		withInvalidData: 0,
-		issues: [] as string[]
+		issues: []
 	}
 
 	try {
@@ -184,21 +185,21 @@ export const validateMigration = async (storageProvider: DexieStorageProvider): 
 		result.totalBookmarks = bookmarks.length
 
 		for (const bookmark of bookmarks) {
-			if (bookmark.entityType && bookmark.entityId) {
+			if (bookmark.entityId) {
 				result.withEntityData++
 
 				// Validate entity type and ID format
 				const detection = EntityDetectionService.detectEntity(bookmark.entityId)
-				if (!detection || detection.entityType !== bookmark.entityType) {
+				if (detection?.entityType !== bookmark.entityType) {
 					result.withInvalidData++
-					result.issues.push(`Invalid entity data for bookmark ${bookmark.id}: type=${bookmark.entityType}, id=${bookmark.entityId}`)
+					result.issues.push(`Invalid entity data for bookmark ${String(bookmark.id)}: type=${bookmark.entityType}, id=${bookmark.entityId}`)
 				}
 			}
 
 			// Check for legacy URL patterns
-			if (bookmark.notes?.includes("URL:")) {
+			if (bookmark.notes?.includes("URL:") === true) {
 				result.withLegacyUrls++
-				result.issues.push(`Bookmark ${bookmark.id} still contains URL in notes`)
+				result.issues.push(`Bookmark ${String(bookmark.id)} still contains URL in notes`)
 			}
 		}
 
@@ -214,9 +215,7 @@ export const validateMigration = async (storageProvider: DexieStorageProvider): 
 
 /**
  * Gets migration statistics without performing migration
- *
- * @param catalogueService - The catalogue service instance
- * @param storageProvider
+ * @param storageProvider - The catalogue service instance
  * @returns Statistics about bookmarks that need migration
  */
 export const getMigrationStats = async (storageProvider: DexieStorageProvider): Promise<{
@@ -235,9 +234,9 @@ export const getMigrationStats = async (storageProvider: DexieStorageProvider): 
 		result.totalBookmarks = bookmarks.length
 
 		for (const bookmark of bookmarks) {
-			if (bookmark.notes?.includes("URL:")) {
+			if (bookmark.notes?.includes("URL:") === true) {
 				result.needMigration++
-			} else if (bookmark.entityType && bookmark.entityId) {
+			} else if (bookmark.entityId) {
 				result.alreadyMigrated++
 			}
 		}
@@ -251,13 +250,11 @@ export const getMigrationStats = async (storageProvider: DexieStorageProvider): 
 
 /**
  * Convenience function to perform complete migration workflow
- *
- * @param catalogueService - The catalogue service instance
- * @param storageProvider
+ * @param storageProvider - The catalogue service instance
  * @param options - Migration options
  * @returns Complete migration result
  */
-export const performMigration = async (storageProvider: DexieStorageProvider, options: MigrationOptions = {}): Promise<{
+export const performMigration = async (storageProvider: DexieStorageProvider, options: Readonly<MigrationOptions> = {}): Promise<{
 	migration: MigrationResult
 	validation: Awaited<ReturnType<typeof validateMigration>>
 	stats: Awaited<ReturnType<typeof getMigrationStats>>
@@ -270,12 +267,12 @@ export const performMigration = async (storageProvider: DexieStorageProvider, op
 	const migrationResult = await migrateBookmarkUrls(storageProvider, options)
 
 	// Validate after migration (only if not dry run)
-	const validationResult = await (options.dryRun
+	const validationResult: ValidationResult = options.dryRun === true
 		? { totalBookmarks: 0, withEntityData: 0, withLegacyUrls: 0, withInvalidData: 0, issues: [] }
-		: validateMigration(storageProvider))
+		: await validateMigration(storageProvider)
 
 	// Get after stats
-	const afterStats = options.dryRun
+	const afterStats = options.dryRun === true
 		? beforeStats
 		: await getMigrationStats(storageProvider)
 

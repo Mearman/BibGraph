@@ -5,7 +5,6 @@
  * Uses predefined operations for security (no dynamic code evaluation).
  *
  * Best for: API calls and data processing that should happen off main thread
- * @module utils/background-tasks/worker-strategy
  */
 
 import type {
@@ -14,6 +13,7 @@ import type {
   BackgroundTaskStrategy,
   ProgressCallback,
 } from './types';
+import { isSignalAborted } from './types';
 
 /**
 Task counter for unique IDs
@@ -21,9 +21,14 @@ Task counter for unique IDs
 let taskIdCounter = 0;
 
 /**
+Default chunk size for batch processing and progress reporting
+ */
+const DEFAULT_CHUNK_SIZE = 10;
+
+/**
  * Generate unique task ID
  */
-const generateTaskId = (): string => `task_${++taskIdCounter}_${Date.now()}`;
+const generateTaskId = (): string => `task_${String(++taskIdCounter)}_${String(Date.now())}`;
 
 /**
  * Worker message types
@@ -35,11 +40,11 @@ interface WorkerRequest {
 }
 
 interface FetchBatchPayload {
-  requests: Array<{
+  requests: readonly {
     url: string;
     options?: RequestInit;
     id: string;
-  }>;
+  }[];
   chunkSize: number;
 }
 
@@ -154,6 +159,23 @@ export interface FetchResult<T> {
 }
 
 /**
+ * Type guard for a single worker-reported fetch result entry, after it has crossed the structured-clone boundary from the worker's postMessage payload
+ */
+const isFetchResultEntry = (value: unknown): value is FetchResult<unknown> => {
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('success' in value)) return false;
+  return typeof value.success === 'boolean';
+};
+
+/**
+ * Type guard for the full worker-reported fetch result record
+ */
+const isFetchResultRecord = (value: unknown): value is Record<string, FetchResult<unknown>> => {
+  if (typeof value !== 'object' || value === null) return false;
+  return Object.values(value).every(isFetchResultEntry);
+};
+
+/**
  * Background task strategy using Web Workers
  *
  * This strategy focuses on batch fetch operations which are the primary
@@ -172,7 +194,7 @@ export class WorkerStrategy implements BackgroundTaskStrategy {
   readonly name = 'worker' as const;
 
   private worker: Worker | null = null;
-  private pendingTasks: Map<string, PendingTask<unknown>> = new Map();
+  private readonly pendingTasks = new Map<string, PendingTask<unknown>>();
   private isTerminated = false;
 
   constructor() {
@@ -239,8 +261,6 @@ export class WorkerStrategy implements BackgroundTaskStrategy {
   /**
    * Execute a single task - delegates to processBatch for consistency
    * Note: For the worker strategy, single tasks are less efficient than batches
-   * @param task
-   * @param options
    */
   async execute<T>(
     task: () => T | Promise<T>,
@@ -250,13 +270,13 @@ export class WorkerStrategy implements BackgroundTaskStrategy {
     // Fall back to running on main thread with yield
     const startTime = performance.now();
 
-    if (options?.signal?.aborted) {
+    if (options?.signal?.aborted === true) {
       return { success: false, cancelled: true, executionTime: 0 };
     }
 
     try {
       // Yield to browser first
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => { setTimeout(resolve, 0); });
 
       const result = await task();
       return {
@@ -276,28 +296,25 @@ export class WorkerStrategy implements BackgroundTaskStrategy {
   /**
    * Process batch - delegates to fetchBatch if items are fetch requests
    * Otherwise falls back to chunked main thread processing
-   * @param items
-   * @param processor
-   * @param options
    */
   async processBatch<T, R>(
-    items: T[],
+    items: readonly T[],
     processor: (item: T) => R | Promise<R>,
     options?: BackgroundTaskOptions & { onProgress?: ProgressCallback }
   ): Promise<BackgroundTaskResult<R[]>> {
-    // Worker strategy doesn't support arbitrary processors
-    // Fall back to chunked main thread processing with yields
+    // Worker strategy doesn't support arbitrary processors Fall back to chunked main thread processing with yields
     const startTime = performance.now();
     const results: R[] = [];
-    const chunkSize = options?.chunkSize ?? 10;
+    const chunkSize = options?.chunkSize ?? DEFAULT_CHUNK_SIZE;
 
-    if (options?.signal?.aborted) {
+    if (options?.signal?.aborted === true) {
       return { success: false, cancelled: true, executionTime: 0 };
     }
 
     try {
       for (let index = 0; index < items.length; index++) {
-        if (options?.signal?.aborted) {
+        // Via isSignalAborted so this is a fresh expression: an earlier identical check narrows this same readonly property, and TypeScript persists that narrowing across loop iterations even though AbortSignal.aborted is live external state that can flip between them.
+        if (isSignalAborted(options?.signal)) {
           return {
             success: false,
             data: results,
@@ -310,7 +327,7 @@ export class WorkerStrategy implements BackgroundTaskStrategy {
 
         // Yield every chunk
         if ((index + 1) % chunkSize === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 0));
+          await new Promise((resolve) => { setTimeout(resolve, 0); });
           options?.onProgress?.(index + 1, items.length);
         }
       }
@@ -339,12 +356,12 @@ export class WorkerStrategy implements BackgroundTaskStrategy {
    * @param options - Task options including progress callback
    * @returns Map of request ID to fetch result
    */
-  async fetchBatch<T>(
-    requests: Array<{ url: string; options?: RequestInit; id: string }>,
+  async fetchBatch(
+    requests: readonly { url: string; options?: RequestInit; id: string }[],
     options?: BackgroundTaskOptions & { onProgress?: ProgressCallback }
-  ): Promise<BackgroundTaskResult<Map<string, FetchResult<T>>>> {
+  ): Promise<BackgroundTaskResult<Map<string, FetchResult<unknown>>>> {
     const startTime = performance.now();
-    const chunkSize = options?.chunkSize ?? 10;
+    const chunkSize = options?.chunkSize ?? DEFAULT_CHUNK_SIZE;
 
     if (!this.worker || this.isTerminated) {
       return {
@@ -354,7 +371,7 @@ export class WorkerStrategy implements BackgroundTaskStrategy {
       };
     }
 
-    if (options?.signal?.aborted) {
+    if (options?.signal?.aborted === true) {
       return { success: false, cancelled: true, executionTime: 0 };
     }
 
@@ -364,16 +381,28 @@ export class WorkerStrategy implements BackgroundTaskStrategy {
     return new Promise((resolve) => {
       this.pendingTasks.set(taskId, {
         resolve: (result) => {
-          // Convert object back to Map
-          if (result.success && result.data) {
-            const dataObject = result.data as Record<string, FetchResult<T>>;
-            const resultMap = new Map<string, FetchResult<T>>(Object.entries(dataObject));
+          // Convert object back to Map, validating the shape reported by the worker across the structured-clone boundary
+          if (result.success && result.data !== undefined && isFetchResultRecord(result.data)) {
+            const resultMap = new Map<string, FetchResult<unknown>>(Object.entries(result.data));
             resolve({
               ...result,
               data: resultMap,
-            } as BackgroundTaskResult<Map<string, FetchResult<T>>>);
+            });
+          } else if (result.success) {
+            // Worker reported success but the payload did not match the expected shape
+            resolve({
+              success: false,
+              error: new Error('Worker returned an unexpected result shape'),
+              executionTime: result.executionTime,
+            });
           } else {
-            resolve(result as BackgroundTaskResult<Map<string, FetchResult<T>>>);
+            // Forward the original failure/cancellation; it has no `data` field to convert
+            resolve({
+              success: false,
+              error: result.error,
+              cancelled: result.cancelled,
+              executionTime: result.executionTime,
+            });
           }
         },
         startTime,

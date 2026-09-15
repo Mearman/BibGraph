@@ -1,6 +1,5 @@
 /**
- * URL compression and decompression utilities using Pako
- * Enables sharing catalogue lists via compressed URL parameters
+ * URL compression and decompression utilities using Pako Enables sharing catalogue lists via compressed URL parameters
  */
 
 import type { EntityType } from "@bibgraph/types";
@@ -12,6 +11,10 @@ import type { GenericLogger } from "./logger";
 const LOG_CATEGORY = "url-compression";
 const MAX_URL_LENGTH = 2000; // Conservative limit for URL length
 const COMPRESSION_LEVEL = 9; // Maximum compression
+const BASE64_PADDING_MODULUS = 4;
+const URL_PARAM_OVERHEAD_LENGTH = 10; // For parameter name and separator
+const ESTIMATED_COMPRESSION_RATIO = 0.3; // Compressed size is typically 20-40% of original for this type of data
+const URL_SHARE_SIZE_BUFFER = 100; // Leave buffer for URL structure
 
 // Interfaces for compressed data structures
 export interface CompressedListData {
@@ -27,11 +30,11 @@ export interface CompressedListData {
   /**
   Entities in the list
    */
-  entities: Array<{
+  entities: {
     entityType: EntityType;
     entityId: string;
     notes?: string;
-  }>;
+  }[];
 }
 
 export interface ShareUrlData {
@@ -50,10 +53,77 @@ export interface ShareUrlData {
 }
 
 /**
- * Compress catalogue list data for URL sharing
- * @param data
+ * Envelope wrapping compressed data with a format version, as produced by {@link compressListData}
  */
-export const compressListData = (data: CompressedListData): string => {
+interface ShareEnvelope {
+  v: number;
+  d: unknown;
+}
+
+const isShareEnvelope = (value: unknown): value is ShareEnvelope => {
+  if (typeof value !== "object" || value === null) return false;
+  if (!("v" in value) || !("d" in value)) return false;
+  return typeof value.v === "number";
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isUnknownArray = (value: unknown): value is unknown[] => Array.isArray(value);
+
+const VALID_ENTITY_TYPES = new Set([
+  'works', 'authors', 'sources', 'institutions', 'topics', 'publishers', 'funders'
+]);
+
+/**
+ * Validate compressed list data structure
+ */
+export const validateListData = (data: unknown): data is CompressedListData => {
+  if (!isRecord(data)) {
+    return false;
+  }
+
+  const { list, entities } = data;
+
+  // Validate list structure
+  if (!isRecord(list)) {
+    return false;
+  }
+
+  if (typeof list.title !== 'string' || list.title === '') {
+    return false;
+  }
+
+  if (list.type !== undefined && (typeof list.type !== 'string' || !['list', 'bibliography'].includes(list.type))) {
+    return false;
+  }
+
+  // Validate entities structure
+  if (!isUnknownArray(entities)) {
+    return false;
+  }
+
+  for (const entity of entities) {
+    if (!isRecord(entity)) {
+      return false;
+    }
+
+    if (typeof entity.entityType !== 'string' || !VALID_ENTITY_TYPES.has(entity.entityType)) {
+      return false;
+    }
+
+    if (typeof entity.entityId !== 'string' || entity.entityId === '') {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+/**
+ * Compress catalogue list data for URL sharing
+ */
+export const compressListData = (data: Readonly<CompressedListData>): string => {
   try {
     // Convert data to JSON string
     const jsonString = JSON.stringify({
@@ -81,13 +151,12 @@ export const compressListData = (data: CompressedListData): string => {
 
 /**
  * Decompress catalogue list data from URL parameter
- * @param compressedData
  */
 export const decompressListData = (compressedData: string): CompressedListData | null => {
   try {
     // Restore base64 padding
     let base64 = compressedData.replaceAll('-', '+').replaceAll('_', '/');
-    while (base64.length % 4) {
+    while (base64.length % BASE64_PADDING_MODULUS) {
       base64 += '=';
     }
 
@@ -103,14 +172,22 @@ export const decompressListData = (compressedData: string): CompressedListData |
     const jsonString = new TextDecoder().decode(decompressed);
 
     // Parse JSON
-    const parsed = JSON.parse(jsonString);
+    const parsed: unknown = JSON.parse(jsonString);
+
+    if (!isShareEnvelope(parsed)) {
+      throw new Error("Invalid compressed data structure");
+    }
 
     // Validate version
     if (parsed.v !== 1) {
-      throw new Error(`Unsupported compression version: ${parsed.v}`);
+      throw new Error(`Unsupported compression version: ${String(parsed.v)}`);
     }
 
-    return parsed.d as CompressedListData;
+    if (!validateListData(parsed.d)) {
+      throw new Error("Invalid compressed list data");
+    }
+
+    return parsed.d;
   } catch {
     // Return null instead of throwing for invalid data
     return null;
@@ -119,16 +196,13 @@ export const decompressListData = (compressedData: string): CompressedListData |
 
 /**
  * Create a shareable URL for a catalogue list
- * @param baseUrl
- * @param listData
- * @param logger
  */
-export const createShareUrl = (baseUrl: string, listData: CompressedListData, logger?: GenericLogger): string => {
+export const createShareUrl = (baseUrl: string, listData: Readonly<CompressedListData>, logger?: GenericLogger): string => {
   try {
     const compressed = compressListData(listData);
 
     // Check if URL is too long
-    const urlLength = baseUrl.length + compressed.length + 10; // +10 for parameter name and separator
+    const urlLength = baseUrl.length + compressed.length + URL_PARAM_OVERHEAD_LENGTH;
     if (urlLength > MAX_URL_LENGTH) {
       logger?.warn(LOG_CATEGORY, "Generated URL may be too long", {
         urlLength,
@@ -148,8 +222,6 @@ export const createShareUrl = (baseUrl: string, listData: CompressedListData, lo
 
 /**
  * Extract and decompress catalogue data from URL
- * @param url
- * @param logger
  */
 export const extractListDataFromUrl = (url: string, logger?: GenericLogger): CompressedListData | null => {
   try {
@@ -157,7 +229,7 @@ export const extractListDataFromUrl = (url: string, logger?: GenericLogger): Com
     const urlObject = new URL(url);
     const compressedData = urlObject.searchParams.get('data');
 
-    if (!compressedData) {
+    if (compressedData === null || compressedData === '') {
       return null;
     }
 
@@ -169,104 +241,53 @@ export const extractListDataFromUrl = (url: string, logger?: GenericLogger): Com
 };
 
 /**
- * Validate compressed list data structure
- * @param data
+ * Optimize list data for compression by reducing redundancy
  */
-export const validateListData = (data: unknown): data is CompressedListData => {
-  if (!data || typeof data !== 'object') {
-    return false;
-  }
-
-  const dataObject = data as Record<string, unknown>;
-  const list = dataObject.list;
-  const entities = dataObject.entities;
-
-  // Validate list structure
-  if (!list || typeof list !== 'object') {
-    return false;
-  }
-
-  const listObject = list as Record<string, unknown>;
-  if (!listObject.title || typeof listObject.title !== 'string') {
-    return false;
-  }
-
-  if (listObject.type && !['list', 'bibliography'].includes(listObject.type as string)) {
-    return false;
-  }
-
-  // Validate entities structure
-  if (!Array.isArray(entities)) {
-    return false;
-  }
-
-  const validEntityTypes = new Set([
-    'works', 'authors', 'sources', 'institutions', 'topics', 'publishers', 'funders'
-  ]);
-
-  for (const entity of entities) {
-    if (!entity || typeof entity !== 'object') {
-      return false;
-    }
-
-    if (!entity.entityType || !validEntityTypes.has(entity.entityType)) {
-      return false;
-    }
-
-    if (!entity.entityId || typeof entity.entityId !== 'string') {
-      return false;
-    }
-  }
-
-  return true;
+export const optimizeListData = (data: Readonly<CompressedListData>): CompressedListData => {
+  const trimmedDescription = data.list.description?.trim();
+  return {
+    list: {
+      title: data.list.title.trim(),
+      description: trimmedDescription === undefined || trimmedDescription === '' ? undefined : trimmedDescription,
+      type: data.list.type,
+      tags: data.list.tags?.filter(tag => tag.trim().length > 0) ?? undefined,
+    },
+    entities: data.entities.map(entity => {
+      const trimmedNotes = entity.notes?.trim();
+      return {
+        entityType: entity.entityType,
+        entityId: entity.entityId.trim(),
+        notes: trimmedNotes === undefined || trimmedNotes === '' ? undefined : trimmedNotes,
+      };
+    }),
+  };
 };
 
 /**
- * Optimize list data for compression by reducing redundancy
- * @param data
- */
-export const optimizeListData = (data: CompressedListData): CompressedListData => ({
-    list: {
-      title: data.list.title.trim(),
-      description: data.list.description?.trim() || undefined,
-      type: data.list.type,
-      tags: data.list.tags?.filter(tag => tag.trim().length > 0) || undefined,
-    },
-    entities: data.entities.map(entity => ({
-      entityType: entity.entityType,
-      entityId: entity.entityId.trim(),
-      notes: entity.notes?.trim() || undefined,
-    })),
-  });
-
-/**
  * Estimate compressed size of list data without actually compressing
- * @param data
  */
-export const estimateCompressedSize = (data: CompressedListData): number => {
+export const estimateCompressedSize = (data: Readonly<CompressedListData>): number => {
   const jsonString = JSON.stringify({
     v: 1,
     d: optimizeListData(data),
   });
 
   // Rough estimate: compressed size is typically 20-40% of original for this type of data
-  return Math.ceil(jsonString.length * 0.3);
+  return Math.ceil(jsonString.length * ESTIMATED_COMPRESSION_RATIO);
 };
 
 /**
  * Check if list data can be reasonably shared via URL
- * @param data
  */
-export const canShareViaUrl = (data: CompressedListData): boolean => {
+export const canShareViaUrl = (data: Readonly<CompressedListData>): boolean => {
   const estimatedSize = estimateCompressedSize(data);
-  return estimatedSize <= MAX_URL_LENGTH - 100; // Leave buffer for URL structure
+  return estimatedSize <= MAX_URL_LENGTH - URL_SHARE_SIZE_BUFFER;
 };
 
 /**
  * Split large lists into multiple shareable chunks
- * @param data
  */
-export const splitListForSharing = (data: CompressedListData): CompressedListData[] => {
+export const splitListForSharing = (data: Readonly<CompressedListData>): CompressedListData[] => {
   const maxEntities = 50; // Conservative limit per URL
   const chunks: CompressedListData[] = [];
 
@@ -280,8 +301,8 @@ export const splitListForSharing = (data: CompressedListData): CompressedListDat
     const chunkData: CompressedListData = {
       list: {
         ...data.list,
-        title: index === 0 ? data.list.title : `${data.list.title} (Part ${Math.floor(index / maxEntities) + 1})`,
-        description: index === 0 ? data.list.description : `Part ${Math.floor(index / maxEntities) + 1} of ${Math.ceil(data.entities.length / maxEntities)}`,
+        title: index === 0 ? data.list.title : `${data.list.title} (Part ${String(Math.floor(index / maxEntities) + 1)})`,
+        description: index === 0 ? data.list.description : `Part ${String(Math.floor(index / maxEntities) + 1)} of ${String(Math.ceil(data.entities.length / maxEntities))}`,
       },
       entities: chunkEntities,
     };

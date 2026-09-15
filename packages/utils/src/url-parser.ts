@@ -96,7 +96,7 @@ export const extractSelectFields = (input: string): string[] => {
 	}
 
 	// Return empty array if no select value found
-	if (!selectValue) {
+	if (selectValue === null || selectValue === "") {
 		return []
 	}
 
@@ -204,9 +204,7 @@ export const parseURL = (urlString: string): ParsedURL => {
 		if (inferredType) {
 			entityId = segment
 			// If entity type not already found, use the inferred type
-			if (!entityType) {
-				entityType = inferredType
-			}
+			entityType ??= inferredType
 			break
 		}
 	}
@@ -242,7 +240,7 @@ export const parseURL = (urlString: string): ParsedURL => {
  * // Returns: "/works?page=2&per-page=50"
  * ```
  */
-export const reconstructURL = (basePath: string, queryParams?: Record<string, string>, selectFields?: string[]): string => {
+export const reconstructURL = (basePath: string, queryParams?: Record<string, string>, selectFields?: readonly string[]): string => {
 	// Handle empty base path
 	if (!basePath || typeof basePath !== "string") {
 		basePath = ""
@@ -254,7 +252,7 @@ export const reconstructURL = (basePath: string, queryParams?: Record<string, st
 	// Add all query parameters except 'select' (we'll handle select specially)
 	if (queryParams) {
 		for (const [key, value] of Object.entries(queryParams)) {
-			if (key === "select" || value === undefined || value === null) {
+			if (key === "select") {
 				continue;
 			}
 
@@ -273,12 +271,12 @@ export const reconstructURL = (basePath: string, queryParams?: Record<string, st
 		selectValue = selectFields.join(",")
 	}
 	// Then check if select exists in queryParams
-	else if (queryParams?.select) {
+	else if (queryParams?.select !== undefined && queryParams.select !== "") {
 		selectValue = queryParams.select
 	}
 
 	// Add select parameter WITHOUT encoding commas
-	if (selectValue) {
+	if (selectValue !== null && selectValue !== "") {
 		// Only encode the field names individually, not the commas
 		const encodedFields = selectValue
 			.split(",")
@@ -305,8 +303,6 @@ export const reconstructURL = (basePath: string, queryParams?: Record<string, st
  * Whether the value is a URL whose host is exactly expectedHost or a subdomain
  * of it. Substring checks ('openalex.org' appearing anywhere) accept attacker
  * hosts like openalex.org.evil.example.
- * @param value
- * @param expectedHost
  */
 export const hostnameMatches = (value: string, expectedHost: string): boolean => {
 	try {

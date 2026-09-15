@@ -160,24 +160,22 @@ export interface MissingPaperDetectionResults {
  * Parse STAR file format
  * Stub implementation - applications should provide their own
  */
-export const parseSTARFile = (): Promise<ParseResult> => {
+export const parseSTARFile = async (): Promise<ParseResult> => {
 	logger.warn(DATA_EVALUATION_LOG_CONTEXT, "parseSTARFile: Using stub implementation")
-	return Promise.resolve({
+	// Genuinely yield to the microtask queue so callers can rely on this always resolving asynchronously
+	await Promise.resolve()
+	return {
 		success: false,
 		error: "Stub implementation - not implemented",
 		metadata: {
 			errors: [],
 		},
-	})
+	}
 };
 
 /**
  * Create STAR dataset from parse result
  * Stub implementation - applications should provide their own
- * @param root0
- * @param root0.file
- * @param root0.parseResult
- * @param root0.reviewTopic
  */
 export const createSTARDatasetFromParseResult = ({
 	file,
@@ -192,7 +190,7 @@ export const createSTARDatasetFromParseResult = ({
 		"createSTARDatasetFromParseResult: Using stub implementation"
 	)
 	return {
-		id: `dataset-${Date.now()}`,
+		id: `dataset-${String(Date.now())}`,
 		name: file.name,
 		papers: [],
 		includedPapers: [],
@@ -206,12 +204,8 @@ export const createSTARDatasetFromParseResult = ({
 /**
  * Compare BibGraph results with ground truth
  * Stub implementation - applications should provide their own
- * @param bibGraphResults
- * @param dataset
- * @param config
- * @param onProgress
  */
-export const compareBibGraphResults = (bibGraphResults: WorkReference[], dataset: STARDataset, config: typeof DEFAULT_MATCHING_CONFIG, onProgress?: (progress: ComparisonProgress) => void): ComparisonResults => {
+export const compareBibGraphResults = (bibGraphResults: readonly WorkReference[], dataset: STARDataset, config: Readonly<typeof DEFAULT_MATCHING_CONFIG>, onProgress?: (progress: Readonly<ComparisonProgress>) => void): ComparisonResults => {
 	logger.warn(
 		DATA_EVALUATION_LOG_CONTEXT,
 		"compareBibGraphResults: Using stub implementation"
@@ -229,7 +223,7 @@ export const compareBibGraphResults = (bibGraphResults: WorkReference[], dataset
 	}
 
 	return {
-		id: `comparison-${Date.now()}`,
+		id: `comparison-${String(Date.now())}`,
 		dataset: {
 			name: dataset.name,
 			includedPapers: dataset.includedPapers,
@@ -243,7 +237,7 @@ export const compareBibGraphResults = (bibGraphResults: WorkReference[], dataset
 		falsePositives: [],
 		falseNegatives: [],
 		additionalPapersFound: [],
-		bibGraphResults,
+		bibGraphResults: [...bibGraphResults],
 		timestamp: new Date().toISOString(),
 	}
 };
@@ -261,9 +255,6 @@ export const searchBasedOnSTARDataset = (_dataset: STARDataset): WorkReference[]
 /**
  * Calculate search coverage
  * Stub implementation - applications should provide their own
- * @param root0
- * @param root0.searchResults
- * @param root0.dataset
  */
 export const calculateSearchCoverage = ({
 	dataset,
@@ -282,20 +273,16 @@ export const calculateSearchCoverage = ({
 /**
  * Detect potentially missing papers in search results
  * Stub implementation - applications should provide their own
- * @param root0
- * @param root0.dataset
- * @param root0.config
- * @param root0.onProgress
  */
 export const detectMissingPapers = ({
 	dataset,
 	config,
 	onProgress,
-}: {
+}: Readonly<{
 	dataset: STARDataset
 	config: MissingPaperDetectionConfig
-	onProgress?: (progress: DetectionProgress) => void
-}): MissingPaperDetectionResults => {
+	onProgress?: (progress: Readonly<DetectionProgress>) => void
+}>): MissingPaperDetectionResults => {
 	logger.warn(DATA_EVALUATION_LOG_CONTEXT, "detectMissingPapers: Using stub implementation")
 
 	// Simulate progress if callback provided
@@ -308,6 +295,7 @@ export const detectMissingPapers = ({
 		})
 
 		// Simulate completion
+		const SIMULATED_COMPLETION_DELAY_MS = 100
 		setTimeout(() => {
 			onProgress({
 				phase: "complete",
@@ -315,11 +303,11 @@ export const detectMissingPapers = ({
 				totalPapers: dataset.papers.length,
 				percentage: 100,
 			})
-		}, 100)
+		}, SIMULATED_COMPLETION_DELAY_MS)
 	}
 
 	return {
-		id: `detection-${Date.now()}`,
+		id: `detection-${String(Date.now())}`,
 		datasetName: dataset.name || "Unknown Dataset",
 		totalInvestigated: dataset.papers.length,
 		potentiallyMissing: [],

@@ -21,13 +21,13 @@
  * generateFieldSummary(['id', 'title', 'doi', 'cited_by_count', 'publication_year']) // "5 fields"
  * ```
  */
-export const generateFieldSummary = (selectFields: string[]): string => {
-	if (!selectFields || selectFields.length === 0) {
+export const generateFieldSummary = (selectFields: readonly string[]): string => {
+	if (selectFields.length === 0) {
 		return "default fields"
 	}
 
 	const count = selectFields.length
-	return count === 1 ? "1 field" : `${count} fields`
+	return count === 1 ? "1 field" : `${String(count)} fields`
 };
 
 /**
@@ -42,13 +42,13 @@ export const generateFieldSummary = (selectFields: string[]): string => {
  * generateDetailedFieldSummary([]) // "default fields"
  * ```
  */
-export const generateDetailedFieldSummary = (selectFields: string[], maxFieldsToShow = 3): string => {
-	if (!selectFields || selectFields.length === 0) {
+export const generateDetailedFieldSummary = (selectFields: readonly string[], maxFieldsToShow = 3): string => {
+	if (selectFields.length === 0) {
 		return "default fields"
 	}
 
 	const count = selectFields.length
-	const countLabel = count === 1 ? "1 field" : `${count} fields`
+	const countLabel = count === 1 ? "1 field" : `${String(count)} fields`
 
 	if (count <= maxFieldsToShow) {
 		// Show all fields
@@ -58,7 +58,7 @@ export const generateDetailedFieldSummary = (selectFields: string[], maxFieldsTo
 	// Show first N fields and indicate how many more
 	const shownFields = selectFields.slice(0, maxFieldsToShow).join(", ")
 	const remainingCount = count - maxFieldsToShow
-	const remainingLabel = remainingCount === 1 ? "1 more" : `${remainingCount} more`
+	const remainingLabel = remainingCount === 1 ? "1 more" : `${String(remainingCount)} more`
 
 	return `${countLabel}: ${shownFields}, +${remainingLabel}`
 };
@@ -75,13 +75,13 @@ export const generateDetailedFieldSummary = (selectFields: string[], maxFieldsTo
  * generateCompactFieldSummary(['id', 'title', 'doi', 'cited_by_count', 'publication_year']) // "5 fields"
  * ```
  */
-export const generateCompactFieldSummary = (selectFields: string[]): string => {
-	if (!selectFields || selectFields.length === 0) {
+export const generateCompactFieldSummary = (selectFields: readonly string[]): string => {
+	if (selectFields.length === 0) {
 		return "default"
 	}
 
 	const count = selectFields.length
-	return count === 1 ? "1 field" : `${count} fields`
+	return count === 1 ? "1 field" : `${String(count)} fields`
 };
 
 /**
@@ -96,8 +96,10 @@ export const generateCompactFieldSummary = (selectFields: string[]): string => {
  * generateFieldListPreview(['id', 'display_name', 'works_count', 'cited_by_count', 'h_index'], 30) // "id, display_name, works_co..."
  * ```
  */
-export const generateFieldListPreview = (selectFields: string[], maxLength = 50): string => {
-	if (!selectFields || selectFields.length === 0) {
+const ELLIPSIS_LENGTH = 3
+
+export const generateFieldListPreview = (selectFields: readonly string[], maxLength = 50): string => {
+	if (selectFields.length === 0) {
 		return "default fields"
 	}
 
@@ -108,7 +110,7 @@ export const generateFieldListPreview = (selectFields: string[], maxLength = 50)
 	}
 
 	// Truncate and add ellipsis
-	return fieldList.slice(0, Math.max(0, maxLength - 3)) + "..."
+	return fieldList.slice(0, Math.max(0, maxLength - ELLIPSIS_LENGTH)) + "..."
 };
 
 /**
@@ -128,7 +130,7 @@ export const generateFieldListPreview = (selectFields: string[], maxLength = 50)
  * // }
  * ```
  */
-export const categorizeFields = (selectFields: string[]): {
+export const categorizeFields = (selectFields: readonly string[]): {
 	identifiers: string[]
 	basic: string[]
 	metrics: string[]
@@ -136,14 +138,23 @@ export const categorizeFields = (selectFields: string[]): {
 	dates: string[]
 	other: string[]
 } => {
-	const categories = {
-		identifiers: [] as string[],
-		basic: [] as string[],
-		metrics: [] as string[],
-		relationships: [] as string[],
-		dates: [] as string[],
-		other: [] as string[],
+	const categories: {
+		identifiers: string[]
+		basic: string[]
+		metrics: string[]
+		relationships: string[]
+		dates: string[]
+		other: string[]
+	} = {
+		identifiers: [],
+		basic: [],
+		metrics: [],
+		relationships: [],
+		dates: [],
+		other: [],
 	}
+
+	const isCategoryKey = (key: string): key is keyof typeof categories => key in categories
 
 	// Field name patterns for categorization
 	const patterns = {
@@ -158,8 +169,8 @@ export const categorizeFields = (selectFields: string[]): {
 		let isCategorized = false
 
 		for (const [category, pattern] of Object.entries(patterns)) {
-			if (pattern.test(field)) {
-				categories[category as keyof typeof categories].push(field)
+			if (pattern.test(field) && isCategoryKey(category)) {
+				categories[category].push(field)
 				isCategorized = true
 				break
 			}
@@ -189,14 +200,14 @@ export const categorizeFields = (selectFields: string[]): {
  * // "1 field"
  * ```
  */
-export const generateSmartFieldSummary = (selectFields: string[]): string => {
-	if (!selectFields || selectFields.length === 0) {
+export const generateSmartFieldSummary = (selectFields: readonly string[]): string => {
+	if (selectFields.length === 0) {
 		return "default fields"
 	}
 
 	const categories = categorizeFields(selectFields)
 	const totalCount = selectFields.length
-	const countLabel = totalCount === 1 ? "1 field" : `${totalCount} fields`
+	const countLabel = totalCount === 1 ? "1 field" : `${String(totalCount)} fields`
 
 	// Build highlights for non-zero categories (excluding 'basic' and 'other')
 	const highlights: string[] = []
@@ -204,23 +215,23 @@ export const generateSmartFieldSummary = (selectFields: string[]): string => {
 	if (categories.identifiers.length > 0) {
 		const label =
 			categories.identifiers.length === 1 ? "identifier" : "identifiers"
-		highlights.push(`${categories.identifiers.length} ${label}`)
+		highlights.push(`${String(categories.identifiers.length)} ${label}`)
 	}
 
 	if (categories.metrics.length > 0) {
 		const label = categories.metrics.length === 1 ? "metric" : "metrics"
-		highlights.push(`${categories.metrics.length} ${label}`)
+		highlights.push(`${String(categories.metrics.length)} ${label}`)
 	}
 
 	if (categories.relationships.length > 0) {
 		const label =
 			categories.relationships.length === 1 ? "relationship" : "relationships"
-		highlights.push(`${categories.relationships.length} ${label}`)
+		highlights.push(`${String(categories.relationships.length)} ${label}`)
 	}
 
 	if (categories.dates.length > 0) {
 		const label = categories.dates.length === 1 ? "date" : "dates"
-		highlights.push(`${categories.dates.length} ${label}`)
+		highlights.push(`${String(categories.dates.length)} ${label}`)
 	}
 
 	if (highlights.length === 0) {
@@ -249,7 +260,7 @@ export const generateSmartFieldSummary = (selectFields: string[]): string => {
  * // }
  * ```
  */
-export const compareFieldSelections = (fieldsA: string[], fieldsB: string[]): {
+export const compareFieldSelections = (fieldsA: readonly string[], fieldsB: readonly string[]): {
 	added: string[]
 	removed: string[]
 	common: string[]
@@ -281,7 +292,7 @@ export const compareFieldSelections = (fieldsA: string[], fieldsB: string[]): {
  * areFieldSelectionsEquivalent(['id', 'title'], ['id', 'display_name']) // false
  * ```
  */
-export const areFieldSelectionsEquivalent = (fieldsA: string[], fieldsB: string[]): boolean => {
+export const areFieldSelectionsEquivalent = (fieldsA: readonly string[], fieldsB: readonly string[]): boolean => {
 	if (fieldsA.length !== fieldsB.length) {
 		return false
 	}
@@ -301,7 +312,7 @@ export const areFieldSelectionsEquivalent = (fieldsA: string[], fieldsB: string[
  * validateFieldNames(['id', 'invalid field!', 'display_name']) // { valid: false, invalidFields: ['invalid field!'] }
  * ```
  */
-export const validateFieldNames = (selectFields: string[]): {
+export const validateFieldNames = (selectFields: readonly string[]): {
 	valid: boolean
 	invalidFields: string[]
 } => {

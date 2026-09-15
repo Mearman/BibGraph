@@ -36,8 +36,8 @@ import type { AddBookmarkParams as AddBookmarkParameters, AddEntityParams as Add
  * Enhanced with comprehensive error handling and logging
  */
 export class DexieStorageProvider implements CatalogueStorageProvider {
-	private db: CatalogueDB;
-	private logger?: GenericLogger;
+	private readonly db: CatalogueDB;
+	private readonly logger?: GenericLogger;
 
 	constructor(logger?: GenericLogger) {
 		this.logger = logger;
@@ -54,13 +54,13 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 		await ListOps.updateList(this.db, listId, updates, this.logger);
 	}
 
-	private async addEntity(parameters: {
+	private async addEntity(parameters: Readonly<{
 		listId: string;
 		entityType: EntityType;
 		entityId: string;
 		notes?: string;
 		position?: number;
-	}): Promise<string> {
+	}>): Promise<string> {
 		return await EntityOps.addEntityToList(
 			this.db,
 			this.fetchList.bind(this),
@@ -145,11 +145,11 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 		listId: string,
 		updates: Partial<Pick<CatalogueList, 'title' | 'description' | 'tags' | 'isPublic'>>
 	): Promise<void> {
-		return await ListOps.updateList(this.db, listId, updates, this.logger);
+		await ListOps.updateList(this.db, listId, updates, this.logger);
 	}
 
 	async deleteList(listId: string): Promise<void> {
-		return await ListOps.deleteList(this.db, listId, this.isSpecialList.bind(this), this.logger);
+		await ListOps.deleteList(this.db, listId, this.isSpecialList.bind(this), this.logger);
 	}
 
 	async searchLists(query: string): Promise<CatalogueList[]> {
@@ -166,7 +166,7 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 
 	// ========== Entity Operations ==========
 
-	async addEntityToList(parameters: AddEntityParameters): Promise<string> {
+	async addEntityToList(parameters: Readonly<AddEntityParameters>): Promise<string> {
 		try {
 			// Validate input parameters
 			if (!parameters.listId || parameters.listId.trim().length === 0) {
@@ -175,10 +175,6 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 			if (!parameters.entityId || parameters.entityId.trim().length === 0) {
 				throw new ValidationError('entityId', parameters.entityId, 'Entity ID cannot be empty');
 			}
-			if (!parameters.entityType) {
-				throw new ValidationError('entityType', parameters.entityType, 'Entity type is required');
-			}
-
 			const result = await this.addEntityToList({
 				listId: parameters.listId,
 				entityType: parameters.entityType,
@@ -212,27 +208,27 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 	}
 
 	async removeEntityFromList(listId: string, entityRecordId: string): Promise<void> {
-		return await this.removeEntityFromList(listId, entityRecordId);
+		await this.removeEntityFromList(listId, entityRecordId);
 	}
 
 	async updateEntityNotes(entityRecordId: string, notes: string): Promise<void> {
-		return await EntityOps.updateEntityNotes(this.db, this.updateList.bind(this), entityRecordId, notes, this.logger);
+		await EntityOps.updateEntityNotes(this.db, this.updateList.bind(this), entityRecordId, notes, this.logger);
 	}
 
 	async updateEntityData(
 		entityRecordId: string,
-		data: { entityType: EntityType; entityId: string; notes?: string }
+		data: Readonly<{ entityType: EntityType; entityId: string; notes?: string }>
 	): Promise<void> {
-		return await EntityOps.updateEntityData(this.db, this.updateList.bind(this), entityRecordId, data, this.logger);
+		await EntityOps.updateEntityData(this.db, this.updateList.bind(this), entityRecordId, data, this.logger);
 	}
 
 	async addEntitiesToList(
 		listId: string,
-		entities: Array<{
+		entities: readonly {
 			entityType: EntityType;
 			entityId: string;
 			notes?: string;
-		}>
+		}[]
 	): Promise<BatchAddResult> {
 		const result = await EntityOps.addEntitiesToList(this.db, this.getList.bind(this), this.updateList.bind(this), listId, entities, this.logger);
 		return {
@@ -241,8 +237,8 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 		};
 	}
 
-	async reorderEntities(listId: string, orderedEntityIds: string[]): Promise<void> {
-		return await EntityOps.reorderEntities(this.db, this.getList.bind(this), this.getListEntities.bind(this), this.updateList.bind(this), listId, orderedEntityIds, this.logger);
+	async reorderEntities(listId: string, orderedEntityIds: readonly string[]): Promise<void> {
+		await EntityOps.reorderEntities(this.db, this.getList.bind(this), this.getListEntities.bind(this), this.updateList.bind(this), listId, orderedEntityIds, this.logger);
 	}
 
 	// ========== Sharing ==========
@@ -290,7 +286,7 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 			}
 
 			// Update access count
-			if (shareRecord.id) {
+			if (shareRecord.id !== undefined) {
 				await this.db.catalogueShares.update(shareRecord.id, {
 					accessCount: shareRecord.accessCount + 1,
 					lastAccessedAt: new Date(),
@@ -307,16 +303,12 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 
 	// ========== Special Lists (Bookmarks & History) ==========
 
-	async addBookmark(parameters: AddBookmarkParameters): Promise<string> {
+	async addBookmark(parameters: Readonly<AddBookmarkParameters>): Promise<string> {
 		try {
 			// Validate input parameters
 			if (!parameters.entityId || parameters.entityId.trim().length === 0) {
 				throw new ValidationError('entityId', parameters.entityId, 'Entity ID cannot be empty');
 			}
-			if (!parameters.entityType) {
-				throw new ValidationError('entityType', parameters.entityType, 'Entity type is required');
-			}
-
 			const result = await BookmarkOps.addBookmark(
 				this.db,
 				this.initializeSpecialLists.bind(this),
@@ -344,7 +336,7 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 	}
 
 	async removeBookmark(entityRecordId: string): Promise<void> {
-		return await BookmarkOps.removeBookmark(this.removeEntityFromList.bind(this), entityRecordId);
+		await BookmarkOps.removeBookmark(this.removeEntityFromList.bind(this), entityRecordId);
 	}
 
 	async getBookmarks(): Promise<CatalogueEntity[]> {
@@ -408,8 +400,8 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 			if (entity.entityId.includes(CORRUPTED_ENTITY_ID_PATTERN)) return false;
 			if (entity.entityId.includes(urlEncodedPattern)) return false;
 			// Also check notes for corrupted URLs
-			if (entity.notes?.includes(CORRUPTED_ENTITY_ID_PATTERN)) return false;
-			if (entity.notes?.includes(urlEncodedPattern)) return false;
+			if (entity.notes?.includes(CORRUPTED_ENTITY_ID_PATTERN) ?? false) return false;
+			if (entity.notes?.includes(urlEncodedPattern) ?? false) return false;
 
 			// Validate entityId/entityType matches URL path (detect race condition mismatches)
 			const urlMatch = entity.notes?.match(/URL: ([^\n]+)/);
@@ -480,7 +472,7 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 		return await GraphListOps.getGraphList(this.db, this.logger);
 	}
 
-	async addToGraphList(parameters: AddToGraphListParams): Promise<string> {
+	async addToGraphList(parameters: Readonly<AddToGraphListParams>): Promise<string> {
 		return await GraphListOps.addToGraphList(this.db, parameters, this.logger);
 	}
 
@@ -505,7 +497,7 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 		return await GraphListOps.isInGraphList(this.db, entityId);
 	}
 
-	async batchAddToGraphList(nodes: AddToGraphListParams[]): Promise<string[]> {
+	async batchAddToGraphList(nodes: readonly AddToGraphListParams[]): Promise<string[]> {
 		const results: string[] = [];
 		for (const node of nodes) {
 			const id = await this.addToGraphList(node);
@@ -528,7 +520,7 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 		borderColor?: string;
 		fillColor?: string;
 		borderWidth?: number;
-		points?: Array<{ x: number; y: number }>;
+		points?: { x: number; y: number }[];
 		strokeColor?: string;
 		strokeWidth?: number;
 		closed?: boolean;
@@ -549,12 +541,12 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 		await AnnotationOps.deleteAnnotation(this.db, annotationId, this.logger);
 	}
 
-	async updateAnnotation(annotationId: string, updates: {
+	async updateAnnotation(annotationId: string, updates: Readonly<{
 		visible?: boolean;
 		x?: number;
 		y?: number;
 		content?: string;
-	}): Promise<void> {
+	}>): Promise<void> {
 		await AnnotationOps.updateAnnotation(this.db, annotationId, updates, this.logger);
 	}
 
@@ -567,12 +559,12 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 	}
 
 	async addAnnotation(annotation: Omit<GraphAnnotationStorage, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-		return await AnnotationOps.addAnnotation(this.db, { ...annotation, visible: annotation.visible ?? true }, this.logger);
+		return await AnnotationOps.addAnnotation(this.db, annotation, this.logger);
 	}
 
 	// ========== Snapshot Operations ==========
 
-	async saveSnapshot(snapshot: {
+	async saveSnapshot(snapshot: Readonly<{
 		name: string;
 		nodes: string;
 		edges: string;
@@ -583,7 +575,7 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 		nodePositions?: string;
 		annotations?: string;
 		isAutoSave?: boolean;
-	}): Promise<string> {
+	}>): Promise<string> {
 		return await SnapshotOps.addSnapshot(this.db, { ...snapshot, isAutoSave: snapshot.isAutoSave ?? false }, this.logger);
 	}
 
@@ -601,7 +593,7 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 		await SnapshotOps.deleteSnapshot(this.db, snapshotId, this.logger);
 	}
 
-	async updateSnapshot(snapshotId: string, updates: {
+	async updateSnapshot(snapshotId: string, updates: Readonly<{
 		name?: string;
 		nodes?: string;
 		edges?: string;
@@ -611,7 +603,7 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 		layoutType?: string;
 		nodePositions?: string;
 		annotations?: string;
-	}): Promise<void> {
+	}>): Promise<void> {
 		await SnapshotOps.updateSnapshot(this.db, snapshotId, updates, this.logger);
 	}
 
@@ -619,7 +611,7 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 		await SnapshotOps.pruneAutoSaveSnapshots(this.db, maxCount, this.logger);
 	}
 
-	async addSnapshot(snapshot: Omit<GraphSnapshotStorage, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+	async addSnapshot(snapshot: Readonly<Omit<GraphSnapshotStorage, 'id' | 'createdAt' | 'updatedAt'>>): Promise<string> {
 		return await this.saveSnapshot(snapshot);
 	}
 
@@ -629,7 +621,7 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 		await SearchHistoryOps.addSearchQuery(this.db, query, maxHistory, this.logger);
 	}
 
-	async getSearchHistory(): Promise<Array<{ query: string; timestamp: Date }>> {
+	async getSearchHistory(): Promise<{ query: string; timestamp: Date }[]> {
 		return await SearchHistoryOps.getSearchHistory(this.db, this.logger);
 	}
 

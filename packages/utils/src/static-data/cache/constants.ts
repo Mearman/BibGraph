@@ -46,6 +46,6 @@ export const STATIC_DATA_CACHE_PATH = "apps/web/public/data/openalex"
 export const getStaticDataCachePath = (projectRoot?: string): string => {
 	// In Node.js environments, we can try to detect the project root
 	// For browser environments, this should be provided
-	const root = projectRoot ?? process.cwd?.() ?? ""
+	const root = projectRoot ?? process.cwd()
 	return path.join(root, STATIC_DATA_CACHE_PATH)
 }

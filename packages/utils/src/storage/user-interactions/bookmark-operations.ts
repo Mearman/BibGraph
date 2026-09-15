@@ -17,9 +17,6 @@ const LOG_CATEGORY = "user-interactions"
 
 /**
  * Check if a request is bookmarked by cache key
- * @param db
- * @param cacheKey
- * @param logger
  */
 export const isRequestBookmarked = async (db: UserInteractionsDB, cacheKey: string, logger?: GenericLogger): Promise<boolean> => {
 	try {
@@ -36,9 +33,6 @@ export const isRequestBookmarked = async (db: UserInteractionsDB, cacheKey: stri
 
 /**
  * Check if a request is bookmarked by hash
- * @param db
- * @param hash
- * @param logger
  */
 export const isRequestBookmarkedByHash = async (db: UserInteractionsDB, hash: string, logger?: GenericLogger): Promise<boolean> => {
 	try {
@@ -55,9 +49,6 @@ export const isRequestBookmarkedByHash = async (db: UserInteractionsDB, hash: st
 
 /**
  * Get bookmark by cache key
- * @param db
- * @param cacheKey
- * @param logger
  */
 export const getBookmark = async (db: UserInteractionsDB, cacheKey: string, logger?: GenericLogger): Promise<BookmarkRecord | null> => {
 	try {
@@ -74,9 +65,6 @@ export const getBookmark = async (db: UserInteractionsDB, cacheKey: string, logg
 
 /**
  * Get bookmark by hash
- * @param db
- * @param hash
- * @param logger
  */
 export const getBookmarkByHash = async (db: UserInteractionsDB, hash: string, logger?: GenericLogger): Promise<BookmarkRecord | null> => {
 	try {
@@ -93,13 +81,6 @@ export const getBookmarkByHash = async (db: UserInteractionsDB, hash: string, lo
 
 /**
  * Add a bookmark for a normalized request
- * @param db
- * @param params
- * @param params.request
- * @param params.title
- * @param params.notes
- * @param params.tags
- * @param logger
  */
 export const addBookmark = async (db: UserInteractionsDB, params: {
 		request: StoredNormalizedRequest
@@ -147,8 +128,6 @@ export const addBookmark = async (db: UserInteractionsDB, params: {
 
 /**
  * Get all bookmarks ordered by timestamp (newest first)
- * @param db
- * @param logger
  */
 export const getAllBookmarks = async (db: UserInteractionsDB, logger?: GenericLogger): Promise<BookmarkRecord[]> => {
 	try {
@@ -163,9 +142,6 @@ export const getAllBookmarks = async (db: UserInteractionsDB, logger?: GenericLo
 
 /**
  * Remove a bookmark by ID
- * @param db
- * @param bookmarkId
- * @param logger
  */
 export const removeBookmark = async (db: UserInteractionsDB, bookmarkId: number, logger?: GenericLogger): Promise<void> => {
 	try {
@@ -191,11 +167,6 @@ export const removeBookmark = async (db: UserInteractionsDB, bookmarkId: number,
 
 /**
  * Update a bookmark's title, notes, or tags
- * @param db
- * @param params
- * @param params.bookmarkId
- * @param params.updates
- * @param logger
  */
 export const updateBookmark = async (db: UserInteractionsDB, params: {
 		bookmarkId: number
@@ -221,9 +192,6 @@ export const updateBookmark = async (db: UserInteractionsDB, params: {
 
 /**
  * Search bookmarks by title, notes, or tags
- * @param db
- * @param query
- * @param logger
  */
 export const searchBookmarks = async (db: UserInteractionsDB, query: string, logger?: GenericLogger): Promise<BookmarkRecord[]> => {
 	try {
@@ -235,7 +203,7 @@ export const searchBookmarks = async (db: UserInteractionsDB, query: string, log
 			(bookmark) =>
 				bookmark.title.toLowerCase().includes(lowercaseQuery) ||
 				Boolean(bookmark.notes?.toLowerCase().includes(lowercaseQuery)) ||
-				bookmark.tags?.some((tag) => tag.toLowerCase().includes(lowercaseQuery))
+				(bookmark.tags?.some((tag) => tag.toLowerCase().includes(lowercaseQuery)) ?? false)
 		)
 	} catch (error) {
 		logger?.error(LOG_CATEGORY, "Failed to search bookmarks", {

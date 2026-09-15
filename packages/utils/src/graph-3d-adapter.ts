@@ -60,6 +60,8 @@ const DEFAULT_LAYOUT_CONFIG: Layout3DConfig = {
 	},
 }
 
+const RANDOM_Z_SPREAD_CENTER = 0.5
+
 /**
  * Convert a 2D GraphNode to a 3D GraphNode3D
  * @param node - 2D graph node
@@ -70,7 +72,7 @@ export const to3DNode = (node: GraphNode, config: Layout3DConfig = DEFAULT_LAYOU
 	// Calculate Z position based on entity type hierarchy or random spread
 	const z = config.useHierarchy && config.entityZLevels
 		? (config.entityZLevels[node.entityType] ?? config.baseZ)
-		: config.baseZ + (Math.random() - 0.5) * config.zSpread
+		: config.baseZ + (Math.random() - RANDOM_Z_SPREAD_CENTER) * config.zSpread
 
 	const { x, y, ...rest } = node
 
@@ -102,6 +104,31 @@ export const from3DNode = (node3D: GraphNode3D): GraphNode => ({
 	});
 
 /**
+ * Calculate bounding box for a 3D edge
+ */
+const calculateEdgeBounds = (start: Readonly<Position3D>, end: Readonly<Position3D>, controlPoint?: Position3D): BoundingBox3D => {
+	const points = [start, end]
+	if (controlPoint) {
+		points.push(controlPoint)
+	}
+
+	return {
+		min: {
+			x: Math.min(...points.map(p => p.x)),
+			y: Math.min(...points.map(p => p.y)),
+			z: Math.min(...points.map(p => p.z)),
+		},
+		max: {
+			x: Math.max(...points.map(p => p.x)),
+			y: Math.max(...points.map(p => p.y)),
+			z: Math.max(...points.map(p => p.z)),
+		},
+	}
+};
+
+const EDGE_MIDPOINT_Z_OFFSET = 10
+
+/**
  * Convert a 2D GraphEdge to a 3D GraphEdge3D
  * @param edge - 2D graph edge
  * @param nodes3D - Map of node IDs to 3D nodes (for control point calculation)
@@ -120,7 +147,7 @@ export const to3DEdge = (edge: GraphEdge, nodes3D?: Map<string, GraphNode3D>): G
 			const midpoint: Position3D = {
 				x: (sourceNode.position.x + targetNode.position.x) / 2,
 				y: (sourceNode.position.y + targetNode.position.y) / 2,
-				z: (sourceNode.position.z + targetNode.position.z) / 2 + 10,
+				z: (sourceNode.position.z + targetNode.position.z) / 2 + EDGE_MIDPOINT_Z_OFFSET,
 			}
 			edge3D.controlPoints = [midpoint]
 			edge3D.curveType = 'quadratic'
@@ -156,7 +183,7 @@ export const from3DEdge = (edge3D: GraphEdge3D): GraphEdge => ({
  * @param config - Optional layout configuration
  * @returns Object containing 3D nodes and edges
  */
-export const to3DGraph = (nodes: GraphNode[], edges: GraphEdge[], config: Layout3DConfig = DEFAULT_LAYOUT_CONFIG): { nodes3D: GraphNode3D[]; edges3D: GraphEdge3D[] } => {
+export const to3DGraph = (nodes: readonly GraphNode[], edges: readonly GraphEdge[], config: Layout3DConfig = DEFAULT_LAYOUT_CONFIG): { nodes3D: GraphNode3D[]; edges3D: GraphEdge3D[] } => {
 	// Convert nodes first
 	const nodes3D = nodes.map(node => to3DNode(node, config))
 
@@ -176,42 +203,15 @@ export const to3DGraph = (nodes: GraphNode[], edges: GraphEdge[], config: Layout
  * @param edges3D - Array of 3D graph edges
  * @returns Object containing 2D nodes and edges
  */
-export const from3DGraph = (nodes3D: GraphNode3D[], edges3D: GraphEdge3D[]): { nodes: GraphNode[]; edges: GraphEdge[] } => ({
+export const from3DGraph = (nodes3D: readonly GraphNode3D[], edges3D: readonly GraphEdge3D[]): { nodes: GraphNode[]; edges: GraphEdge[] } => ({
 		nodes: nodes3D.map(from3DNode),
 		edges: edges3D.map(from3DEdge),
 	});
 
 /**
- * Calculate bounding box for a 3D edge
- * @param start
- * @param end
- * @param controlPoint
- */
-const calculateEdgeBounds = (start: Position3D, end: Position3D, controlPoint?: Position3D): BoundingBox3D => {
-	const points = [start, end]
-	if (controlPoint) {
-		points.push(controlPoint)
-	}
-
-	return {
-		min: {
-			x: Math.min(...points.map(p => p.x)),
-			y: Math.min(...points.map(p => p.y)),
-			z: Math.min(...points.map(p => p.z)),
-		},
-		max: {
-			x: Math.max(...points.map(p => p.x)),
-			y: Math.max(...points.map(p => p.y)),
-			z: Math.max(...points.map(p => p.z)),
-		},
-	}
-};
-
-/**
  * Calculate bounding box for a set of 3D nodes
- * @param nodes3D
  */
-export const calculateGraphBounds = (nodes3D: GraphNode3D[]): BoundingBox3D => {
+export const calculateGraphBounds = (nodes3D: readonly GraphNode3D[]): BoundingBox3D => {
 	if (nodes3D.length === 0) {
 		return {
 			min: { x: 0, y: 0, z: 0 },
@@ -235,7 +235,6 @@ export const calculateGraphBounds = (nodes3D: GraphNode3D[]): BoundingBox3D => {
 
 /**
  * Calculate the center point of a bounding box
- * @param bounds
  */
 export const getBoundsCenter = (bounds: BoundingBox3D): Position3D => ({
 		x: (bounds.min.x + bounds.max.x) / 2,
@@ -245,7 +244,6 @@ export const getBoundsCenter = (bounds: BoundingBox3D): Position3D => ({
 
 /**
  * Calculate the size (dimensions) of a bounding box
- * @param bounds
  */
 export const getBoundsSize = (bounds: BoundingBox3D): Position3D => ({
 		x: bounds.max.x - bounds.min.x,
@@ -255,17 +253,13 @@ export const getBoundsSize = (bounds: BoundingBox3D): Position3D => ({
 
 /**
  * Check if a point is inside a bounding box
- * @param point
- * @param bounds
  */
-export const isPointInBounds = (point: Position3D, bounds: BoundingBox3D): boolean => point.x >= bounds.min.x && point.x <= bounds.max.x &&
+export const isPointInBounds = (point: Readonly<Position3D>, bounds: BoundingBox3D): boolean => point.x >= bounds.min.x && point.x <= bounds.max.x &&
 		point.y >= bounds.min.y && point.y <= bounds.max.y &&
 		point.z >= bounds.min.z && point.z <= bounds.max.z;
 
 /**
  * Check if two bounding boxes intersect
- * @param a
- * @param b
  */
 export const doBoundsIntersect = (a: BoundingBox3D, b: BoundingBox3D): boolean => a.min.x <= b.max.x && a.max.x >= b.min.x &&
 		a.min.y <= b.max.y && a.max.y >= b.min.y &&
@@ -273,10 +267,8 @@ export const doBoundsIntersect = (a: BoundingBox3D, b: BoundingBox3D): boolean =
 
 /**
  * Expand a bounding box to include a point
- * @param bounds
- * @param point
  */
-export const expandBounds = (bounds: BoundingBox3D, point: Position3D): BoundingBox3D => ({
+export const expandBounds = (bounds: BoundingBox3D, point: Readonly<Position3D>): BoundingBox3D => ({
 		min: {
 			x: Math.min(bounds.min.x, point.x),
 			y: Math.min(bounds.min.y, point.y),
@@ -291,10 +283,8 @@ export const expandBounds = (bounds: BoundingBox3D, point: Position3D): Bounding
 
 /**
  * Calculate distance between two 3D points
- * @param a
- * @param b
  */
-export const distance3D = (a: Position3D, b: Position3D): number => {
+export const distance3D = (a: Readonly<Position3D>, b: Readonly<Position3D>): number => {
 	const dx = b.x - a.x
 	const dy = b.y - a.y
 	const dz = b.z - a.z
@@ -303,11 +293,8 @@ export const distance3D = (a: Position3D, b: Position3D): number => {
 
 /**
  * Linear interpolation between two 3D positions
- * @param a
- * @param b
- * @param t
  */
-export const lerp3D = (a: Position3D, b: Position3D, t: number): Position3D => ({
+export const lerp3D = (a: Readonly<Position3D>, b: Readonly<Position3D>, t: number): Position3D => ({
 		x: a.x + (b.x - a.x) * t,
 		y: a.y + (b.y - a.y) * t,
 		z: a.z + (b.z - a.z) * t,
@@ -315,9 +302,8 @@ export const lerp3D = (a: Position3D, b: Position3D, t: number): Position3D => (
 
 /**
  * Normalize a 3D vector
- * @param v
  */
-export const normalize3D = (v: Position3D): Position3D => {
+export const normalize3D = (v: Readonly<Position3D>): Position3D => {
 	const length_ = Math.hypot(v.x, v.y, v.z)
 	if (length_ === 0) return { x: 0, y: 0, z: 0 }
 	return {

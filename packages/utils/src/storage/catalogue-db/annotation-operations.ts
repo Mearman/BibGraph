@@ -8,13 +8,18 @@ import type { GraphAnnotationStorage } from "./index.js";
 import { LOG_CATEGORY } from "./index.js";
 import type { CatalogueDB } from "./schema.js";
 
-type GraphAnnotationStorageInput = Omit<GraphAnnotationStorage, 'id' | 'createdAt' | 'updatedAt'>;
+type GraphAnnotationStorageInput = Omit<GraphAnnotationStorage, 'id' | 'createdAt' | 'updatedAt' | 'visible'> & {
+  /**
+  Whether the annotation is visible; defaults to true when omitted
+   */
+  visible?: boolean;
+};
 
 /**
  * Add a graph annotation
- * @param db Database instance
- * @param annotation Annotation data (id will be generated if not provided)
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param annotation - Annotation data (id will be generated if not provided)
+ * @param logger - Optional logger
  */
 export const addAnnotation = async (
   db: CatalogueDB,
@@ -66,9 +71,9 @@ export const addAnnotation = async (
 
 /**
  * Get all annotations for a specific graph (or all annotations if no graphId provided)
- * @param db Database instance
- * @param graphId Optional graph ID to filter annotations
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param graphId - Optional graph ID to filter annotations
+ * @param logger - Optional logger
  */
 export const getAnnotations = async (
   db: CatalogueDB,
@@ -76,7 +81,7 @@ export const getAnnotations = async (
   logger?: GenericLogger
 ): Promise<GraphAnnotationStorage[]> => {
   try {
-    if (graphId) {
+    if (graphId !== undefined) {
       return await db.annotations.where('graphId').equals(graphId).toArray();
     }
     return await db.annotations.toArray();
@@ -88,9 +93,9 @@ export const getAnnotations = async (
 
 /**
  * Get a single annotation by ID
- * @param db Database instance
- * @param id Annotation ID
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param id - Annotation ID
+ * @param logger - Optional logger
  */
 export const getAnnotation = async (
   db: CatalogueDB,
@@ -108,10 +113,10 @@ export const getAnnotation = async (
 
 /**
  * Update an existing annotation
- * @param db Database instance
- * @param id Annotation ID
- * @param updates Fields to update
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param id - Annotation ID
+ * @param updates - Fields to update
+ * @param logger - Optional logger
  */
 export const updateAnnotation = async (
   db: CatalogueDB,
@@ -135,9 +140,9 @@ export const updateAnnotation = async (
 
 /**
  * Delete an annotation
- * @param db Database instance
- * @param id Annotation ID
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param id - Annotation ID
+ * @param logger - Optional logger
  */
 export const deleteAnnotation = async (
   db: CatalogueDB,
@@ -155,9 +160,9 @@ export const deleteAnnotation = async (
 
 /**
  * Delete all annotations for a specific graph
- * @param db Database instance
- * @param graphId Graph ID
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param graphId - Graph ID
+ * @param logger - Optional logger
  */
 export const deleteAnnotationsByGraph = async (
   db: CatalogueDB,
@@ -175,10 +180,10 @@ export const deleteAnnotationsByGraph = async (
 
 /**
  * Toggle annotation visibility
- * @param db Database instance
- * @param id Annotation ID
- * @param visible New visibility state
- * @param logger Optional logger
+ * @param db - Database instance
+ * @param id - Annotation ID
+ * @param visible - New visibility state
+ * @param logger - Optional logger
  */
 export const toggleAnnotationVisibility = async (
   db: CatalogueDB,

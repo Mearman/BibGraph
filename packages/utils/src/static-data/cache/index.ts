@@ -5,7 +5,7 @@
  */
 
 // Export all types
-export * from "./types"
+export type * from "./types"
 
 // Export core utilities
 export { generateContentHash } from "./hash"

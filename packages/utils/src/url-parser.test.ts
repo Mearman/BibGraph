@@ -568,9 +568,11 @@ describe("custom field view preservation (User Story 2 - T026)", () => {
 		expect(parsedMinimal.entityId).toBe(parsedExtended.entityId)
 		expect(parsedMinimal.selectFields).not.toEqual(parsedExtended.selectFields)
 
-		// Verify field counts differ
-		expect(parsedMinimal.selectFields.length).toBe(2)
-		expect(parsedExtended.selectFields.length).toBe(5)
+		// Verify field counts differ, derived from the URLs themselves rather than a hardcoded count
+		const minimalFieldCount = minimalUrl.split("select=", 2)[1].split(",").length
+		const extendedFieldCount = extendedUrl.split("select=", 2)[1].split(",").length
+		expect(parsedMinimal.selectFields.length).toBe(minimalFieldCount)
+		expect(parsedExtended.selectFields.length).toBe(extendedFieldCount)
 	})
 
 	it("should handle select parameter with nested object fields", () => {
@@ -725,7 +727,7 @@ describe("custom field view preservation (User Story 2 - T026)", () => {
 		const parsed = parseURL(originalUrl)
 
 		expect(parsed.selectFields).toEqual(fields)
-		expect(parsed.selectFields.length).toBe(15)
+		expect(parsed.selectFields.length).toBe(fields.length)
 
 		const reconstructed = reconstructURL(
 			parsed.basePath,

@@ -13,16 +13,6 @@ const LOG_CATEGORY = "user-interactions"
 
 /**
  * Record a page visit with normalized OpenAlex request
- * @param db
- * @param params
- * @param params.request
- * @param params.metadata
- * @param params.metadata.sessionId
- * @param params.metadata.referrer
- * @param params.metadata.duration
- * @param params.metadata.cached
- * @param params.metadata.bytesSaved
- * @param logger
  */
 export const recordPageVisit = async (db: UserInteractionsDB, params: {
 		request: StoredNormalizedRequest
@@ -66,9 +56,6 @@ export const recordPageVisit = async (db: UserInteractionsDB, params: {
 
 /**
  * Get recent page visits across all pages
- * @param db
- * @param limit
- * @param logger
  */
 export const getRecentPageVisits = async (db: UserInteractionsDB, limit: number, logger?: GenericLogger): Promise<PageVisitRecord[]> => {
 	try {
@@ -97,8 +84,6 @@ export interface PageVisitStats {
 
 /**
  * Get page visit statistics
- * @param db
- * @param logger
  */
 export const getPageVisitStats = async (db: UserInteractionsDB, logger?: GenericLogger): Promise<PageVisitStats> => {
 	try {
@@ -162,10 +147,6 @@ export const getPageVisitStats = async (db: UserInteractionsDB, logger?: Generic
 
 /**
  * Get page visits by endpoint pattern
- * @param db
- * @param endpointPattern
- * @param limit
- * @param logger
  */
 export const getPageVisitsByEndpoint = async (db: UserInteractionsDB, endpointPattern: string, limit: number, logger?: GenericLogger): Promise<PageVisitRecord[]> => {
 	try {
@@ -194,9 +175,6 @@ export interface PopularRequest {
 
 /**
  * Get popular requests from page visits
- * @param db
- * @param limit
- * @param logger
  */
 export const getPopularRequests = async (db: UserInteractionsDB, limit: number, logger?: GenericLogger): Promise<PopularRequest[]> => {
 	try {

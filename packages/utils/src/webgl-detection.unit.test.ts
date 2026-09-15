@@ -1,7 +1,7 @@
+// @vitest-environment jsdom
+
 /**
  * Unit tests for WebGL detection utility
- * @vitest-environment jsdom
- * @module webgl-detection.unit.test
  */
 
 import { afterEach,beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,7 +10,9 @@ import {
   detectWebGLCapabilities,
   getRecommendedRendererSettings,
   isWebGLAvailable,
+  LOW_POWER_MAX_NODES,
   resetWebGLDetectionCache,
+  STANDARD_MAX_NODES,
   type WebGLDetectionResult,
 } from './webgl-detection';
 
@@ -46,18 +48,26 @@ describe('WebGL Detection', () => {
     });
 
     it('should detect WebGL2 when available', () => {
+      // WebGL enum values, per the WebGL/WEBGL_debug_renderer_info specs
+      const UNMASKED_RENDERER_WEBGL = 0x92_45;
+      const UNMASKED_VENDOR_WEBGL = 0x92_46;
+      const MAX_TEXTURE_SIZE = 0x0D_33;
+      const MAX_VERTEX_UNIFORM_VECTORS = 0x8B_4A;
+      const MOCK_MAX_TEXTURE_SIZE = 16_384;
+      const MOCK_MAX_VERTEX_UNIFORMS = 256;
+
       // Mock canvas and WebGL2 context
       const mockGl = {
         getParameter: vi.fn().mockImplementation((parameter: number) => {
-          if (parameter === 0x92_45) return 'Test Renderer'; // UNMASKED_RENDERER_WEBGL
-          if (parameter === 0x92_46) return 'Test Vendor'; // UNMASKED_VENDOR_WEBGL
-          if (parameter === 0x0D_33) return 16_384; // MAX_TEXTURE_SIZE
-          if (parameter === 0x8B_4A) return 256; // MAX_VERTEX_UNIFORM_VECTORS
+          if (parameter === UNMASKED_RENDERER_WEBGL) return 'Test Renderer';
+          if (parameter === UNMASKED_VENDOR_WEBGL) return 'Test Vendor';
+          if (parameter === MAX_TEXTURE_SIZE) return MOCK_MAX_TEXTURE_SIZE;
+          if (parameter === MAX_VERTEX_UNIFORM_VECTORS) return MOCK_MAX_VERTEX_UNIFORMS;
           return null;
         }),
         getExtension: vi.fn().mockImplementation((name: string) => {
           if (name === 'WEBGL_debug_renderer_info') {
-            return { UNMASKED_VENDOR_WEBGL: 0x92_46, UNMASKED_RENDERER_WEBGL: 0x92_45 };
+            return { UNMASKED_VENDOR_WEBGL, UNMASKED_RENDERER_WEBGL };
           }
           if (name === 'WEBGL_lose_context') {
             return { loseContext: vi.fn() };
@@ -65,8 +75,8 @@ describe('WebGL Detection', () => {
           return null;
         }),
         getContextAttributes: vi.fn().mockReturnValue({ antialias: true }),
-        MAX_TEXTURE_SIZE: 0x0D_33,
-        MAX_VERTEX_UNIFORM_VECTORS: 0x8B_4A,
+        MAX_TEXTURE_SIZE,
+        MAX_VERTEX_UNIFORM_VECTORS,
       };
 
       const mockCanvas = {
@@ -200,7 +210,7 @@ describe('WebGL Detection', () => {
 
       expect(settings.antialias).toBe(true);
       expect(settings.shadowMapEnabled).toBe(true);
-      expect(settings.maxNodes).toBeGreaterThan(500);
+      expect(settings.maxNodes).toBeGreaterThan(LOW_POWER_MAX_NODES);
     });
 
     it('should return conservative settings when WebGL unavailable', () => {
@@ -231,7 +241,7 @@ describe('WebGL Detection', () => {
 
       // WebGL1 should still work but with reduced features
       expect(settings.shadowMapEnabled).toBe(false); // No shadow maps for Intel + webgl1
-      expect(settings.maxNodes).toBeLessThanOrEqual(1000); // Lower node limit for Intel
+      expect(settings.maxNodes).toBeLessThanOrEqual(STANDARD_MAX_NODES); // Lower node limit for Intel
     });
 
     it('should reduce settings for low-power devices', () => {
@@ -247,7 +257,7 @@ describe('WebGL Detection', () => {
       const settings = getRecommendedRendererSettings(capabilities);
 
       // Intel GPUs should have reduced settings
-      expect(settings.maxNodes).toBeLessThanOrEqual(500);
+      expect(settings.maxNodes).toBeLessThanOrEqual(LOW_POWER_MAX_NODES);
       expect(settings.shadowMapEnabled).toBe(false);
     });
   });

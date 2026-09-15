@@ -1,8 +1,7 @@
 /**
  * WebGL capability detection utilities
  *
- * Provides functions to detect WebGL/WebGL2 support and hardware capabilities
- * for graceful degradation in 3D visualization.
+ * Provides functions to detect WebGL/WebGL2 support and hardware capabilities for graceful degradation in 3D visualization.
  */
 
 /**
@@ -54,6 +53,49 @@ export interface WebGLDetectionResult {
 let cachedResult: WebGLDetectionResult | null = null
 
 /**
+ * Get a human-readable message for WebGL unavailability
+ */
+const detectWebGLUnavailableReason = (): string => {
+	if (typeof window === 'undefined') {
+		return 'WebGL requires a browser environment'
+	}
+
+	// Check if running in a context that blocks WebGL
+	const canvas = document.createElement('canvas')
+
+	try {
+		const context = canvas.getContext('webgl2') ??
+			canvas.getContext('webgl') ??
+			canvas.getContext('experimental-webgl')
+
+		if (!context) {
+			// Check for common reasons
+			if (navigator.userAgent.includes('HeadlessChrome')) {
+				return 'WebGL is disabled in headless browser mode'
+			}
+
+			// Check for hardware acceleration
+			const userAgent = navigator.userAgent.toLowerCase()
+			if (userAgent.includes('swiftshader') || userAgent.includes('llvmpipe')) {
+				return 'Software rendering detected - hardware acceleration may be disabled'
+			}
+
+			return 'WebGL is not supported by your browser. Try updating your browser or enabling hardware acceleration.'
+		}
+	} catch (e) {
+		return `WebGL initialization failed: ${e instanceof Error ? e.message : 'Unknown error'}`
+	}
+
+	return 'WebGL is not available for unknown reasons'
+};
+
+/**
+ * Type guard confirming a canvas rendering context is genuinely a WebGL context, needed because `getContext('experimental-webgl')` isn't a recognised overload in the DOM lib types and so resolves to the generic `RenderingContext` type
+ */
+const isWebGLRenderingContext = (context: unknown): context is WebGLRenderingContext =>
+	typeof WebGLRenderingContext !== 'undefined' && context instanceof WebGLRenderingContext
+
+/**
  * Detect WebGL capabilities in the current browser environment
  * @returns Detection result with capability information
  */
@@ -92,7 +134,13 @@ export const detectWebGLCapabilities = (): WebGLDetectionResult => {
 	// Fall back to WebGL1
 	if (!gl) {
 		try {
-			gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl') as WebGLRenderingContext | null
+			const webglContext = canvas.getContext('webgl')
+			if (webglContext) {
+				gl = webglContext
+			} else {
+				const experimentalContext = canvas.getContext('experimental-webgl')
+				gl = isWebGLRenderingContext(experimentalContext) ? experimentalContext : null
+			}
 			if (gl) {
 				capability = 'webgl1'
 			}
@@ -113,12 +161,16 @@ export const detectWebGLCapabilities = (): WebGLDetectionResult => {
 
 	// Get hardware information
 	const debugInfo = gl.getExtension('WEBGL_debug_renderer_info')
-	const vendor = debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) as string : undefined
-	const renderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) as string : undefined
+	const vendorParam: unknown = debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : undefined
+	const vendor = typeof vendorParam === 'string' ? vendorParam : undefined
+	const rendererParam: unknown = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : undefined
+	const renderer = typeof rendererParam === 'string' ? rendererParam : undefined
 
 	// Get capabilities
-	const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number
-	const maxVertexUniforms = gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS) as number
+	const maxTextureSizeParam: unknown = gl.getParameter(gl.MAX_TEXTURE_SIZE)
+	const maxTextureSize = typeof maxTextureSizeParam === 'number' ? maxTextureSizeParam : undefined
+	const maxVertexUniformsParam: unknown = gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS)
+	const maxVertexUniforms = typeof maxVertexUniformsParam === 'number' ? maxVertexUniformsParam : undefined
 
 	// Check antialias support
 	const isAntialiasSupported = gl.getContextAttributes()?.antialias ?? false
@@ -153,54 +205,22 @@ export const isWebGLAvailable = (): boolean => detectWebGLCapabilities().availab
 export const isWebGL2Available = (): boolean => detectWebGLCapabilities().capability === 'webgl2';
 
 /**
- * Get a human-readable message for WebGL unavailability
- */
-const detectWebGLUnavailableReason = (): string => {
-	if (typeof window === 'undefined') {
-		return 'WebGL requires a browser environment'
-	}
-
-	// Check if running in a context that blocks WebGL
-	const canvas = document.createElement('canvas')
-
-	try {
-		const context = canvas.getContext('webgl2') ||
-			canvas.getContext('webgl') ||
-			canvas.getContext('experimental-webgl')
-
-		if (!context) {
-			// Check for common reasons
-			if (navigator.userAgent.includes('HeadlessChrome')) {
-				return 'WebGL is disabled in headless browser mode'
-			}
-
-			// Check for hardware acceleration
-			const userAgent = navigator.userAgent.toLowerCase()
-			if (userAgent.includes('swiftshader') || userAgent.includes('llvmpipe')) {
-				return 'Software rendering detected - hardware acceleration may be disabled'
-			}
-
-			return 'WebGL is not supported by your browser. Try updating your browser or enabling hardware acceleration.'
-		}
-	} catch (e) {
-		return `WebGL initialization failed: ${e instanceof Error ? e.message : 'Unknown error'}`
-	}
-
-	return 'WebGL is not available for unknown reasons'
-};
-
-/**
  * Reset the cached detection result (useful for testing)
  */
 export const resetWebGLDetectionCache = (): void => {
 	cachedResult = null
 };
 
+const HIGH_END_TEXTURE_SIZE_THRESHOLD = 16_384
+const MAX_STANDARD_PIXEL_RATIO = 2
+export const LOW_POWER_MAX_NODES = 500
+export const HIGH_END_MAX_NODES = 2000
+export const STANDARD_MAX_NODES = 1000
+
 /**
  * Get recommended renderer settings based on WebGL capabilities
- * @param result
  */
-export const getRecommendedRendererSettings = (result: WebGLDetectionResult): {
+export const getRecommendedRendererSettings = (result: Readonly<WebGLDetectionResult>): {
 	antialias: boolean
 	pixelRatio: number
 	shadowMapEnabled: boolean
@@ -216,17 +236,20 @@ export const getRecommendedRendererSettings = (result: WebGLDetectionResult): {
 	}
 
 	// Check for low-powered devices
-	const isLowPower = result.renderer?.toLowerCase().includes('intel') ||
-		result.renderer?.toLowerCase().includes('swiftshader') ||
-		result.renderer?.toLowerCase().includes('mesa')
+	const rendererLower = result.renderer?.toLowerCase()
+	const isLowPower = rendererLower !== undefined && (
+		rendererLower.includes('intel') ||
+		rendererLower.includes('swiftshader') ||
+		rendererLower.includes('mesa')
+	)
 
 	// Check texture size as proxy for GPU capability
-	const isHighEnd = (result.maxTextureSize ?? 0) >= 16_384
+	const isHighEnd = (result.maxTextureSize ?? 0) >= HIGH_END_TEXTURE_SIZE_THRESHOLD
 
 	return {
 		antialias: result.antialiasSupported ?? false,
-		pixelRatio: isHighEnd ? Math.min(window.devicePixelRatio, 2) : 1,
+		pixelRatio: isHighEnd ? Math.min(window.devicePixelRatio, MAX_STANDARD_PIXEL_RATIO) : 1,
 		shadowMapEnabled: !isLowPower && result.capability === 'webgl2',
-		maxNodes: isLowPower ? 500 : (isHighEnd ? 2000 : 1000),
+		maxNodes: isLowPower ? LOW_POWER_MAX_NODES : (isHighEnd ? HIGH_END_MAX_NODES : STANDARD_MAX_NODES),
 	}
 };

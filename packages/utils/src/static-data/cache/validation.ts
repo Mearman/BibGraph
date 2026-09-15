@@ -9,38 +9,35 @@ import type { CacheStorageType } from "../../cache-browser/types.js"
 import { isCacheStorageType } from "./constants.js"
 import { parseOpenAlexUrl } from "./url.js"
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value)
+
 /**
- * Validate that data appears to be a valid OpenAlex entity
- * Checks for required fields (id, display_name)
+ * Validate that data appears to be a valid OpenAlex entity Checks for required fields (id, display_name)
  * @param data - Unknown data to validate
  * @returns True if data has expected OpenAlex entity structure
  */
 export const isValidOpenAlexEntity = (data: unknown): boolean => {
-	if (!data || typeof data !== "object") {
+	if (!isRecord(data)) {
 		return false
 	}
 
-	const object = data as Record<string, unknown>
-
 	// OpenAlex entities should have id and display_name
-	return typeof object.id === "string" && typeof object.display_name === "string"
+	return typeof data.id === "string" && typeof data.display_name === "string"
 }
 
 /**
- * Validate that data appears to be a valid OpenAlex query result
- * Checks for required fields (results array, meta object)
+ * Validate that data appears to be a valid OpenAlex query result Checks for required fields (results array, meta object)
  * @param data - Unknown data to validate
  * @returns True if data has expected OpenAlex query result structure
  */
 export const isValidOpenAlexQueryResult = (data: unknown): boolean => {
-	if (!data || typeof data !== "object") {
+	if (!isRecord(data)) {
 		return false
 	}
 
-	const object = data as Record<string, unknown>
-
 	// OpenAlex query results should have results array and meta object
-	return Array.isArray(object.results) && typeof object.meta === "object"
+	return Array.isArray(data.results) && typeof data.meta === "object"
 }
 
 /**

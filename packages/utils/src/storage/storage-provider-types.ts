@@ -2,7 +2,6 @@
  * Storage Provider Types
  *
  * Parameter and result type definitions for CatalogueStorageProvider operations.
- * @package
  */
 
 import type {
@@ -14,6 +13,7 @@ import type {
   CatalogueList,
   ListType,
 } from './catalogue-db/index.js';
+import type { CatalogueStorageProvider } from './catalogue-storage-provider.js';
 
 /**
  * Parameters for creating a new catalogue list
@@ -156,4 +156,4 @@ export interface ShareAccessResult {
 /**
  * Factory function type for creating storage providers
  */
-export type StorageProviderFactory = (logger?: GenericLogger) => import('./catalogue-storage-provider.js').CatalogueStorageProvider;
+export type StorageProviderFactory = (logger?: GenericLogger) => CatalogueStorageProvider;

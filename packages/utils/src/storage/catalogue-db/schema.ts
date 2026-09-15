@@ -15,6 +15,10 @@ import type {
 } from "./index.js";
 import { CORRUPTED_ENTITY_ID_PATTERN, DB_NAME } from "./index.js";
 
+const SCHEMA_VERSION_3 = 3;
+const SCHEMA_VERSION_4 = 4;
+const SCHEMA_VERSION_5 = 5;
+
 /**
  * Catalogue database class
  * Defines IndexedDB schema and handles migrations
@@ -66,13 +70,13 @@ class CatalogueDB extends Dexie {
 
           // Log cleanup (console.log since logger not available in migration context)
           console.log(
-            `[catalogue-db] Migration v2: Cleaned up ${corruptedIds.length} corrupted history entries`
+            `[catalogue-db] Migration v2: Cleaned up ${String(corruptedIds.length)} corrupted history entries`
           );
         }
       });
 
     // Migration v3: Add search history table
-    this.version(3)
+    this.version(SCHEMA_VERSION_3)
       .stores({
         // Same schema as v2
         catalogueLists: "id, title, type, createdAt, updatedAt, isPublic, shareToken, *tags",
@@ -81,13 +85,13 @@ class CatalogueDB extends Dexie {
         // New search history table
         searchHistory: "id, query, timestamp",
       })
-      .upgrade(async () => {
+      .upgrade(() => {
         // No data migration needed - this is a new table
         console.log('[catalogue-db] Migration v3: Added search history table');
       });
 
     // Migration v4: Add graph annotations table
-    this.version(4)
+    this.version(SCHEMA_VERSION_4)
       .stores({
         // Same schema as v3
         catalogueLists: "id, title, type, createdAt, updatedAt, isPublic, shareToken, *tags",
@@ -97,13 +101,13 @@ class CatalogueDB extends Dexie {
         // New annotations table with indexes for querying by graph and type
         annotations: "id, type, createdAt, updatedAt, visible, graphId, nodeId",
       })
-      .upgrade(async () => {
+      .upgrade(() => {
         // No data migration needed - this is a new table
         console.log('[catalogue-db] Migration v4: Added graph annotations table');
       });
 
     // Migration v5: Add graph snapshots table
-    this.version(5)
+    this.version(SCHEMA_VERSION_5)
       .stores({
         // Same schema as v4
         catalogueLists: "id, title, type, createdAt, updatedAt, isPublic, shareToken, *tags",
@@ -114,7 +118,7 @@ class CatalogueDB extends Dexie {
         // New snapshots table with indexes for querying and auto-save management
         snapshots: "id, name, createdAt, updatedAt, isAutoSave, shareToken",
       })
-      .upgrade(async () => {
+      .upgrade(() => {
         // No data migration needed - this is a new table
         console.log('[catalogue-db] Migration v5: Added graph snapshots table');
       });

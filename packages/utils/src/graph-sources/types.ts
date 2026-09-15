@@ -3,7 +3,6 @@
  *
  * Defines the abstraction for different data sources that can contribute
  * entities to the graph visualization.
- * @module graph-sources/types
  */
 
 import type { AuthorPosition, EntityType, GraphEdge, GraphNode, RelationType } from '@bibgraph/types';
@@ -122,18 +121,18 @@ export interface GraphDataSource {
    * Get all entities from this source
    * Includes relationship extraction
    */
-  getEntities(): Promise<GraphSourceEntity[]>;
+  getEntities: () => Promise<GraphSourceEntity[]>;
 
   /**
    * Get entity count without loading full data
    * Used for displaying counts in toggle UI
    */
-  getEntityCount(): Promise<number>;
+  getEntityCount: () => Promise<number>;
 
   /**
    * Check if this source is available/accessible
    */
-  isAvailable(): Promise<boolean>;
+  isAvailable: () => Promise<boolean>;
 }
 
 /**

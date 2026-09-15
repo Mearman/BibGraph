@@ -5,10 +5,19 @@
 
 import Dexie from "dexie"
 
-import type { BookmarkRecord, PageVisitRecord } from "./types.js"
+import type { BookmarkRecord, PageVisitRecord, StoredNormalizedRequest } from "./types.js"
 
 // Constants for database operations
 const DB_NAME = "user-interactions"
+
+/**
+ * Shape of a bookmark's request field as read during the V3-to-V4 upgrade: only `cacheKey` and `endpoint` are guaranteed present on pre-migration records, while the API-URL fields being written by this migration (`internalEndpoint`, `apiUrl`, `internalPath`) are not yet populated.
+ */
+type BookmarkMigrationRequest = Pick<StoredNormalizedRequest, "cacheKey" | "endpoint"> & Partial<Omit<StoredNormalizedRequest, "cacheKey" | "endpoint">>
+
+interface BookmarkRecordDuringApiUrlMigration {
+	request: BookmarkMigrationRequest
+}
 
 // Database schema version constants
 const DB_VERSION_UNIFIED_REQUEST_SCHEMA = 3
@@ -38,9 +47,9 @@ class UserInteractionsDB extends Dexie {
 		this.version(DB_VERSION_API_URL_SCHEMA).stores({
 			bookmarks: "++id, request.cacheKey, request.hash, request.internalEndpoint, request.apiUrl, timestamp, *tags",
 			pageVisits: "++id, request.cacheKey, request.hash, request.internalEndpoint, timestamp, cached",
-		}).upgrade(tx => {
+		}).upgrade(async tx => {
 			// Migration from V3 to V4: Convert internal paths to API URLs
-			return tx.table("bookmarks").toCollection().modify(bookmark => {
+			return await tx.table<BookmarkRecordDuringApiUrlMigration>("bookmarks").toCollection().modify(bookmark => {
 				const { cacheKey, endpoint } = bookmark.request;
 
 				// Convert internal cacheKey to API URL

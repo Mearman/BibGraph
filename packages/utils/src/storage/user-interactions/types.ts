@@ -11,7 +11,7 @@ export type BookmarkEventListener = (event: {
 }) => void;
 
 export class BookmarkEventEmitter {
-  private listeners: BookmarkEventListener[] = [];
+  private readonly listeners: BookmarkEventListener[] = [];
 
   subscribe(listener: BookmarkEventListener) {
     this.listeners.push(listener);
@@ -38,8 +38,7 @@ export class BookmarkEventEmitter {
 export const bookmarkEventEmitter = new BookmarkEventEmitter();
 
 /**
- * Normalized OpenAlex request stored with visit
- * This matches the structure from @bibgraph/client
+ * Normalized OpenAlex request stored with visit This matches the structure from `@bibgraph/client`
  */
 export interface StoredNormalizedRequest {
   /**

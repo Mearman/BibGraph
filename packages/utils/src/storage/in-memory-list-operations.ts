@@ -12,8 +12,6 @@ import type { CreateListParams as CreateListParameters, ListStats } from './stor
 
 /**
  * Create a new catalogue list
- * @param storage
- * @param params
  */
 export const createList = (storage: InMemoryStorage, params: CreateListParameters): string => {
 	const id = crypto.randomUUID();
@@ -34,14 +32,11 @@ export const createList = (storage: InMemoryStorage, params: CreateListParameter
 
 /**
  * Get a list by ID
- * @param storage
- * @param listId
  */
 export const getList = (storage: InMemoryStorage, listId: string): CatalogueList | null => storage.lists.get(listId) ?? null;
 
 /**
  * Get all lists sorted by updatedAt descending
- * @param storage
  */
 export const getAllLists = (storage: InMemoryStorage): CatalogueList[] => {
 	const allLists = [...storage.lists.values()];
@@ -50,9 +45,6 @@ export const getAllLists = (storage: InMemoryStorage): CatalogueList[] => {
 
 /**
  * Update list properties
- * @param storage
- * @param listId
- * @param updates
  */
 export const updateList = (storage: InMemoryStorage, listId: string, updates: Partial<Pick<CatalogueList, 'title' | 'description' | 'tags' | 'isPublic'>>): void => {
 	const list = storage.lists.get(listId);
@@ -71,7 +63,6 @@ export const updateList = (storage: InMemoryStorage, listId: string, updates: Pa
 
 /**
  * Check if a list is a special system list
- * @param listId
  */
 export const isSpecialList = (listId: string): boolean => {
 	const specialIds: string[] = Object.values(SPECIAL_LIST_IDS);
@@ -80,8 +71,6 @@ export const isSpecialList = (listId: string): boolean => {
 
 /**
  * Delete a list and all associated entities and shares
- * @param storage
- * @param listId
  */
 export const deleteList = (storage: InMemoryStorage, listId: string): void => {
 	if (isSpecialList(listId)) {
@@ -112,8 +101,6 @@ export const deleteList = (storage: InMemoryStorage, listId: string): void => {
 
 /**
  * Search lists by title, description, or tags
- * @param storage
- * @param query
  */
 export const searchLists = (storage: InMemoryStorage, query: string): CatalogueList[] => {
 	const lowercaseQuery = query.toLowerCase();
@@ -122,8 +109,8 @@ export const searchLists = (storage: InMemoryStorage, query: string): CatalogueL
 	for (const list of storage.lists.values()) {
 		if (
 			list.title.toLowerCase().includes(lowercaseQuery) ||
-			(list.description && list.description.toLowerCase().includes(lowercaseQuery)) ||
-			(list.tags && list.tags.some((tag) => tag.toLowerCase().includes(lowercaseQuery)))
+			(list.description?.toLowerCase().includes(lowercaseQuery) ?? false) ||
+			(list.tags?.some((tag) => tag.toLowerCase().includes(lowercaseQuery)) ?? false)
 		) {
 			results.push(list);
 		}
@@ -134,8 +121,6 @@ export const searchLists = (storage: InMemoryStorage, query: string): CatalogueL
 
 /**
  * Get list statistics
- * @param storage
- * @param listId
  */
 export const getListStats = (storage: InMemoryStorage, listId: string): ListStats => {
 	const entityCounts: Record<EntityType, number> = {
@@ -172,11 +157,10 @@ export const getListStats = (storage: InMemoryStorage, listId: string): ListStat
 
 /**
  * Get non-system lists (user-created lists only)
- * @param storage
  */
 export const getNonSystemLists = (storage: InMemoryStorage): CatalogueList[] => {
 	const allLists = getAllLists(storage);
 	return allLists.filter(
-		(list) => list.id && !isSpecialList(list.id) && !list.tags?.includes('system')
+		(list) => list.id !== undefined && !isSpecialList(list.id) && !(list.tags?.includes('system') ?? false)
 	);
 };

@@ -3,7 +3,6 @@
  *
  * Unified interface for executing tasks without blocking the main thread.
  * Supports multiple strategies: idle callbacks, scheduler API, and Web Workers.
- * @module utils/background-tasks/types
  */
 
 /**
@@ -88,29 +87,29 @@ export interface BackgroundTaskStrategy {
   /**
   Whether this strategy is supported in the current environment
    */
-  isSupported(): boolean;
+  isSupported: () => boolean;
 
   /**
    * Execute a single task in the background
    */
-  execute<T>(
+  execute: <T>(
     task: () => T | Promise<T>,
     options?: BackgroundTaskOptions
-  ): Promise<BackgroundTaskResult<T>>;
+  ) => Promise<BackgroundTaskResult<T>>;
 
   /**
    * Process items in batches with yielding between chunks
    */
-  processBatch<T, R>(
-    items: T[],
+  processBatch: <T, R>(
+    items: readonly T[],
     processor: (item: T) => R | Promise<R>,
     options?: BackgroundTaskOptions & { onProgress?: ProgressCallback }
-  ): Promise<BackgroundTaskResult<R[]>>;
+  ) => Promise<BackgroundTaskResult<R[]>>;
 
   /**
    * Cancel all pending tasks (if supported)
    */
-  cancelAll(): void;
+  cancelAll: () => void;
 }
 
 /**
@@ -150,3 +149,11 @@ export interface WorkerResultMessage {
   error?: string;
   progress?: { processed: number; total: number };
 }
+
+/**
+ * Read an abort signal's current aborted state as a plain boolean.
+ *
+ * Called as a function on each check rather than comparing `signal?.aborted === true` inline at multiple points in one scope: TypeScript narrows a readonly property at its first check and persists that narrowing across awaits and loop iterations, even though AbortSignal.aborted is live external state that can flip between checks. Each call to this helper is a fresh expression, so no stale narrowing applies, while the boolean return also satisfies strict boolean-expression checks at the call site.
+ */
+export const isSignalAborted = (signal: AbortSignal | undefined): boolean =>
+	signal?.aborted === true;
