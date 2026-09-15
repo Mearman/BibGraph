@@ -19,9 +19,6 @@ const LOG_PREFIX = 'graph-index-tier';
 
 /**
  * Create a GraphEdgeRecord from input data
- * @param input
- * @param edgeId
- * @param discoveredAt
  */
 const createEdgeRecord = (
   input: GraphEdgeInput,
@@ -49,7 +46,6 @@ const createEdgeRecord = (
 /**
  * Add an edge to the graph index
  * Returns false if edge already exists (deduplication)
- * @param input
  */
 export const addEdge = async (input: GraphEdgeInput): Promise<boolean> => {
   const database = getGraphIndexDB();
@@ -79,9 +75,6 @@ export const addEdge = async (input: GraphEdgeInput): Promise<boolean> => {
 
 /**
  * Check if an edge exists
- * @param source
- * @param target
- * @param type
  */
 export const hasEdge = async (
   source: string,
@@ -106,9 +99,6 @@ export const hasEdge = async (
 
 /**
  * Get all edges from a source node
- * @param nodeId
- * @param type
- * @param filter
  */
 export const getEdgesFrom = async (
   nodeId: string,
@@ -123,7 +113,7 @@ export const getEdgesFrom = async (
   try {
     let edges: GraphEdgeRecord[];
 
-    edges = await (type
+    edges = await (type !== undefined
       ? database.edges.where('[source+type]').equals([nodeId, type]).toArray()
       : database.edges.where('source').equals(nodeId).toArray());
 
@@ -144,9 +134,6 @@ export const getEdgesFrom = async (
 
 /**
  * Get all edges to a target node
- * @param nodeId
- * @param type
- * @param filter
  */
 export const getEdgesTo = async (
   nodeId: string,
@@ -161,7 +148,7 @@ export const getEdgesTo = async (
   try {
     let edges: GraphEdgeRecord[];
 
-    edges = await (type
+    edges = await (type !== undefined
       ? database.edges.where('[target+type]').equals([nodeId, type]).toArray()
       : database.edges.where('target').equals(nodeId).toArray());
 
@@ -216,9 +203,6 @@ export const getEdgeCount = async (): Promise<number> => {
 
 /**
  * Delete an edge
- * @param source
- * @param target
- * @param type
  */
 export const deleteEdge = async (
   source: string,
@@ -242,9 +226,8 @@ export const deleteEdge = async (
 
 /**
  * Add multiple edges in a batch (with deduplication)
- * @param inputs
  */
-export const addEdges = async (inputs: GraphEdgeInput[]): Promise<number> => {
+export const addEdges = async (inputs: readonly GraphEdgeInput[]): Promise<number> => {
   const database = getGraphIndexDB();
   if (!database) {
     return 0;

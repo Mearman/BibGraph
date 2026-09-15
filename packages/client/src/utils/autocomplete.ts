@@ -3,10 +3,10 @@
  * Provides shared types and base class for autocomplete functionality across all OpenAlex entity types
  */
 
-import type { AutocompleteResult, EntityType, QueryParams } from "@bibgraph/types";
-import { isRecord } from "@bibgraph/types";
+import type { AutocompleteBaseResult, AutocompleteResult, EntityType, QueryParams } from "@bibgraph/types";
+import { AutocompleteBaseResponseSchema, AutocompleteResponseSchema, isRecord } from "@bibgraph/types";
 
-import { OpenAlexBaseClient } from "../client";
+import type { OpenAlexBaseClient, ValidationSchema } from "../client";
 import { logger } from "../internal/logger";
 
 /**
@@ -50,20 +50,16 @@ export interface AutocompleteResponse<T = AutocompleteResult> {
   };
 }
 
-interface DebouncedPromiseCache {
-  [key: string]:
-    | {
+type DebouncedPromiseCache = Record<string, | {
         promise: Promise<unknown>;
         timestamp: number;
       }
-    | undefined;
-}
+    | undefined>;
 
 /**
  * Type guard to check if a cached promise can be safely cast to the expected type
- * @param promise
  */
-const isValidCachedPromise = <T>(promise: Promise<unknown>): promise is Promise<T> => promise instanceof Promise;
+const isValidCachedPromise = <T>(promise: Readonly<Promise<unknown>>): promise is Promise<T> => promise instanceof Promise;
 
 /**
  * Base AutocompleteApi class providing shared autocomplete logic and utilities
@@ -83,21 +79,22 @@ export class BaseAutocompleteApi {
    * Core autocomplete method for making requests to OpenAlex autocomplete endpoints
    * @param endpoint - The autocomplete endpoint path
    * @param options - Autocomplete request options
+   * @param responseSchema - Schema validating the response envelope for this endpoint (per-entity endpoints return results without entity_type; the cross-entity endpoint includes it)
    * @returns Promise resolving to autocomplete response
    */
-  protected async makeAutocompleteRequest<T = AutocompleteResult>(
+  protected async makeAutocompleteRequest<T extends AutocompleteBaseResult = AutocompleteBaseResult>(
     endpoint: string,
-    options: AutocompleteOptions,
+    options: Readonly<AutocompleteOptions>,
+    responseSchema: Readonly<ValidationSchema<AutocompleteResponse<T>>>,
   ): Promise<AutocompleteResponse<T>> {
-    // OpenAlex autocomplete endpoints do NOT accept per_page or format parameters
-    // Only pass the options that were explicitly provided
+    // OpenAlex autocomplete endpoints do NOT accept per_page or format parameters Only pass the options that were explicitly provided
     const parameters: QueryParams & AutocompleteOptions = {
       ...options,
       q: options.q.trim(),
     };
 
     try {
-      return await this.client.get<AutocompleteResponse<T>>(endpoint, parameters);
+      return await this.client.get<AutocompleteResponse<T>>(endpoint, parameters, responseSchema);
     } catch (error: unknown) {
       const errorDetails = this.formatErrorForLogging(error);
       logger.warn(
@@ -128,7 +125,7 @@ export class BaseAutocompleteApi {
     }
 
     const cacheKey = `autocomplete_${query.trim().toLowerCase()}_${entityType}`;
-    return this.executeWithDebounce(cacheKey, () =>
+    return this.executeWithDebounce(cacheKey, async () =>
       this.performAutocomplete(query, entityType),
     );
   }
@@ -141,7 +138,7 @@ export class BaseAutocompleteApi {
    */
   protected async searchMultipleTypes(
     query: string,
-    entityTypes: EntityType[],
+    entityTypes: readonly EntityType[],
   ): Promise<AutocompleteResult[]> {
     if (!query.trim()) {
       return [];
@@ -150,7 +147,7 @@ export class BaseAutocompleteApi {
     const cacheKey = `search_${query.trim().toLowerCase()}_${entityTypes.join(",")}`;
 
     return this.executeWithDebounce(cacheKey, async () => {
-      const promises = entityTypes.map((type) =>
+      const promises = entityTypes.map(async (type) =>
         this.performAutocomplete(query, type).catch(
           (): AutocompleteResult[] => [],
         ),
@@ -163,8 +160,6 @@ export class BaseAutocompleteApi {
 
   /**
    * Execute function with debouncing to prevent excessive API calls
-   * @param cacheKey
-   * @param fn
    */
   protected async executeWithDebounce<T>(
     cacheKey: string,
@@ -196,7 +191,6 @@ export class BaseAutocompleteApi {
   /**
    * Perform general autocomplete request without entity type specification
    * Calls the /autocomplete endpoint which returns results across all entity types
-   * @param query
    */
   protected async performGeneralAutocomplete(
     query: string,
@@ -207,7 +201,11 @@ export class BaseAutocompleteApi {
         q: query.trim(),
       };
 
-      const response = await this.makeAutocompleteRequest(endpoint, options);
+      const response = await this.makeAutocompleteRequest(
+        endpoint,
+        options,
+        AutocompleteResponseSchema,
+      );
 
       return response.results;
     } catch (error: unknown) {
@@ -222,8 +220,6 @@ export class BaseAutocompleteApi {
 
   /**
    * Perform autocomplete request for a specific entity type
-   * @param query
-   * @param entityType
    */
   protected async performAutocomplete(
     query: string,
@@ -235,7 +231,11 @@ export class BaseAutocompleteApi {
         q: query.trim(),
       };
 
-      const response = await this.makeAutocompleteRequest(endpoint, options);
+      const response = await this.makeAutocompleteRequest(
+        endpoint,
+        options,
+        AutocompleteBaseResponseSchema,
+      );
 
       return response.results.map((result) => ({
         ...result,
@@ -253,12 +253,11 @@ export class BaseAutocompleteApi {
 
   /**
    * Sort autocomplete results by relevance (cited_by_count, then works_count)
-   * @param results
    */
   protected sortAutocompleteResults(
-    results: AutocompleteResult[],
+    results: readonly AutocompleteResult[],
   ): AutocompleteResult[] {
-    return results.sort((a, b) => {
+    return [...results].sort((a, b) => {
       // Sort by cited_by_count (descending), then by works_count (descending)
       const aCitations = a.cited_by_count ?? 0;
       const bCitations = b.cited_by_count ?? 0;
@@ -274,7 +273,6 @@ export class BaseAutocompleteApi {
 
   /**
    * Map plural entity type to singular form for AutocompleteResult
-   * @param entityType
    */
   protected mapEntityTypeToSingular(
     entityType: EntityType,
@@ -299,18 +297,18 @@ export class BaseAutocompleteApi {
 
   /**
    * Validate autocomplete options
-   * @param options
    */
-  protected validateAutocompleteOptions(options: AutocompleteOptions): void {
-    if (!options.q?.trim()) {
+  protected validateAutocompleteOptions(options: Readonly<AutocompleteOptions>): void {
+    if (options.q.trim() === "") {
       throw new Error("Query string is required and cannot be empty");
     }
 
+    const MAX_PER_PAGE = 200;
     if (
       options.per_page !== undefined &&
-      (options.per_page < 1 || options.per_page > 200)
+      (options.per_page < 1 || options.per_page > MAX_PER_PAGE)
     ) {
-      throw new Error("per_page must be between 1 and 200");
+      throw new Error(`per_page must be between 1 and ${String(MAX_PER_PAGE)}`);
     }
   }
 
@@ -360,7 +358,6 @@ export class BaseAutocompleteApi {
 
   /**
    * Format unknown error for safe logging using type guards
-   * @param error
    */
   protected formatErrorForLogging(error: unknown): Record<string, unknown> {
     if (error instanceof Error) {
@@ -424,7 +421,7 @@ export class CompleteAutocompleteApi extends BaseAutocompleteApi {
    */
   async autocompleteGeneral(
     query: string,
-    options: Omit<AutocompleteOptions, "q"> = {},
+    options: Readonly<Omit<AutocompleteOptions, "q">> = {},
   ): Promise<AutocompleteResult[]> {
     if (!query.trim()) {
       return [];
@@ -443,6 +440,7 @@ export class CompleteAutocompleteApi extends BaseAutocompleteApi {
         const response = await this.makeAutocompleteRequest(
           endpoint,
           requestOptions,
+          AutocompleteResponseSchema,
         );
         return this.sortAutocompleteResults(response.results);
       } catch (error: unknown) {
@@ -573,7 +571,7 @@ export class CompleteAutocompleteApi extends BaseAutocompleteApi {
    */
   async search(
     query: string,
-    entityTypes?: EntityType[],
+    entityTypes?: readonly EntityType[],
   ): Promise<AutocompleteResult[]> {
     if (!query.trim()) {
       return [];
@@ -617,7 +615,11 @@ export class CompleteAutocompleteApi extends BaseAutocompleteApi {
             ...this.formatFiltersForEntityType(filters),
           };
 
-          const response = await this.makeAutocompleteRequest(endpoint, parameters);
+          const response = await this.makeAutocompleteRequest(
+            endpoint,
+            parameters,
+            AutocompleteBaseResponseSchema,
+          );
           return response.results.map((result) => ({
             ...result,
             entity_type: this.mapEntityTypeToSingular(type),
@@ -634,7 +636,6 @@ export class CompleteAutocompleteApi extends BaseAutocompleteApi {
 
   /**
    * Infer which entity types to search based on filter keys
-   * @param filters
    */
   private inferEntityTypesFromFilters(
     filters: Record<string, unknown>,
@@ -684,7 +685,6 @@ export class CompleteAutocompleteApi extends BaseAutocompleteApi {
 
   /**
    * Format filters for specific entity type endpoints
-   * @param filters
    */
   private formatFiltersForEntityType(
     filters: Record<string, unknown>,
@@ -693,14 +693,14 @@ export class CompleteAutocompleteApi extends BaseAutocompleteApi {
     // Return basic filters that are commonly supported
     const basicFilters: Record<string, unknown> = {};
 
-    if (filters["from_publication_date"]) {
-      basicFilters["from_publication_date"] = filters["from_publication_date"];
+    if (filters.from_publication_date !== undefined) {
+      basicFilters.from_publication_date = filters.from_publication_date;
     }
-    if (filters["to_publication_date"]) {
-      basicFilters["to_publication_date"] = filters["to_publication_date"];
+    if (filters.to_publication_date !== undefined) {
+      basicFilters.to_publication_date = filters.to_publication_date;
     }
-    if (filters["is_oa"] !== undefined) {
-      basicFilters["is_oa"] = filters["is_oa"];
+    if (filters.is_oa !== undefined) {
+      basicFilters.is_oa = filters.is_oa;
     }
 
     return basicFilters;

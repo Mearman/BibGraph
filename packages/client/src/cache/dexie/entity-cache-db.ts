@@ -90,12 +90,8 @@ let databaseInstance: EntityCacheDB | null = null;
  */
 export const isIndexedDBAvailable = (): boolean => {
   try {
-    // Check for browser environment
-    if (typeof globalThis === "undefined" || !("indexedDB" in globalThis)) {
-      return false;
-    }
-    // Additional check for indexedDB availability
-    return globalThis.indexedDB !== null && globalThis.indexedDB !== undefined;
+    // Check for browser environment and indexedDB availability
+    return typeof globalThis !== "undefined" && "indexedDB" in globalThis;
   } catch {
     return false;
   }
@@ -145,8 +141,6 @@ export const deleteEntityCacheDB = async (): Promise<void> => {
 
 /**
  * Generate a composite cache key
- * @param entityType
- * @param entityId
  */
 export const generateCacheKey = (entityType: StaticEntityType, entityId: string): string => `${entityType}:${entityId}`;
 

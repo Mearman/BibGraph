@@ -44,12 +44,8 @@ let databaseInstance: GraphIndexDB | null = null;
  */
 export const isIndexedDBAvailableForGraph = (): boolean => {
   try {
-    // Check for browser environment
-    if (typeof globalThis === 'undefined' || !('indexedDB' in globalThis)) {
-      return false;
-    }
-    // Additional check for indexedDB availability
-    return globalThis.indexedDB !== null && globalThis.indexedDB !== undefined;
+    // Check for browser environment and indexedDB availability
+    return typeof globalThis !== 'undefined' && 'indexedDB' in globalThis;
   } catch {
     return false;
   }
@@ -102,9 +98,6 @@ export const deleteGraphIndexDB = async (): Promise<void> => {
  *
  * Format: `${source}-${target}-${type}`
  * This ensures edge deduplication.
- * @param source
- * @param target
- * @param type
  */
 export const generateEdgeId = (source: string, target: string, type: string): string => `${source}-${target}-${type}`;
 

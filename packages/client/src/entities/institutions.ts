@@ -11,8 +11,9 @@ import type {
   QueryParams,
   Work,
 } from "@bibgraph/types";
+import { authorSchema, AutocompleteBaseResponseSchema, institutionSchema, workSchema } from "@bibgraph/types";
 
-import { OpenAlexBaseClient } from "../client";
+import type { OpenAlexBaseClient } from "../client";
 import type { AutocompleteOptions } from "../utils/autocomplete";
 import type { InstitutionSearchOptions } from "./institutions/index";
 import {
@@ -20,10 +21,6 @@ import {
   formatErrorForLogging,
   validateAndNormalizeRor,
 } from "./institutions/index";
-
-// Re-export types for DTS bundling (vite-plugin-dts requires explicit type re-exports)
-// eslint-disable-next-line custom/no-reexport-from-non-barrel
-export type { InstitutionSearchOptions, InstitutionsQueryParams } from "./institutions/index";
 
 /**
 OpenAlex API limit for autocomplete results
@@ -67,7 +64,7 @@ const RANDOM_SEED_UPPER_BOUND = 1_000_000;
  * `getInstitutionAuthors`, `getAssociatedInstitutions`
  */
 export class InstitutionsApi {
-  private client: OpenAlexBaseClient;
+  private readonly client: OpenAlexBaseClient;
 
   constructor(client: OpenAlexBaseClient) {
     this.client = client;
@@ -81,7 +78,6 @@ export class InstitutionsApi {
    * - ROR prefix: `ror:05dxps055`
    * - ROR URL: `https://ror.org/05dxps055`
    * - ROR domain: `ror.org/05dxps055`
-   *
    * @param id - Institution ID (OpenAlex ID, ROR ID, etc.)
    * @param params - Optional query parameters (select fields, etc.)
    * @returns Promise resolving to institution entity
@@ -92,11 +88,12 @@ export class InstitutionsApi {
     params: QueryParams = {},
   ): Promise<InstitutionEntity> {
     const processedId = validateAndNormalizeRor(id);
-    return this.client.getById<InstitutionEntity>(
-      "institutions",
-      processedId,
+    return this.client.getById<InstitutionEntity>({
+      endpoint: "institutions",
+      id: processedId,
       params,
-    );
+      schema: institutionSchema,
+    });
   }
 
   /**
@@ -126,14 +123,15 @@ export class InstitutionsApi {
         q: trimmedQuery,
       };
 
-      if (options?.per_page && options.per_page > 0) {
+      if (options?.per_page !== undefined && options.per_page > 0) {
         queryParameters.per_page = Math.min(options.per_page, AUTOCOMPLETE_MAX_RESULTS);
       }
 
       const endpoint = "autocomplete/institutions";
-      const response = await this.client.getResponse<AutocompleteResult>(
+      const response = await this.client.get(
         endpoint,
         queryParameters,
+        AutocompleteBaseResponseSchema,
       );
 
       return response.results.map((result) => ({
@@ -158,7 +156,7 @@ export class InstitutionsApi {
     return this.client.getResponse<InstitutionEntity>(
       "institutions",
       queryParameters,
-    );
+    institutionSchema);
   }
 
   /**
@@ -235,7 +233,7 @@ export class InstitutionsApi {
       filter: `authorships.institutions.id:${processedId}`,
       ...buildInstitutionQueryParameters(options),
     };
-    return this.client.getResponse<Work>("works", queryParameters);
+    return this.client.getResponse<Work>("works", queryParameters, workSchema);
   }
 
   /**
@@ -255,7 +253,7 @@ export class InstitutionsApi {
       filter: `last_known_institution.id:${processedId}`,
       ...buildInstitutionQueryParameters(options),
     };
-    return this.client.getResponse<Author>("authors", queryParameters);
+    return this.client.getResponse<Author>("authors", queryParameters, authorSchema);
   }
 
   /**
@@ -289,7 +287,7 @@ export class InstitutionsApi {
    * @returns Promise resolving to random sample of institutions
    */
   async getRandomInstitutions(
-    count: number = 10,
+    count = 10,
     options: InstitutionSearchOptions = {},
     seed?: number,
   ): Promise<OpenAlexResponse<InstitutionEntity>> {
@@ -362,13 +360,13 @@ export class InstitutionsApi {
   /**
    * Stream all institutions matching the criteria (use with caution for large datasets)
    * @param options - Search parameters and filters
-   * @yields Arrays of institutions in batches
+   * @returns Arrays of institutions in batches
    */
   async *streamInstitutions(
     options: InstitutionSearchOptions = {},
   ): AsyncGenerator<InstitutionEntity[], void, unknown> {
     const queryParameters = buildInstitutionQueryParameters(options);
-    yield* this.client.stream<InstitutionEntity>("institutions", queryParameters);
+    yield* this.client.stream<InstitutionEntity>("institutions", queryParameters, institutionSchema);
   }
 
   /**
@@ -385,6 +383,7 @@ export class InstitutionsApi {
     return this.client.getAll<InstitutionEntity>(
       "institutions",
       queryParameters,
+      institutionSchema,
       maxResults,
     );
   }

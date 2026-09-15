@@ -10,8 +10,16 @@ import { apiInterceptor, type InterceptedRequest } from "../interceptors/api-int
 import { OpenAlexApiError } from "./errors";
 
 /**
+Inclusive lower bound of a successful HTTP status range
+ */
+const HTTP_SUCCESS_STATUS_MIN = 200;
+/**
+Exclusive upper bound of a successful HTTP status range
+ */
+const HTTP_SUCCESS_STATUS_MAX_EXCLUSIVE = 300;
+
+/**
  * Type guard for OpenAlexError response
- * @param data
  */
 const isOpenAlexError = (data: unknown): data is OpenAlexError => {
   return (
@@ -23,7 +31,6 @@ const isOpenAlexError = (data: unknown): data is OpenAlexError => {
 
 /**
  * Parse error response from OpenAlex API
- * @param response
  */
 export const parseError = async (response: Response): Promise<OpenAlexApiError> => {
   try {
@@ -64,11 +71,6 @@ export interface ResponseInterceptionParams {
 
 /**
  * Handle response interception for caching and logging
- * @param root0
- * @param root0.interceptedRequest
- * @param root0.response
- * @param root0.responseTime
- * @param root0.cacheResponseEntities
  */
 export const handleResponseInterception = async ({
   interceptedRequest,
@@ -76,7 +78,7 @@ export const handleResponseInterception = async ({
   responseTime,
   cacheResponseEntities,
 }: ResponseInterceptionParams): Promise<void> => {
-  if (interceptedRequest && response.status >= 200 && response.status < 300) {
+  if (interceptedRequest && response.status >= HTTP_SUCCESS_STATUS_MIN && response.status < HTTP_SUCCESS_STATUS_MAX_EXCLUSIVE) {
     try {
       const responseClone = response.clone();
       let responseData: unknown;
@@ -110,13 +112,10 @@ export const handleResponseInterception = async ({
       });
 
       const isDiskCacheEnabled =
-        globalThis.process?.env?.BIBGRAPH_DISK_CACHE_ENABLED !== "false";
+        process.env.BIBGRAPH_DISK_CACHE_ENABLED !== "false";
 
-      if (
-        interceptedCall &&
-        globalThis.process?.versions?.node &&
-        isDiskCacheEnabled
-      ) {
+      // No separate Node-runtime check is needed here: the try/catch below already handles the browser case (the dynamic import simply fails there).
+      if (interceptedCall && isDiskCacheEnabled) {
         try {
           const { defaultDiskWriter } = await import("../cache/disk");
           await defaultDiskWriter.writeToCache({

@@ -1,9 +1,23 @@
 /**
  * Checksum validation utilities for external identifiers
  *
- * Provides checksum validation for ORCID and ISSN identifiers
- * using their respective standard algorithms.
+ * Provides checksum validation for ORCID and ISSN identifiers using their respective standard algorithms.
  */
+
+/**
+ * Divisor shared by the mod-11-2 (ORCID) and mod-11 (ISSN) checksum algorithms.
+ */
+const MOD_11_DIVISOR = 11;
+
+/**
+ * In the mod-11-2 algorithm (ORCID), the check digit is `(12 - remainder) mod 11`.
+ */
+const ORCID_CHECK_DIGIT_COMPLEMENT = 12;
+
+/**
+ * Both algorithms represent a computed check value of 10 with the letter 'X'.
+ */
+const CHECK_DIGIT_X_VALUE = 10;
 
 /**
  * Validate ORCID checksum using mod-11-2 algorithm
@@ -12,7 +26,6 @@
  * - Each digit is multiplied by its position weight
  * - The check digit is calculated to make the total divisible by 11
  * - X represents 10 as the check digit
- *
  * @param orcid - ORCID in format XXXX-XXXX-XXXX-XXXX
  * @returns Whether the checksum is valid
  */
@@ -30,9 +43,9 @@ export const validateOrcidChecksum = (orcid: string): boolean => {
     total = (total + Number.parseInt(digit, 10)) * 2;
   }
 
-  const remainder = total % 11;
-  const result = (12 - remainder) % 11;
-  const expectedCheckDigit = result === 10 ? "X" : result.toString();
+  const remainder = total % MOD_11_DIVISOR;
+  const result = (ORCID_CHECK_DIGIT_COMPLEMENT - remainder) % MOD_11_DIVISOR;
+  const expectedCheckDigit = result === CHECK_DIGIT_X_VALUE ? "X" : result.toString();
 
   return checkDigit === expectedCheckDigit;
 };
@@ -44,7 +57,6 @@ export const validateOrcidChecksum = (orcid: string): boolean => {
  * - Each digit is multiplied by a weight from 8 to 2
  * - The check digit makes the weighted sum divisible by 11
  * - X represents 10 as the check digit
- *
  * @param issn - ISSN in format XXXX-XXXX
  * @returns Whether the checksum is valid
  */
@@ -57,16 +69,15 @@ export const validateIssnChecksum = (issn: string): boolean => {
   const baseDigits = digits.slice(0, -1);
 
   // Calculate checksum using mod-11 algorithm
+  const ISSN_START_WEIGHT = 8;
   let total = 0;
-  for (const [index, baseDigit] of [...baseDigits].entries()) {
-    const ISSN_START_WEIGHT = 8;
+  for (let index = 0; index < baseDigits.length; index += 1) {
+    const baseDigit = baseDigits.charAt(index);
     total += Number.parseInt(baseDigit, 10) * (ISSN_START_WEIGHT - index);
   }
 
-  const MOD_11_DIVISOR = 11;
   const remainder = total % MOD_11_DIVISOR;
   const result = remainder === 0 ? 0 : MOD_11_DIVISOR - remainder;
-  const CHECK_DIGIT_X_VALUE = 10;
   const expectedCheckDigit =
     result === CHECK_DIGIT_X_VALUE ? "X" : result.toString();
 

@@ -7,11 +7,13 @@
  * Check if running in development mode based on NODE_ENV
  */
 export const checkNodeEnv = (): boolean | null => {
-  if (globalThis.process?.env?.NODE_ENV) {
-    const nodeEnvironment = globalThis.process?.env?.NODE_ENV.toLowerCase();
-    if (nodeEnvironment === "development" || nodeEnvironment === "dev") return true;
-    if (nodeEnvironment === "production") return false;
+  const nodeEnvironmentValue = process.env.NODE_ENV;
+  if (nodeEnvironmentValue === undefined) {
+    return null;
   }
+  const nodeEnvironment = nodeEnvironmentValue.toLowerCase();
+  if (nodeEnvironment === "development" || nodeEnvironment === "dev") return true;
+  if (nodeEnvironment === "production") return false;
   return null;
 };
 
@@ -19,16 +21,15 @@ export const checkNodeEnv = (): boolean | null => {
  * Check Vite's __DEV__ flag
  */
 export const checkViteDevFlag = (): boolean | null => {
-  if (typeof globalThis !== "undefined" && "__DEV__" in globalThis) {
-    try {
-      const globalObject = globalThis as Record<string, unknown>;
-      const developmentFlag = globalObject.__DEV__;
+  try {
+    if ("__DEV__" in globalThis) {
+      const developmentFlag: unknown = globalThis.__DEV__;
       if (typeof developmentFlag === "boolean") {
         return developmentFlag;
       }
-    } catch {
-      // Ignore errors if __DEV__ is not accessible
     }
+  } catch {
+    // Ignore errors if __DEV__ is not accessible
   }
   return null;
 };
@@ -38,24 +39,17 @@ export const checkViteDevFlag = (): boolean | null => {
  */
 export const checkBrowserDevIndicators = (): boolean | null => {
   try {
-    if (typeof globalThis !== "undefined" && "window" in globalThis) {
-      const win =
-        "window" in globalThis &&
-        globalThis.window &&
-        "location" in window
-          ? window
-          : undefined;
-      if (win?.location?.hostname) {
-        const { hostname } = win.location;
-        // Local development indicators
-        if (
-          hostname === "localhost" ||
-          hostname === "127.0.0.1" ||
-          hostname.endsWith(".local")
-        ) {
-          return true;
-        }
-      }
+    if (typeof window === "undefined") {
+      return null;
+    }
+    const { hostname } = window.location;
+    // Local development indicators
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.endsWith(".local")
+    ) {
+      return true;
     }
   } catch {
     // Ignore errors in browser detection
@@ -88,8 +82,7 @@ export const isDevelopmentMode = (): boolean => {
  * Check if running in a test environment
  */
 export const isTestEnvironment = (): boolean => {
-  return typeof process !== 'undefined' &&
-    (globalThis.process?.env?.NODE_ENV === 'test' ||
-     process.env.VITEST === 'true' ||
-     process.env.JEST_WORKER_ID !== undefined);
+  return process.env.NODE_ENV === 'test' ||
+    process.env.VITEST === 'true' ||
+    process.env.JEST_WORKER_ID !== undefined;
 };

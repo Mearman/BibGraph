@@ -4,7 +4,7 @@
  * Functions for indexing OpenAlex entities in the persistent graph
  */
 
-import type { EntityType, OpenAlexEntity } from "@bibgraph/types";
+import { isEntityType, type OpenAlexEntity } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
 
 import { extractAndIndexRelationships } from "../cache/dexie/graph-extraction";
@@ -20,15 +20,20 @@ import { cleanOpenAlexId } from "./static-data-utils";
  * @param entityData - The full entity data
  */
 export const indexEntityInGraph = async (entityId: string, entityType: string, entityData: OpenAlexEntity): Promise<void> => {
+  if (!isEntityType(entityType)) {
+    logger.debug("client", "Skipping graph indexing for unrecognized entity type", { entityId, entityType });
+    return;
+  }
+
   try {
     const graph = getPersistentGraph();
     await graph.initialize();
 
     const result = await extractAndIndexRelationships(
       graph,
-      entityType as EntityType,
+      entityType,
       entityId,
-      entityData as Record<string, unknown>,
+      entityData,
     );
 
     if (result.edgesAdded > 0 || result.stubsCreated > 0) {
@@ -56,7 +61,12 @@ export const indexEntityInGraph = async (entityId: string, entityType: string, e
  * @param results - Array of entity results
  * @param entityType - The entity type
  */
-export const indexEntitiesInGraph = async (results: unknown[], entityType: string): Promise<void> => {
+export const indexEntitiesInGraph = async (results: readonly unknown[], entityType: string): Promise<void> => {
+  if (!isEntityType(entityType)) {
+    logger.debug("client", "Skipping graph indexing for unrecognized entity type", { entityType });
+    return;
+  }
+
   try {
     const graph = getPersistentGraph();
     await graph.initialize();
@@ -74,9 +84,9 @@ export const indexEntitiesInGraph = async (results: unknown[], entityType: strin
       try {
         const extractResult = await extractAndIndexRelationships(
           graph,
-          entityType as EntityType,
+          entityType,
           cleanId,
-          result as Record<string, unknown>,
+          result,
         );
         totalNodes += extractResult.nodesProcessed;
         totalEdges += extractResult.edgesAdded;

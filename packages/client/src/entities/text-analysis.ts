@@ -3,9 +3,52 @@
  * Provides comprehensive methods for analyzing text content using OpenAlex's aboutness assignments
  */
 
-import type { OpenAlexId, QueryParams } from "@bibgraph/types";
+import type {
+  QueryParams,
+  TextAnalysisConcept,
+  TextAnalysisKeyword,
+  TextAnalysisResponse,
+  TextAnalysisTopic,
+} from "@bibgraph/types";
+import {
+  TextAnalysisConceptSchema,
+  TextAnalysisKeywordSchema,
+  TextAnalysisResponseSchema,
+  TextAnalysisTopicSchema,
+} from "@bibgraph/types";
+import { z } from "zod";
 
 import type { OpenAlexBaseClient } from "../client";
+
+/**
+Minimum allowed length for a text analysis title, in characters
+ */
+const TITLE_MIN_LENGTH = 20;
+
+/**
+Maximum allowed length for a text analysis title, in characters
+ */
+const TITLE_MAX_LENGTH = 2000;
+
+/**
+Maximum allowed length for a text analysis abstract, in characters
+ */
+const ABSTRACT_MAX_LENGTH = 5000;
+
+/**
+Default minimum relevance score threshold used by the getRelevant* helpers
+ */
+const DEFAULT_MIN_SCORE = 0.3;
+
+/**
+Score threshold above which an entity is considered high relevance
+ */
+const HIGH_SCORE_THRESHOLD = 0.7;
+
+/**
+Score threshold above which an entity is considered medium (rather than low) relevance
+ */
+const MEDIUM_SCORE_THRESHOLD = 0.3;
 
 /**
  * Options for text analysis requests
@@ -26,190 +69,44 @@ export interface TextAnalysisOptions {
 }
 
 /**
- * Base interface for text analysis entities
+ * Result types for the text analysis endpoints, canonically defined as Zod-inferred types in the shared types package and re-exported here for the client's public surface
  */
-export interface TextAnalysisEntity {
-  /**
-  OpenAlex ID of the entity
-   */
-  id: OpenAlexId;
-  /**
-  Display name of the entity
-   */
-  display_name: string;
-  /**
-  Relevance/confidence score
-   */
-  score: number;
-}
-
-/**
- * Keyword entity from text analysis
- */
-export type TextAnalysisKeyword = TextAnalysisEntity;
-
-/**
- * Topic entity from text analysis
- */
-export interface TextAnalysisTopic extends TextAnalysisEntity {
-  /**
-  Topic level in the hierarchy
-   */
-  level?: number;
-  /**
-  Parent topic information
-   */
-  subfield?: {
-    id: OpenAlexId;
-    display_name: string;
-  };
-  field?: {
-    id: OpenAlexId;
-    display_name: string;
-  };
-  domain?: {
-    id: OpenAlexId;
-    display_name: string;
-  };
-}
-
-/**
- * Concept entity from text analysis
- */
-export interface TextAnalysisConcept extends TextAnalysisEntity {
-  /**
-  Concept level in the hierarchy (0-5)
-   */
-  level: number;
-  /**
-  Wikidata ID if available
-   */
-  wikidata?: string;
-}
-
-/**
- * Response from the combined text analysis endpoint
- */
-export interface TextAnalysisResponse {
-  /**
-  Array of extracted keywords
-   */
-  keywords: TextAnalysisKeyword[];
-  /**
-  Array of identified topics
-   */
-  topics: TextAnalysisTopic[];
-  /**
-  Array of detected concepts
-   */
-  concepts: TextAnalysisConcept[];
-  /**
-  Metadata about the analysis
-   */
-  meta?: {
-    /**
-    Number of keywords found
-     */
-    keywords_count: number;
-    /**
-    Number of topics found
-     */
-    topics_count: number;
-    /**
-    Number of concepts found
-     */
-    concepts_count: number;
-    /**
-    Processing time in milliseconds
-     */
-    processing_time_ms?: number;
-  };
-}
-
-/**
- * Response from individual analysis endpoints (if needed for future use)
- * Currently the endpoints return arrays directly, but keeping these types
- * in case the API structure changes
- */
-export interface KeywordsResponse {
-  /**
-  Array of extracted keywords
-   */
-  results: TextAnalysisKeyword[];
-  /**
-  Metadata about keyword extraction
-   */
-  meta?: {
-    count: number;
-    processing_time_ms?: number;
-  };
-}
-
-export interface TopicsResponse {
-  /**
-  Array of identified topics
-   */
-  results: TextAnalysisTopic[];
-  /**
-  Metadata about topic identification
-   */
-  meta?: {
-    count: number;
-    processing_time_ms?: number;
-  };
-}
-
-export interface ConceptsResponse {
-  /**
-  Array of detected concepts
-   */
-  results: TextAnalysisConcept[];
-  /**
-  Metadata about concept detection
-   */
-  meta?: {
-    count: number;
-    processing_time_ms?: number;
-  };
-}
 
 /**
  * Text Analysis API class providing comprehensive methods for analyzing text content
  */
 export class TextAnalysisApi {
-  constructor(private client: OpenAlexBaseClient) {}
+  constructor(private readonly client: OpenAlexBaseClient) {}
 
   /**
    * Validate text analysis options
-   * @param options
    */
-  private validateOptions(options: TextAnalysisOptions): void {
+  private validateOptions(options: Readonly<TextAnalysisOptions>): void {
     const titleLength = options.title.length;
-    if (titleLength < 20 || titleLength > 2000) {
-      throw new Error(`Title must be between 20-2000 characters (current: ${titleLength})`);
+    if (titleLength < TITLE_MIN_LENGTH || titleLength > TITLE_MAX_LENGTH) {
+      throw new Error(`Title must be between ${String(TITLE_MIN_LENGTH)}-${String(TITLE_MAX_LENGTH)} characters (current: ${String(titleLength)})`);
     }
 
-    if (options.abstract && options.abstract.length > 5000) {
-      throw new Error(`Abstract must be less than 5000 characters (current: ${options.abstract.length})`);
+    if (options.abstract !== undefined && options.abstract.length > ABSTRACT_MAX_LENGTH) {
+      throw new Error(`Abstract must be less than ${String(ABSTRACT_MAX_LENGTH)} characters (current: ${String(options.abstract.length)})`);
     }
   }
 
   /**
    * Build query parameters for text analysis requests
-   * @param options
    */
-  private buildParams(options: TextAnalysisOptions): QueryParams {
+  private buildParams(options: Readonly<TextAnalysisOptions>): QueryParams {
     this.validateOptions(options);
 
     const parameters: QueryParams = {
       title: options.title,
     };
 
-    if (options.abstract) {
+    if (options.abstract !== undefined) {
       parameters.abstract = options.abstract;
     }
 
-    if (options.format) {
+    if (options.format !== undefined) {
       parameters.format = options.format;
     }
 
@@ -232,9 +129,9 @@ export class TextAnalysisApi {
    * console.log('Concepts:', analysis.concepts);
    * ```
    */
-  async analyzeText(options: TextAnalysisOptions): Promise<TextAnalysisResponse> {
+  async analyzeText(options: Readonly<TextAnalysisOptions>): Promise<TextAnalysisResponse> {
     const parameters = this.buildParams(options);
-    return await this.client.get<TextAnalysisResponse>("text", parameters);
+    return await this.client.get("text", parameters, TextAnalysisResponseSchema);
   }
 
   /**
@@ -242,7 +139,7 @@ export class TextAnalysisApi {
    * @param options - Text analysis options including title and optional abstract
    * @returns Promise resolving to complete text analysis results
    */
-  async getText(options: TextAnalysisOptions): Promise<TextAnalysisResponse> {
+  async getText(options: Readonly<TextAnalysisOptions>): Promise<TextAnalysisResponse> {
     return this.analyzeText(options);
   }
 
@@ -261,9 +158,9 @@ export class TextAnalysisApi {
    * });
    * ```
    */
-  async getKeywords(options: TextAnalysisOptions): Promise<TextAnalysisKeyword[]> {
+  async getKeywords(options: Readonly<TextAnalysisOptions>): Promise<TextAnalysisKeyword[]> {
     const parameters = this.buildParams(options);
-    return await this.client.get<TextAnalysisKeyword[]>("text/keywords", parameters);
+    return await this.client.get("text/keywords", parameters, z.array(TextAnalysisKeywordSchema));
   }
 
   /**
@@ -285,9 +182,9 @@ export class TextAnalysisApi {
    * });
    * ```
    */
-  async getTopics(options: TextAnalysisOptions): Promise<TextAnalysisTopic[]> {
+  async getTopics(options: Readonly<TextAnalysisOptions>): Promise<TextAnalysisTopic[]> {
     const parameters = this.buildParams(options);
-    return await this.client.get<TextAnalysisTopic[]>("text/topics", parameters);
+    return await this.client.get("text/topics", parameters, z.array(TextAnalysisTopicSchema));
   }
 
   /**
@@ -308,9 +205,9 @@ export class TextAnalysisApi {
    * });
    * ```
    */
-  async getConcepts(options: TextAnalysisOptions): Promise<TextAnalysisConcept[]> {
+  async getConcepts(options: Readonly<TextAnalysisOptions>): Promise<TextAnalysisConcept[]> {
     const parameters = this.buildParams(options);
-    return await this.client.get<TextAnalysisConcept[]>("text/concepts", parameters);
+    return await this.client.get("text/concepts", parameters, z.array(TextAnalysisConceptSchema));
   }
 
   /**
@@ -326,8 +223,8 @@ export class TextAnalysisApi {
    * ```
    */
   async getRelevantKeywords(
-    options: TextAnalysisOptions,
-    minScore: number = 0.3
+    options: Readonly<TextAnalysisOptions>,
+    minScore = DEFAULT_MIN_SCORE
   ): Promise<TextAnalysisKeyword[]> {
     const keywords = await this.getKeywords(options);
     return keywords.filter(keyword => keyword.score >= minScore);
@@ -346,8 +243,8 @@ export class TextAnalysisApi {
    * ```
    */
   async getRelevantTopics(
-    options: TextAnalysisOptions,
-    minScore: number = 0.3
+    options: Readonly<TextAnalysisOptions>,
+    minScore = DEFAULT_MIN_SCORE
   ): Promise<TextAnalysisTopic[]> {
     const topics = await this.getTopics(options);
     return topics.filter(topic => topic.score >= minScore);
@@ -366,8 +263,8 @@ export class TextAnalysisApi {
    * ```
    */
   async getRelevantConcepts(
-    options: TextAnalysisOptions,
-    minScore: number = 0.3
+    options: Readonly<TextAnalysisOptions>,
+    minScore = DEFAULT_MIN_SCORE
   ): Promise<TextAnalysisConcept[]> {
     const concepts = await this.getConcepts(options);
     return concepts.filter(concept => concept.score >= minScore);
@@ -388,7 +285,7 @@ export class TextAnalysisApi {
    * }
    * ```
    */
-  async getTopResults(options: TextAnalysisOptions): Promise<{
+  async getTopResults(options: Readonly<TextAnalysisOptions>): Promise<{
     topKeyword?: TextAnalysisKeyword;
     topTopic?: TextAnalysisTopic;
     topConcept?: TextAnalysisConcept;
@@ -420,7 +317,7 @@ export class TextAnalysisApi {
    * console.log(`Average score: ${analysis.summary.averageScore}`);
    * ```
    */
-  async getDetailedAnalysis(options: TextAnalysisOptions): Promise<{
+  async getDetailedAnalysis(options: Readonly<TextAnalysisOptions>): Promise<{
     keywords: TextAnalysisKeyword[];
     topics: TextAnalysisTopic[];
     concepts: TextAnalysisConcept[];
@@ -451,8 +348,8 @@ export class TextAnalysisApi {
 
     const scoreDistribution = allEntities.reduce(
       (distribution, entity) => {
-        if (entity.score >= 0.7) distribution.high++;
-        else if (entity.score >= 0.3) distribution.medium++;
+        if (entity.score >= HIGH_SCORE_THRESHOLD) distribution.high++;
+        else if (entity.score >= MEDIUM_SCORE_THRESHOLD) distribution.medium++;
         else distribution.low++;
         return distribution;
       },

@@ -9,12 +9,22 @@ import type {
   OpenAlexResponse,
   QueryParams,
 } from "@bibgraph/types";
-import { extractPropertyValue, trustObjectShape } from "@bibgraph/types";
+import { extractPropertyValue, keywordSchema,trustObjectShape  } from "@bibgraph/types";
 
-import { OpenAlexBaseClient } from "../client";
+import type { OpenAlexBaseClient } from "../client";
 import { buildFilterString } from "../utils/query-builder";
 // Replace lodash-es with native JavaScript
 const isString = (value: unknown): value is string => typeof value === "string";
+
+/**
+OpenAlex API limit for the per_page parameter
+ */
+const MAX_PER_PAGE = 200;
+
+/**
+Sample size used to compute aggregate keyword statistics
+ */
+const STATS_SAMPLE_SIZE = 1000;
 
 
 /**
@@ -74,13 +84,11 @@ export interface StrictKeywordsQueryParams {
 
 /**
  * Type guard to check if a value is a string array
- * @param value
  */
 const isStringArray = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => isString(item));
 
 /**
  * Convert strict keywords query params to base query params
- * @param params
  */
 const toQueryParameters = (params: StrictKeywordsQueryParams): QueryParams => {
   const result: QueryParams = {
@@ -97,7 +105,7 @@ const toQueryParameters = (params: StrictKeywordsQueryParams): QueryParams => {
 
   // Convert filter object to filter string if it exists and is an object
   if (
-    params.filter &&
+    params.filter !== undefined &&
     typeof params.filter === "object" &&
     !isString(params.filter)
   ) {
@@ -186,11 +194,10 @@ export interface SearchKeywordsOptions {
  * Keywords API class providing methods for keyword operations
  */
 export class KeywordsApi {
-  constructor(private client: OpenAlexBaseClient) {}
+  constructor(private readonly client: OpenAlexBaseClient) {}
 
   /**
    * Type guard to check if params is QueryParams by checking for string sort property
-   * @param params
    */
   private isQueryParams(params: unknown): params is QueryParams {
     if (typeof params !== "object" || params === null) {
@@ -207,7 +214,6 @@ export class KeywordsApi {
 
   /**
    * Type guard to check if params is StrictKeywordsQueryParams
-   * @param params
    */
   private isStrictKeywordsQueryParams(
     params: unknown,
@@ -220,7 +226,7 @@ export class KeywordsApi {
    * @param id - The keyword ID (must be a valid OpenAlex keyword ID)
    * @param params - Additional query parameters with strict typing
    * @returns Promise resolving to a keyword
-   * @throws {OpenAlexApiError} When the keyword is not found or invalid ID format
+   * @throws An OpenAlexApiError when the keyword is not found or the ID format is invalid
    * @example
    * ```typescript
    * const keyword = await keywordsApi.getKeyword('https://openalex.org/K123456789', {
@@ -241,11 +247,12 @@ export class KeywordsApi {
       typeof params.sort === "string" &&
       this.isQueryParams(params)
     ) {
-      return this.client.getById({ endpoint: "keywords", id, params });
+      return this.client.getById({ schema: keywordSchema, endpoint: "keywords", id, params });
     }
     // Otherwise, convert from StrictKeywordsQueryParams
     if (this.isStrictKeywordsQueryParams(params)) {
       return this.client.getById({
+        schema: keywordSchema,
         endpoint: "keywords",
         id,
         params: toQueryParameters(params),
@@ -253,6 +260,7 @@ export class KeywordsApi {
     }
     // Default case - treat as basic params
     return this.client.getById({
+      schema: keywordSchema,
       endpoint: "keywords",
       id,
       params: toQueryParameters({}),
@@ -281,17 +289,17 @@ export class KeywordsApi {
       typeof params.sort === "string" &&
       this.isQueryParams(params)
     ) {
-      return this.client.getResponse<Keyword>("keywords", params);
+      return this.client.getResponse<Keyword>("keywords", params, keywordSchema);
     }
     // Otherwise, convert from StrictKeywordsQueryParams
     if (this.isStrictKeywordsQueryParams(params)) {
       return this.client.getResponse<Keyword>(
         "keywords",
         toQueryParameters(params),
-      );
+      keywordSchema);
     }
     // Default case - treat as basic params
-    return this.client.getResponse<Keyword>("keywords", toQueryParameters({}));
+    return this.client.getResponse<Keyword>("keywords", toQueryParameters({}), keywordSchema);
   }
 
   /**
@@ -299,7 +307,7 @@ export class KeywordsApi {
    * @param query - Search query string (must be non-empty)
    * @param options - Search options including filters and pagination
    * @returns Promise resolving to search results
-   * @throws {Error} When query is empty or invalid pagination parameters
+   * @throws An Error when query is empty or invalid pagination parameters
    * @example
    * ```typescript
    * const results = await keywordsApi.searchKeywords('machine learning', {
@@ -327,10 +335,10 @@ export class KeywordsApi {
 
     // Validate pagination parameters
     if (page < 1) {
-      throw new Error("Page number must be >= 1");
+      throw new Error("Page number must be at least 1");
     }
-    if (per_page < 1 || per_page > 200) {
-      throw new Error("per_page must be between 1 and 200");
+    if (per_page < 1 || per_page > MAX_PER_PAGE) {
+      throw new Error(`per_page must be between 1 and ${String(MAX_PER_PAGE)}`);
     }
 
     const baseParameters = {
@@ -349,10 +357,10 @@ export class KeywordsApi {
 
   /**
    * Get keywords by minimum works count with strict validation
-   * @param minWorksCount - Minimum number of works for keywords (must be >= 0)
+   * @param minWorksCount - Minimum number of works for keywords (must be at least 0)
    * @param params - Additional query parameters
    * @returns Promise resolving to filtered keywords
-   * @throws {Error} When minWorksCount is invalid
+   * @throws An Error when minWorksCount is invalid
    * @example
    * ```typescript
    * const popularKeywords = await keywordsApi.getKeywordsByWorksCount(100, {
@@ -404,7 +412,7 @@ export class KeywordsApi {
   /**
    * Stream all keywords using cursor pagination
    * @param params - Query parameters for filtering
-   * @yields Batches of keywords
+   * @returns Batches of keywords
    * @example
    * ```typescript
    * for await (const keywordBatch of keywordsApi.streamKeywords({ filter: { 'works_count': '>10' } })) {
@@ -421,15 +429,15 @@ export class KeywordsApi {
       typeof params.sort === "string" &&
       this.isQueryParams(params)
     ) {
-      yield* this.client.stream<Keyword>("keywords", params);
+      yield* this.client.stream<Keyword>("keywords", params, keywordSchema);
       return;
     }
     // Otherwise, convert from StrictKeywordsQueryParams
     if (this.isStrictKeywordsQueryParams(params)) {
-      yield* this.client.stream<Keyword>("keywords", toQueryParameters(params));
+      yield* this.client.stream<Keyword>("keywords", toQueryParameters(params), keywordSchema);
     } else {
       // Default case - treat as basic params
-      yield* this.client.stream<Keyword>("keywords", toQueryParameters({}));
+      yield* this.client.stream<Keyword>("keywords", toQueryParameters({}), keywordSchema);
     }
   }
 
@@ -452,6 +460,7 @@ export class KeywordsApi {
     return this.client.getAll<Keyword>(
       "keywords",
       toQueryParameters(params),
+      keywordSchema,
       maxResults,
     );
   }
@@ -480,7 +489,7 @@ export class KeywordsApi {
     });
 
     // For more detailed stats, we might need to aggregate from a sample
-    const sampleSize = Math.min(1000, response.meta.count);
+    const sampleSize = Math.min(STATS_SAMPLE_SIZE, response.meta.count);
     const sample = await this.getKeywords({
       ...params,
       per_page: sampleSize,
@@ -490,7 +499,7 @@ export class KeywordsApi {
       (sum, keyword) =>
         sum +
         keyword.counts_by_year.reduce(
-          (yearSum, year) => yearSum + (year.works_count ?? 0),
+          (yearSum, year) => yearSum + year.works_count,
           0,
         ),
       0,

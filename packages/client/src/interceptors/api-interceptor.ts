@@ -171,17 +171,46 @@ export interface ApiInterceptorConfig {
  * OpenAlex API Request/Response Interceptor
  * Only active in development mode
  */
+/**
+Default deduplication window: 5 minutes, expressed in milliseconds
+ */
+const DEDUPLICATION_WINDOW_MINUTES = 5;
+const SECONDS_PER_MINUTE = 60;
+const MILLISECONDS_PER_SECOND = 1000;
+const DEFAULT_DEDUPLICATION_WINDOW_MS = DEDUPLICATION_WINDOW_MINUTES * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND;
+
+const DEFAULT_MAX_DEDUPLICATION_ENTRIES = 1000;
+
+/**
+Inclusive lower bound of a successful HTTP status range
+ */
+const HTTP_SUCCESS_STATUS_MIN = 200;
+/**
+Exclusive upper bound of a successful HTTP status range
+ */
+const HTTP_SUCCESS_STATUS_MAX_EXCLUSIVE = 300;
+
+/**
+Maximum characters of a URL shown in a debug log line before truncating
+ */
+const DEBUG_URL_PREVIEW_LENGTH = 100;
+/**
+Maximum characters of a cache key shown in a debug log line before truncating
+ */
+const DEBUG_CACHE_KEY_PREVIEW_LENGTH = 50;
+
 export class ApiInterceptor {
   private readonly config: Required<ApiInterceptorConfig>;
   private readonly deduplicationMap = new Map<string, DeduplicationEntry>();
   private requestIdCounter = 0;
 
-  constructor(config: ApiInterceptorConfig = {}) {
+  constructor(config: Readonly<ApiInterceptorConfig> = {}) {
     this.config = {
       enabled: config.enabled ?? this.isDevelopmentMode(),
-      deduplicationWindow: config.deduplicationWindow ?? 5 * 60 * 1000, // 5 minutes
-      maxDeduplicationEntries: config.maxDeduplicationEntries ?? 1000,
-      onApiCall: config.onApiCall ?? (() => {}),
+      deduplicationWindow: config.deduplicationWindow ?? DEFAULT_DEDUPLICATION_WINDOW_MS,
+      maxDeduplicationEntries: config.maxDeduplicationEntries ?? DEFAULT_MAX_DEDUPLICATION_ENTRIES,
+      // Deliberate no-op default: callers that don't care about intercepted calls needn't supply one.
+      onApiCall: config.onApiCall ?? ((): void => { /* no-op */ }),
     };
 
     if (this.config.enabled) {
@@ -193,11 +222,13 @@ export class ApiInterceptor {
    * Check NODE_ENV for development mode
    */
   private checkNodeEnv(): boolean | null {
-    if (globalThis.process?.env?.NODE_ENV) {
-      const nodeEnvironment = globalThis.process?.env?.NODE_ENV.toLowerCase();
-      if (nodeEnvironment === "development" || nodeEnvironment === "dev") return true;
-      if (nodeEnvironment === "production") return false;
+    const nodeEnvironmentValue = process.env.NODE_ENV;
+    if (nodeEnvironmentValue === undefined) {
+      return null;
     }
+    const nodeEnvironment = nodeEnvironmentValue.toLowerCase();
+    if (nodeEnvironment === "development" || nodeEnvironment === "dev") return true;
+    if (nodeEnvironment === "production") return false;
     return null;
   }
 
@@ -205,15 +236,15 @@ export class ApiInterceptor {
    * Check Vite's __DEV__ flag
    */
   private checkViteDevFlag(): boolean | null {
-    if (typeof globalThis !== "undefined" && "__DEV__" in globalThis) {
-      try {
-        const developmentFlag = (globalThis as Record<string, unknown>)["__DEV__"];
+    try {
+      if ("__DEV__" in globalThis) {
+        const developmentFlag: unknown = globalThis.__DEV__;
         if (typeof developmentFlag === "boolean") {
           return developmentFlag;
         }
-      } catch {
-        // Ignore errors if __DEV__ is not accessible
       }
+    } catch {
+      // Ignore errors if __DEV__ is not accessible
     }
     return null;
   }
@@ -223,24 +254,17 @@ export class ApiInterceptor {
    */
   private checkBrowserDevIndicators(): boolean | null {
     try {
-      if (typeof globalThis !== "undefined" && "window" in globalThis) {
-        const win =
-          "window" in globalThis &&
-          globalThis.window &&
-          "location" in window
-            ? window
-            : undefined;
-        if (win?.location?.hostname) {
-          const { hostname } = win.location;
-          // Local development indicators
-          if (
-            hostname === "localhost" ||
-            hostname === "127.0.0.1" ||
-            hostname.endsWith(".local")
-          ) {
-            return true;
-          }
-        }
+      if (typeof window === "undefined") {
+        return null;
+      }
+      const { hostname } = window.location;
+      // Local development indicators
+      if (
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname.endsWith(".local")
+      ) {
+        return true;
       }
     } catch {
       // Ignore errors in browser detection
@@ -272,12 +296,11 @@ export class ApiInterceptor {
    * Generate a unique request ID
    */
   private generateRequestId(): string {
-    return `req_${Date.now()}_${++this.requestIdCounter}`;
+    return `req_${String(Date.now())}_${String(++this.requestIdCounter)}`;
   }
 
   /**
    * Extract entity type from OpenAlex URL
-   * @param url
    */
   private extractEntityType(url: string): EntityType | undefined {
     const urlObject = new URL(url);
@@ -308,7 +331,6 @@ export class ApiInterceptor {
 
   /**
    * Extract entity ID from OpenAlex URL
-   * @param url
    */
   private extractEntityId(url: string): string | undefined {
     const urlObject = new URL(url);
@@ -326,7 +348,6 @@ export class ApiInterceptor {
 
   /**
    * Parse query parameters from URL
-   * @param url
    */
   private parseQueryParams(url: string): QueryParams {
     const urlObject = new URL(url);
@@ -357,7 +378,6 @@ export class ApiInterceptor {
 
   /**
    * Generate cache key from request components
-   * @param components
    */
   private generateCacheKey(components: CacheKeyComponents): string {
     const { entityType, entityId, params, baseUrl } = components;
@@ -382,7 +402,6 @@ export class ApiInterceptor {
 
   /**
    * Check if request should be deduplicated
-   * @param cacheKey
    */
   private shouldDeduplicate(cacheKey: string): boolean {
     const now = Date.now();
@@ -405,7 +424,6 @@ export class ApiInterceptor {
 
   /**
    * Add request to deduplication map
-   * @param cacheKey
    */
   private addToDeduplication(cacheKey: string): void {
     const now = Date.now();
@@ -439,13 +457,11 @@ export class ApiInterceptor {
       this.deduplicationMap.delete(key);
     }
 
-    logger.debug(`Cleaned up ${expired.length} expired deduplication entries`);
+    logger.debug(`Cleaned up ${String(expired.length)} expired deduplication entries`);
   }
 
   /**
    * Intercept an outgoing request
-   * @param url
-   * @param options
    */
   public interceptRequest(
     url: string,
@@ -476,7 +492,9 @@ export class ApiInterceptor {
           }
         } else {
           // Handle Record<string, string> format
-          Object.assign(headers, options.headers);
+          for (const [key, value] of Object.entries(options.headers)) {
+            headers[key] = value;
+          }
         }
       }
 
@@ -495,7 +513,7 @@ export class ApiInterceptor {
         requestId,
         entityType,
         entityId,
-        url: url.slice(0, 100) + (url.length > 100 ? "..." : ""),
+        url: url.slice(0, DEBUG_URL_PREVIEW_LENGTH) + (url.length > DEBUG_URL_PREVIEW_LENGTH ? "..." : ""),
       });
 
       return interceptedRequest;
@@ -507,10 +525,6 @@ export class ApiInterceptor {
 
   /**
    * Intercept a response
-   * @param request
-   * @param response
-   * @param data
-   * @param responseTime
    */
   public interceptResponse(
     request: InterceptedRequest,
@@ -518,13 +532,13 @@ export class ApiInterceptor {
     data: unknown,
     responseTime: number,
   ): InterceptedApiCall | null {
-    if (!this.config.enabled || !request) {
+    if (!this.config.enabled) {
       return null;
     }
 
     try {
       // Check if response is successful (2xx status)
-      if (response.status < 200 || response.status >= 300) {
+      if (response.status < HTTP_SUCCESS_STATUS_MIN || response.status >= HTTP_SUCCESS_STATUS_MAX_EXCLUSIVE) {
         logger.debug("Skipping non-2xx response", {
           requestId: request.requestId,
           status: response.status,
@@ -535,15 +549,15 @@ export class ApiInterceptor {
       const timestamp = Date.now();
 
       // Capture final URL after redirects
-      if (response.url && response.url !== request.url) {
+      if (response.url !== "" && response.url !== request.url) {
         request.finalUrl = response.url;
 
         // Re-extract entity info from final URL for correct cache key generation
         const finalEntityType = this.extractEntityType(response.url);
         const finalEntityId = this.extractEntityId(response.url);
 
-        if (finalEntityType) request.entityType = finalEntityType;
-        if (finalEntityId) request.entityId = finalEntityId;
+        if (finalEntityType !== undefined) request.entityType = finalEntityType;
+        if (finalEntityId !== undefined && finalEntityId !== "") request.entityId = finalEntityId;
 
         logger.debug("Request redirected", {
           requestId: request.requestId,
@@ -590,7 +604,7 @@ export class ApiInterceptor {
       if (this.shouldDeduplicate(cacheKey)) {
         logger.debug("Request deduplicated", {
           requestId: request.requestId,
-          cacheKey: cacheKey.slice(0, 50) + "...",
+          cacheKey: cacheKey.slice(0, DEBUG_CACHE_KEY_PREVIEW_LENGTH) + "...",
         });
         return null;
       }

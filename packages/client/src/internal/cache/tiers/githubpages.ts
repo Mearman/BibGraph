@@ -1,6 +1,5 @@
 /**
- * GitHub Pages cache tier for static data
- * Fetches pre-cached entities from GitHub Pages or local static JSON files
+ * GitHub Pages cache tier for static data Fetches pre-cached entities from GitHub Pages or local static JSON files
  */
 
 import { logger } from "@bibgraph/utils";
@@ -30,17 +29,41 @@ interface RetryConfig {
 	cooldownMs: number;
 }
 
-interface HttpError {
-	message: string;
-	status: number;
-	retryAfter?: string;
+/**
+ * Error thrown when a GitHub Pages fetch receives a non-OK HTTP response
+ */
+class HttpError extends Error {
+	readonly status: number;
+	readonly retryAfter?: string;
+
+	constructor(message: string, status: number, retryAfter?: string) {
+		super(message);
+		this.name = "HttpError";
+		this.status = status;
+		this.retryAfter = retryAfter;
+	}
 }
+
+const RETRY_MAX_ATTEMPTS = 3;
+const TEST_BASE_DELAY_MS = 50;
+const PROD_BASE_DELAY_MS = 1000;
+const TEST_MAX_DELAY_MS = 200;
+const PROD_MAX_DELAY_MS = 10_000;
+const TEST_JITTER_MS = 0;
+const PROD_JITTER_MS = 500;
+const TEST_COOLDOWN_MS = 1000;
+const PROD_COOLDOWN_MS = 30_000; // shorter cooldown in tests
+const MS_PER_SECOND = 1000;
+const FETCH_TIMEOUT_MS = 10_000; // 10 second timeout
+const HEAD_REQUEST_TIMEOUT_MS = 5000; // 5 second timeout for HEAD request
+const HTTP_STATUS_NOT_FOUND = 404;
 
 /**
  * Calculate cache statistics from raw stats
- * @param stats
  */
-const calculateCacheStats = (stats: CacheStats): {
+const calculateCacheStats = (
+	stats: Readonly<CacheStats>,
+): {
 	requests: number;
 	hits: number;
 	averageLoadTime: number;
@@ -55,31 +78,30 @@ const calculateCacheStats = (stats: CacheStats): {
  * GitHub Pages cache implementation for static data
  */
 export class GitHubPagesCacheTier implements CacheTierInterface {
-	private stats: CacheStats = { requests: 0, hits: 0, totalLoadTime: 0 };
+	private readonly stats: CacheStats = { requests: 0, hits: 0, totalLoadTime: 0 };
 	private readonly LOG_PREFIX = "github-pages-cache";
-	private baseUrl: string;
+	private readonly baseUrl: string;
 
 	// Track recent failures per URL to avoid repeated bursts against remote
-	private recentFailures: Map<string, FailureState> = new Map();
+	private readonly recentFailures = new Map<string, FailureState>();
 
 	// Configurable retry policy for remote tier
-	private retryConfig: RetryConfig = (() => {
+	private readonly retryConfig: RetryConfig = (() => {
 		const isTest = Boolean(
-			globalThis.process?.env?.VITEST ??
-				globalThis.process?.env?.NODE_ENV === "test",
+			process.env.VITEST ??
+				process.env.NODE_ENV === "test",
 		);
 		return {
-			maxAttempts: 3,
-			baseDelayMs: isTest ? 50 : 1000,
-			maxDelayMs: isTest ? 200 : 10_000,
-			jitterMs: isTest ? 0 : 500,
-			cooldownMs: isTest ? 1000 : 30_000, // shorter cooldown in tests
+			maxAttempts: RETRY_MAX_ATTEMPTS,
+			baseDelayMs: isTest ? TEST_BASE_DELAY_MS : PROD_BASE_DELAY_MS,
+			maxDelayMs: isTest ? TEST_MAX_DELAY_MS : PROD_MAX_DELAY_MS,
+			jitterMs: isTest ? TEST_JITTER_MS : PROD_JITTER_MS,
+			cooldownMs: isTest ? TEST_COOLDOWN_MS : PROD_COOLDOWN_MS,
 		};
 	})();
 
 	constructor(baseUrl?: string) {
-		// Don't set a default URL - require explicit configuration
-		// This prevents attempting to fetch from non-existent placeholder URLs
+		// Don't set a default URL - require explicit configuration This prevents attempting to fetch from non-existent placeholder URLs
 		this.baseUrl = baseUrl ?? "";
 	}
 
@@ -91,34 +113,30 @@ export class GitHubPagesCacheTier implements CacheTierInterface {
 
 	/**
 	 * Create a typed HTTP error object
-	 * @param response
 	 */
 	private createHttpError(response: Response): HttpError {
-		return {
-			message: `HTTP ${response.status}: ${response.statusText}`,
-			status: response.status,
-			retryAfter: response.headers.get("Retry-After") ?? undefined,
-		};
+		return new HttpError(
+			`HTTP ${String(response.status)}: ${response.statusText}`,
+			response.status,
+			response.headers.get("Retry-After") ?? undefined,
+		);
 	}
 
 	/**
 	 * Calculate retry delay with exponential backoff and jitter
-	 * @param attempt
-	 * @param retryAfterSec
 	 */
 	private calculateRetryDelay(attempt: number, retryAfterSec?: number): number {
 		const base = this.retryConfig.baseDelayMs * Math.pow(2, attempt - 1);
 		const jitter = Math.random() * this.retryConfig.jitterMs;
 		return Math.min(
-			(retryAfterSec ? retryAfterSec * 1000 : base) + jitter,
+			(retryAfterSec !== undefined ? retryAfterSec * MS_PER_SECOND : base) +
+				jitter,
 			this.retryConfig.maxDelayMs,
 		);
 	}
 
 	/**
 	 * Update failure state for a URL
-	 * @param url
-	 * @param error
 	 */
 	private updateFailureState(url: string, error: unknown): void {
 		const previous = this.recentFailures.get(url) ?? {
@@ -133,12 +151,7 @@ export class GitHubPagesCacheTier implements CacheTierInterface {
 		};
 
 		// If it's a 404, don't set cooldown
-		const is404 =
-			typeof error === "object" &&
-			error !== null &&
-			"status" in error &&
-			typeof (error as Record<string, unknown>).status === "number" &&
-			(error as Record<string, unknown>).status === 404;
+		const is404 = error instanceof HttpError && error.status === HTTP_STATUS_NOT_FOUND;
 
 		if (!is404 && newState.attempts >= this.retryConfig.maxAttempts) {
 			newState.cooldownUntil = Date.now() + this.retryConfig.cooldownMs;
@@ -164,7 +177,7 @@ export class GitHubPagesCacheTier implements CacheTierInterface {
 		// If we recently hit repeated failures for this URL, respect cooldown
 		const failureState = this.recentFailures.get(url);
 		if (
-			failureState?.cooldownUntil &&
+			failureState?.cooldownUntil !== undefined &&
 			Date.now() < failureState.cooldownUntil
 		) {
 			logger.debug(
@@ -180,7 +193,7 @@ export class GitHubPagesCacheTier implements CacheTierInterface {
 				const controller = new AbortController();
 				const timeoutId = setTimeout(() => {
 					controller.abort();
-				}, 10_000); // 10 second timeout
+				}, FETCH_TIMEOUT_MS);
 
 				const response = await fetch(url, {
 					method: "GET",
@@ -194,7 +207,7 @@ export class GitHubPagesCacheTier implements CacheTierInterface {
 				clearTimeout(timeoutId);
 
 				if (!response.ok) {
-					if (response.status === 404) {
+					if (response.status === HTTP_STATUS_NOT_FOUND) {
 						return { found: false };
 					}
 					throw this.createHttpError(response);
@@ -226,33 +239,21 @@ export class GitHubPagesCacheTier implements CacheTierInterface {
 				this.updateFailureState(url, error);
 
 				// Check if it's a 404 error
-				const is404 =
-					typeof error === "object" &&
-					error !== null &&
-					"status" in error &&
-					typeof (error as Record<string, unknown>).status === "number" &&
-					(error as Record<string, unknown>).status === 404;
-				if (is404) {
+				if (error instanceof HttpError && error.status === HTTP_STATUS_NOT_FOUND) {
 					return { found: false };
 				}
 
 				// Retry if attempts remain
 				if (attempt < this.retryConfig.maxAttempts) {
 					let retryAfterSec: number | undefined;
-					if (
-						typeof error === "object" &&
-						error !== null &&
-						"retryAfter" in error
-					) {
-						const errorObject = error as Record<string, unknown>;
-						const retryAfter = errorObject.retryAfter;
-						if (typeof retryAfter === "string") {
-							retryAfterSec = Number.parseInt(retryAfter);
-						}
+					if (error instanceof HttpError && error.retryAfter !== undefined) {
+						retryAfterSec = Number.parseInt(error.retryAfter);
 					}
 
 					const delay = this.calculateRetryDelay(attempt, retryAfterSec);
-					await new Promise((resolve) => setTimeout(resolve, delay));
+					await new Promise((resolve) => {
+						setTimeout(resolve, delay);
+					});
 					return attemptFetch(attempt + 1);
 				}
 
@@ -284,7 +285,7 @@ export class GitHubPagesCacheTier implements CacheTierInterface {
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => {
 				controller.abort();
-			}, 5000); // 5 second timeout for HEAD request
+			}, HEAD_REQUEST_TIMEOUT_MS);
 
 			const response = await fetch(url, {
 				method: "HEAD",
@@ -303,6 +304,7 @@ export class GitHubPagesCacheTier implements CacheTierInterface {
 		hits: number;
 		averageLoadTime: number;
 	}> {
+		await Promise.resolve();
 		return calculateCacheStats(this.stats);
 	}
 

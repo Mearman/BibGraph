@@ -65,13 +65,36 @@ export const validateRorFormat = (rorId: string): boolean => {
 };
 
 /**
+ * Validate ROR ID length and throw if invalid
+ * @param rorId - ROR ID to validate
+ * @param errorMessage - Error message to throw if invalid
+ * @throws Error if ROR ID length is not 9 characters
+ */
+export const validateRorIdLength = (rorId: string, errorMessage: string): void => {
+  if (rorId.length !== ROR_ID_LENGTH) {
+    throw new Error(errorMessage);
+  }
+};
+
+/**
+ * Validate ROR format and throw if invalid
+ * @param rorId - ROR ID to validate
+ * @throws Error if ROR ID format is invalid
+ */
+export const validateAndThrowIfInvalid = (rorId: string): void => {
+  if (!validateRorFormat(rorId)) {
+    throw new Error(`Invalid ROR ID format: ${rorId}`);
+  }
+};
+
+/**
  * Try to extract ROR ID from URL pattern (https://ror.org/...)
  * @param trimmed - Trimmed input string
  * @returns Normalized ROR URL or null if not a URL pattern
  * @throws Error if ROR ID format is invalid
  */
 export const tryExtractRorFromUrl = (trimmed: string): string | null => {
-  const urlMatch = trimmed.match(/^https?:\/\/ror\.org\/([0-9a-z]*)/i);
+  const urlMatch = /^https?:\/\/ror\.org\/([0-9a-z]*)/i.exec(trimmed);
   if (!urlMatch) return null;
 
   const rorId = urlMatch[1];
@@ -88,7 +111,7 @@ export const tryExtractRorFromUrl = (trimmed: string): string | null => {
  * @throws Error if ROR ID format is invalid
  */
 export const tryExtractRorFromDomain = (trimmed: string): string | null => {
-  const domainMatch = trimmed.match(/^ror\.org\/([0-9a-z]*)/i);
+  const domainMatch = /^ror\.org\/([0-9a-z]*)/i.exec(trimmed);
   if (!domainMatch) return null;
 
   const rorId = domainMatch[1];
@@ -108,7 +131,7 @@ export const tryExtractRorFromDomain = (trimmed: string): string | null => {
  * @throws Error if ROR ID format is invalid
  */
 export const tryExtractRorFromPrefix = (trimmed: string): string | null => {
-  const prefixMatch = trimmed.match(/^ror:([0-9a-z]*)/i);
+  const prefixMatch = /^ror:([0-9a-z]*)/i.exec(trimmed);
   if (!prefixMatch) return null;
 
   const rorId = prefixMatch[1];
@@ -157,29 +180,6 @@ export const tryExtractBareRor = (trimmed: string): string | null => {
 };
 
 /**
- * Validate ROR ID length and throw if invalid
- * @param rorId - ROR ID to validate
- * @param errorMessage - Error message to throw if invalid
- * @throws Error if ROR ID length is not 9 characters
- */
-export const validateRorIdLength = (rorId: string, errorMessage: string): void => {
-  if (rorId?.length !== ROR_ID_LENGTH) {
-    throw new Error(errorMessage);
-  }
-};
-
-/**
- * Validate ROR format and throw if invalid
- * @param rorId - ROR ID to validate
- * @throws Error if ROR ID format is invalid
- */
-export const validateAndThrowIfInvalid = (rorId: string): void => {
-  if (!validateRorFormat(rorId)) {
-    throw new Error(`Invalid ROR ID format: ${rorId}`);
-  }
-};
-
-/**
  * Detect and normalize ROR identifiers
  * @param id - Input identifier
  * @returns Normalized ROR URL or null if not a valid ROR ID
@@ -194,16 +194,16 @@ export const detectAndNormalizeRor = (id: string): string | null => {
 
   // Try different ROR pattern types in order of specificity
   const rorUrl = tryExtractRorFromUrl(trimmed);
-  if (rorUrl) return rorUrl;
+  if (rorUrl !== null) return rorUrl;
 
   const rorDomain = tryExtractRorFromDomain(trimmed);
-  if (rorDomain) return rorDomain;
+  if (rorDomain !== null) return rorDomain;
 
   const rorPrefix = tryExtractRorFromPrefix(trimmed);
-  if (rorPrefix) return rorPrefix;
+  if (rorPrefix !== null) return rorPrefix;
 
   const bareRor = tryExtractBareRor(trimmed);
-  if (bareRor !== undefined) return bareRor;
+  if (bareRor !== null) return bareRor;
 
   return null;
 };
@@ -226,7 +226,7 @@ export const validateAndNormalizeRor = (id: string): string => {
 
   // Try to detect and normalize ROR ID
   const normalizedRor = detectAndNormalizeRor(trimmedId);
-  if (normalizedRor) {
+  if (normalizedRor !== null) {
     return normalizedRor;
   }
 

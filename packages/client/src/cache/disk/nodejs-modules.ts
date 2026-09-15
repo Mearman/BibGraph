@@ -5,27 +5,33 @@
 
 // Unused imports removed - logging handled by caller modules
 
+import type * as CryptoModule from "node:crypto";
+import type * as FsPromisesModule from "node:fs/promises";
+import type * as PathModule from "node:path";
+
+/**
+ * Type guard narrowing an unknown value to a plain record, used to safely inspect `package.json` contents parsed from disk without an unchecked type assertion.
+ */
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
+
 // Dynamic imports for Node.js modules to avoid browser bundling issues
-let fs: typeof import("node:fs/promises") | undefined;
-let path: typeof import("node:path") | undefined;
-let crypto: typeof import("node:crypto") | undefined;
+let fs: typeof FsPromisesModule | undefined;
+let path: typeof PathModule | undefined;
+let crypto: typeof CryptoModule | undefined;
 
 /**
  * For testing: allow injecting mock Node.js modules
- * @param root0
- * @param root0.mockFs
- * @param root0.mockPath
- * @param root0.mockCrypto
  */
 export const __setMockModules = ({
 	mockFs,
 	mockPath,
 	mockCrypto,
-}: {
-	mockFs?: typeof import("fs/promises");
-	mockPath?: typeof import("path");
-	mockCrypto?: typeof import("crypto");
-}): void => {
+}: Readonly<{
+	mockFs?: typeof FsPromisesModule;
+	mockPath?: typeof PathModule;
+	mockCrypto?: typeof CryptoModule;
+}>): void => {
 	fs = mockFs;
 	path = mockPath;
 	crypto = mockCrypto;
@@ -44,18 +50,18 @@ export const initializeNodeModules = async (): Promise<void> => {
 		import("node:path"),
 		import("node:crypto"),
 	]);
-	fs = fsModule.default || fsModule;
-	path = pathModule.default || pathModule;
-	crypto = cryptoModule.default || cryptoModule;
+	fs = fsModule.default;
+	path = pathModule.default;
+	crypto = cryptoModule.default;
 };
 
 /**
  * Get initialized Node modules (throws if not initialized)
  */
 export const getNodeModules = (): {
-	fs: typeof import("node:fs/promises");
-	path: typeof import("node:path");
-	crypto: typeof import("node:crypto");
+	fs: typeof FsPromisesModule;
+	path: typeof PathModule;
+	crypto: typeof CryptoModule;
 } => {
 	if (!fs || !path || !crypto) {
 		throw new Error(
@@ -87,8 +93,8 @@ export const findWorkspaceRoot = async (): Promise<string> => {
 			try {
 				const packageJson = pathModule.join(currentDir, "package.json");
 				const content = await fsModule.readFile(packageJson, "utf8");
-				const package_ = JSON.parse(content) as { workspaces?: unknown };
-				if (package_.workspaces) {
+				const package_: unknown = JSON.parse(content);
+				if (isPlainObject(package_) && package_.workspaces !== undefined) {
 					return currentDir;
 				}
 			} catch {
@@ -106,23 +112,25 @@ export const findWorkspaceRoot = async (): Promise<string> => {
 
 /**
  * Sleep for specified milliseconds
- * @param ms
  */
-export const sleep = (ms: number): Promise<void> => {
-	return new Promise((resolve) => setTimeout(resolve, ms));
+export const sleep = async (ms: number): Promise<void> => {
+	await new Promise<void>((resolve) => {
+		setTimeout(resolve, ms);
+	});
 };
 
 /**
  * Format bytes for human-readable display
- * @param bytes
  */
+const BYTES_PER_UNIT = 1024;
+
 export const formatBytes = (bytes: number): string => {
 	const units = ["B", "KB", "MB", "GB", "TB"];
 	let size = bytes;
 	let unitIndex = 0;
 
-	while (size >= 1024 && unitIndex < units.length - 1) {
-		size /= 1024;
+	while (size >= BYTES_PER_UNIT && unitIndex < units.length - 1) {
+		size /= BYTES_PER_UNIT;
 		unitIndex++;
 	}
 

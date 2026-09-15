@@ -8,11 +8,11 @@
  */
 export interface CitationWorkData {
   display_name?: string;
-  authorships?: Array<{
+  authorships?: {
     author: {
       display_name?: string;
     };
-  }>;
+  }[];
   publication_year?: number;
   primary_location?: {
     source?: {
@@ -48,15 +48,16 @@ interface CitationParameters {
   authorshipsLength: number;
 }
 
+const MAX_CITATION_AUTHORS = 3;
+
 /**
  * Extract and prepare author names for citation
- * @param authorships
  */
-const prepareAuthors = (authorships: Array<{ author: { display_name?: string } }>): string[] => {
+const prepareAuthors = (authorships: readonly { author: { display_name?: string } }[]): string[] => {
   const authors = authorships
-    .slice(0, 3) // Limit to first 3 authors
+    .slice(0, MAX_CITATION_AUTHORS)
     .map((authorship) => authorship.author.display_name)
-    .filter((name): name is string => !!name);
+    .filter((name): name is string => name !== undefined && name !== "");
 
   if (authors.length === 0) {
     authors.push("Unknown Author");
@@ -67,7 +68,6 @@ const prepareAuthors = (authorships: Array<{ author: { display_name?: string } }
 
 /**
  * Extract citation parameters from work object
- * @param work
  */
 const extractCitationParameters = (work: CitationWorkData): CitationParameters => {
   const {
@@ -85,7 +85,8 @@ const extractCitationParameters = (work: CitationWorkData): CitationParameters =
   const volume = biblio?.volume;
   const issue = biblio?.issue;
   const pages =
-    biblio?.first_page && biblio.last_page
+    biblio?.first_page !== undefined && biblio.first_page !== "" &&
+    biblio.last_page !== undefined && biblio.last_page !== ""
       ? `${biblio.first_page}-${biblio.last_page}`
       : biblio?.first_page;
 
@@ -104,7 +105,6 @@ const extractCitationParameters = (work: CitationWorkData): CitationParameters =
 
 /**
  * Format APA style citation
- * @param params
  */
 const formatAPACitation = (params: CitationParameters): string => {
   const { authors, display_name, year, journal, volume, issue, pages, doi, authorshipsLength } = params;
@@ -117,49 +117,47 @@ const formatAPACitation = (params: CitationParameters): string => {
     citation += `${authors[0]} & ${authors[1]}`;
   } else {
     citation += `${authors[0]}, ${authors[1]}, & ${authors[2]}`;
-    if (authorshipsLength > 3) citation += ", et al.";
+    if (authorshipsLength > MAX_CITATION_AUTHORS) citation += ", et al.";
   }
 
   // Year
-  citation += year ? ` (${year}).` : " (n.d.).";
+  citation += year !== undefined && year !== "" ? ` (${year}).` : " (n.d.).";
 
   // Title
   citation += ` ${display_name}.`;
 
   // Journal info
-  if (journal) {
+  if (journal !== undefined && journal !== "") {
     citation += ` *${journal}*`;
-    if (volume && issue) citation += `, ${volume}(${issue})`;
-    else if (volume) citation += `, ${volume}`;
-    if (pages) citation += `, ${pages}`;
+    if (volume !== undefined && volume !== "" && issue !== undefined && issue !== "") citation += `, ${volume}(${issue})`;
+    else if (volume !== undefined && volume !== "") citation += `, ${volume}`;
+    if (pages !== undefined && pages !== "") citation += `, ${pages}`;
     citation += ".";
   }
 
   // DOI
-  if (doi) citation += ` https://doi.org/${doi}`;
+  if (doi !== undefined && doi !== "") citation += ` https://doi.org/${doi}`;
 
   return citation;
 };
 
 /**
  * Format a single author name for MLA style (Last, First)
- * @param author
  */
 const formatMLASingleAuthor = (author: string): string => {
   const nameParts = author.split(" ");
   if (nameParts.length > 1) {
     const lastName = nameParts.at(-1);
     const firstNames = nameParts.slice(0, -1).join(" ");
-    return `${lastName}, ${firstNames}`;
+    return `${String(lastName)}, ${firstNames}`;
   }
   return author;
 };
 
 /**
  * Format author names for MLA style
- * @param authors
  */
-const formatMLAAuthors = (authors: string[]): string => {
+const formatMLAAuthors = (authors: readonly string[]): string => {
   if (authors.length === 0) return "";
 
   // First author (Last, First)
@@ -177,32 +175,26 @@ const formatMLAAuthors = (authors: string[]): string => {
 
 /**
  * Format journal information for MLA style
- * @param journal
- * @param volume
- * @param issue
- * @param year
- * @param pages
  */
 const formatMLAJournalInfo = (journal: string, volume?: string, issue?: string, year?: string, pages?: string): string => {
   let journalInfo = ` *${journal}*`;
-  if (volume) journalInfo += `, vol. ${volume}`;
-  if (issue) journalInfo += `, no. ${issue}`;
-  if (year) journalInfo += `, ${year}`;
-  if (pages) journalInfo += `, pp. ${pages}`;
+  if (volume !== undefined && volume !== "") journalInfo += `, vol. ${volume}`;
+  if (issue !== undefined && issue !== "") journalInfo += `, no. ${issue}`;
+  if (year !== undefined && year !== "") journalInfo += `, ${year}`;
+  if (pages !== undefined && pages !== "") journalInfo += `, pp. ${pages}`;
   journalInfo += ".";
   return journalInfo;
 };
 
 /**
  * Format MLA style citation
- * @param params
  */
 const formatMLACitation = (params: CitationParameters): string => {
   const { authors, display_name, year, journal, volume, issue, pages } = params;
   let citation = formatMLAAuthors(authors);
   citation += `. "${display_name}."`;
 
-  if (journal) {
+  if (journal !== undefined && journal !== "") {
     citation += formatMLAJournalInfo(journal, volume, issue, year, pages);
   }
 
@@ -211,7 +203,6 @@ const formatMLACitation = (params: CitationParameters): string => {
 
 /**
  * Format Chicago style citation
- * @param params
  */
 const formatChicagoCitation = (params: CitationParameters): string => {
   const { authors, display_name, year, journal, volume, issue, pages, doi } = params;
@@ -220,7 +211,7 @@ const formatChicagoCitation = (params: CitationParameters): string => {
   // Authors
   if (authors.length === 1) {
     citation += `${authors[0]}.`;
-  } else if (authors.length <= 3) {
+  } else if (authors.length <= MAX_CITATION_AUTHORS) {
     citation += `${authors.join(", ")}.`;
   } else {
     citation += `${authors[0]} et al.`;
@@ -230,17 +221,17 @@ const formatChicagoCitation = (params: CitationParameters): string => {
   citation += ` "${display_name}."`;
 
   // Journal info
-  if (journal) {
+  if (journal !== undefined && journal !== "") {
     citation += ` *${journal}*`;
-    if (volume && issue) citation += ` ${volume}, no. ${issue}`;
-    else if (volume) citation += ` ${volume}`;
-    if (year) citation += ` (${year})`;
-    if (pages) citation += `: ${pages}`;
+    if (volume !== undefined && volume !== "" && issue !== undefined && issue !== "") citation += ` ${volume}, no. ${issue}`;
+    else if (volume !== undefined && volume !== "") citation += ` ${volume}`;
+    if (year !== undefined && year !== "") citation += ` (${year})`;
+    if (pages !== undefined && pages !== "") citation += `: ${pages}`;
     citation += ".";
   }
 
   // DOI
-  if (doi) citation += ` https://doi.org/${doi}.`;
+  if (doi !== undefined && doi !== "") citation += ` https://doi.org/${doi}.`;
 
   return citation;
 };

@@ -8,21 +8,32 @@ import { isRecord } from "@bibgraph/types";
 /**
  * Simple synchronous hash function that works in both browser and Node.js
  * Uses FNV-1a hash algorithm (fast, deterministic, collision-resistant for our use case)
- * @param str
  */
+// Bit-shift amounts that together multiply by the FNV prime (16777619) using only shifts and adds.
+const FNV_PRIME_SHIFT_A = 1;
+const FNV_PRIME_SHIFT_B = 4;
+const FNV_PRIME_SHIFT_C = 7;
+const FNV_PRIME_SHIFT_D = 8;
+const FNV_PRIME_SHIFT_E = 24;
+const HEX_RADIX = 16;
+const HEX_HASH_LENGTH = 8;
+
 const simpleHash = (str: string): string => {
   let hash = 2_166_136_261; // FNV offset basis
 
   for (let index = 0; index < str.length; index++) {
     hash ^= str.charCodeAt(index);
-    // FNV prime: 16777619
     hash +=
-      (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+      (hash << FNV_PRIME_SHIFT_A) +
+      (hash << FNV_PRIME_SHIFT_B) +
+      (hash << FNV_PRIME_SHIFT_C) +
+      (hash << FNV_PRIME_SHIFT_D) +
+      (hash << FNV_PRIME_SHIFT_E);
   }
 
   // Convert to unsigned 32-bit and then to hex
   const unsigned = hash >>> 0;
-  return unsigned.toString(16).padStart(8, "0");
+  return unsigned.toString(HEX_RADIX).padStart(HEX_HASH_LENGTH, "0");
 };
 
 export interface OpenAlexRequest {
@@ -64,17 +75,38 @@ export interface NormalizedRequest {
 }
 
 /**
+ * Type guard narrowing to `unknown[]` rather than the `any[]` that `Array.isArray` itself narrows to, so downstream array operations stay type-safe instead of silently becoming `any`.
+ */
+const isUnknownArray = (value: unknown): value is unknown[] => Array.isArray(value);
+
+/**
+ * Convert an arbitrary value to a string suitable for sorting/serialization comparisons.
+ */
+const toComparableString = (value: unknown): string => {
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  return JSON.stringify(value);
+};
+
+/**
  * Normalize an object's keys and values recursively for consistent comparison
- * @param obj
  */
 const normalizeObject = (obj: Record<string, unknown>): Record<string, unknown> => Object.keys(obj)
     .sort()
-    .reduce((accumulator, key) => {
+    .reduce<Record<string, unknown>>((accumulator, key) => {
       const value = obj[key];
 
-      if (Array.isArray(value)) {
-        // Sort array elements for consistent ordering
-        accumulator[key] = [...value].sort();
+      if (isUnknownArray(value)) {
+        // Sort array elements for consistent ordering, comparing by string representation
+        accumulator[key] = [...value].sort((a: unknown, b: unknown) =>
+          toComparableString(a).localeCompare(toComparableString(b)),
+        );
       } else if (isRecord(value)) {
         accumulator[key] = normalizeObject(value);
       } else {
@@ -86,7 +118,6 @@ const normalizeObject = (obj: Record<string, unknown>): Record<string, unknown> 
 
 /**
  * Convert params object to URL query string
- * @param params
  */
 const parametersToQueryString = (params: Record<string, unknown>): string => {
   const entries: [string, string][] = [];
@@ -96,13 +127,20 @@ const parametersToQueryString = (params: Record<string, unknown>): string => {
       continue;
     }
 
-    if (Array.isArray(value)) {
+    if (isUnknownArray(value)) {
       entries.push([key, value.join(",")]);
-    } else if (typeof value === "object") {
+    } else if (isRecord(value)) {
       // For complex objects (like filters), serialize to JSON
       entries.push([key, JSON.stringify(value)]);
-    } else {
+    } else if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      typeof value === "bigint"
+    ) {
       entries.push([key, String(value)]);
+    } else {
+      entries.push([key, toComparableString(value)]);
     }
   }
 
@@ -148,18 +186,13 @@ export const normalizeRequest = (request: OpenAlexRequest): NormalizedRequest =>
 
 /**
  * Compare two normalized requests for equality
- * @param a
- * @param b
  */
 export const requestsEqual = (a: NormalizedRequest, b: NormalizedRequest): boolean => a.hash === b.hash;
 
 /**
  * Check if a request is a duplicate of a recent request (within time window)
- * @param request
- * @param recentRequests
- * @param windowMs
  */
-export const isDuplicateRequest = (request: NormalizedRequest, recentRequests: Array<{ request: NormalizedRequest; timestamp: number }>, windowMs = 1000): boolean => {
+export const isDuplicateRequest = (request: NormalizedRequest, recentRequests: readonly { request: NormalizedRequest; timestamp: number }[], windowMs = 1000): boolean => {
   const now = Date.now();
 
   return recentRequests.some(

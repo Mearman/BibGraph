@@ -32,7 +32,7 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
   constructor(
     initialFilters: Partial<T> = {},
     operator: LogicalOperator = "AND",
-    initialPagination: PaginationParameters = {},
+    initialPagination: Readonly<PaginationParameters> = {},
   ) {
     this.filters = { ...initialFilters };
     this.logicalOperator = operator;
@@ -99,10 +99,10 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
       throw new Error(`Invalid date range: ${String(validation.error)}`);
     }
 
-    if (validation.normalizedFrom) {
+    if (validation.normalizedFrom !== undefined) {
       this.safelyAssignToField(fromField, validation.normalizedFrom);
     }
-    if (validation.normalizedTo) {
+    if (validation.normalizedTo !== undefined) {
       this.safelyAssignToField(toField, validation.normalizedTo);
     }
 
@@ -116,7 +116,7 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
    * @returns This QueryBuilder instance for chaining
    */
   addSearch(field: keyof T, query: string): this {
-    if (query?.trim().length === 0) {
+    if (query.trim().length === 0) {
       return this;
     }
 
@@ -170,8 +170,9 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
    * @returns This QueryBuilder instance for chaining
    */
   setPerPage(perPage: number): this {
-    if (perPage < 1 || perPage > 200) {
-      throw new Error("per_page must be between 1 and 200");
+    const MAX_PER_PAGE = 200;
+    if (perPage < 1 || perPage > MAX_PER_PAGE) {
+      throw new Error(`per_page must be between 1 and ${String(MAX_PER_PAGE)}`);
     }
     this.pagination.per_page = perPage;
     return this;
@@ -193,7 +194,7 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
    * @returns This QueryBuilder instance for chaining
    */
   setGroupBy(groupBy: string): this {
-    if (groupBy?.trim().length === 0) {
+    if (groupBy.trim().length === 0) {
       throw new Error("group_by cannot be empty");
     }
     this.pagination.group_by = groupBy.trim();
@@ -252,7 +253,6 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
 
   /**
    * Type guard to check if a string key is valid for the filter type
-   * @param key
    */
   private isValidKey(key: string): key is string & keyof T {
     return typeof key === "string" && key.length > 0;
@@ -260,11 +260,10 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
 
   /**
    * Type guard to check if a value can be assigned to filter fields
-   * @param value
    */
   private isAssignableToField(
     value: unknown,
-  ): value is string | number | boolean | Array<unknown> {
+  ): value is string | number | boolean | unknown[] {
     return (
       typeof value === "string" ||
       typeof value === "number" ||
@@ -274,19 +273,16 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
   }
 
   /**
-   * Type guard to safely access filters as a record
-   * @param _filters
+   * Type guard narrowing filters to a plain record so a field can be assigned by dynamic key without a type assertion
    */
   private isFiltersRecord(
-    _filters: Partial<T>,
-  ): _filters is Partial<T> & Record<string, unknown> {
-    return true;
+    filters: Partial<T>,
+  ): filters is Partial<T> & Record<string, unknown> {
+    return typeof filters === "object" && !Array.isArray(filters);
   }
 
   /**
    * Safely assign a value to a filter field after validation
-   * @param field
-   * @param value
    */
   private safelyAssignToField(field: keyof T, value: unknown): void {
     if (!(this.isAssignableToField(value) && this.isFiltersRecord(this.filters))) {
@@ -294,16 +290,13 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
     }
 
     const filterKey = String(field);
-    const filtersRecord = this.filters as Record<string, unknown>;
-    if (typeof filtersRecord === "object" && filtersRecord !== null) {
-      filtersRecord[filterKey] = value;
-    }
+    // Write through a Record<string, unknown>-typed binding: `this.filters` narrows to `Partial<T> & Record<string, unknown>`, but writing through an intersection whose Partial<T> member is a generic mapped type is rejected by TS (TS2862) even once narrowed -- this binding carries only the Record<string, unknown> half, which supports indexed writes.
+    const filtersRecord: Record<string, unknown> = this.filters;
+    filtersRecord[filterKey] = value;
   }
 
   /**
    * Safely assign a value to a filter field by key string after validation
-   * @param key
-   * @param value
    */
   private safelyAssignByKey(key: string, value: unknown): void {
     if (
@@ -311,7 +304,8 @@ export class QueryBuilder<T extends EntityFilters = EntityFilters> {
       this.isAssignableToField(value) &&
       this.isFiltersRecord(this.filters)
     ) {
-      (this.filters as Record<string, unknown>)[key] = value;
+      const filtersRecord: Record<string, unknown> = this.filters;
+      filtersRecord[key] = value;
     }
   }
 }

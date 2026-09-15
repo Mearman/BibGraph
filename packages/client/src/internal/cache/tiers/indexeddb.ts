@@ -18,11 +18,16 @@ interface CacheStats {
 	totalLoadTime: number;
 }
 
+const DEFAULT_TTL_DAYS = 7;
+const HOURS_PER_DAY = 24;
+const MINUTES_PER_HOUR = 60;
+const SECONDS_PER_MINUTE = 60;
+const MS_PER_SECOND = 1000;
+
 /**
  * Calculate cache statistics from raw stats
- * @param stats
  */
-const calculateCacheStats = (stats: CacheStats): {
+const calculateCacheStats = (stats: Readonly<CacheStats>): {
 	requests: number;
 	hits: number;
 	averageLoadTime: number;
@@ -37,14 +42,19 @@ const calculateCacheStats = (stats: CacheStats): {
  * IndexedDB cache implementation using Dexie
  */
 export class IndexedDBCacheTier implements CacheTierInterface {
-	private dexieTier: DexieCacheTier;
+	private readonly dexieTier: DexieCacheTier;
 	private stats: CacheStats = { requests: 0, hits: 0, totalLoadTime: 0 };
 	private readonly LOG_PREFIX = "indexeddb-cache";
 
 	constructor() {
 		this.dexieTier = new DexieCacheTier({
 			maxEntries: 10_000,
-			defaultTtl: 7 * 24 * 60 * 60 * 1000, // 7 days default TTL
+			defaultTtl:
+				DEFAULT_TTL_DAYS *
+				HOURS_PER_DAY *
+				MINUTES_PER_HOUR *
+				SECONDS_PER_MINUTE *
+				MS_PER_SECOND, // 7 days default TTL
 			enableLruEviction: true,
 			evictionBatchSize: 100,
 		});
@@ -142,6 +152,7 @@ export class IndexedDBCacheTier implements CacheTierInterface {
 		hits: number;
 		averageLoadTime: number;
 	}> {
+		await Promise.resolve();
 		return calculateCacheStats(this.stats);
 	}
 
@@ -161,7 +172,6 @@ export class IndexedDBCacheTier implements CacheTierInterface {
 
 	/**
 	 * Clear entities of a specific type
-	 * @param entityType
 	 */
 	async clearByType(entityType: StaticEntityType): Promise<number> {
 		return this.dexieTier.clearByType(entityType);

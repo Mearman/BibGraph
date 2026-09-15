@@ -11,13 +11,7 @@ import { staticDataProvider } from "./static-data-provider";
 import { cleanOpenAlexId, toStaticEntityType } from "./static-data-utils";
 
 /**
- * Cache a full entity result (from single entity API responses)
- * @param entityType - The entity type (e.g., "works", "authors")
- * @param entityType.entityType
- * @param id - The entity ID
- * @param entityType.id
- * @param data - The entity data to cache
- * @param entityType.data
+ * Cache a full entity result (from single entity API responses). Takes the entity type (e.g. "works", "authors"), the entity ID, and the entity data to cache.
  */
 export const cacheEntityResult = async ({
   entityType,
@@ -42,14 +36,7 @@ export const cacheEntityResult = async ({
 };
 
 /**
- * Cache a partial entity result (from list responses)
- * Unlike cacheEntityResult, this accepts any object with a valid OpenAlex ID
- * @param entityType - The entity type
- * @param entityType.entityType
- * @param id - The entity ID
- * @param entityType.id
- * @param data - The partial entity data
- * @param entityType.data
+ * Cache a partial entity result (from list responses). Unlike cacheEntityResult, this accepts any object with a valid OpenAlex ID. Takes the entity type, the entity ID, and the partial entity data.
  */
 export const cachePartialEntity = async ({
   entityType,
@@ -79,7 +66,7 @@ export const cachePartialEntity = async ({
  * @param results - Array of entity results
  * @param entityType - The entity type
  */
-export const cacheEntitiesFromResults = async (results: unknown[], entityType: string): Promise<void> => {
+export const cacheEntitiesFromResults = async (results: readonly unknown[], entityType: string): Promise<void> => {
   let cachedCount = 0;
 
   for (const result of results) {

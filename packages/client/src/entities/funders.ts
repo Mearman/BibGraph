@@ -12,17 +12,27 @@ import type {
   QueryParams,
   Work,
 } from "@bibgraph/types";
+import { AutocompleteBaseResponseSchema, funderSchema, institutionSchema, workSchema } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
 
-import { OpenAlexBaseClient } from "../client";
+import type { OpenAlexBaseClient } from "../client";
 import { buildFilterString } from "../utils/query-builder";
 
 /**
- * FundersApi provides methods for interacting with OpenAlex funders
- * Funders represent organizations that provide funding for research and academic work
+Maximum number of funders returned by a random sample
+ */
+const MAX_RANDOM_SAMPLE_SIZE = 50;
+
+/**
+OpenAlex API limit for the per_page parameter
+ */
+const MAX_PER_PAGE = 200;
+
+/**
+ * FundersApi provides methods for interacting with OpenAlex funders Funders represent organizations that provide funding for research and academic work
  */
 export class FundersApi {
-  private client: OpenAlexBaseClient;
+  private readonly client: OpenAlexBaseClient;
 
   constructor(client: OpenAlexBaseClient) {
     this.client = client;
@@ -35,7 +45,7 @@ export class FundersApi {
    * @returns Promise resolving to the funder object
    */
   async get(id: string, params: QueryParams = {}): Promise<Funder> {
-    return this.client.getById<Funder>({ endpoint: "funders", id, params });
+    return this.client.getById<Funder>({ schema: funderSchema, endpoint: "funders", id, params });
   }
 
   /**
@@ -56,7 +66,7 @@ export class FundersApi {
   async getMultiple(
     params: QueryParams & FundersFilters = {},
   ): Promise<OpenAlexResponse<Funder>> {
-    return this.client.getResponse<Funder>("funders", params);
+    return this.client.getResponse<Funder>("funders", params, funderSchema);
   }
 
   /**
@@ -68,12 +78,11 @@ export class FundersApi {
     params: QueryParams & FundersFilters & { filter?: string } = {},
   ): Promise<OpenAlexResponse<Funder>> {
     const processedParameters = this.buildQueryParams(params);
-    return this.client.getResponse<Funder>("funders", processedParameters);
+    return this.client.getResponse<Funder>("funders", processedParameters, funderSchema);
   }
 
   /**
    * Build query parameters with proper filter processing
-   * @param params
    */
   private buildQueryParams(
     params: QueryParams & FundersFilters & { filter?: string } = {},
@@ -83,7 +92,7 @@ export class FundersApi {
 
     // Handle filter object conversion to string
     if (
-      filter &&
+      filter !== undefined &&
       typeof filter === "object" &&
       Object.keys(filter).length > 0
     ) {
@@ -148,9 +157,10 @@ export class FundersApi {
         q: query.trim(),
       };
 
-      const response = await this.client.getResponse<AutocompleteResult>(
+      const response = await this.client.get(
         endpoint,
         queryParameters,
+        AutocompleteBaseResponseSchema,
       );
 
       return response.results.map((result) => ({
@@ -194,8 +204,8 @@ export class FundersApi {
   ): Promise<OpenAlexResponse<Funder>> {
     return this.getMultiple({
       ...params,
-      sample: Math.min(count, 50),
-      per_page: Math.min(count, 50),
+      sample: Math.min(count, MAX_RANDOM_SAMPLE_SIZE),
+      per_page: Math.min(count, MAX_RANDOM_SAMPLE_SIZE),
     });
   }
 
@@ -226,7 +236,7 @@ export class FundersApi {
     return this.client.getResponse<Work>("works", {
       ...params,
       filter: `grants.funder:${funderId}`,
-    });
+    }, workSchema);
   }
 
   /**
@@ -242,7 +252,7 @@ export class FundersApi {
     return this.client.getResponse<Institution>("institutions", {
       ...params,
       filter: `works_count:>0`, // Get institutions with works, then filter by funder in practice
-    });
+    }, institutionSchema);
   }
 
   /**
@@ -265,10 +275,10 @@ export class FundersApi {
    * @returns Promise resolving to funders from the specified countries
    */
   async getByCountries(
-    countryCodes: string[],
+    countryCodes: readonly string[],
     params: QueryParams = {},
   ): Promise<OpenAlexResponse<Funder>> {
-    return this.filters({ country_code: countryCodes }, params);
+    return this.filters({ country_code: [...countryCodes] }, params);
   }
 
   /**
@@ -278,7 +288,7 @@ export class FundersApi {
    * @returns Promise resolving to funders that fund research in specified topics
    */
   async getByTopics(
-    topicIds: string[],
+    topicIds: readonly string[],
     params: QueryParams = {},
   ): Promise<OpenAlexResponse<Funder>> {
     return this.filters({ "topics.id": topicIds.join("|") }, params);
@@ -297,7 +307,7 @@ export class FundersApi {
     return this.getMultiple({
       ...params,
       sort: "grants_count:desc",
-      per_page: Math.min(limit, 200),
+      per_page: Math.min(limit, MAX_PER_PAGE),
     });
   }
 
@@ -314,7 +324,7 @@ export class FundersApi {
     return this.getMultiple({
       ...params,
       sort: "works_count:desc",
-      per_page: Math.min(limit, 200),
+      per_page: Math.min(limit, MAX_PER_PAGE),
     });
   }
 
@@ -331,7 +341,7 @@ export class FundersApi {
     return this.getMultiple({
       ...params,
       sort: "cited_by_count:desc",
-      per_page: Math.min(limit, 200),
+      per_page: Math.min(limit, MAX_PER_PAGE),
     });
   }
 
@@ -361,7 +371,7 @@ export class FundersApi {
     params: QueryParams & FundersFilters = {},
     batchSize = 200,
   ): AsyncGenerator<Funder[], void, unknown> {
-    yield* this.client.stream<Funder>("funders", params, batchSize);
+    yield* this.client.stream<Funder>("funders", params,funderSchema,  batchSize);
   }
 
   /**
@@ -374,6 +384,6 @@ export class FundersApi {
     params: QueryParams & FundersFilters = {},
     maxResults?: number,
   ): Promise<Funder[]> {
-    return this.client.getAll<Funder>("funders", params, maxResults);
+    return this.client.getAll<Funder>("funders", params,funderSchema,  maxResults);
   }
 }

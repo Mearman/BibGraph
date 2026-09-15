@@ -28,6 +28,14 @@ export const extractErrorProperties = (errorObj: Record<string, unknown>): Recor
   });
 
 /**
+ * Type guard narrowing an unknown value to a plain object with string keys
+ * @param value - Value to check
+ * @returns True if the value is a non-null, non-array object
+ */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
  * Format unknown error for safe logging using type guards
  * @param error - Unknown error object to format
  * @returns Formatted error object safe for logging
@@ -45,8 +53,8 @@ export const formatErrorForLogging = (error: unknown): Record<string, unknown> =
     return { message: error };
   }
 
-  if (typeof error === "object" && error !== null) {
-    return extractErrorProperties(error as Record<string, unknown>);
+  if (isRecord(error)) {
+    return extractErrorProperties(error);
   }
 
   // Fallback for primitive types or null

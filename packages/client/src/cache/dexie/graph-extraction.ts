@@ -4,7 +4,6 @@
  * Bridges relationship extraction from entity data with the PersistentGraph.
  * Extracts relationships and indexed edge properties from OpenAlex entities,
  * creating nodes and edges in the persistent graph.
- * @module cache/dexie/graph-extraction
  */
 
 import {
@@ -27,8 +26,33 @@ import { generateCacheKey, getEntityCacheDB } from './entity-cache-db';
 import { type PersistentGraph } from './persistent-graph';
 
 // ============================================================================
+// Type Guards
+// ============================================================================
+
+/**
+ * Narrow an unknown value to a plain (non-array) record
+ */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * Narrow an unknown value to an array of plain records
+ */
+const isRecordArray = (value: unknown): value is Record<string, unknown>[] =>
+  Array.isArray(value) && value.every((item) => isRecord(item));
+
+/**
+ * Narrow an unknown value to a non-empty string
+ */
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.length > 0;
+
+// ============================================================================
 // Constants
 // ============================================================================
+
+const FULL_COMPLETENESS_THRESHOLD_RATIO = 0.7;
+const PARTIAL_COMPLETENESS_THRESHOLD_RATIO = 0.5;
 
 /**
  * Fields that indicate partial entity data (has useful info beyond ID)
@@ -76,8 +100,6 @@ const FULL_FIELDS_BY_TYPE: Partial<Record<EntityType, string[]>> = {
  * - stub: Only has ID (or minimal deducible info)
  * - partial: Has some useful fields but not complete
  * - full: Has most/all expected fields for entity type
- * @param entityType
- * @param entityData
  */
 export const determineCompleteness = (entityType: EntityType, entityData: Record<string, unknown>): CompletenessStatus => {
   // Get field requirements for this type
@@ -95,11 +117,11 @@ export const determineCompleteness = (entityType: EntityType, entityData: Record
   ).length;
 
   // Determine completeness
-  if (fullCount >= Math.ceil(fullFields.length * 0.7)) {
+  if (fullCount >= Math.ceil(fullFields.length * FULL_COMPLETENESS_THRESHOLD_RATIO)) {
     // Has 70%+ of full fields
     return 'full';
   }
-  if (partialCount >= Math.ceil(partialFields.length * 0.5)) {
+  if (partialCount >= Math.ceil(partialFields.length * PARTIAL_COMPLETENESS_THRESHOLD_RATIO)) {
     // Has 50%+ of partial fields
     return 'partial';
   }
@@ -114,8 +136,6 @@ export const determineCompleteness = (entityType: EntityType, entityData: Record
 /**
  * Extract author position from authorship array index
  * OpenAlex convention: first=0, last=length-1, middle=everything else
- * @param authorshipIndex
- * @param totalAuthorships
  */
 export const extractAuthorPosition = (authorshipIndex: number, totalAuthorships: number): AuthorPosition => {
   if (totalAuthorships <= 0) {
@@ -132,7 +152,6 @@ export const extractAuthorPosition = (authorshipIndex: number, totalAuthorships:
 
 /**
  * Extract corresponding author flag from authorship data
- * @param authorship
  */
 export const extractIsCorresponding = (authorship: Record<string, unknown>): boolean | undefined => {
   const isCorresponding = authorship.is_corresponding;
@@ -141,17 +160,16 @@ export const extractIsCorresponding = (authorship: Record<string, unknown>): boo
 
 /**
  * Extract open access status from work data
- * @param entityData
  */
 export const extractIsOpenAccess = (entityData: Record<string, unknown>): boolean | undefined => {
-  const openAccess = entityData.open_access as Record<string, unknown> | undefined;
-  if (openAccess && typeof openAccess.is_oa === 'boolean') {
+  const openAccess = entityData.open_access;
+  if (isRecord(openAccess) && typeof openAccess.is_oa === 'boolean') {
     return openAccess.is_oa;
   }
 
   // Also check primary_location for OA status
-  const primaryLocation = entityData.primary_location as Record<string, unknown> | undefined;
-  if (primaryLocation && typeof primaryLocation.is_oa === 'boolean') {
+  const primaryLocation = entityData.primary_location;
+  if (isRecord(primaryLocation) && typeof primaryLocation.is_oa === 'boolean') {
     return primaryLocation.is_oa;
   }
 
@@ -169,20 +187,17 @@ const VERSION_MAP: Record<string, PublicationVersion> = {
 
 /**
  * Extract publication version from location data
- * @param entityData
  */
 export const extractVersion = (entityData: Record<string, unknown>): PublicationVersion | undefined => {
-  const primaryLocation = entityData.primary_location as Record<string, unknown> | undefined;
-  if (primaryLocation?.version) {
-    const version = primaryLocation.version as string;
-    return VERSION_MAP[version];
+  const primaryLocation = entityData.primary_location;
+  if (isRecord(primaryLocation) && isNonEmptyString(primaryLocation.version)) {
+    return VERSION_MAP[primaryLocation.version];
   }
   return undefined;
 };
 
 /**
  * Extract topic score from topic association
- * @param topic
  */
 export const extractTopicScore = (topic: Record<string, unknown>): number | undefined => {
   const score = topic.score;
@@ -191,19 +206,17 @@ export const extractTopicScore = (topic: Record<string, unknown>): number | unde
 
 /**
  * Extract affiliation years from affiliation data
- * @param affiliation
  */
 export const extractAffiliationYears = (affiliation: Record<string, unknown>): number[] | undefined => {
   const years = affiliation.years;
   if (Array.isArray(years) && years.length > 0 && years.every((y) => typeof y === 'number')) {
-    return years as number[];
+    return years;
   }
   return undefined;
 };
 
 /**
  * Extract award ID from grant data
- * @param grant
  */
 export const extractAwardId = (grant: Record<string, unknown>): string | undefined => {
   const awardId = grant.award_id;
@@ -230,16 +243,21 @@ const STATIC_ENTITY_TYPES = new Set<string>([
 
 /**
  * Check if an entity type is cacheable
- * @param entityType
  */
 const isStaticEntityType = (entityType: string): entityType is StaticEntityType => STATIC_ENTITY_TYPES.has(entityType);
 
 /**
- * Look up entity labels from the IndexedDB entity cache
- * Returns a map of entityId -> display_name for entities found in cache
- * @param entities
+ * Narrow a cache lookup entry to one whose entity type is cacheable
  */
-const lookupLabelsFromCache = async (entities: Array<{ id: string; entityType: EntityType }>): Promise<Map<string, string>> => {
+const hasStaticEntityType = (
+  entity: Readonly<{ id: string; entityType: EntityType }>
+): entity is { id: string; entityType: StaticEntityType } => isStaticEntityType(entity.entityType);
+
+/**
+ * Look up entity labels from the IndexedDB entity cache
+ * Returns a map of entityId to display_name for entities found in cache
+ */
+const lookupLabelsFromCache = async (entities: readonly { id: string; entityType: EntityType }[]): Promise<Map<string, string>> => {
   const labelMap = new Map<string, string>();
 
   const database = getEntityCacheDB();
@@ -250,10 +268,10 @@ const lookupLabelsFromCache = async (entities: Array<{ id: string; entityType: E
   try {
     // Filter to only cacheable entity types and build lookup list
     const lookups = entities
-      .filter((e) => isStaticEntityType(e.entityType))
+      .filter(hasStaticEntityType)
       .map((e) => ({
         id: e.id,
-        cacheKey: generateCacheKey(e.entityType as StaticEntityType, e.id),
+        cacheKey: generateCacheKey(e.entityType, e.id),
       }));
 
     if (lookups.length === 0) {
@@ -270,12 +288,16 @@ const lookupLabelsFromCache = async (entities: Array<{ id: string; entityType: E
 
     // Extract display_name from cached entity data
     for (const { id, record } of records) {
-      if (record?.data) {
+      if (record !== undefined && record.data.length > 0) {
         try {
-          const entityData = JSON.parse(record.data) as Record<string, unknown>;
-          const displayName =
-            (entityData.display_name as string) ?? (entityData.title as string);
-          if (displayName) {
+          const entityData: unknown = JSON.parse(record.data);
+          if (!isRecord(entityData)) {
+            continue;
+          }
+          const displayName = isNonEmptyString(entityData.display_name)
+            ? entityData.display_name
+            : entityData.title;
+          if (isNonEmptyString(displayName)) {
             labelMap.set(id, displayName);
           }
         } catch {
@@ -288,6 +310,178 @@ const lookupLabelsFromCache = async (entities: Array<{ id: string; entityType: E
   }
 
   return labelMap;
+};
+
+
+/**
+ * Extract authorship-specific properties (authorPosition, isCorresponding)
+ */
+const extractAuthorshipProperties = (edgeInput: GraphEdgeInput, entityData: Record<string, unknown>, authorId: string): void => {
+  const { authorships } = entityData;
+  if (!isRecordArray(authorships)) {
+    return;
+  }
+
+  const normalizedAuthorId = normalizeOpenAlexId(authorId);
+
+  // Find the matching authorship entry
+  const authorshipIndex = authorships.findIndex((auth) => {
+    const { author } = auth;
+    if (!isRecord(author) || !isNonEmptyString(author.id)) {
+      return false;
+    }
+    return normalizeOpenAlexId(author.id) === normalizedAuthorId;
+  });
+
+  if (authorshipIndex !== -1) {
+    const authorship = authorships[authorshipIndex];
+
+    // Extract author position
+    edgeInput.authorPosition = extractAuthorPosition(authorshipIndex, authorships.length);
+
+    // Extract corresponding author flag
+    edgeInput.isCorresponding = extractIsCorresponding(authorship);
+  }
+};
+
+/**
+ * Extract publication-specific properties (isOpenAccess, version)
+ */
+const extractPublicationProperties = (edgeInput: GraphEdgeInput, entityData: Record<string, unknown>): void => {
+  edgeInput.isOpenAccess = extractIsOpenAccess(entityData);
+  edgeInput.version = extractVersion(entityData);
+};
+
+/**
+ * Extract topic-specific properties (score)
+ */
+const extractTopicProperties = (edgeInput: GraphEdgeInput, entityData: Record<string, unknown>, topicId: string): void => {
+  const { topics } = entityData;
+  if (!isRecordArray(topics)) {
+    return;
+  }
+
+  const normalizedTopicId = normalizeOpenAlexId(topicId);
+
+  // Find the matching topic entry
+  const topic = topics.find((t) => {
+    if (!isNonEmptyString(t.id)) {
+      return false;
+    }
+    return normalizeOpenAlexId(t.id) === normalizedTopicId;
+  });
+
+  if (topic) {
+    edgeInput.score = extractTopicScore(topic);
+  }
+};
+
+/**
+ * Extract affiliation-specific properties (years)
+ */
+const extractAffiliationProperties = (edgeInput: GraphEdgeInput, entityData: Record<string, unknown>, institutionId: string): void => {
+  const { affiliations } = entityData;
+  if (!isRecordArray(affiliations)) {
+    return;
+  }
+
+  const normalizedInstitutionId = normalizeOpenAlexId(institutionId);
+
+  // Find the matching affiliation entry
+  const affiliation = affiliations.find((aff) => {
+    const { institution } = aff;
+    if (!isRecord(institution) || !isNonEmptyString(institution.id)) {
+      return false;
+    }
+    return normalizeOpenAlexId(institution.id) === normalizedInstitutionId;
+  });
+
+  if (affiliation) {
+    edgeInput.years = extractAffiliationYears(affiliation);
+  }
+};
+
+/**
+ * Extract funding-specific properties (awardId)
+ */
+const extractFundingProperties = (edgeInput: GraphEdgeInput, entityData: Record<string, unknown>, funderId: string): void => {
+  const { grants } = entityData;
+  if (!isRecordArray(grants)) {
+    return;
+  }
+
+  const normalizedFunderId = normalizeOpenAlexId(funderId);
+
+  // Find the matching grant entry
+  const grant = grants.find((g) => {
+    const { funder } = g;
+    if (typeof funder !== 'string') {
+      return false;
+    }
+    return normalizeOpenAlexId(funder) === normalizedFunderId;
+  });
+
+  if (grant) {
+    edgeInput.awardId = extractAwardId(grant);
+  }
+}
+
+/**
+ * Create edge input with indexed properties based on relationship type
+ */
+const createEdgeInputWithProperties = (sourceId: string, targetId: string, relationType: RT, entityType: EntityType, entityData: Record<string, unknown>, relationship: Readonly<{ targetId: string; targetType: EntityType; relationType: RT }>): GraphEdgeInput => {
+  const edgeInput: GraphEdgeInput = {
+    source: sourceId,
+    target: targetId,
+    type: relationType,
+    direction: 'outbound',
+  };
+
+  // Extract properties based on relationship type
+  switch (relationType) {
+    case RT.AUTHORSHIP:
+      extractAuthorshipProperties(edgeInput, entityData, relationship.targetId);
+      break;
+
+    case RT.PUBLICATION:
+      extractPublicationProperties(edgeInput, entityData);
+      break;
+
+    case RT.TOPIC:
+    case RT.AUTHOR_RESEARCHES:
+      extractTopicProperties(edgeInput, entityData, relationship.targetId);
+      break;
+
+    case RT.AFFILIATION:
+      extractAffiliationProperties(edgeInput, entityData, relationship.targetId);
+      break;
+
+    case RT.FUNDED_BY:
+      extractFundingProperties(edgeInput, entityData, relationship.targetId);
+      break;
+
+    // Other relationship types don't have special indexed properties
+    case RT.REFERENCE:
+    case RT.HOST_ORGANIZATION:
+    case RT.LINEAGE:
+    case RT.INSTITUTION_ASSOCIATED:
+    case RT.INSTITUTION_HAS_REPOSITORY:
+    case RT.FIELD_PART_OF_DOMAIN:
+    case RT.FUNDER_LOCATED_IN:
+    case RT.INSTITUTION_LOCATED_IN:
+    case RT.PUBLISHER_CHILD_OF:
+    case RT.TOPIC_PART_OF_FIELD:
+    case RT.TOPIC_PART_OF_SUBFIELD:
+    case RT.TOPIC_SIBLING:
+    case RT.WORK_HAS_KEYWORD:
+    case RT.CONCEPT:
+    case RT.HAS_ROLE:
+    case RT.RELATED_TO:
+    default:
+      break;
+  }
+
+  return edgeInput;
 };
 
 // ============================================================================
@@ -328,10 +522,6 @@ export interface ExtractionResult {
  * 2. Extracts relationships using the shared relationship-extractor
  * 3. Creates stub nodes for referenced entities
  * 4. Creates edges with indexed properties
- * @param graph
- * @param entityType
- * @param entityId
- * @param entityData
  */
 export const extractAndIndexRelationships = async (graph: PersistentGraph, entityType: EntityType, entityId: string, entityData: Record<string, unknown>): Promise<ExtractionResult> => {
   const result: ExtractionResult = {
@@ -374,7 +564,7 @@ export const extractAndIndexRelationships = async (graph: PersistentGraph, entit
 
   // Look up labels from cache for entities missing targetLabel
   const entitiesNeedingLabels = newNodeRels
-    .filter((rel) => !rel.targetLabel)
+    .filter((rel) => rel.targetLabel === undefined || rel.targetLabel === "")
     .map((rel) => ({ id: rel.targetId, entityType: rel.targetType }));
 
   const cachedLabels =
@@ -392,11 +582,11 @@ export const extractAndIndexRelationships = async (graph: PersistentGraph, entit
     // Create stub node for target if it doesn't exist
     if (!graph.hasNode(targetId)) {
       // Priority: targetLabel from nested data > cached label > ID fallback
-      const label = rel.targetLabel ?? cachedLabels.get(targetId) ?? targetId;
+      const stubLabel = rel.targetLabel ?? cachedLabels.get(targetId) ?? targetId;
       stubInputs.push({
         id: targetId,
         entityType: rel.targetType,
-        label,
+        label: stubLabel,
         completeness: 'stub',
       });
       result.stubsCreated++;
@@ -431,193 +621,13 @@ export const extractAndIndexRelationships = async (graph: PersistentGraph, entit
 };
 
 /**
- * Create edge input with indexed properties based on relationship type
- * @param sourceId
- * @param targetId
- * @param relationType
- * @param entityType
- * @param entityData
- * @param relationship
- * @param relationship.targetId
- * @param relationship.targetType
- * @param relationship.relationType
- */
-const createEdgeInputWithProperties = (sourceId: string, targetId: string, relationType: RT, entityType: EntityType, entityData: Record<string, unknown>, relationship: { targetId: string; targetType: EntityType; relationType: RT }): GraphEdgeInput => {
-  const edgeInput: GraphEdgeInput = {
-    source: sourceId,
-    target: targetId,
-    type: relationType,
-    direction: 'outbound',
-  };
-
-  // Extract properties based on relationship type
-  switch (relationType) {
-    case RT.AUTHORSHIP:
-      extractAuthorshipProperties(edgeInput, entityData, relationship.targetId);
-      break;
-
-    case RT.PUBLICATION:
-      extractPublicationProperties(edgeInput, entityData);
-      break;
-
-    case RT.TOPIC:
-    case RT.AUTHOR_RESEARCHES:
-      extractTopicProperties(edgeInput, entityData, relationship.targetId);
-      break;
-
-    case RT.AFFILIATION:
-      extractAffiliationProperties(edgeInput, entityData, relationship.targetId);
-      break;
-
-    case RT.FUNDED_BY:
-      extractFundingProperties(edgeInput, entityData, relationship.targetId);
-      break;
-
-    // Other relationship types don't have special indexed properties
-    default:
-      break;
-  }
-
-  return edgeInput;
-};
-
-/**
- * Extract authorship-specific properties (authorPosition, isCorresponding)
- * @param edgeInput
- * @param entityData
- * @param authorId
- */
-const extractAuthorshipProperties = (edgeInput: GraphEdgeInput, entityData: Record<string, unknown>, authorId: string): void => {
-  const authorships = entityData.authorships as Array<Record<string, unknown>> | undefined;
-  if (!authorships) {
-    return;
-  }
-
-  const normalizedAuthorId = normalizeOpenAlexId(authorId);
-
-  // Find the matching authorship entry
-  const authorshipIndex = authorships.findIndex((auth) => {
-    const author = auth.author as Record<string, unknown> | undefined;
-    if (!author?.id) {
-      return false;
-    }
-    return normalizeOpenAlexId(author.id as string) === normalizedAuthorId;
-  });
-
-  if (authorshipIndex !== -1) {
-    const authorship = authorships[authorshipIndex];
-
-    // Extract author position
-    edgeInput.authorPosition = extractAuthorPosition(authorshipIndex, authorships.length);
-
-    // Extract corresponding author flag
-    edgeInput.isCorresponding = extractIsCorresponding(authorship);
-  }
-};
-
-/**
- * Extract publication-specific properties (isOpenAccess, version)
- * @param edgeInput
- * @param entityData
- */
-const extractPublicationProperties = (edgeInput: GraphEdgeInput, entityData: Record<string, unknown>): void => {
-  edgeInput.isOpenAccess = extractIsOpenAccess(entityData);
-  edgeInput.version = extractVersion(entityData);
-};
-
-/**
- * Extract topic-specific properties (score)
- * @param edgeInput
- * @param entityData
- * @param topicId
- */
-const extractTopicProperties = (edgeInput: GraphEdgeInput, entityData: Record<string, unknown>, topicId: string): void => {
-  const topics = entityData.topics as Array<Record<string, unknown>> | undefined;
-  if (!topics) {
-    return;
-  }
-
-  const normalizedTopicId = normalizeOpenAlexId(topicId);
-
-  // Find the matching topic entry
-  const topic = topics.find((t) => {
-    if (!t.id) {
-      return false;
-    }
-    return normalizeOpenAlexId(t.id as string) === normalizedTopicId;
-  });
-
-  if (topic) {
-    edgeInput.score = extractTopicScore(topic);
-  }
-};
-
-/**
- * Extract affiliation-specific properties (years)
- * @param edgeInput
- * @param entityData
- * @param institutionId
- */
-const extractAffiliationProperties = (edgeInput: GraphEdgeInput, entityData: Record<string, unknown>, institutionId: string): void => {
-  const affiliations = entityData.affiliations as Array<Record<string, unknown>> | undefined;
-  if (!affiliations) {
-    return;
-  }
-
-  const normalizedInstitutionId = normalizeOpenAlexId(institutionId);
-
-  // Find the matching affiliation entry
-  const affiliation = affiliations.find((aff) => {
-    const institution = aff.institution as Record<string, unknown> | undefined;
-    if (!institution?.id) {
-      return false;
-    }
-    return normalizeOpenAlexId(institution.id as string) === normalizedInstitutionId;
-  });
-
-  if (affiliation) {
-    edgeInput.years = extractAffiliationYears(affiliation);
-  }
-};
-
-/**
- * Extract funding-specific properties (awardId)
- * @param edgeInput
- * @param entityData
- * @param funderId
- */
-const extractFundingProperties = (edgeInput: GraphEdgeInput, entityData: Record<string, unknown>, funderId: string): void => {
-  const grants = entityData.grants as Array<Record<string, unknown>> | undefined;
-  if (!grants) {
-    return;
-  }
-
-  const normalizedFunderId = normalizeOpenAlexId(funderId);
-
-  // Find the matching grant entry
-  const grant = grants.find((g) => {
-    const funder = g.funder;
-    if (!funder || typeof funder !== 'string') {
-      return false;
-    }
-    return normalizeOpenAlexId(funder) === normalizedFunderId;
-  });
-
-  if (grant) {
-    edgeInput.awardId = extractAwardId(grant);
-  }
-};
-
-/**
  * Process multiple entities in batch
- * @param graph
- * @param entities
  */
-export const extractAndIndexEntities = async (graph: PersistentGraph, entities: Array<{
+export const extractAndIndexEntities = async (graph: PersistentGraph, entities: readonly {
     entityType: EntityType;
     entityId: string;
     entityData: Record<string, unknown>;
-  }>): Promise<ExtractionResult> => {
+  }[]): Promise<ExtractionResult> => {
   const totalResult: ExtractionResult = {
     nodesProcessed: 0,
     edgesAdded: 0,

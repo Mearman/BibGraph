@@ -58,13 +58,12 @@ const MAX_COLLABORATORS_TO_FETCH = 50;
 
 /**
  * Build work filters based on collaborator filters
- * @param filters
  */
-export const buildWorksFiltersFromCollaboratorFilters = (filters: AuthorCollaboratorsFilters): AuthorWorksFilters => {
+export const buildWorksFiltersFromCollaboratorFilters = (filters: Readonly<AuthorCollaboratorsFilters>): AuthorWorksFilters => {
   const worksFilters: AuthorWorksFilters = {};
 
-  if (filters.from_publication_year) {
-    worksFilters["publication_year"] =
+  if (filters.from_publication_year !== undefined) {
+    worksFilters.publication_year =
       `>=${filters.from_publication_year.toString()}`;
   }
 
@@ -74,15 +73,13 @@ export const buildWorksFiltersFromCollaboratorFilters = (filters: AuthorCollabor
 /**
  * Analyze co-authorships from a collection of works
  * Returns a map of collaborator IDs to their collaboration statistics
- * @param works
- * @param authorId
  */
-export const analyzeCoauthorships = (works: Work[], authorId: string): Map<string, CollaboratorStats> => {
+export const analyzeCoauthorships = (works: readonly Work[], authorId: string): Map<string, CollaboratorStats> => {
   const collaboratorStats = new Map<string, CollaboratorStats>();
 
   for (const work of works) {
     const coauthorIds = (work.authorships ?? [])
-      .map((auth) => auth.author?.id)
+      .map((auth) => auth.author.id)
       .filter((id): id is string => id !== undefined && id !== authorId);
 
     for (const coauthorId of coauthorIds) {
@@ -96,7 +93,7 @@ export const analyzeCoauthorships = (works: Work[], authorId: string): Map<strin
       const stats = collaboratorStats.get(coauthorId);
       if (!stats) continue;
       stats.count++;
-      if (work.publication_year) {
+      if (work.publication_year !== undefined) {
         stats.years.push(work.publication_year);
       }
     }
@@ -107,17 +104,13 @@ export const analyzeCoauthorships = (works: Work[], authorId: string): Map<strin
 
 /**
  * Filter collaborators by minimum works threshold and sort by collaboration count
- * @param collaboratorStats
- * @param minWorks
  */
-export const filterAndSortCollaborators = (collaboratorStats: Map<string, CollaboratorStats>, minWorks: number): Array<[string, CollaboratorStats]> => [...collaboratorStats]
+export const filterAndSortCollaborators = (collaboratorStats: Map<string, CollaboratorStats>, minWorks: number): [string, CollaboratorStats][] => [...collaboratorStats]
     .filter(([, stats]) => stats.count >= minWorks)
     .sort(([, a], [, b]) => b.count - a.count);
 
 /**
  * Build collaborator result from stats and author data
- * @param author
- * @param stats
  */
 export const buildCollaboratorResult = (author: Author, stats: CollaboratorStats): CollaboratorResult => {
   const result: CollaboratorResult = {
@@ -135,10 +128,8 @@ export const buildCollaboratorResult = (author: Author, stats: CollaboratorStats
 
 /**
  * Fetch collaborator details and build results
- * @param filteredCollaborators
- * @param getAuthor
  */
-export const fetchCollaboratorDetails = async (filteredCollaborators: Array<[string, CollaboratorStats]>, getAuthor: AuthorFetcher): Promise<CollaboratorResult[]> => {
+export const fetchCollaboratorDetails = async (filteredCollaborators: readonly [string, CollaboratorStats][], getAuthor: AuthorFetcher): Promise<CollaboratorResult[]> => {
   const collaboratorResults = await Promise.allSettled(
     filteredCollaborators
       .slice(0, MAX_COLLABORATORS_TO_FETCH)
@@ -166,13 +157,8 @@ export const fetchCollaboratorDetails = async (filteredCollaborators: Array<[str
 
 /**
  * Orchestrates the full collaborator analysis workflow
- * @param authorId
- * @param filters
- * @param params
- * @param getAuthorWorks
- * @param getAuthor
  */
-export const analyzeAuthorCollaborators = async (authorId: string, filters: AuthorCollaboratorsFilters, params: QueryParams, getAuthorWorks: WorksFetcher, getAuthor: AuthorFetcher): Promise<CollaboratorResult[]> => {
+export const analyzeAuthorCollaborators = async (authorId: string, filters: Readonly<AuthorCollaboratorsFilters>, params: Readonly<QueryParams>, getAuthorWorks: WorksFetcher, getAuthor: AuthorFetcher): Promise<CollaboratorResult[]> => {
   // Build works filters from collaborator filters
   const worksFilters = buildWorksFiltersFromCollaboratorFilters(filters);
 

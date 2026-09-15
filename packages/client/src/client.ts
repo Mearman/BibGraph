@@ -4,7 +4,9 @@
  */
 
 import type { OpenAlexResponse, QueryParams } from "@bibgraph/types";
-import { validateWithSchema } from "@bibgraph/types";
+import { OpenAlexResponseSchema, validateWithSchema } from "@bibgraph/types";
+import { validateApiResponse } from "@bibgraph/utils";
+import type { z } from "zod";
 
 import { apiInterceptor, type InterceptedRequest } from "./interceptors/api-interceptor";
 // Import from extracted modules
@@ -22,6 +24,10 @@ import {
 import { isDevelopmentMode } from "./internal/environment-detection";
 import { OpenAlexApiError, OpenAlexRateLimitError } from "./internal/errors";
 import { calculateRetryDelay, RETRY_CONFIG } from "./internal/rate-limit";
+
+const HTTP_SERVER_ERROR_THRESHOLD = 500;
+const HTTP_TOO_MANY_REQUESTS = 429;
+const ERROR_BODY_PREVIEW_LENGTH = 200;
 import {
   buildRequestOptions,
   checkHostCooldown,
@@ -40,7 +46,6 @@ import {
   handleResponseInterception,
   parseError,
 } from "./internal/response-handler";
-import { validateApiResponse } from "./internal/type-helpers";
 import { buildUrl } from "./internal/url-builder";
 
 // Re-export types and errors for external use - see index.ts
@@ -54,7 +59,7 @@ export interface ValidationSchema<T> {
 
 export class OpenAlexBaseClient {
   private config: Required<FullyConfiguredClient>;
-  private rateLimitState: RateLimitState;
+  private readonly rateLimitState: RateLimitState;
 
   constructor(config: OpenAlexClientConfig = {}) {
     // Create a fully-specified config with all required properties
@@ -92,10 +97,6 @@ export class OpenAlexBaseClient {
 
   /**
    * Handle rate limit (429) response with retry logic
-   * @param response
-   * @param url
-   * @param options
-   * @param retryCount
    */
   private async handleRateLimitResponse(
     response: Response,
@@ -104,7 +105,7 @@ export class OpenAlexBaseClient {
     retryCount: number,
   ): Promise<Response> {
     const retryAfter = response.headers.get("Retry-After");
-    const retryAfterMs = retryAfter
+    const retryAfterMs = retryAfter !== null
       ? parseRetryAfterToMs(retryAfter)
       : undefined;
 
@@ -127,18 +128,13 @@ export class OpenAlexBaseClient {
     setHostCooldown(url, retryAfterMs);
 
     throw new OpenAlexRateLimitError({
-      message: `Rate limit exceeded (HTTP 429) after ${maxRateLimitAttempts} attempts`,
+      message: `Rate limit exceeded (HTTP 429) after ${String(maxRateLimitAttempts)} attempts`,
       retryAfter: retryAfterMs,
     });
   }
 
   /**
    * Handle server error (5xx) with retry logic
-   * @param response
-   * @param url
-   * @param options
-   * @param retryCount
-   * @param maxServerRetries
    */
   private async handleServerError(
     response: Response,
@@ -147,7 +143,7 @@ export class OpenAlexBaseClient {
     retryCount: number,
     maxServerRetries: number,
   ): Promise<Response> {
-    if (response.status >= 500 && retryCount < maxServerRetries) {
+    if (response.status >= HTTP_SERVER_ERROR_THRESHOLD && retryCount < maxServerRetries) {
       const waitTime = getRetryDelay(
         retryCount,
         this.config.retries,
@@ -167,10 +163,6 @@ export class OpenAlexBaseClient {
   /**
    * Handle response interception for caching and logging
    * Protected to allow subclasses to extend caching behavior
-   * @param root0
-   * @param root0.interceptedRequest
-   * @param root0.response
-   * @param root0.responseTime
    */
   protected async handleResponseInterception({
     interceptedRequest,
@@ -192,9 +184,6 @@ export class OpenAlexBaseClient {
   /**
    * Hook for caching entities from response data
    * Override in subclasses to implement entity-level caching
-   * @param _params
-   * @param _params.url
-   * @param _params.responseData
    */
   protected async cacheResponseEntities(_params: {
     url: string;
@@ -204,11 +193,25 @@ export class OpenAlexBaseClient {
   }
 
   /**
+   * Reset the daily rate-limit counters once the current UTC day has rolled over, so a stale yesterday count cannot trip the daily limit
+   */
+  private resetDailyRateLimitCounters(): void {
+    if (Date.now() >= this.rateLimitState.dailyResetTime) {
+      this.rateLimitState.requestsToday = 0;
+      this.rateLimitState.dailyResetTime = getNextMidnightUTC();
+    }
+  }
+
+  /**
+   * Record a permitted request in the rate-limit state after enforcement has passed
+   */
+  private recordRateLimitRequest(): void {
+    this.rateLimitState.requestsToday++;
+    this.rateLimitState.lastRequestTime = Date.now();
+  }
+
+  /**
    * Make a request with retries and error handling
-   * @param root0
-   * @param root0.url
-   * @param root0.options
-   * @param root0.retryCount
    */
   private async makeRequest({
     url,
@@ -225,7 +228,9 @@ export class OpenAlexBaseClient {
 
     try {
       checkHostCooldown(url);
+      this.resetDailyRateLimitCounters();
       await enforceRateLimit(this.config, this.rateLimitState);
+      this.recordRateLimitRequest();
 
       const requestStartTime = Date.now();
       const requestOptions = buildRequestOptions(options, this.config);
@@ -246,7 +251,7 @@ export class OpenAlexBaseClient {
       clearTimeout(timeoutId);
       const responseTime = Date.now() - requestStartTime;
 
-      if (response.status === 429) {
+      if (response.status === HTTP_TOO_MANY_REQUESTS) {
         return await this.handleRateLimitResponse(
           response,
           url,
@@ -304,89 +309,66 @@ export class OpenAlexBaseClient {
   }
 
   /**
-   * GET request that returns parsed JSON with schema-based validation
-   * @param endpoint
-   * @param params
-   * @param schema
+   * GET request that returns schema-validated JSON. Every response is parsed against the caller-provided schema, so an API response that does not match the expected shape fails loudly here instead of flowing downstream as an unvalidated value.
    */
   public async get<T = unknown>(
     endpoint: string,
     params: QueryParams = {},
-    schema?: ValidationSchema<T>,
+    schema: Readonly<ValidationSchema<T>>,
   ): Promise<T> {
     const url = buildUrl(endpoint, params, this.config);
     const response = await this.makeRequest({ url });
 
     // Validate content-type before parsing JSON
     const contentType = response.headers.get("content-type");
-    if (!contentType?.includes("application/json")) {
+    if (contentType?.includes("application/json") !== true) {
       const text = await response.text();
       throw new OpenAlexApiError({
-        message: `Expected JSON response but got ${contentType ?? "unknown content-type"}. Response: ${text.slice(0, 200)}...`,
+        message: `Expected JSON response but got ${contentType ?? "unknown content-type"}. Response: ${text.slice(0, ERROR_BODY_PREVIEW_LENGTH)}...`,
         statusCode: response.status,
       });
     }
 
     const data: unknown = await response.json();
     const validatedData = validateApiResponse(data);
-
-    // If schema is provided, use it for type-safe validation
-    if (schema) {
-      return validateWithSchema({ data: validatedData, schema });
-    }
-
-    // Return validated data - callers must handle typing
-    return validatedData as T;
+    return validateWithSchema({ data: validatedData, schema });
   }
 
   /**
-   * GET request that returns an OpenAlex response with results and metadata
-   * @param endpoint
-   * @param params
+   * GET request that returns an OpenAlex response with results and metadata, validating each result against the provided entity schema
    */
   public async getResponse<T>(
     endpoint: string,
     params: QueryParams = {},
+    resultSchema: z.ZodType<T>,
   ): Promise<OpenAlexResponse<T>> {
-    return this.get<OpenAlexResponse<T>>(endpoint, params);
+    return this.get(endpoint, params, OpenAlexResponseSchema(resultSchema));
   }
 
   /**
-   * GET request for a single entity by ID
-   * @param endpointOrParams
-   * @param id
-   * @param params
-   * @param schema
+   * GET request for a single entity by ID, validated against the provided schema
    */
-  public async getById<T = unknown>(
-    endpointOrParams: string | { endpoint: string; id: string; params?: QueryParams; schema?: ValidationSchema<T> },
-    id?: string,
-    params?: QueryParams,
-    schema?: ValidationSchema<T>
-  ): Promise<T> {
-    // Handle legacy signature: getById(endpoint, id, params, schema)
-    if (typeof endpointOrParams === 'string') {
-      const endpoint = endpointOrParams;
-      if (!id) {
-        throw new Error('ID is required for legacy getById signature');
-      }
-      return this.get(`${endpoint}/${encodeURIComponent(id)}`, params, schema);
-    }
-
-    // Handle new signature: getById({ endpoint, id, params, schema })
-    const { endpoint, id: entityId, params: newParameters = {}, schema: newSchema } = endpointOrParams;
-    return this.get(`${endpoint}/${encodeURIComponent(entityId)}`, newParameters, newSchema);
+  public async getById<T = unknown>({
+    endpoint,
+    id,
+    params = {},
+    schema,
+  }: {
+    endpoint: string;
+    id: string;
+    params?: QueryParams;
+    schema: ValidationSchema<T>;
+  }): Promise<T> {
+    return this.get(`${endpoint}/${encodeURIComponent(id)}`, params, schema);
   }
 
   /**
-   * Stream all results using cursor pagination
-   * @param endpoint
-   * @param params
-   * @param batchSize
+   * Stream all results using cursor pagination, validating each result against the provided entity schema
    */
   public async *stream<T>(
     endpoint: string,
     params: QueryParams = {},
+    resultSchema: z.ZodType<T>,
     batchSize = 200,
   ): AsyncGenerator<T[], void, unknown> {
     let cursor: string | undefined;
@@ -396,11 +378,11 @@ export class OpenAlexBaseClient {
     streamParameters.per_page ??= batchSize;
 
     do {
-      if (cursor) {
+      if (cursor !== undefined) {
         streamParameters.cursor = cursor;
       }
 
-      const response = await this.getResponse<T>(endpoint, streamParameters);
+      const response = await this.getResponse<T>(endpoint, streamParameters, resultSchema);
 
       if (response.results.length === 0) {
         break;
@@ -410,7 +392,7 @@ export class OpenAlexBaseClient {
 
       // Extract cursor from next page URL if available
       cursor = this.extractCursorFromResponse();
-    } while (cursor);
+    } while (cursor !== undefined);
   }
 
   /**
@@ -424,21 +406,19 @@ export class OpenAlexBaseClient {
 
   /**
    * Get all results (use with caution for large datasets)
-   * @param endpoint
-   * @param params
-   * @param maxResults
    */
   public async getAll<T>(
     endpoint: string,
     params: QueryParams = {},
+    resultSchema: z.ZodType<T>,
     maxResults?: number,
   ): Promise<T[]> {
     const results: T[] = [];
     let count = 0;
 
-    for await (const batch of this.stream<T>(endpoint, params)) {
+    for await (const batch of this.stream<T>(endpoint, params, resultSchema)) {
       for (const item of batch) {
-        if (maxResults && count >= maxResults) {
+        if (maxResults !== undefined && count >= maxResults) {
           return results;
         }
         results.push(item);
@@ -451,7 +431,6 @@ export class OpenAlexBaseClient {
 
   /**
    * Update client configuration
-   * @param config
    */
   public updateConfig(config: Partial<OpenAlexClientConfig>): void {
     this.config = {

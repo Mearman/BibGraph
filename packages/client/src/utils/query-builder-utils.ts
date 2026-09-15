@@ -20,8 +20,10 @@ import type { DateRangeValidation, PaginationParams as PaginationParameters, Sor
  * }
  * ```
  */
+const MIN_DATE_STRING_LENGTH = 4;
+
 export const validateDateRange = (from: string | null | undefined, to: string | null | undefined): DateRangeValidation => {
-  if (!from || !to) {
+  if (from === undefined || from === null || from === "" || to === undefined || to === null || to === "") {
     return {
       isValid: false,
       error: "Both from and to dates must be provided",
@@ -33,7 +35,7 @@ export const validateDateRange = (from: string | null | undefined, to: string | 
     try {
       // First check if the date string matches expected patterns
       const trimmed = dateString.trim();
-      if (!trimmed || trimmed.length < 4) {
+      if (trimmed === "" || trimmed.length < MIN_DATE_STRING_LENGTH) {
         return undefined; // Too short to be a valid date
       }
 
@@ -64,14 +66,14 @@ export const validateDateRange = (from: string | null | undefined, to: string | 
   const normalizedFrom = normalizeDate(from);
   const normalizedTo = normalizeDate(to);
 
-  if (!normalizedFrom) {
+  if (normalizedFrom === undefined) {
     return {
       isValid: false,
       error: `Invalid 'from' date format: ${from}`,
     };
   }
 
-  if (!normalizedTo) {
+  if (normalizedTo === undefined) {
     return {
       isValid: false,
       error: `Invalid 'to' date format: ${to}`,
@@ -189,12 +191,17 @@ export const normalizePaginationParams = (params: Record<string, unknown>): Pagi
  * // Result: "publication_year:desc,cited_by_count:desc"
  * ```
  */
-export const buildSortString = (sorts: SortOptions | SortOptions[] | null | undefined): string => {
+/**
+ * Type guard narrowing to `readonly SortOptions[]` rather than the `any[]` that `Array.isArray` itself narrows to, so downstream array operations stay type-safe instead of silently becoming `any`.
+ */
+const isSortOptionsArray = (value: unknown): value is readonly SortOptions[] => Array.isArray(value);
+
+export const buildSortString = (sorts: SortOptions | readonly SortOptions[] | null | undefined): string => {
   if (!sorts) {
     return "";
   }
 
-  const sortArray = Array.isArray(sorts) ? sorts : [sorts];
+  const sortArray: readonly SortOptions[] = isSortOptionsArray(sorts) ? sorts : [sorts];
 
   return sortArray
     .filter((sort) => sort.field)
@@ -217,16 +224,16 @@ export const buildSortString = (sorts: SortOptions | SortOptions[] | null | unde
  */
 export const buildSelectString = (fields:
     | readonly (string | null | undefined)[]
-    | (string | null | undefined)[]
+     
     | null
     | undefined): string => {
-  if (!Array.isArray(fields) || fields.length === 0) {
+  if (fields === null || fields === undefined || fields.length === 0) {
     return "";
   }
 
   return fields
     .filter(
-      (field): field is string => field != null && field.trim().length > 0,
+      (field): field is string => field !== null && field !== undefined && field.trim().length > 0,
     )
     .map((field) => field.trim())
     .join(",");

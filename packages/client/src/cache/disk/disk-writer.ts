@@ -47,6 +47,13 @@ export interface DiskWriterConfig {
 	minDiskSpaceBytes: number;
 }
 
+const DEFAULT_MAX_CONCURRENT_WRITES = 10;
+const DEFAULT_LOCK_TIMEOUT_MS = 5000;
+const BYTES_PER_KB = 1024;
+const DEFAULT_MIN_DISK_SPACE_MB = 100;
+const MIN_HTTP_STATUS_CODE = 100;
+const MAX_HTTP_STATUS_CODE = 599;
+
 /**
  * Comprehensive disk cache writer with atomic operations and concurrent access control
  */
@@ -57,13 +64,13 @@ export class DiskCacheWriter {
 	private workspaceRoot: string | null = null;
 	private workspaceRootPromise: Promise<string> | null = null;
 
-	constructor(config: Partial<DiskWriterConfig> = {}) {
+	constructor(config: Readonly<Partial<DiskWriterConfig>> = {}) {
 		this.config = {
 			basePath: config.basePath ?? STATIC_DATA_CACHE_PATH,
-			maxConcurrentWrites: config.maxConcurrentWrites ?? 10,
-			lockTimeoutMs: config.lockTimeoutMs ?? 5000,
+			maxConcurrentWrites: config.maxConcurrentWrites ?? DEFAULT_MAX_CONCURRENT_WRITES,
+			lockTimeoutMs: config.lockTimeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS,
 			checkDiskSpace: config.checkDiskSpace ?? true,
-			minDiskSpaceBytes: config.minDiskSpaceBytes ?? 100 * 1024 * 1024, // 100MB
+			minDiskSpaceBytes: config.minDiskSpaceBytes ?? DEFAULT_MIN_DISK_SPACE_MB * BYTES_PER_KB * BYTES_PER_KB,
 		};
 
 		logger.debug("cache", "DiskCacheWriter initialized", {
@@ -89,18 +96,16 @@ export class DiskCacheWriter {
 		}
 
 		// If we have a cached workspace root, use it for relative paths
-		if (this.workspaceRoot) {
+		if (this.workspaceRoot !== null) {
 			return path.join(this.workspaceRoot, this.config.basePath);
 		}
 
 		// Perform workspace root detection for relative paths
-		if (!this.workspaceRootPromise) {
-			this.workspaceRootPromise = NodeModules.findWorkspaceRoot().then((root) => {
-				this.workspaceRoot = root;
-				logger.debug("cache", "Workspace root found", { root });
-				return root;
-			});
-		}
+		this.workspaceRootPromise ??= NodeModules.findWorkspaceRoot().then((root) => {
+			this.workspaceRoot = root;
+			logger.debug("cache", "Workspace root found", { root });
+			return root;
+		});
 
 		const root = await this.workspaceRootPromise;
 		return path.join(root, this.config.basePath);
@@ -108,7 +113,6 @@ export class DiskCacheWriter {
 
 	/**
 	 * Write intercepted response data to disk cache
-	 * @param data
 	 */
 	public async writeToCache(data: EntityExtraction.InterceptedData): Promise<void> {
 		// Enforce concurrent write limit
@@ -138,7 +142,6 @@ export class DiskCacheWriter {
 	 * 4. Atomic file writes using temporary files
 	 * 5. Index updates with hierarchical propagation
 	 * 6. Lock release in finally block
-	 * @param data
 	 */
 	private async _writeToCache(data: EntityExtraction.InterceptedData): Promise<void> {
 		let indexLockId: string | undefined;
@@ -277,7 +280,7 @@ export class DiskCacheWriter {
 			});
 		} finally {
 			// Release all locks
-			if (indexLockId && filePaths) {
+			if (indexLockId !== undefined && filePaths) {
 				FileOps.releaseFileLock(
 					{
 						lockId: indexLockId,
@@ -289,7 +292,7 @@ export class DiskCacheWriter {
 					this.activeLocks,
 				);
 			}
-			if (dataLockId && filePaths) {
+			if (dataLockId !== undefined && filePaths) {
 				FileOps.releaseFileLock(
 					{ lockId: dataLockId, filePath: filePaths.dataFile },
 					this.activeLocks,
@@ -300,13 +303,8 @@ export class DiskCacheWriter {
 
 	/**
 	 * Validate intercepted data structure
-	 * @param data
 	 */
 	private validateInterceptedData(data: EntityExtraction.InterceptedData): void {
-		if (!data || typeof data !== "object") {
-			throw new Error("Invalid intercepted data: must be an object");
-		}
-
 		const requiredFields = [
 			"url",
 			"method",
@@ -326,13 +324,15 @@ export class DiskCacheWriter {
 
 		if (
 			typeof data.statusCode !== "number" ||
-			data.statusCode < 100 ||
-			data.statusCode > 599
+			data.statusCode < MIN_HTTP_STATUS_CODE ||
+			data.statusCode > MAX_HTTP_STATUS_CODE
 		) {
-			throw new Error("Invalid status code: must be a number between 100-599");
+			throw new Error(
+				`Invalid status code: must be a number between ${String(MIN_HTTP_STATUS_CODE)}-${String(MAX_HTTP_STATUS_CODE)}`,
+			);
 		}
 
-		if (!data.responseData) {
+		if (data.responseData === undefined || data.responseData === null) {
 			throw new Error("Invalid response data: must be present");
 		}
 	}
@@ -382,7 +382,6 @@ export const defaultDiskWriter = new DiskCacheWriter();
 
 /**
  * Convenience function to write intercepted data to cache
- * @param data
  */
 export const writeToDiskCache = async (
 	data: EntityExtraction.InterceptedData,

@@ -5,4 +5,4 @@
 
 export * from "./filter-utils";
 export * from "./id-validators";
-export * from "./types";
+export type * from "./types";

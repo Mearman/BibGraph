@@ -11,8 +11,9 @@ import type {
   Work,
   WorksFilters,
 } from "@bibgraph/types";
+import { AutocompleteBaseResponseSchema, workSchema } from "@bibgraph/types";
 
-import { OpenAlexBaseClient } from "../client";
+import type { OpenAlexBaseClient } from "../client";
 import { buildFilterString } from "../utils/query-builder";
 import {
   isWorksFilters,
@@ -32,10 +33,15 @@ import type {
 } from "./works/types";
 
 /**
+Upper bound for random seed generation
+ */
+const RANDOM_SEED_UPPER_BOUND = 1_000_000;
+
+/**
  * Works API class providing methods for academic paper operations
  */
 export class WorksApi {
-  constructor(private client: OpenAlexBaseClient) {}
+  constructor(private readonly client: OpenAlexBaseClient) {}
 
   /**
    * Get a single work by its OpenAlex ID, DOI, PMID, or other identifier
@@ -65,8 +71,9 @@ export class WorksApi {
   async getWork(id: string, params: QueryParams = {}): Promise<Work> {
     // Validate and normalize DOI if applicable
     const normalizedDoi = validateAndNormalizeDOI(id);
-    if (normalizedDoi) {
+    if (normalizedDoi !== null) {
       return this.client.getById<Work>({
+        schema: workSchema,
         endpoint: "works",
         id: normalizedDoi,
         params,
@@ -75,8 +82,9 @@ export class WorksApi {
 
     // Validate and normalize PMID if applicable
     const normalizedPmid = validateAndNormalizePMID(id);
-    if (normalizedPmid) {
+    if (normalizedPmid !== null) {
       return this.client.getById<Work>({
+        schema: workSchema,
         endpoint: "works",
         id: normalizedPmid,
         params,
@@ -84,7 +92,7 @@ export class WorksApi {
     }
 
     // For other identifiers (OpenAlex ID, etc.), pass through directly
-    return this.client.getById<Work>({ endpoint: "works", id, params });
+    return this.client.getById<Work>({ schema: workSchema, endpoint: "works", id, params });
   }
 
   /**
@@ -104,7 +112,7 @@ export class WorksApi {
     params: WorksQueryParameters = {},
   ): Promise<OpenAlexResponse<Work>> {
     const queryParameters = this.buildQueryParams(params);
-    return this.client.getResponse<Work>("works", queryParameters);
+    return this.client.getResponse<Work>("works", queryParameters, workSchema);
   }
 
   /**
@@ -210,7 +218,7 @@ export class WorksApi {
       return [];
     }
 
-    const referencesToFetch = options.limit
+    const referencesToFetch = options.limit !== undefined
       ? work.referenced_works.slice(0, options.limit)
       : work.referenced_works;
 
@@ -247,7 +255,7 @@ export class WorksApi {
       return [];
     }
 
-    const relatedToFetch = options.limit
+    const relatedToFetch = options.limit !== undefined
       ? work.related_works.slice(0, options.limit)
       : work.related_works;
 
@@ -280,14 +288,14 @@ export class WorksApi {
   ): Promise<Work[]> {
     const MAX_SAMPLE_SIZE = 10_000;
     if (count > MAX_SAMPLE_SIZE) {
-      throw new Error(`Maximum sample size is ${MAX_SAMPLE_SIZE} works`);
+      throw new Error(`Maximum sample size is ${String(MAX_SAMPLE_SIZE)} works`);
     }
 
     const queryParameters = this.buildQueryParams(params);
     queryParameters.sample = count;
-    queryParameters.seed = Math.floor(Math.random() * 1_000_000);
+    queryParameters.seed = Math.floor(Math.random() * RANDOM_SEED_UPPER_BOUND);
 
-    const response = await this.client.getResponse<Work>("works", queryParameters);
+    const response = await this.client.getResponse<Work>("works", queryParameters, workSchema);
     return response.results;
   }
 
@@ -304,7 +312,7 @@ export class WorksApi {
     const queryParameters = this.buildQueryParams(params);
     queryParameters.per_page ??= batchSize;
 
-    yield* this.client.stream<Work>("works", queryParameters, queryParameters.per_page);
+    yield* this.client.stream<Work>("works", queryParameters,workSchema,  queryParameters.per_page);
   }
 
   /**
@@ -318,7 +326,7 @@ export class WorksApi {
     maxResults?: number,
   ): Promise<Work[]> {
     const queryParameters = this.buildQueryParams(params);
-    return this.client.getAll<Work>("works", queryParameters, maxResults);
+    return this.client.getAll<Work>("works", queryParameters,workSchema,  maxResults);
   }
 
   /**
@@ -334,11 +342,11 @@ export class WorksApi {
     const queryParameters = this.buildQueryParams(params);
     queryParameters.per_page = 0;
 
-    if (groupBy) {
+    if (groupBy !== undefined) {
       queryParameters.group_by = groupBy;
     }
 
-    return this.client.getResponse<Work>("works", queryParameters);
+    return this.client.getResponse<Work>("works", queryParameters, workSchema);
   }
 
   /**
@@ -360,7 +368,7 @@ export class WorksApi {
       queryParameters.filter = buildFilterString(filters);
     }
 
-    const response = await this.client.getResponse<Work>("works", queryParameters);
+    const response = await this.client.getResponse<Work>("works", queryParameters, workSchema);
 
     if (!response.group_by) {
       throw new Error(`No grouping data returned for field: ${groupBy}`);
@@ -396,7 +404,7 @@ export class WorksApi {
       queryParameters.filter = buildFilterString(options.filters);
     }
 
-    const response = await this.client.getResponse<Work>("works", queryParameters);
+    const response = await this.client.getResponse<Work>("works", queryParameters, workSchema);
 
     if (!response.group_by) {
       throw new Error(`No grouping data returned for field: ${field}`);
@@ -445,26 +453,27 @@ export class WorksApi {
     }
 
     try {
-      const queryParameters: QueryParams & { q: string } = { q: trimmedQuery };
+      let queryParameters: QueryParams & { q: string } = { q: trimmedQuery };
 
       if (options.per_page !== undefined) {
         const MIN_PER_PAGE = 1;
         const MAX_PER_PAGE = 50;
         if (options.per_page < MIN_PER_PAGE || options.per_page > MAX_PER_PAGE) {
           throw new Error(
-            `per_page must be between ${MIN_PER_PAGE} and ${MAX_PER_PAGE}`,
+            `per_page must be between ${String(MIN_PER_PAGE)} and ${String(MAX_PER_PAGE)}`,
           );
         }
         queryParameters.per_page = options.per_page;
       }
 
-      if (options.filters) {
-        Object.assign(queryParameters, options.filters);
+      if (options.filters !== undefined) {
+        queryParameters = { ...queryParameters, ...options.filters };
       }
 
-      const response = await this.client.getResponse<AutocompleteResult>(
+      const response = await this.client.get(
         "autocomplete/works",
         queryParameters,
+        AutocompleteBaseResponseSchema,
       );
 
       return response.results.map((result) => ({
@@ -522,7 +531,7 @@ export class WorksApi {
     const { filter, ...otherParameters } = params;
     const queryParameters: QueryParams = { ...otherParameters };
 
-    if (filter) {
+    if (filter !== undefined) {
       if (typeof filter === "string") {
         queryParameters.filter = filter;
       } else if (isWorksFilters(filter)) {

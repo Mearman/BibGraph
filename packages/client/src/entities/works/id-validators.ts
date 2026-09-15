@@ -4,6 +4,21 @@
  */
 
 /**
+Maximum digit length allowed for a PMID (most PMIDs are 8 digits; allowing for future growth)
+ */
+const MAX_PMID_LENGTH = 10;
+
+/**
+Length of the "10." DOI prefix that precedes the registrant code
+ */
+const DOI_PREFIX_LENGTH = 3;
+
+/**
+Minimum digit length required for a DOI registrant code
+ */
+const MIN_REGISTRANT_LENGTH = 4;
+
+/**
  * Validate PMID numeric component
  * PMIDs are typically 1-8 digits, but can theoretically be longer
  * @param pmidNumber - Numeric string to validate
@@ -18,7 +33,7 @@ const isValidPMIDNumber = (pmidNumber: string): boolean => {
   // Reasonable length constraints (1-10 digits)
   // Most PMIDs are 8 digits, but allowing for future growth
   const { length } = pmidNumber;
-  if (length < 1 || length > 10) {
+  if (length < 1 || length > MAX_PMID_LENGTH) {
     return false;
   }
 
@@ -44,7 +59,7 @@ export const validateAndNormalizePMID = (id: string): string | null => {
   const cleanId = id.trim();
 
   // Check for prefixed formats: pmid:12345678 or PMID:12345678
-  const prefixMatch = cleanId.match(/^(?:PMID|pmid):(\d+)$/);
+  const prefixMatch = /^(?:PMID|pmid):(\d+)$/.exec(cleanId);
   if (prefixMatch) {
     const [, pmidNumber] = prefixMatch;
     if (isValidPMIDNumber(pmidNumber)) {
@@ -88,8 +103,8 @@ const isValidDOIString = (doiString: string): boolean => {
   }
 
   // Registrant code validation (after "10.")
-  const registrantPart = parts[0].slice(3); // Remove "10."
-  return !(registrantPart.length < 4) && /^\d+$/.test(registrantPart);
+  const registrantPart = parts[0].slice(DOI_PREFIX_LENGTH); // Remove "10."
+  return !(registrantPart.length < MIN_REGISTRANT_LENGTH) && /^\d+$/.test(registrantPart);
 };
 
 /**
@@ -104,7 +119,7 @@ export const validateAndNormalizeDOI = (id: string): string | null => {
   const cleanId = id.trim();
 
   // Check for full DOI URL: https://doi.org/10.xxxx/yyyy
-  const doiUrlMatch = cleanId.match(/^https?:\/\/(?:www\.)?doi\.org\/(.+)$/i);
+  const doiUrlMatch = /^https?:\/\/(?:www\.)?doi\.org\/(.+)$/i.exec(cleanId);
   if (doiUrlMatch) {
     const [, doiString] = doiUrlMatch;
     if (isValidDOIString(doiString)) {
@@ -114,8 +129,8 @@ export const validateAndNormalizeDOI = (id: string): string | null => {
   }
 
   // Check for crossref.org redirect: https://www.crossref.org/iPage?doi=10.xxxx/yyyy
-  const crossrefMatch = cleanId.match(
-    /^https?:\/\/(?:www\.)?crossref\.org\/iPage\?doi=(.+)$/i,
+  const crossrefMatch = /^https?:\/\/(?:www\.)?crossref\.org\/iPage\?doi=(.+)$/i.exec(
+    cleanId,
   );
   if (crossrefMatch) {
     const [, encodedDoi] = crossrefMatch;
@@ -127,7 +142,7 @@ export const validateAndNormalizeDOI = (id: string): string | null => {
   }
 
   // Check for prefixed format: doi:10.xxxx/yyyy
-  const prefixMatch = cleanId.match(/^doi:(.+)$/i);
+  const prefixMatch = /^doi:(.+)$/i.exec(cleanId);
   if (prefixMatch) {
     const [, doiString] = prefixMatch;
     if (isValidDOIString(doiString)) {

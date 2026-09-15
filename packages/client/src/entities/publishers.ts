@@ -12,10 +12,21 @@ import type {
   Source,
   Work,
 } from "@bibgraph/types";
+import { AutocompleteBaseResponseSchema, publisherSchema, sourceSchema, workSchema } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
 
-import { OpenAlexBaseClient } from "../client";
+import type { OpenAlexBaseClient } from "../client";
 import { buildFilterString } from "../utils/query-builder";
+
+/**
+Maximum number of publishers returned by a random sample
+ */
+const MAX_RANDOM_SAMPLE_SIZE = 50;
+
+/**
+OpenAlex API limit for the per_page parameter
+ */
+const MAX_PER_PAGE = 200;
 
 /**
  * Search options for publishers API
@@ -33,7 +44,7 @@ export interface PublisherSearchOptions {
  * Publishers represent organizations that publish academic sources (journals, conferences, etc.)
  */
 export class PublishersApi {
-  private client: OpenAlexBaseClient;
+  private readonly client: OpenAlexBaseClient;
 
   constructor(client: OpenAlexBaseClient) {
     this.client = client;
@@ -47,6 +58,7 @@ export class PublishersApi {
    */
   async get(id: string, params: QueryParams = {}): Promise<Publisher> {
     return this.client.getById<Publisher>({
+      schema: publisherSchema,
       endpoint: "publishers",
       id,
       params,
@@ -71,7 +83,7 @@ export class PublishersApi {
   async getMultiple(
     params: QueryParams & PublishersFilters = {},
   ): Promise<OpenAlexResponse<Publisher>> {
-    return this.client.getResponse<Publisher>("publishers", params);
+    return this.client.getResponse<Publisher>("publishers", params, publisherSchema);
   }
 
   /**
@@ -83,12 +95,11 @@ export class PublishersApi {
     params: PublisherSearchOptions = {},
   ): Promise<OpenAlexResponse<Publisher>> {
     const processedParameters = this.buildQueryParams(params);
-    return this.client.getResponse<Publisher>("publishers", processedParameters);
+    return this.client.getResponse<Publisher>("publishers", processedParameters, publisherSchema);
   }
 
   /**
    * Build query parameters with proper filter processing
-   * @param options
    */
   private buildQueryParams(options: PublisherSearchOptions = {}): QueryParams {
     const { filters, sort, page, per_page, select, ...otherOptions } = options;
@@ -103,7 +114,7 @@ export class PublishersApi {
     }
 
     // Add sort if provided
-    if (sort) {
+    if (sort !== undefined) {
       queryParameters.sort = sort;
     }
 
@@ -178,9 +189,10 @@ export class PublishersApi {
         q: query.trim(),
       };
 
-      const response = await this.client.getResponse<AutocompleteResult>(
+      const response = await this.client.get(
         endpoint,
         queryParameters,
+        AutocompleteBaseResponseSchema,
       );
 
       return response.results.map((result) => ({
@@ -224,8 +236,8 @@ export class PublishersApi {
   ): Promise<OpenAlexResponse<Publisher>> {
     return this.getMultiple({
       ...params,
-      sample: Math.min(count, 50),
-      per_page: Math.min(count, 50),
+      sample: Math.min(count, MAX_RANDOM_SAMPLE_SIZE),
+      per_page: Math.min(count, MAX_RANDOM_SAMPLE_SIZE),
     });
   }
 
@@ -242,7 +254,7 @@ export class PublishersApi {
     return this.client.getResponse<Source>("sources", {
       ...params,
       filter: `host_organization_lineage:${publisherId}`,
-    });
+    }, sourceSchema);
   }
 
   /**
@@ -258,7 +270,7 @@ export class PublishersApi {
     return this.client.getResponse<Work>("works", {
       ...params,
       filter: `locations.source.host_organization_lineage:${publisherId}`,
-    });
+    }, workSchema);
   }
 
   /**
@@ -284,10 +296,10 @@ export class PublishersApi {
    * @returns Promise resolving to publishers from specified countries
    */
   async getByCountry(
-    countryCodes: string[],
+    countryCodes: readonly string[],
     params: QueryParams = {},
   ): Promise<OpenAlexResponse<Publisher>> {
-    return this.filters({ country_codes: countryCodes }, params);
+    return this.filters({ country_codes: [...countryCodes] }, params);
   }
 
   /**
@@ -297,7 +309,7 @@ export class PublishersApi {
    * @returns Promise resolving to publishers in the specified lineage
    */
   async getByLineage(
-    lineageIds: string[],
+    lineageIds: readonly string[],
     params: QueryParams = {},
   ): Promise<OpenAlexResponse<Publisher>> {
     return this.filters({ lineage: lineageIds.join("|") }, params);
@@ -316,7 +328,7 @@ export class PublishersApi {
     return this.getMultiple({
       ...params,
       sort: "works_count:desc",
-      per_page: Math.min(limit, 200),
+      per_page: Math.min(limit, MAX_PER_PAGE),
     });
   }
 
@@ -333,7 +345,7 @@ export class PublishersApi {
     return this.getMultiple({
       ...params,
       sort: "cited_by_count:desc",
-      per_page: Math.min(limit, 200),
+      per_page: Math.min(limit, MAX_PER_PAGE),
     });
   }
 
@@ -347,7 +359,7 @@ export class PublishersApi {
     params: QueryParams & PublishersFilters = {},
     batchSize = 200,
   ): AsyncGenerator<Publisher[], void, unknown> {
-    yield* this.client.stream<Publisher>("publishers", params, batchSize);
+    yield* this.client.stream<Publisher>("publishers", params,publisherSchema,  batchSize);
   }
 
   /**
@@ -360,6 +372,6 @@ export class PublishersApi {
     params: QueryParams & PublishersFilters = {},
     maxResults?: number,
   ): Promise<Publisher[]> {
-    return this.client.getAll<Publisher>("publishers", params, maxResults);
+    return this.client.getAll<Publisher>("publishers", params,publisherSchema,  maxResults);
   }
 }

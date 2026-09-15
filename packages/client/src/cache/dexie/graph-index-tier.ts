@@ -235,14 +235,14 @@ export class GraphIndexTier {
   // Bulk Operations
   // ===========================================================================
 
-  async addNodes(inputs: GraphNodeInput[]): Promise<void> {
+  async addNodes(inputs: readonly GraphNodeInput[]): Promise<void> {
     if (!(await this.ensureInitialized())) {
       return;
     }
     return nodeOps.addNodes(inputs);
   }
 
-  async addEdges(inputs: GraphEdgeInput[]): Promise<number> {
+  async addEdges(inputs: readonly GraphEdgeInput[]): Promise<number> {
     if (!(await this.ensureInitialized())) {
       return 0;
     }
@@ -335,9 +335,7 @@ let graphIndexTierInstance: GraphIndexTier | null = null;
  * Get the graph index tier singleton
  */
 export const getGraphIndexTier = (): GraphIndexTier => {
-  if (!graphIndexTierInstance) {
-    graphIndexTierInstance = new GraphIndexTier();
-  }
+  graphIndexTierInstance ??= new GraphIndexTier();
   return graphIndexTierInstance;
 };
 

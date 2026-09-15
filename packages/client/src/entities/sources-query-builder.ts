@@ -2,8 +2,6 @@
  * Sources Query Builder Utilities
  *
  * Provides query parameter building for Sources API requests.
- *
- * @module sources-query-builder
  */
 
 import type { QueryParams, SourcesFilters } from "@bibgraph/types";
@@ -57,7 +55,7 @@ export const buildSourceFilterParams = (options: SourceSearchOptions = {}): Quer
   }
 
   // Add sort if provided
-  if (sort) {
+  if (sort !== undefined) {
     queryParameters.sort = sort;
   }
 

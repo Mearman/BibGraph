@@ -1,11 +1,9 @@
-import { hostnameMatches } from "@bibgraph/utils";
 /**
- * Static data provider for OpenAlex client
- * Implements multi-tier caching with environment detection and automatic fallback
+ * Static data provider for OpenAlex client Implements multi-tier caching with environment detection and automatic fallback
  *
  * Refactored to use extracted cache tier modules for improved maintainability
  */
-import { logger } from "@bibgraph/utils";
+import { hostnameMatches, logger } from "@bibgraph/utils";
 
 // Import extracted cache tiers
 import {
@@ -16,6 +14,21 @@ import {
 } from "./cache/tiers";
 import type { CacheTierInterface } from "./cache-tiers-types";
 import type { StaticEntityType } from "./static-data-utils";
+
+// Shape of one static index.json entry, as fetched from a GitHub Pages/local static cache. Every field is optional, so a bare object check is a genuinely sufficient type guard.
+interface StaticIndexFileInfo {
+	url?: string;
+	lastRetrieved?: string;
+	contentHash?: string;
+}
+
+interface StaticIndexData {
+	lastUpdated?: string;
+	files?: Record<string, StaticIndexFileInfo>;
+}
+
+const isStaticIndexData = (value: unknown): value is StaticIndexData =>
+	typeof value === "object" && value !== null;
 
 // Define and export types and enums
 export interface StaticDataResult {
@@ -81,11 +94,11 @@ export interface CachedEntityEntry {
 class StaticDataProvider {
 	private readonly LOG_PREFIX = "static-cache";
 
-	private memoryCacheTier: MemoryCacheTier;
-	private indexedDBCacheTier: IndexedDBCacheTier;
-	private localDiskCacheTier: LocalDiskCacheTier;
+	private readonly memoryCacheTier: MemoryCacheTier;
+	private readonly indexedDBCacheTier: IndexedDBCacheTier;
+	private readonly localDiskCacheTier: LocalDiskCacheTier;
 	private gitHubPagesCacheTier: GitHubPagesCacheTier;
-	private environment: Environment;
+	private readonly environment: Environment;
 	private globalStats!: CacheStatistics;
 
 	constructor() {
@@ -97,8 +110,8 @@ class StaticDataProvider {
 		this.initializeStats();
 	}
 
-	configure(config: { gitHubPagesBaseUrl?: string }) {
-		if (config.gitHubPagesBaseUrl) {
+	configure(config: Readonly<{ gitHubPagesBaseUrl?: string }>) {
+		if (config.gitHubPagesBaseUrl !== undefined && config.gitHubPagesBaseUrl !== "") {
 			// Re-create the GitHub Pages tier with new URL
 			this.gitHubPagesCacheTier = new GitHubPagesCacheTier(
 				config.gitHubPagesBaseUrl,
@@ -231,7 +244,7 @@ class StaticDataProvider {
 		entityType: StaticEntityType,
 		id: string,
 		data: unknown,
-		sourceTier: CacheTierInterface,
+		sourceTier: Readonly<CacheTierInterface>,
 	): Promise<void> {
 		const tiers = this.getAvailableTiers();
 		const sourceTierIndex = tiers.indexOf(sourceTier);
@@ -276,7 +289,7 @@ class StaticDataProvider {
 
 	async getCacheStatistics(): Promise<CacheStatistics> {
 		// Update individual tier stats
-		const cacheTiers: Array<[CacheTier, CacheTierInterface]> = [
+		const cacheTiers: [CacheTier, CacheTierInterface][] = [
 			[CacheTier.MEMORY, this.memoryCacheTier],
 			[CacheTier.INDEXED_DB, this.indexedDBCacheTier],
 			[CacheTier.LOCAL_DISK, this.localDiskCacheTier],
@@ -353,7 +366,6 @@ class StaticDataProvider {
 
 	/**
 	 * Clear IndexedDB cache entries by entity type
-	 * @param entityType
 	 */
 	async clearIndexedDBByType(entityType: StaticEntityType): Promise<number> {
 		return this.indexedDBCacheTier.clearByType(entityType);
@@ -368,12 +380,12 @@ class StaticDataProvider {
 
 	getEnvironmentInfo(): EnvironmentInfo {
 		const isTest = Boolean(
-			globalThis.process?.env?.VITEST ??
-				globalThis.process?.env?.NODE_ENV === "test",
+			process.env.VITEST ??
+				(process.env.NODE_ENV === "test"),
 		);
-		const isDevelopment = (globalThis.process?.env?.NODE_ENV === "development" ||
-				(!globalThis.process?.env?.NODE_ENV && !isTest));
-		const isProduction = (globalThis.process?.env?.NODE_ENV === "production");
+		const isDevelopment = (process.env.NODE_ENV === "development" ||
+				(process.env.NODE_ENV === undefined && !isTest));
+		const isProduction = (process.env.NODE_ENV === "production");
 
 		return {
 			isDevelopment,
@@ -385,9 +397,6 @@ class StaticDataProvider {
 	/**
 	 * Set static data in the cache (memory and IndexedDB tiers)
 	 * Used to cache API results for future lookups
-	 * @param entityType
-	 * @param id
-	 * @param data
 	 */
 	async setStaticData(
 		entityType: StaticEntityType,
@@ -519,8 +528,7 @@ class StaticDataProvider {
 	}
 
 	/**
-	 * Enumerate available entities in the static cache by fetching index files
-	 * Returns entities that are available in the static JSON cache (GitHub Pages or local)
+	 * Enumerate available entities in the static cache by fetching index files Returns entities that are available in the static JSON cache (GitHub Pages or local)
 	 */
 	async enumerateStaticCacheEntities(): Promise<CachedEntityEntry[]> {
 		const baseUrl = this.gitHubPagesCacheTier.getBaseUrl();
@@ -551,18 +559,14 @@ class StaticDataProvider {
 					continue;
 				}
 
-				const indexData = await response.json() as {
-					lastUpdated?: string;
-					files?: Record<string, {
-						url?: string;
-						lastRetrieved?: string;
-						contentHash?: string;
-					}>;
-				};
+				const indexData: unknown = await response.json();
+				if (!isStaticIndexData(indexData)) {
+					continue;
+				}
 
 				if (indexData.files) {
 					for (const [entityId, fileInfo] of Object.entries(indexData.files)) {
-						const lastRetrieved = fileInfo.lastRetrieved
+						const lastRetrieved = fileInfo.lastRetrieved !== undefined && fileInfo.lastRetrieved !== ""
 							? new Date(fileInfo.lastRetrieved).getTime()
 							: Date.now();
 

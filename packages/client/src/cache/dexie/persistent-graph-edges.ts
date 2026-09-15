@@ -2,7 +2,6 @@
  * Persistent Graph Edge Helpers
  *
  * Helper functions for edge operations in the persistent graph.
- * @module cache/dexie/persistent-graph-edges
  */
 
 import type {
@@ -16,8 +15,6 @@ import type { GraphCache } from './persistent-graph-types';
 
 /**
  * Create an edge record from input
- * @param input
- * @param timestamp
  */
 export const createEdgeRecord = (input: GraphEdgeInput, timestamp: number): GraphEdgeRecord => {
   const edgeId = generateEdgeId(input.source, input.target, input.type);
@@ -42,10 +39,6 @@ export const createEdgeRecord = (input: GraphEdgeInput, timestamp: number): Grap
 
 /**
  * Add an edge to adjacency lists
- * @param cache
- * @param edgeId
- * @param source
- * @param target
  */
 export const addToAdjacencyLists = (cache: GraphCache, edgeId: string, source: string, target: string): void => {
   const outbound = cache.outboundEdges.get(source);
@@ -65,8 +58,6 @@ export const addToAdjacencyLists = (cache: GraphCache, edgeId: string, source: s
 
 /**
  * Add edge to cache and adjacency lists
- * @param cache
- * @param record
  */
 export const addEdgeToCache = (cache: GraphCache, record: GraphEdgeRecord): void => {
   cache.edges.set(record.id, record);
@@ -75,8 +66,6 @@ export const addEdgeToCache = (cache: GraphCache, record: GraphEdgeRecord): void
 
 /**
  * Check if an edge property filter matches an edge
- * @param edge
- * @param filter
  */
 const matchesFilter = (edge: GraphEdgeRecord, filter: EdgePropertyFilter): boolean => {
   if (filter.authorPosition !== undefined && edge.authorPosition !== filter.authorPosition) {
@@ -97,12 +86,11 @@ const matchesFilter = (edge: GraphEdgeRecord, filter: EdgePropertyFilter): boole
   if (filter.scoreMax !== undefined && (edge.score === undefined || edge.score > filter.scoreMax)) {
     return false;
   }
-  if (
-    filter.yearsInclude !== undefined &&
-    filter.yearsInclude.length > 0 &&
-    (!edge.years || filter.yearsInclude.every((year) => !edge.years?.includes(year)))
-  ) {
-    return false;
+  if (filter.yearsInclude !== undefined && filter.yearsInclude.length > 0) {
+    const { years } = edge;
+    if (years === undefined || filter.yearsInclude.every((year) => !years.includes(year))) {
+      return false;
+    }
   }
   if (filter.awardId !== undefined && edge.awardId !== filter.awardId) {
     return false;
@@ -115,7 +103,5 @@ const matchesFilter = (edge: GraphEdgeRecord, filter: EdgePropertyFilter): boole
 
 /**
  * Apply edge property filter to edges
- * @param edges
- * @param filter
  */
-export const applyEdgeFilter = (edges: GraphEdgeRecord[], filter: EdgePropertyFilter): GraphEdgeRecord[] => edges.filter((edge) => matchesFilter(edge, filter));
+export const applyEdgeFilter = (edges: readonly GraphEdgeRecord[], filter: EdgePropertyFilter): GraphEdgeRecord[] => edges.filter((edge) => matchesFilter(edge, filter));

@@ -16,30 +16,39 @@ export interface ReadabilityResult {
   readingLevel: string;
 }
 
+// A word this short or shorter is treated as a single syllable outright, skipping the vowel-cluster heuristic below.
+const SHORT_WORD_MAX_LENGTH = 3;
+
 /**
  * Count syllables in a word (simple approximation)
- * @param word
  */
 const countSyllables = (word: string): number => {
   word = word.toLowerCase();
-  if (word.length <= 3) return 1;
+  if (word.length <= SHORT_WORD_MAX_LENGTH) return 1;
   const vowels = word.match(/[aeiouy]+/g);
   let syllables = vowels ? vowels.length : 1;
   if (word.endsWith("e")) syllables--;
   return Math.max(1, syllables);
 };
 
+// Flesch Reading Ease score thresholds for each reading-level label.
+const READING_EASE_VERY_EASY_MIN = 90;
+const READING_EASE_EASY_MIN = 80;
+const READING_EASE_FAIRLY_EASY_MIN = 70;
+const READING_EASE_STANDARD_MIN = 60;
+const READING_EASE_FAIRLY_DIFFICULT_MIN = 50;
+const READING_EASE_DIFFICULT_MIN = 30;
+
 /**
  * Determine reading level from Flesch Reading Ease score
- * @param fleschReadingEase
  */
 const determineReadingLevel = (fleschReadingEase: number): string => {
-  if (fleschReadingEase >= 90) return "Very Easy";
-  if (fleschReadingEase >= 80) return "Easy";
-  if (fleschReadingEase >= 70) return "Fairly Easy";
-  if (fleschReadingEase >= 60) return "Standard";
-  if (fleschReadingEase >= 50) return "Fairly Difficult";
-  if (fleschReadingEase >= 30) return "Difficult";
+  if (fleschReadingEase >= READING_EASE_VERY_EASY_MIN) return "Very Easy";
+  if (fleschReadingEase >= READING_EASE_EASY_MIN) return "Easy";
+  if (fleschReadingEase >= READING_EASE_FAIRLY_EASY_MIN) return "Fairly Easy";
+  if (fleschReadingEase >= READING_EASE_STANDARD_MIN) return "Standard";
+  if (fleschReadingEase >= READING_EASE_FAIRLY_DIFFICULT_MIN) return "Fairly Difficult";
+  if (fleschReadingEase >= READING_EASE_DIFFICULT_MIN) return "Difficult";
   return "Very Difficult";
 };
 
@@ -58,8 +67,6 @@ const ROUNDING_FACTOR = 100;
 
 /**
  * Calculate Flesch Reading Ease and Grade Level scores
- * @param avgWordsPerSentence
- * @param avgSyllablesPerWord
  */
 const calculateFleschScores = (avgWordsPerSentence: number, avgSyllablesPerWord: number): { fleschReadingEase: number; fleschKincaidGrade: number } => {
   const fleschReadingEase =
@@ -83,7 +90,7 @@ const calculateFleschScores = (avgWordsPerSentence: number, avgSyllablesPerWord:
  * ```
  */
 export const analyzeReadability = (abstract: string | null): ReadabilityResult | null => {
-  if (!abstract || typeof abstract !== "string") {
+  if (abstract === null || abstract === "" || typeof abstract !== "string") {
     return null;
   }
 

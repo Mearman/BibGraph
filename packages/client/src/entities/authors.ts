@@ -18,6 +18,7 @@ import type {
   QueryParams,
   Work,
 } from "@bibgraph/types";
+import { authorSchema, AutocompleteBaseResponseSchema, workSchema } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
 
 import type { OpenAlexBaseClient } from "../client";
@@ -34,11 +35,12 @@ import {
   filterValidTopics,
 } from "./authors/type-guards";
 
+
 /**
  * Authors API class providing methods for author entity operations
  */
 export class AuthorsApi {
-  constructor(private client: OpenAlexBaseClient) {}
+  constructor(private readonly client: OpenAlexBaseClient) {}
 
   /**
    * Check if an identifier is a valid ORCID in any supported format
@@ -68,7 +70,7 @@ export class AuthorsApi {
    */
   async autocomplete(
     query: string,
-    options: AuthorAutocompleteOptions = {},
+    options: Readonly<AuthorAutocompleteOptions> = {},
   ): Promise<AutocompleteResult[]> {
     // Validate query parameter
     if (!query || typeof query !== "string") {
@@ -94,9 +96,10 @@ export class AuthorsApi {
         queryParameters.per_page = Math.min(options.per_page, MAX_AUTOCOMPLETE_RESULTS);
       }
 
-      const response = await this.client.getResponse<AutocompleteResult>(
+      const response = await this.client.get(
         endpoint,
         queryParameters,
+        AutocompleteBaseResponseSchema,
       );
 
       return response.results.map((result) => ({
@@ -140,6 +143,7 @@ export class AuthorsApi {
     // Normalize ORCID if it's an ORCID identifier
     const normalizedId = normalizeOrcidId(id) ?? id;
     return this.client.getById<Author>({
+      schema: authorSchema,
       endpoint: "authors",
       id: normalizedId,
       params,
@@ -171,11 +175,14 @@ export class AuthorsApi {
     const processedParameters = { ...params };
 
     // Convert filter object to string if needed
-    if (processedParameters.filter && typeof processedParameters.filter === "object") {
+    if (
+      processedParameters.filter !== undefined &&
+      typeof processedParameters.filter === "object"
+    ) {
       processedParameters.filter = buildFilterString(processedParameters.filter);
     }
 
-    return this.client.getResponse<Author>("authors", processedParameters);
+    return this.client.getResponse<Author>("authors", processedParameters, authorSchema);
   }
 
   /**
@@ -214,7 +221,7 @@ export class AuthorsApi {
     if (options.select !== undefined) parameters.select = options.select;
     if (options.filters) parameters.filter = buildFilterString(options.filters);
 
-    return this.client.getResponse<Author>("authors", parameters);
+    return this.client.getResponse<Author>("authors", parameters, authorSchema);
   }
 
   /**
@@ -270,7 +277,7 @@ export class AuthorsApi {
     return this.client.getResponse<Work>("works", {
       ...params,
       filter: buildFilterString(combinedFilters),
-    });
+    }, workSchema);
   }
 
   /**
@@ -328,7 +335,7 @@ export class AuthorsApi {
    */
   async getAuthorCollaborators(
     authorId: string,
-    filters: AuthorCollaboratorsFilters = {},
+    filters: Readonly<AuthorCollaboratorsFilters> = {},
     params: QueryParams = {},
   ): Promise<CollaboratorResult[]> {
     return analyzeAuthorCollaborators(
@@ -348,7 +355,7 @@ export class AuthorsApi {
    * @returns Promise resolving to OpenAlexResponse containing random authors
    */
   async getRandomAuthors(
-    count: number = 25,
+    count = 25,
     params: QueryParams & { filter?: string } = {},
   ): Promise<OpenAlexResponse<Author>> {
     const MAX_SAMPLE_SIZE = 200;
@@ -385,7 +392,7 @@ export class AuthorsApi {
    * @returns Promise resolving to OpenAlexResponse containing most cited authors
    */
   async getMostCitedAuthors(
-    limit: number = 50,
+    limit = 50,
     filters: AuthorsFilters = {},
     params: QueryParams = {},
   ): Promise<OpenAlexResponse<Author>> {
@@ -412,7 +419,7 @@ export class AuthorsApi {
    * @returns Promise resolving to OpenAlexResponse containing most productive authors
    */
   async getMostProductiveAuthors(
-    limit: number = 50,
+    limit = 50,
     filters: AuthorsFilters = {},
     params: QueryParams = {},
   ): Promise<OpenAlexResponse<Author>> {
@@ -440,9 +447,9 @@ export class AuthorsApi {
    */
   async *streamAuthors(
     params: QueryParams & { filter?: string } = {},
-    batchSize: number = 200,
+    batchSize = 200,
   ): AsyncGenerator<Author[], void, unknown> {
-    yield* this.client.stream<Author>("authors", params, batchSize);
+    yield* this.client.stream<Author>("authors", params,authorSchema,  batchSize);
   }
 
   /**
@@ -465,7 +472,7 @@ export class AuthorsApi {
       parameters.filter = filterString;
     }
 
-    const response = await this.client.getResponse<Author>("authors", parameters);
+    const response = await this.client.getResponse<Author>("authors", parameters, authorSchema);
 
     return response.group_by ?? [];
   }
@@ -482,7 +489,7 @@ export class AuthorsApi {
   ): Promise<GroupedResponse<Author>> {
     const hasValidProperties = <T extends Record<string, unknown>>(
       object: unknown,
-      keys: (keyof T)[],
+      keys: readonly (keyof T)[],
     ): object is T =>
       typeof object === "object" && object !== null && keys.every((key) => key in object);
 
@@ -495,18 +502,18 @@ export class AuthorsApi {
     const parameters: QueryParams & { filter?: string } = {
       group_by: field,
       per_page,
-      ...(sort && { sort }),
-      ...(page && { page }),
+      ...(sort !== undefined && sort !== "" && { sort }),
+      ...(page !== undefined && page > 0 && { page }),
     };
 
     const filterString = filters
-      ? buildFilterString(filters as Record<string, unknown>)
+      ? buildFilterString(filters)
       : "";
     if (filterString) {
       parameters.filter = filterString;
     }
 
-    const response = await this.client.getResponse<Author>("authors", parameters);
+    const response = await this.client.getResponse<Author>("authors", parameters, authorSchema);
 
     // Transform the response to match GroupedResponse type
     return {

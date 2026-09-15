@@ -13,6 +13,7 @@ import type {
   OpenAlexResponse,
   QueryParams,
 } from "@bibgraph/types";
+import { AutocompleteBaseResponseSchema, conceptSchema } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
 
 import type { OpenAlexBaseClient } from "../client";
@@ -22,18 +23,45 @@ import { buildFilterString } from "../utils/query-builder";
 import { toQueryParams as toQueryParameters } from "../utils/query-params";
 
 /**
+OpenAlex API limit for autocomplete results
+ */
+const AUTOCOMPLETE_MAX_RESULTS = 200;
+
+/**
+OpenAlex API limit for the per_page parameter
+ */
+const MAX_PER_PAGE = 200;
+
+/**
+Highest valid OpenAlex concept hierarchy level
+ */
+const MAX_CONCEPT_LEVEL = 5;
+
+/**
+Sample size used to compute aggregate concept statistics
+ */
+const STATS_SAMPLE_SIZE = 1000;
+
+/**
+ * Type guard narrowing an unknown value to a plain object with string keys
+ * @param value - Value to check
+ * @returns True if the value is a non-null, non-array object
+ */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
  * Concepts API class providing methods for concept operations
  */
 export class ConceptsApi {
-  private autocompleteApi: AutocompleteApi;
+  private readonly autocompleteApi: AutocompleteApi;
 
-  constructor(private client: OpenAlexBaseClient) {
+  constructor(private readonly client: OpenAlexBaseClient) {
     this.autocompleteApi = new AutocompleteApi(client);
   }
 
   /**
    * Type guard to check if params is QueryParams by checking for string sort property
-   * @param params
    */
   private isQueryParams(params: unknown): params is QueryParams {
     if (typeof params !== "object" || params === null) {
@@ -48,7 +76,6 @@ export class ConceptsApi {
 
   /**
    * Type guard to check if params is ConceptsQueryParams
-   * @param params
    */
   private isConceptsQueryParams(
     params: unknown,
@@ -68,7 +95,7 @@ export class ConceptsApi {
    */
   async autocomplete(
     query: string,
-    options: BaseAutocompleteOptions = {},
+    options: Readonly<BaseAutocompleteOptions> = {},
   ): Promise<AutocompleteResult[]> {
     if (!query || typeof query !== "string") {
       throw new Error(
@@ -89,12 +116,13 @@ export class ConceptsApi {
 
       // Apply per_page limit if specified
       if (options.per_page !== undefined && options.per_page > 0) {
-        queryParameters.per_page = Math.min(options.per_page, 200); // Respect OpenAlex API limits
+        queryParameters.per_page = Math.min(options.per_page, AUTOCOMPLETE_MAX_RESULTS); // Respect OpenAlex API limits
       }
 
-      const response = await this.client.getResponse<AutocompleteResult>(
+      const response = await this.client.get(
         endpoint,
         queryParameters,
+        AutocompleteBaseResponseSchema,
       );
 
       return response.results.map((result) => ({
@@ -122,7 +150,7 @@ export class ConceptsApi {
    *   - https://www.wikidata.org/entity/Q123456
    * @param params - Additional query parameters with strict typing
    * @returns Promise resolving to a concept
-   * @throws {OpenAlexApiError} When the concept is not found or invalid ID format
+   * @throws An OpenAlexApiError when the concept is not found or the ID format is invalid
    * @example
    * ```typescript
    * // Using OpenAlex ID
@@ -148,7 +176,7 @@ export class ConceptsApi {
     let normalizedId = id;
     if (isValidWikidata(id)) {
       const wikidataId = normalizeExternalId(id, "wikidata");
-      if (wikidataId) {
+      if (wikidataId !== null) {
         // The normalizer returns Q notation, but OpenAlex API expects wikidata: prefix
         normalizedId = wikidataId.startsWith("Q")
           ? `wikidata:${wikidataId}`
@@ -169,6 +197,7 @@ export class ConceptsApi {
       this.isQueryParams(params)
     ) {
       return this.client.getById<Concept>({
+        schema: conceptSchema,
         endpoint: "concepts",
         id: normalizedId,
         params,
@@ -177,6 +206,7 @@ export class ConceptsApi {
     // Otherwise, convert from ConceptsQueryParams
     if (this.isConceptsQueryParams(params)) {
       return this.client.getById<Concept>({
+        schema: conceptSchema,
         endpoint: "concepts",
         id: normalizedId,
         params: toQueryParameters(params),
@@ -184,6 +214,7 @@ export class ConceptsApi {
     }
     // Default case - treat as basic params
     return this.client.getById<Concept>({
+      schema: conceptSchema,
       endpoint: "concepts",
       id: normalizedId,
       params,
@@ -212,17 +243,17 @@ export class ConceptsApi {
       typeof params.sort === "string" &&
       this.isQueryParams(params)
     ) {
-      return this.client.getResponse<Concept>("concepts", params);
+      return this.client.getResponse<Concept>("concepts", params, conceptSchema);
     }
     // Otherwise, convert from ConceptsQueryParams
     if (this.isConceptsQueryParams(params)) {
       return this.client.getResponse<Concept>(
         "concepts",
         toQueryParameters(params),
-      );
+      conceptSchema);
     }
     // Default case - treat as basic params
-    return this.client.getResponse<Concept>("concepts", toQueryParameters({}));
+    return this.client.getResponse<Concept>("concepts", toQueryParameters({}), conceptSchema);
   }
 
   /**
@@ -230,7 +261,7 @@ export class ConceptsApi {
    * @param query - Search query string (must be non-empty)
    * @param options - Search options including filters and pagination
    * @returns Promise resolving to search results
-   * @throws {Error} When query is empty or invalid pagination parameters
+   * @throws An Error when query is empty or invalid pagination parameters
    * @example
    * ```typescript
    * const results = await conceptsApi.searchConcepts('machine learning', {
@@ -242,37 +273,32 @@ export class ConceptsApi {
    */
   async searchConcepts(
     query: string,
-    options: ConceptSearchOptions = {},
+    options: Readonly<ConceptSearchOptions> = {},
   ): Promise<OpenAlexResponse<Concept>> {
     if (!query || typeof query !== "string" || query.trim().length === 0) {
       throw new Error("Search query must be a non-empty string");
     }
 
-    // Validate options object has expected structure for ConceptSearchOptions
-    if (typeof options !== "object" || options === null) {
-      throw new Error("Options must be an object");
-    }
-
     const {
-      filters,
       sort = "relevance_score:desc",
       page = 1,
       per_page = 25,
       select,
     } = options;
+    const filtersValue: unknown = options.filters;
 
     // Validate pagination parameters
     if (page < 1) {
-      throw new Error("Page number must be >= 1");
+      throw new Error("Page number must be at least 1");
     }
-    if (per_page < 1 || per_page > 200) {
-      throw new Error("per_page must be between 1 and 200");
+    if (per_page < 1 || per_page > MAX_PER_PAGE) {
+      throw new Error(`per_page must be between 1 and ${String(MAX_PER_PAGE)}`);
     }
 
     const baseParameters = {
       search: query.trim(),
-      filter: filters
-        ? buildFilterString(filters as Record<string, unknown>)
+      filter: isRecord(filtersValue)
+        ? buildFilterString(filtersValue)
         : "",
       sort: sort,
       page,
@@ -287,10 +313,10 @@ export class ConceptsApi {
 
   /**
    * Get concepts by minimum works count with strict validation
-   * @param minWorksCount - Minimum number of works for concepts (must be >= 0)
+   * @param minWorksCount - Minimum number of works for concepts (must be at least 0)
    * @param params - Additional query parameters
    * @returns Promise resolving to filtered concepts
-   * @throws {Error} When minWorksCount is invalid
+   * @throws An Error when minWorksCount is invalid
    * @example
    * ```typescript
    * const popularConcepts = await conceptsApi.getConceptsByWorksCount(100, {
@@ -334,7 +360,7 @@ export class ConceptsApi {
     level: number,
     params: ConceptsQueryParams = {},
   ): Promise<OpenAlexResponse<Concept>> {
-    if (!Number.isInteger(level) || level < 0 || level > 5) {
+    if (!Number.isInteger(level) || level < 0 || level > MAX_CONCEPT_LEVEL) {
       throw new Error("Level must be an integer between 0 and 5");
     }
 
@@ -372,7 +398,7 @@ export class ConceptsApi {
   /**
    * Stream all concepts using cursor pagination
    * @param params - Query parameters for filtering
-   * @yields Batches of concepts
+   * @returns Batches of concepts
    * @example
    * ```typescript
    * for await (const conceptBatch of conceptsApi.streamConcepts({ filter: { 'works_count': '>10' } })) {
@@ -389,15 +415,15 @@ export class ConceptsApi {
       typeof params.sort === "string" &&
       this.isQueryParams(params)
     ) {
-      yield* this.client.stream<Concept>("concepts", params);
+      yield* this.client.stream<Concept>("concepts", params, conceptSchema);
       return;
     }
     // Otherwise, convert from ConceptsQueryParams
     if (this.isConceptsQueryParams(params)) {
-      yield* this.client.stream<Concept>("concepts", toQueryParameters(params));
+      yield* this.client.stream<Concept>("concepts", toQueryParameters(params), conceptSchema);
     } else {
       // Default case - treat as basic params
-      yield* this.client.stream<Concept>("concepts", toQueryParameters({}));
+      yield* this.client.stream<Concept>("concepts", toQueryParameters({}), conceptSchema);
     }
   }
 
@@ -420,6 +446,7 @@ export class ConceptsApi {
     return this.client.getAll<Concept>(
       "concepts",
       toQueryParameters(params),
+      conceptSchema,
       maxResults,
     );
   }
@@ -449,7 +476,7 @@ export class ConceptsApi {
     });
 
     // For more detailed stats, we might need to aggregate from a sample
-    const sampleSize = Math.min(1000, response.meta.count);
+    const sampleSize = Math.min(STATS_SAMPLE_SIZE, response.meta.count);
     const sample = await this.getConcepts({
       ...params,
       per_page: sampleSize,

@@ -11,7 +11,6 @@ const isStaticEntityType = (value: string): value is StaticEntityType => VALID_E
 
 /**
  * Validate and return entity type for static cache lookup
- * @param entityType
  */
 export const toStaticEntityType = (entityType: string): StaticEntityType => {
 	if (isStaticEntityType(entityType)) {
@@ -22,7 +21,6 @@ export const toStaticEntityType = (entityType: string): StaticEntityType => {
 
 /**
  * Clean OpenAlex ID by removing URL prefix if present
- * @param id
  */
 export const cleanOpenAlexId = (id: string): string => {
 	// Handle null/undefined/empty - return as-is to preserve for error handling

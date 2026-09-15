@@ -39,7 +39,6 @@ export class IdResolver {
 
   /**
    * Validate and normalize any external identifier
-   * @param id
    */
   validateId(id: unknown): IdValidationResult {
     if (!isString(id) || !isNonEmptyString(id)) {
@@ -55,7 +54,6 @@ export class IdResolver {
 
   /**
    * Validate a trimmed identifier string
-   * @param trimmedId
    */
   private validateTrimmedId(trimmedId: string): IdValidationResult {
     for (const pattern of idPatterns) {
@@ -68,8 +66,6 @@ export class IdResolver {
 
   /**
    * Try to validate an ID against a specific pattern
-   * @param trimmedId
-   * @param pattern
    */
   private tryPattern(
     trimmedId: string,
@@ -85,8 +81,6 @@ export class IdResolver {
 
   /**
    * Process a successful pattern match
-   * @param trimmedId
-   * @param pattern
    */
   private processPatternMatch(
     trimmedId: string,
@@ -127,8 +121,6 @@ export class IdResolver {
 
   /**
    * Validate checksum if needed
-   * @param pattern
-   * @param normalized
    */
   private validateChecksumIfNeeded(
     pattern: IdPattern,
@@ -142,9 +134,6 @@ export class IdResolver {
 
   /**
    * Build metadata for valid identifier
-   * @param normalized
-   * @param type
-   * @param checksumValid
    */
   private buildMetadata(
     normalized: string,
@@ -156,7 +145,7 @@ export class IdResolver {
 
     if (type === "openalex") {
       const entityType = this.getOpenAlexEntityType(normalized);
-      if (entityType) {
+      if (entityType !== undefined) {
         metadata.entityType = entityType;
       }
     }
@@ -166,8 +155,6 @@ export class IdResolver {
 
   /**
    * Create an invalid validation result
-   * @param original
-   * @param error
    */
   private createInvalidResult(
     original: string,
@@ -184,16 +171,13 @@ export class IdResolver {
 
   /**
    * Batch validate multiple identifiers
-   * @param ids
    */
-  validateIds(ids: unknown[]): IdValidationResult[] {
+  validateIds(ids: readonly unknown[]): IdValidationResult[] {
     return ids.map((id) => this.validateId(id));
   }
 
   /**
    * Check if an identifier is valid for a specific type
-   * @param id
-   * @param type
    */
   isValidType(id: string, type: ExternalIdType): boolean {
     const result = this.validateId(id);
@@ -202,8 +186,6 @@ export class IdResolver {
 
   /**
    * Get the URL format for an identifier
-   * @param normalized
-   * @param type
    */
   private getUrlFormat(
     normalized: string,
@@ -237,6 +219,8 @@ export class IdResolver {
       case "issn":
         // ISSN doesn't have a standard URL format
         return undefined;
+      case "unknown":
+        return undefined;
       default:
         return undefined;
     }
@@ -244,10 +228,9 @@ export class IdResolver {
 
   /**
    * Get OpenAlex entity type from ID prefix
-   * @param id
    */
   private getOpenAlexEntityType(id: string): string | undefined {
-    const prefixMatch = id.match(/^([ACFIKPQSTW])/i);
+    const prefixMatch = /^([ACFIKPQSTW])/i.exec(id);
     if (!prefixMatch) return undefined;
 
     const prefixMap: Record<string, string> = {
@@ -300,8 +283,6 @@ export class IdResolver {
 
   /**
    * Normalize identifier to standard format
-   * @param id
-   * @param type
    */
   normalizeId(id: string, type?: ExternalIdType): string | null {
     if (type) {
@@ -324,7 +305,6 @@ export class IdResolver {
 
   /**
    * Normalize identifier to URL format
-   * @param id
    */
   normalizeToUrl(id: string): string | null {
     const result = this.validateId(id);
@@ -334,12 +314,12 @@ export class IdResolver {
   /**
    * Get supported identifier types and their information
    */
-  static getSupportedTypes(): Array<{
+  static getSupportedTypes(): {
     type: ExternalIdType;
     name: string;
     description: string;
     examples: string[];
-  }> {
+  }[] {
     return idPatterns.map((pattern) => ({
       type: pattern.type,
       name: pattern.name,

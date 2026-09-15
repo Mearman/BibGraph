@@ -202,7 +202,8 @@ describe("AutocompleteApi Integration Tests", () => {
 
     it("should handle whitespace-only query", async () => {
       // Whitespace queries return empty arrays instead of throwing errors
-      const results = await client.client.autocomplete.autocompleteGeneral(' '.repeat(3));
+      const WHITESPACE_QUERY_LENGTH = 3;
+      const results = await client.client.autocomplete.autocompleteGeneral(' '.repeat(WHITESPACE_QUERY_LENGTH));
       expect(Array.isArray(results)).toBe(true);
       expect(results).toHaveLength(0);
     });
@@ -274,17 +275,18 @@ describe("AutocompleteApi Integration Tests", () => {
 
       const duration = Date.now() - startTime;
       // Should complete within 5 seconds
-      expect(duration).toBeLessThan(5000);
+      const MAX_REQUEST_DURATION_MS = 5000;
+      expect(duration).toBeLessThan(MAX_REQUEST_DURATION_MS);
     });
 
     it("should handle multiple concurrent requests", async () => {
       const queries = ["test1", "test2", "test3"];
 
       const results = await Promise.all(
-        queries.map((q) => client.client.autocomplete.autocompleteGeneral(q)),
+        queries.map(async (q) => client.client.autocomplete.autocompleteGeneral(q)),
       );
 
-      expect(results).toHaveLength(3);
+      expect(results).toHaveLength(queries.length);
       for (const result of results) {
         expect(Array.isArray(result)).toBe(true);
       }

@@ -15,6 +15,14 @@ import {
 
 const LOG_PREFIX = "dexie-cache";
 
+const DEFAULT_MAX_ENTRIES = 10_000;
+const HOURS_PER_DAY = 24;
+const MINUTES_PER_HOUR = 60;
+const SECONDS_PER_MINUTE = 60;
+const MILLISECONDS_PER_SECOND = 1000;
+const DEFAULT_TTL_MS = HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND;
+const DEFAULT_EVICTION_BATCH_SIZE = 100;
+
 /**
  * Configuration for the Dexie cache tier
  */
@@ -66,7 +74,7 @@ export interface DexieCacheStats {
  * Dexie-based cache tier for persistent browser storage
  */
 export class DexieCacheTier {
-  private config: Required<DexieCacheTierConfig>;
+  private readonly config: Required<DexieCacheTierConfig>;
   private stats = {
     requests: 0,
     hits: 0,
@@ -76,12 +84,12 @@ export class DexieCacheTier {
   private initialized = false;
   private initializationPromise: Promise<void> | null = null;
 
-  constructor(config: DexieCacheTierConfig = {}) {
+  constructor(config: Readonly<DexieCacheTierConfig> = {}) {
     this.config = {
-      maxEntries: config.maxEntries ?? 10_000,
-      defaultTtl: config.defaultTtl ?? 24 * 60 * 60 * 1000, // 24 hours
+      maxEntries: config.maxEntries ?? DEFAULT_MAX_ENTRIES,
+      defaultTtl: config.defaultTtl ?? DEFAULT_TTL_MS,
       enableLruEviction: config.enableLruEviction ?? true,
-      evictionBatchSize: config.evictionBatchSize ?? 100,
+      evictionBatchSize: config.evictionBatchSize ?? DEFAULT_EVICTION_BATCH_SIZE,
     };
   }
 
@@ -133,8 +141,6 @@ export class DexieCacheTier {
 
   /**
    * Get an entity from the cache
-   * @param entityType
-   * @param id
    */
   async get(entityType: StaticEntityType, id: string): Promise<DexieCacheResult> {
     const startTime = Date.now();
@@ -173,7 +179,7 @@ export class DexieCacheTier {
         accessCount: record.accessCount + 1,
       });
 
-      const data = JSON.parse(record.data);
+      const data: unknown = JSON.parse(record.data);
       const loadTime = Date.now() - startTime;
 
       this.stats.hits++;
@@ -197,8 +203,6 @@ export class DexieCacheTier {
 
   /**
    * Check if an entity exists in the cache
-   * @param entityType
-   * @param id
    */
   async has(entityType: StaticEntityType, id: string): Promise<boolean> {
     if (!(await this.ensureInitialized())) {
@@ -233,10 +237,6 @@ export class DexieCacheTier {
 
   /**
    * Store an entity in the cache
-   * @param entityType
-   * @param id
-   * @param data
-   * @param ttl
    */
   async set(entityType: StaticEntityType, id: string, data: unknown, ttl?: number): Promise<void> {
     if (!(await this.ensureInitialized())) {
@@ -285,8 +285,6 @@ export class DexieCacheTier {
 
   /**
    * Delete an entity from the cache
-   * @param entityType
-   * @param id
    */
   async delete(entityType: StaticEntityType, id: string): Promise<boolean> {
     if (!(await this.ensureInitialized())) {
@@ -333,7 +331,6 @@ export class DexieCacheTier {
 
   /**
    * Clear entities of a specific type
-   * @param entityType
    */
   async clearByType(entityType: StaticEntityType): Promise<number> {
     if (!(await this.ensureInitialized())) {
@@ -359,7 +356,7 @@ export class DexieCacheTier {
    * Get cache statistics
    */
   async getStats(): Promise<DexieCacheStats> {
-    const baseStats = {
+    const baseStats: DexieCacheStats = {
       requests: this.stats.requests,
       hits: this.stats.hits,
       misses: this.stats.misses,
@@ -367,8 +364,8 @@ export class DexieCacheTier {
         this.stats.requests > 0 ? this.stats.totalLoadTime / this.stats.requests : 0,
       totalEntries: 0,
       totalSizeBytes: 0,
-      oldestEntry: null as number | null,
-      newestEntry: null as number | null,
+      oldestEntry: null,
+      newestEntry: null,
     };
 
     if (!(await this.ensureInitialized())) {
@@ -419,6 +416,7 @@ export class DexieCacheTier {
     hits: number;
     averageLoadTime: number;
   }> {
+    await this.ensureInitialized();
     return {
       requests: this.stats.requests,
       hits: this.stats.hits,
@@ -464,9 +462,8 @@ export class DexieCacheTier {
 
   /**
    * Check if a cache entry is expired
-   * @param record
    */
-  private isExpired(record: CachedEntityRecord): boolean {
+  private isExpired(record: Readonly<CachedEntityRecord>): boolean {
     if (record.ttl === null) {
       return false;
     }
@@ -533,9 +530,7 @@ export class DexieCacheTier {
 let dexieCacheTierInstance: DexieCacheTier | null = null;
 
 export const getDexieCacheTier = (config?: DexieCacheTierConfig): DexieCacheTier => {
-  if (!dexieCacheTierInstance) {
-    dexieCacheTierInstance = new DexieCacheTier(config);
-  }
+  dexieCacheTierInstance ??= new DexieCacheTier(config);
   return dexieCacheTierInstance;
 };
 
