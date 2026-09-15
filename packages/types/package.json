@@ -10,12 +10,12 @@
 	},
 	"scripts": {
 		"_build": "vite build",
+		"_lint": "eslint . --cache",
+		"_typecheck": "tsc --noEmit",
 		"build": "pnpm run _build",
 		"clean": "rm -rf dist",
 		"dev": "vite build --watch",
-		"_lint": "eslint . --cache",
 		"lint": "pnpm run _lint",
-		"_typecheck": "tsc --noEmit",
 		"typecheck": "pnpm run _typecheck"
 	},
 	"dependencies": {
