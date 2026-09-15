@@ -102,7 +102,15 @@ export const getAllRoutes = (): string[] => {
 	const interfaceContent = interfaceMatch[1];
 	const routeMatches = interfaceContent.matchAll(/'([^']+)':/g);
 
-	const routes: string[] = Array.from(routeMatches, match => match[1]);
+	// Normalise trailing slashes off non-root paths: the route-tree generator
+	// emits trailing slashes for index routes ('/authors/'), and everything
+	// downstream here matches on slash-free paths
+	const routes: string[] = Array.from(routeMatches, match => {
+		const routePath = match[1];
+		return routePath.length > 1 && routePath.endsWith("/")
+			? routePath.slice(0, -1)
+			: routePath;
+	});
 
 	return routes.sort();
 };
