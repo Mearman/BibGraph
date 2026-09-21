@@ -41,11 +41,11 @@
 		"@testing-library/user-event": "14.6.7",
 		"@types/node": "26.4.1",
 		"@vitest/coverage-v8": "4.1.11",
-		"eslint": "10.10.0",
+		"eslint": "10.11.0",
 		"immer": "11.1.18",
 		"memfs": "4.71.0",
 		"msw": "2.15.0",
-		"typescript": "6.0.3",
+		"typescript": "7.0.2",
 		"vitest": "4.1.11",
 		"vitest-axe": "0.1.0"
 	},
