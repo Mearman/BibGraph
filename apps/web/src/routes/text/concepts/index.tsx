@@ -43,9 +43,12 @@ const TextConceptsRoute = () => {
     }
   }, []);
 
-  useEffect(() => {
+  // Follow a changed initial title by adjusting state while rendering, which React prefers to an effect that sets state.
+  const [seenInitialTitle, setSeenInitialTitle] = useState(initialTitle);
+  if (seenInitialTitle !== initialTitle) {
+    setSeenInitialTitle(initialTitle);
     setTitle(initialTitle);
-  }, [initialTitle]);
+  }
 
   const {
     data: concepts = [],

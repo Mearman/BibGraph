@@ -285,10 +285,11 @@ export const EntityList = ({
     return response.results;
   }, [entityType, perPage, urlFilters, searchParams, currentPage]);
 
+  const { execute } = asyncOperation;
   React.useEffect(() => {
-    void asyncOperation.execute(fetchData);
-    // `asyncOperation.execute` (not the whole `asyncOperation` object): the hook returns a fresh object each render, so depending on the object would re-fire this effect on every render and loop fetches forever, while `execute` itself is useCallback-stable.
-  }, [fetchData, asyncOperation.execute]);
+    void execute(fetchData);
+    // `execute` (not the whole `asyncOperation` object): the hook returns a fresh object each render, so depending on the object would re-fire this effect on every render and loop fetches forever, while `execute` itself is useCallback-stable.
+  }, [fetchData, execute]);
 
   // Announce when data loading completes
   React.useEffect(() => {
