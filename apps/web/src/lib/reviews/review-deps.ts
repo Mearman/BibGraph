@@ -9,16 +9,7 @@ import { createReview, updateReview } from "@/stores/review-store";
 import { createOpenAlexPoolFetcher } from "../algorithms/openalex-pool-fetcher";
 import type { ReviewServiceDeps } from "../algorithms/review-service";
 import { createWorkLabelFetcher } from "../algorithms/work-labels";
-
-/**
- * Upper bound on a review's query pool. One broad query must not exhaust the API budget; a systematic-review query returning more than this is narrowed by the reviewer.
- */
-export const MAX_REVIEW_POOL_SIZE = 1000;
-
-/**
- * Seeds a zero-seeds start picks.
- */
-export const ZERO_SEEDS_SELECTION_SIZE = 5;
+import { MAX_REVIEW_POOL_SIZE } from "./review-constants";
 
 export const reviewServiceDeps: ReviewServiceDeps = {
 	fetcher: createOpenAlexPoolFetcher(

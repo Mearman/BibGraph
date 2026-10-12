@@ -36,11 +36,13 @@ const comparison: AlgorithmComparison = {
 	ranking: [row({ algorithmId: "association", stage: "ranking", label: "association (PARSE)", family: "novel", chosen: true })],
 };
 
+const IN_USE = { exploration: "standard-bfs", "seed-selection": null, ranking: "association" } as const;
+
 const renderTable = () => {
 	const onChoose = vi.fn<(stage: AlgorithmStage, algorithmId: string) => void>();
 	render(
 		<MantineProvider>
-			<AlgorithmComparisonTable comparison={comparison} onChoose={onChoose} />
+			<AlgorithmComparisonTable comparison={comparison} inUse={IN_USE} onChoose={onChoose} />
 		</MantineProvider>,
 	);
 	return onChoose;
@@ -56,17 +58,18 @@ describe("AlgorithmComparisonTable", () => {
 		expect(within(exploration).getByText("novel")).toBeInTheDocument();
 	});
 
-	it("shows measured evidence and marks the suggested algorithm", () => {
+	it("shows measured evidence and marks both the suggested and the in-use algorithm", () => {
 		renderTable();
 		const exploration = screen.getByRole("region", { name: "Exploration" });
 		expect(within(exploration).getByText("recovered 2 of 2 held-out seeds on this pool")).toBeInTheDocument();
 		expect(within(exploration).getAllByText("suggested")).toHaveLength(1);
+		expect(within(exploration).getAllByText("in use")).toHaveLength(1);
 	});
 
 	it("lets the reviewer override a stage's pick", () => {
 		const onChoose = renderTable();
 		const exploration = screen.getByRole("region", { name: "Exploration" });
-		fireEvent.click(within(exploration).getByRole("button", { name: "Use standard-bfs" }));
-		expect(onChoose).toHaveBeenCalledWith("exploration", "standard-bfs");
+		fireEvent.click(within(exploration).getByRole("button", { name: "Use DOME" }));
+		expect(onChoose).toHaveBeenCalledWith("exploration", "dome");
 	});
 });
