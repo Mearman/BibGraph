@@ -6,14 +6,10 @@ export default {
     () => 'syncpack lint'
   ],
 
-  // TypeScript and JavaScript files in packages and apps. Turbo's cache scopes the run: only the package whose inputs changed re-lints, which is the same affected-projects behaviour the nx command provided.
-  '{packages,apps}/**/*.{ts,tsx,js,jsx}': [
+  // TypeScript and JavaScript sources. One glob and one sequential task list: lint-staged runs the tasks of separate globs concurrently, and both turbo tasks depend on the same package builds, so two globs raced on each package's dist directory. Turbo's cache scopes each run to the packages whose inputs changed.
+  '**/*.{ts,tsx,js,jsx}': [
+    () => 'sh -c "pnpm exec turbo run _typecheck"',
     () => 'sh -c "pnpm exec turbo run _lint -- --fix"'
-  ],
-
-  // Type check the packages whose inputs changed
-  '*.{ts,tsx}': [
-    () => 'sh -c "pnpm exec turbo run _typecheck"'
   ],
 
   // GitHub workflow files (actionlint only validates workflow files in .github/workflows/)
