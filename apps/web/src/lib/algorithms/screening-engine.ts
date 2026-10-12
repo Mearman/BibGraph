@@ -1,0 +1,177 @@
+/**
+ * Semantic screening engine: ranks a review's candidate pool by association with its seed works. Builds the pool's undirected citation-association graph, discovers seed-to-seed paths with a registry exploration algorithm, ranks the paths with PARSE (graphwise), and aggregates each path's salience onto the works that bridge it. Deterministic throughout: fixed iteration order and score-then-id tie-breaks, so the same pool and seeds always yield the same screening order.
+ *
+ * The association weight ports the thesis's structural MI (eq:mi_structural, mirrored in tools/association_search.py): direct citation floors at 1, otherwise half the sum of the bibliographic-coupling Jaccard over full reference lists and the within-pool co-citation Jaccard.
+ */
+
+import type { ExplorationConfig, ExplorationResult, Seed } from "graphwise/exploration";
+import { AdjacencyMapGraph, type NodeId, type ReadableGraph } from "graphwise/graph";
+import { parse, type RankedPath } from "graphwise/ranking";
+
+/**
+ * A pool work: its OpenAlex id and the works it cites (OpenAlex referenced_works, external ids included).
+ */
+export interface PoolWork {
+	readonly id: string;
+	readonly references: readonly string[];
+}
+
+/**
+ * One screened candidate: the association score that earned its position and the path that evidence comes from.
+ */
+export interface RankedCandidate {
+	readonly workId: string;
+	/**
+	 * Highest PARSE salience over seed-to-seed paths passing through this work.
+	 */
+	readonly score: number;
+	readonly evidence: {
+		readonly fromSeed: string;
+		readonly toSeed: string;
+		/**
+		 * The bridging works of the best path, endpoints excluded, in path order.
+		 */
+		readonly via: readonly string[];
+	};
+	/**
+	 * How many seed-to-seed paths pass through this work.
+	 */
+	readonly pathsConnected: number;
+}
+
+export type ExplorationRunner = (
+	graph: Readonly<ReadableGraph>,
+	seeds: readonly Seed[],
+	config?: ExplorationConfig,
+) => ExplorationResult;
+
+export interface ScreeningOptions {
+	/**
+	 * The exploration algorithm whose paths feed PARSE; the registry's run functions satisfy this.
+	 */
+	readonly exploration: ExplorationRunner;
+	readonly explorationConfig?: ExplorationConfig;
+}
+
+// Direct citation is the strongest structural association.
+const DIRECT_CITATION_MI = 1;
+// eq:mi_structural is half the sum of the coupling and co-citation Jaccards.
+const STRUCTURAL_MI_HALF = 0.5;
+
+const jaccardSimilarity = (a: ReadonlySet<string>, b: ReadonlySet<string>): number => {
+	if (a.size === 0 && b.size === 0) return 0;
+	let intersection = 0;
+	for (const value of a) {
+		if (b.has(value)) intersection++;
+	}
+	const union = a.size + b.size - intersection;
+	return union === 0 ? 0 : intersection / union;
+};
+
+/**
+ * Map accessor that fails loudly: every pool id is initialised before any read, so a miss is a logic error, not an expected absence.
+ */
+const required = <T>(map: Map<string, T>, id: string, what: string): T => {
+	const value = map.get(id);
+	if (value === undefined) {
+		throw new Error(`${what} missing for pool work ${id}`);
+	}
+	return value;
+};
+
+export const screenSemantically = (
+	pool: readonly PoolWork[],
+	seeds: readonly string[],
+	options: ScreeningOptions,
+): readonly RankedCandidate[] => {
+	const refsById = new Map<string, ReadonlySet<string>>();
+	for (const work of pool) {
+		refsById.set(work.id, new Set(work.references));
+	}
+	for (const seed of seeds) {
+		if (!refsById.has(seed)) {
+			throw new Error(`seed not in pool: ${seed}`);
+		}
+	}
+	const poolIds = new Set(refsById.keys());
+	// Pool-internal citation direction: which pool works each work cites, and which cite it.
+	const citesInPool = new Map<string, Set<string>>();
+	const citedByInPool = new Map<string, Set<string>>();
+	for (const id of poolIds) {
+		citesInPool.set(id, new Set());
+		citedByInPool.set(id, new Set());
+	}
+	for (const work of pool) {
+		for (const ref of required(refsById, work.id, "references")) {
+			if (!poolIds.has(ref) || ref === work.id) continue;
+			required(citesInPool, work.id, "pool citations").add(ref);
+			required(citedByInPool, ref, "pool citers").add(work.id);
+		}
+	}
+
+	const structuralMi = (u: NodeId, v: NodeId): number => {
+		if (
+			required(citesInPool, u, "pool citations").has(v) ||
+			required(citesInPool, v, "pool citations").has(u)
+		) {
+			return DIRECT_CITATION_MI;
+		}
+		const coupling = jaccardSimilarity(required(refsById, u, "references"), required(refsById, v, "references"));
+		const coCitation = jaccardSimilarity(
+			required(citedByInPool, u, "pool citers"),
+			required(citedByInPool, v, "pool citers"),
+		);
+		return STRUCTURAL_MI_HALF * (coupling + coCitation);
+	};
+
+	const graph = AdjacencyMapGraph.undirected();
+	for (const work of pool) {
+		graph.addNode({ id: work.id });
+	}
+	const ordered = [...poolIds].sort();
+	for (let i = 0; i < ordered.length; i++) {
+		for (let j = i + 1; j < ordered.length; j++) {
+			const u = ordered[i];
+			const v = ordered[j];
+			if (structuralMi(u, v) === 0) continue;
+			graph.addEdge({ source: u, target: v });
+		}
+	}
+
+	const seedObjects: readonly Seed[] = seeds.map((id) => ({ id }));
+	const exploration = options.exploration(graph, seedObjects, options.explorationConfig);
+	const ranked = parse(graph, exploration.paths, {
+		mi: (miGraph, u, v) => {
+			if (!miGraph.hasNode(u) || !miGraph.hasNode(v)) {
+				throw new Error(`PARSE MI requested for a node outside the graph: ${miGraph.hasNode(u) ? v : u}`);
+			}
+			return structuralMi(u, v);
+		},
+	});
+
+	const seedSet = new Set(seeds);
+	const best = new Map<string, { score: number; path: RankedPath; count: number }>();
+	for (const path of ranked.paths) {
+		for (const node of path.nodes) {
+			if (seedSet.has(node)) continue;
+			const current = best.get(node);
+			if (current && path.salience <= current.score) {
+				current.count++;
+				continue;
+			}
+			best.set(node, { score: path.salience, path, count: current ? current.count + 1 : 1 });
+		}
+	}
+
+	const candidates: RankedCandidate[] = [];
+	for (const [workId, entry] of best) {
+		const via = entry.path.nodes.filter((node) => !seedSet.has(node));
+		candidates.push({
+			workId,
+			score: entry.score,
+			evidence: { fromSeed: entry.path.fromSeed.id, toSeed: entry.path.toSeed.id, via },
+			pathsConnected: entry.count,
+		});
+	}
+	return candidates.sort((a, b) => (a.score !== b.score ? (a.score > b.score ? -1 : 1) : a.workId < b.workId ? -1 : 1));
+};
