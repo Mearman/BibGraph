@@ -203,6 +203,7 @@ GitHub Actions: validate → e2e → deploy → post-deploy verification → sem
 
 - **Xpac Works**: 190M additional research outputs (datasets, software, specimens)
 - **Entity Relationships**: Filterable, direction-aware relationship visualization
+- **Literature Reviews** (`/reviews`): start from a Boolean query, seed works, or both (with no seeds the app picks them), screen by semantic association ranking or standard query order, refine by inclusion, and compare every novel and baseline algorithm side by side on the review's own pool
 - **Graph Algorithms**: 9 clustering algorithms, traversal, pathfinding (see `packages/algorithms/`)
 - **Multi-tier Caching**: 80-99% bandwidth savings via field-level caching
 
@@ -449,6 +450,34 @@ As a user, I want to browse and manage my cache so I can see what's stored local
   - Storage usage statistics shown (size, entry count, last modified)
   - Clear cache by entity type or entirely
   - Cache rebuild option available
+
+### Literature Reviews
+
+**US-32: Start a review from scratch or from seeds**
+As a researcher, I want to start a literature review from a Boolean query, from known seed works, or both, so I can begin with whatever I already have.
+- Acceptance:
+  - `/reviews` lists stored reviews and offers a create form (name, Boolean query, seed works as ids or URLs, bookmarked works)
+  - A query alone starts a zero-seeds review: the app picks the seeds from the query's results with its best-measured seed selector
+  - Input with neither a query nor seeds, or with seeds that are not OpenAlex work ids, is rejected with a clear message
+  - A review keeps the pool it was started with, so reopening it gives the same answer and makes no new requests
+
+**US-33: Screen and refine**
+As a researcher, I want to screen candidate works and have my decisions refine the ranking, so the list improves as I work.
+- Acceptance:
+  - Semantic screening ranks works by association with the seeds, each row showing its score and the connecting works; standard screening lists the query's own order
+  - Including a work folds it into the seeds and re-ranks; excluding a work hides it; both persist across reloads
+
+**US-34: Compare every algorithm**
+As a researcher, I want every exploration, seed-selection and ranking algorithm compared side by side on my review's own works, with novel and baseline marked, so I can see which one performs best on my data.
+- Acceptance:
+  - Each stage lists the full roster with a novel or baseline badge, the measured value and the evidence behind it
+  - Measurement runs in a web worker, so the page stays responsive
+
+**US-35: Suggested composition, free to override**
+As a researcher, I want the app to suggest the best-measured algorithm for each stage and let me override any of them.
+- Acceptance:
+  - Ties break deterministically, in roster order; the suggestion and its evidence are shown
+  - A reviewer's override is kept and never replaced by later measurement; switching the seed selector of a zero-seeds review re-picks its seeds
 
 ### Research Evaluation (PhD-specific)
 
