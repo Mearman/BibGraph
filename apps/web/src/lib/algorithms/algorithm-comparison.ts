@@ -38,6 +38,11 @@ export interface CompareOptions {
 const MIN_SEEDS_FOR_HOLDOUT = 2;
 
 /**
+ * Share of the pool each held-out exploration may expand. With no budget every algorithm eventually reaches every connected seed and the measure cannot tell them apart; a fixed share of the pool follows association chains far enough to find related works yet stays small enough that the algorithms differ, and it bounds the cost of measuring on a large pool.
+ */
+const EXPLORATION_BUDGET_FRACTION = 0.25;
+
+/**
  * Fraction of the pool reachable within one hop of the picks (picks included), the coverage a zero-seeds selection buys before any screening decision exists.
  */
 export const oneHopCoverage = (pool: readonly PoolWork[], picks: readonly string[]): number => {
@@ -98,6 +103,7 @@ const compareExploration = (pool: readonly PoolWork[], seeds: readonly string[])
 		return markChosen(roster.map((spec) => rowFor(spec, { value: null, evidence })));
 	}
 	const { graph } = buildPoolAssociation(pool);
+	const budget = Math.ceil(pool.length * EXPLORATION_BUDGET_FRACTION);
 	return markChosen(
 		roster.map((spec) => {
 			if (!spec.run) {
@@ -106,11 +112,11 @@ const compareExploration = (pool: readonly PoolWork[], seeds: readonly string[])
 			let recovered = 0;
 			for (const heldOut of seeds) {
 				const remaining = seeds.filter((seed) => seed !== heldOut).map((id) => ({ id }));
-				if (spec.run(graph, remaining).sampledNodes.has(heldOut)) recovered++;
+				if (spec.run(graph, remaining, { maxNodes: budget }).sampledNodes.has(heldOut)) recovered++;
 			}
 			return rowFor(spec, {
 				value: recovered,
-				evidence: ["recovered", recovered, "of", seeds.length, "held-out seeds on this pool"].join(" "),
+				evidence: ["recovered", recovered, "of", seeds.length, "held-out seeds within a budget of", budget, "works"].join(" "),
 			});
 		}),
 	);

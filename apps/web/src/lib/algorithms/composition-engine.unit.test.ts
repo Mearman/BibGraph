@@ -49,7 +49,7 @@ describe("composition engine", () => {
 	it("picks the roster-first exploration when all algorithms recover every held-out seed", () => {
 		const suggestion = suggestComposition(chainPool, ["s1", "s2"], { selectionSize: SELECTION_SIZE });
 		expect(suggestion.exploration?.algorithmId).toBe("standard-bfs");
-		expect(suggestion.exploration?.evidence).toContain("recovered 2 of 2 held-out seeds");
+		expect(suggestion.exploration?.evidence).toMatch(/^recovered \d+ of 2 held-out seeds within a budget of \d+ works$/);
 	});
 
 	it("defaults the exploration with stated evidence when there are fewer seeds than hold-out needs", () => {

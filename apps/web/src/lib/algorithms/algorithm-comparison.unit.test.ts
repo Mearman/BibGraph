@@ -38,7 +38,7 @@ describe("compareAlgorithms", () => {
 		const comparison = compareAlgorithms(pool, ["hub", "n7"], { selectionSize: SELECTION_SIZE });
 		for (const row of comparison.exploration) {
 			expect(row.value).not.toBeNull();
-			expect(row.evidence).toContain("held-out seeds on this pool");
+			expect(row.evidence).toMatch(/^recovered \d+ of 2 held-out seeds within a budget of \d+ works$/);
 		}
 	});
 
