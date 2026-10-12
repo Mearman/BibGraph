@@ -46,7 +46,7 @@ export const oneHopCoverage = (pool: readonly PoolWork[], picks: readonly string
 	return covered.size / pool.length;
 };
 
-const toPoolGraph = (pool: readonly PoolWork[]) => {
+export const toPoolGraph = (pool: readonly PoolWork[]) => {
 	const { graph } = buildPoolAssociation(pool);
 	const adjacency = new Map<string, readonly string[]>();
 	for (const work of pool) {
