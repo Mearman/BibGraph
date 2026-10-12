@@ -1,0 +1,140 @@
+/**
+ * Literature-review store: Dexie persistence for systematic reviews created, refined and screened in the app. A review holds its seed works, its Boolean query, per-work screening decisions, and the app's suggested composition of algorithms (each stage's pick with the evidence that earned it). Follows the repository-store singleton pattern.
+ */
+
+import { logger } from "@bibgraph/utils/logger";
+import Dexie, { type Table } from "dexie";
+
+/**
+A per-work screening decision the refine loop feeds back as signal.
+ */
+export type ScreeningDecision = "include" | "exclude";
+
+/**
+One stage's suggested algorithm and the measurement that earned the pick.
+ */
+export interface CompositionPick {
+	algorithmId: string;
+	evidence: string;
+}
+
+/**
+The suggested pipeline for a review; null stages have no suggestion yet.
+ */
+export interface SuggestedComposition {
+	exploration: CompositionPick | null;
+	ranking: CompositionPick | null;
+	seedSelection: CompositionPick | null;
+}
+
+export interface LiteratureReview {
+	id: string;
+	name: string;
+	query: string;
+	/**
+	OpenAlex work ids the review started from; empty for a zero-seeds start.
+	 */
+	seeds: string[];
+	decisions: Record<string, ScreeningDecision | undefined>;
+	suggestedComposition: SuggestedComposition | null;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+interface ReviewRecord extends LiteratureReview {
+	/**
+	Dexie indexes need a primary key; id is the string uuid.
+	 */
+	id: string;
+}
+
+class ReviewDB extends Dexie {
+	reviews!: Table<ReviewRecord, string>;
+
+	constructor() {
+		super("bibgraph-reviews");
+		this.version(1).stores({
+			reviews: "id, name, createdAt",
+		});
+	}
+}
+
+let databaseInstance: ReviewDB | null = null;
+
+const getDB = (): ReviewDB => {
+	databaseInstance ??= new ReviewDB();
+	return databaseInstance;
+};
+
+const REVIEW_ID_RADIX = 36;
+const REVIEW_ID_LENGTH = 12;
+
+const newReviewId = (): string => {
+	const bytes = new Uint8Array(REVIEW_ID_LENGTH);
+	crypto.getRandomValues(bytes);
+	return Array.from(bytes, (b) => b.toString(REVIEW_ID_RADIX).padStart(2, "0")).join("").slice(0, REVIEW_ID_LENGTH * 2);
+};
+
+export interface CreateReviewInput {
+	name: string;
+	query?: string;
+	seeds?: string[];
+}
+
+export const createReview = async (input: CreateReviewInput): Promise<LiteratureReview> => {
+	const now = new Date();
+	const review: LiteratureReview = {
+		id: newReviewId(),
+		name: input.name,
+		query: input.query ?? "",
+		seeds: input.seeds ?? [],
+		decisions: {},
+		suggestedComposition: null,
+		createdAt: now,
+		updatedAt: now,
+	};
+	await getDB().reviews.add(review);
+	logger.debug("storage", "review created", { id: review.id, name: review.name });
+	return review;
+};
+
+export const getReview = async (id: string): Promise<LiteratureReview | undefined> =>
+	getDB().reviews.get(id);
+
+export const listReviews = async (): Promise<LiteratureReview[]> =>
+	getDB().reviews.orderBy("createdAt").toArray();
+
+export const deleteReview = async (id: string): Promise<void> => {
+	await getDB().reviews.delete(id);
+};
+
+export interface UpdateReviewInput {
+	name?: string;
+	query?: string;
+	seeds?: string[];
+	suggestedComposition?: SuggestedComposition;
+}
+
+export const updateReview = async (id: string, patch: UpdateReviewInput): Promise<void> => {
+	await getDB().reviews.update(id, { ...patch, updatedAt: new Date() });
+};
+
+export const setDecision = async (
+	id: string,
+	workId: string,
+	decision: ScreeningDecision,
+): Promise<void> => {
+	const review = await getDB().reviews.get(id);
+	if (!review) {
+		throw new Error(`review not found: ${id}`);
+	}
+	const decisions = { ...review.decisions, [workId]: decision };
+	await getDB().reviews.update(id, { decisions, updatedAt: new Date() });
+};
+
+/**
+Test-only helper: wipes the table so each unit test starts empty.
+ */
+export const clearAllReviewsForTests = async (): Promise<void> => {
+	await getDB().reviews.clear();
+};
