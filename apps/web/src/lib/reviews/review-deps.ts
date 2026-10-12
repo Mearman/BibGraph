@@ -3,6 +3,7 @@
  */
 
 import { cachedOpenAlex } from "@bibgraph/client";
+import { z } from "zod";
 
 import type { ReviewSessionDeps } from "@/hooks/use-review-session";
 import type { ReviewsDeps } from "@/hooks/use-reviews";
@@ -13,35 +14,26 @@ import { type ReviewServiceDeps, startReview } from "../algorithms/review-servic
 import { createWorkLabelFetcher } from "../algorithms/work-labels";
 import { MAX_REVIEW_POOL_SIZE } from "./review-constants";
 
+/**
+ * Shapes of the two field projections the review screens request; the client validates a projected result against these rather than the full Work schema.
+ */
+const poolWorkSchema = z.object({ id: z.string(), referenced_works: z.array(z.string()) });
+const labelWorkSchema = z.object({
+	id: z.string(),
+	display_name: z.string().nullable(),
+	publication_year: z.number().nullable(),
+});
+
 export const reviewServiceDeps: ReviewServiceDeps = {
 	fetcher: createOpenAlexPoolFetcher(
-		{
-			getWorks: async (params) => {
-				const response = await cachedOpenAlex.client.works.getWorks(params);
-				return {
-					results: response.results.map((work) => ({
-						id: work.id,
-						referenced_works: work.referenced_works ?? [],
-					})),
-				};
-			},
-		},
+		{ getWorks: async (params) => cachedOpenAlex.client.works.getWorksProjection(params, poolWorkSchema) },
 		{ maxPoolSize: MAX_REVIEW_POOL_SIZE },
 	),
 	store: { createReview, updateReview },
 };
 
 export const fetchWorkLabels = createWorkLabelFetcher({
-	getWorks: async (params) => {
-		const response = await cachedOpenAlex.client.works.getWorks(params);
-		return {
-			results: response.results.map((work) => ({
-				id: work.id,
-				display_name: work.display_name,
-				publication_year: work.publication_year ?? null,
-			})),
-		};
-	},
+	getWorks: async (params) => cachedOpenAlex.client.works.getWorksProjection(params, labelWorkSchema),
 });
 
 export const reviewsDeps: ReviewsDeps = {
