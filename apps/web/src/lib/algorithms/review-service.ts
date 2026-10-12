@@ -8,7 +8,8 @@ import type {
 	SuggestedComposition,
 	UpdateReviewInput,
 } from "../../stores/review-store";
-import { suggestComposition, toPoolGraph } from "./composition-engine";
+import { toPoolGraph } from "./algorithm-comparison";
+import { suggestComposition } from "./composition-engine";
 import { loadReviewPool, type PoolFetcher } from "./pool-loader";
 import { algorithmById } from "./registry";
 import { type PoolWork, type RankedCandidate, screenSemantically } from "./screening-engine";

@@ -5,7 +5,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { SuggestedComposition } from "../../stores/review-store";
-import { oneHopCoverage, suggestComposition } from "./composition-engine";
+import { oneHopCoverage } from "./algorithm-comparison";
+import { suggestComposition } from "./composition-engine";
 import { algorithmsByStage } from "./registry";
 import { buildPoolAssociation,type PoolWork } from "./screening-engine";
 import { selectSeeds } from "./seed-engine";
