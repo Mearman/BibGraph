@@ -27,6 +27,7 @@ export const suggestComposition = (
 	return {
 		exploration: chosenPick(comparison.exploration),
 		ranking: chosenPick(comparison.ranking),
-		seedSelection: chosenPick(comparison["seed-selection"]),
+		// A review that already has seeds needs no selection pick; the comparison still shows how each selector measures.
+		seedSelection: seeds.length > 0 ? null : chosenPick(comparison["seed-selection"]),
 	};
 };

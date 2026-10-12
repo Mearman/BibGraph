@@ -122,11 +122,7 @@ const compareExploration = (pool: readonly PoolWork[], seeds: readonly string[])
 	);
 };
 
-const compareSeedSelection = (
-	pool: readonly PoolWork[],
-	seeds: readonly string[],
-	options: CompareOptions,
-): readonly ComparisonRow[] => {
+const compareSeedSelection = (pool: readonly PoolWork[], options: CompareOptions): readonly ComparisonRow[] => {
 	const poolGraph = toPoolGraph(pool);
 	const rows = algorithmsByStage("seed-selection").map((spec) => {
 		const coverage = oneHopCoverage(pool, selectSeeds(spec.id, poolGraph, options.selectionSize));
@@ -135,8 +131,7 @@ const compareSeedSelection = (
 			evidence: ["picks cover", Math.round(coverage * pool.length), "of", pool.length, "pool works within one hop"].join(" "),
 		});
 	});
-	// A review that already has seeds needs no selection suggestion; the measurements stay visible for comparison.
-	return seeds.length > 0 ? rows.map((row) => ({ ...row, chosen: false })) : markChosen(rows);
+	return markChosen(rows);
 };
 
 const compareRanking = (): readonly ComparisonRow[] => {
@@ -153,6 +148,6 @@ export const compareAlgorithms = (
 	options: CompareOptions,
 ): AlgorithmComparison => ({
 	exploration: compareExploration(pool, seeds),
-	"seed-selection": compareSeedSelection(pool, seeds, options),
+	"seed-selection": compareSeedSelection(pool, options),
 	ranking: compareRanking(),
 });

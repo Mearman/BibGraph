@@ -50,12 +50,12 @@ describe("compareAlgorithms", () => {
 		}
 	});
 
-	it("marks exactly one chosen row in exploration, and in selection only for a zero-seeds review", () => {
-		const seeded = compareAlgorithms(pool, ["hub", "n7"], { selectionSize: SELECTION_SIZE });
-		expect(seeded.exploration.filter((row) => row.chosen)).toHaveLength(1);
-		expect(seeded["seed-selection"].filter((row) => row.chosen)).toHaveLength(0);
-		const unseeded = compareAlgorithms(pool, [], { selectionSize: SELECTION_SIZE });
-		expect(unseeded["seed-selection"].filter((row) => row.chosen)).toHaveLength(1);
+	it("marks exactly one chosen row per measured stage, whether or not the review has seeds", () => {
+		for (const seeds of [["hub", "n7"], []]) {
+			const comparison = compareAlgorithms(pool, seeds, { selectionSize: SELECTION_SIZE });
+			expect(comparison.exploration.filter((row) => row.chosen)).toHaveLength(1);
+			expect(comparison["seed-selection"].filter((row) => row.chosen)).toHaveLength(1);
+		}
 	});
 
 	it("measures every selector's coverage even when the review already has seeds", () => {
