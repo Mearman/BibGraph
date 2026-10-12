@@ -85,8 +85,18 @@ export interface CreateReviewInput {
 	seeds?: string[];
 }
 
+let lastCreatedAtMs = 0;
+
+/**
+ * The creation time for a new review, strictly later than the previous one in this process. Reviews are listed by creation time, and two created within the same millisecond would otherwise tie and fall back to their random ids.
+ */
+const nextCreationTime = (): Date => {
+	lastCreatedAtMs = Math.max(Date.now(), lastCreatedAtMs + 1);
+	return new Date(lastCreatedAtMs);
+};
+
 export const createReview = async (input: CreateReviewInput): Promise<LiteratureReview> => {
-	const now = new Date();
+	const now = nextCreationTime();
 	const review: LiteratureReview = {
 		id: newReviewId(),
 		name: input.name,
