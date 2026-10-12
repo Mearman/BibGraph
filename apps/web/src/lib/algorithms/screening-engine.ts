@@ -79,19 +79,19 @@ const required = <T>(map: Map<string, T>, id: string, what: string): T => {
 	return value;
 };
 
-export const screenSemantically = (
-	pool: readonly PoolWork[],
-	seeds: readonly string[],
-	options: ScreeningOptions,
-): readonly RankedCandidate[] => {
+export interface PoolAssociation {
+	readonly graph: Readonly<ReadableGraph>;
+	readonly poolIds: ReadonlySet<string>;
+	readonly structuralMi: (u: NodeId, v: NodeId) => number;
+}
+
+/**
+ * Builds the pool's undirected citation-association graph with its structural MI, shared by every algorithm surface that reasons over pool association (screening, composition suggestion).
+ */
+export const buildPoolAssociation = (pool: readonly PoolWork[]): PoolAssociation => {
 	const refsById = new Map<string, ReadonlySet<string>>();
 	for (const work of pool) {
 		refsById.set(work.id, new Set(work.references));
-	}
-	for (const seed of seeds) {
-		if (!refsById.has(seed)) {
-			throw new Error(`seed not in pool: ${seed}`);
-		}
 	}
 	const poolIds = new Set(refsById.keys());
 	// Pool-internal citation direction: which pool works each work cites, and which cite it.
@@ -135,6 +135,20 @@ export const screenSemantically = (
 			const v = ordered[j];
 			if (structuralMi(u, v) === 0) continue;
 			graph.addEdge({ source: u, target: v });
+		}
+	}
+	return { graph, poolIds, structuralMi };
+};
+
+export const screenSemantically = (
+	pool: readonly PoolWork[],
+	seeds: readonly string[],
+	options: ScreeningOptions,
+): readonly RankedCandidate[] => {
+	const { graph, poolIds, structuralMi } = buildPoolAssociation(pool);
+	for (const seed of seeds) {
+		if (!poolIds.has(seed)) {
+			throw new Error(`seed not in pool: ${seed}`);
 		}
 	}
 
