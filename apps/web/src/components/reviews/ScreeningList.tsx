@@ -4,17 +4,8 @@
 
 import { Button, Group, Paper, Stack, Text } from "@mantine/core";
 
+import type { ScreeningRow } from "@/lib/reviews/screening-view";
 import type { ScreeningDecision } from "@/stores/review-store";
-
-export interface ScreeningRow {
-	readonly workId: string;
-	readonly title: string;
-	readonly year: number | null;
-	/**
-	 * One line of evidence for the row's position, for example the association score and bridging work, or the query rank.
-	 */
-	readonly detail: string;
-}
 
 export interface ScreeningListProps {
 	readonly rows: readonly ScreeningRow[];

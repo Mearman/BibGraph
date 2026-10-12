@@ -10,7 +10,8 @@ import { MantineProvider } from "@mantine/core";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { type ScreeningRow } from "./ScreeningList";
+import type { ScreeningRow } from "@/lib/reviews/screening-view";
+
 import { ScreeningList } from "./ScreeningList";
 
 const rows: readonly ScreeningRow[] = [
