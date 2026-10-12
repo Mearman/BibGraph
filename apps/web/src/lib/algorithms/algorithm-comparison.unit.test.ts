@@ -93,4 +93,11 @@ describe("compareAlgorithms", () => {
 		}
 		expect(unmeasured.ranking.filter((row) => row.chosen)).toHaveLength(1);
 	});
+
+	it("measures on at most three held-out seeds however many seeds the review has", () => {
+		const comparison = compareAlgorithms(pool, ["hub", "n7", "n3", "n1", "n5"], { selectionSize: SELECTION_SIZE });
+		for (const row of [...comparison.exploration, ...comparison.ranking]) {
+			expect(row.evidence).toContain("of 3 held-out seeds");
+		}
+	});
 });

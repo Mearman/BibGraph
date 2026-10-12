@@ -51,6 +51,13 @@ export interface CompareOptions {
 const MIN_SEEDS_FOR_HOLDOUT = 2;
 
 /**
+ * Held-out seeds measured per stage. Every held-out seed repeats an exploration (and, for ranking, all twenty-five rankers), so measuring on all of a large seed set costs more with every seed; a fixed, sorted sample of this many keeps the cost bounded and the choice repeatable.
+ */
+const MAX_HELD_OUT_SEEDS = 3;
+
+const heldOutSample = (seeds: readonly string[]): readonly string[] => [...seeds].sort().slice(0, MAX_HELD_OUT_SEEDS);
+
+/**
  * Ranking measurement drops one seed, explores from the rest and ranks the works they reach; two remaining seeds keep the held-out measure from resting on a single seed's neighbourhood.
  */
 const MIN_SEEDS_FOR_RANKING_HOLDOUT = 3;
@@ -122,19 +129,20 @@ const compareExploration = (pool: readonly PoolWork[], seeds: readonly string[])
 	}
 	const { graph } = buildPoolAssociation(pool);
 	const budget = explorationBudget(pool.length);
+	const heldOutSeeds = heldOutSample(seeds);
 	return markChosen(
 		roster.map((spec) => {
 			if (!spec.run) {
 				throw new Error(`exploration algorithm without a runnable implementation: ${spec.id}`);
 			}
 			let recovered = 0;
-			for (const heldOut of seeds) {
+			for (const heldOut of heldOutSeeds) {
 				const remaining = seeds.filter((seed) => seed !== heldOut).map((id) => ({ id }));
 				if (spec.run(graph, remaining, { maxNodes: budget }).sampledNodes.has(heldOut)) recovered++;
 			}
 			return rowFor(spec, {
 				value: recovered,
-				evidence: ["recovered", recovered, "of", seeds.length, "held-out seeds within a budget of", budget, "works"].join(" "),
+				evidence: ["recovered", recovered, "of", heldOutSeeds.length, "held-out seeds within a budget of", budget, "works"].join(" "),
 			});
 		}),
 	);
@@ -177,7 +185,8 @@ const compareRanking = (
 	const budget = explorationBudget(pool.length);
 	const topK = Math.ceil(pool.length * RANKING_TOP_FRACTION);
 	const recovered = new Map<string, number>(roster.map((spec) => [spec.id, 0]));
-	for (const heldOut of seeds) {
+	const sample = heldOutSample(seeds);
+	for (const heldOut of sample) {
 		const remaining = seeds.filter((seed) => seed !== heldOut);
 		// One exploration per held-out seed, shared by every ranker: they differ only in how they score the same paths.
 		const explored = run(graph, remaining.map((id) => ({ id })), { maxNodes: budget });
@@ -201,7 +210,7 @@ const compareRanking = (
 			const count = recovered.get(spec.id) ?? 0;
 			return rowFor(spec, {
 				value: count,
-				evidence: ["recovered", count, "of", seeds.length, "held-out seeds in the top", topK, "candidates"].join(" "),
+				evidence: ["recovered", count, "of", sample.length, "held-out seeds in the top", topK, "candidates"].join(" "),
 			});
 		}),
 	);
