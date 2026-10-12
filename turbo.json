@@ -22,17 +22,21 @@
 			"outputs": ["dist/**"]
 		},
 		"_typecheck": {
-			"dependsOn": ["^_build"],
+			// Own-package build too: a cold `validate` runs _lint/_typecheck/_test
+			// concurrently with the package's own _build, and the TS/eslint project
+			// services resolve through package.json "exports" into dist, which is
+			// mid-write during the race (ENOENT dist/package.json on first runs).
+			"dependsOn": ["^_build", "_build"],
 			"inputs": ["src/**", "tests/**", "tsconfig.json", "package.json"],
 			"outputs": []
 		},
 		"_lint": {
-			"dependsOn": ["^_build"],
+			"dependsOn": ["^_build", "_build"],
 			"inputs": ["$TURBO_DEFAULT$", "!dist/**"],
 			"outputs": [".eslintcache"]
 		},
 		"_test": {
-			"dependsOn": ["^_build"],
+			"dependsOn": ["^_build", "_build"],
 			"inputs": [
 				"src/**",
 				"tests/**",
