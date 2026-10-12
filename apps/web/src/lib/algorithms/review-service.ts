@@ -3,13 +3,14 @@
  */
 
 import type {
+	CompositionPick,
 	CreateReviewInput,
 	LiteratureReview,
 	SuggestedComposition,
 	UpdateReviewInput,
 } from "../../stores/review-store";
-import { toPoolGraph } from "./algorithm-comparison";
-import { suggestComposition } from "./composition-engine";
+import { compareSeedSelection, toPoolGraph } from "./algorithm-comparison";
+import { defaultComposition } from "./composition-engine";
 import { loadReviewPool, type PoolFetcher } from "./pool-loader";
 import { algorithmById } from "./registry";
 import {
@@ -69,16 +70,18 @@ export const startReview = async (
 ): Promise<StartedReview> => {
 	const pool = await loadReviewPool({ query: input.query, seeds: input.seeds }, deps.fetcher);
 	let seeds = [...input.seeds];
-	let composition = suggestComposition(pool, seeds, { selectionSize: input.selectionSize });
+	let seedSelection: CompositionPick | null = null;
 	if (seeds.length === 0) {
-		const selection = composition.seedSelection;
-		if (selection === null) {
-			throw new Error("zero-seeds composition suggested no seed selector");
+		// Only the seed selectors are measured at start: they are cheap, and the review has no seeds until one is picked.
+		const selection = compareSeedSelection(pool, { selectionSize: input.selectionSize }).find((row) => row.chosen);
+		if (selection === undefined) {
+			throw new Error("no seed selector was measured for a zero-seeds start");
 		}
 		seeds = selectSeeds(selection.algorithmId, toPoolGraph(pool), input.selectionSize);
-		// Exploration and ranking are measured on the seeds the selector produced, not on an empty set.
-		composition = { ...suggestComposition(pool, seeds, { selectionSize: input.selectionSize }), seedSelection: selection };
+		seedSelection = { algorithmId: selection.algorithmId, evidence: selection.evidence, chosenBy: "app" };
 	}
+	// Exploration and ranking start from defaults so the review opens at once; measuring every algorithm is far slower than loading the pool, and the session replaces the defaults with the measured best (adoptMeasured).
+	const composition = defaultComposition(seedSelection);
 	const created = await deps.store.createReview({ name: input.name, query: input.query, seeds });
 	await deps.store.updateReview(created.id, { suggestedComposition: composition });
 	return { review: { ...created, suggestedComposition: composition }, pool, composition };

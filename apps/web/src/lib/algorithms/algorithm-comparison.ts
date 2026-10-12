@@ -140,7 +140,7 @@ const compareExploration = (pool: readonly PoolWork[], seeds: readonly string[])
 	);
 };
 
-const compareSeedSelection = (pool: readonly PoolWork[], options: CompareOptions): readonly ComparisonRow[] => {
+export const compareSeedSelection = (pool: readonly PoolWork[], options: CompareOptions): readonly ComparisonRow[] => {
 	const poolGraph = toPoolGraph(pool);
 	const rows = algorithmsByStage("seed-selection").map((spec) => {
 		const coverage = oneHopCoverage(pool, selectSeeds(spec.id, poolGraph, options.selectionSize));

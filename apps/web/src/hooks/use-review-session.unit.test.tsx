@@ -9,7 +9,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { suggestComposition } from "@/lib/algorithms/composition-engine";
+import { defaultComposition, suggestComposition } from "@/lib/algorithms/composition-engine";
 import type { PoolFetcher } from "@/lib/algorithms/pool-loader";
 import type { WorkLabel } from "@/lib/algorithms/work-labels";
 import type { LiteratureReview, ScreeningDecision } from "@/stores/review-store";
@@ -78,8 +78,9 @@ const makeDeps = (): { deps: ReviewSessionDeps; stored: { current: LiteratureRev
 const wrapperFor = (client: QueryClient) =>
 	({ children }: { readonly children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 
-const setup = () => {
+const setup = (mutate?: (review: LiteratureReview) => LiteratureReview) => {
 	const { deps, stored } = makeDeps();
+	if (mutate) stored.current = mutate(stored.current);
 	const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 	const hook = renderHook(() => useReviewSession("r1", deps), { wrapper: wrapperFor(client) });
 	return { hook, stored };
@@ -135,5 +136,27 @@ describe("useReviewSession", () => {
 		});
 		expect(stored.current.suggestedComposition?.exploration?.algorithmId).toBe("dome");
 		expect(stored.current.suggestedComposition?.exploration?.evidence).toContain("chosen by reviewer");
+	});
+
+	it("replaces the starting defaults with the measured best once the comparison arrives", async () => {
+		const { hook, stored } = setup((review) => ({ ...review, suggestedComposition: defaultComposition(null) }));
+		await waitFor(() => {
+			expect(stored.current.suggestedComposition?.exploration?.evidence).not.toContain("default");
+		});
+		expect(stored.current.suggestedComposition?.exploration?.chosenBy).toBe("app");
+		expect(hook.result.current.phase).toBe("ready");
+	});
+
+	it("keeps a reviewer override when the comparison arrives", async () => {
+		const override = { algorithmId: "dome", evidence: "chosen by reviewer", chosenBy: "reviewer" as const };
+		const { hook, stored } = setup((review) => ({
+			...review,
+			suggestedComposition: { ...defaultComposition(null), exploration: override },
+		}));
+		await waitFor(() => {
+			expect(stored.current.suggestedComposition?.ranking?.evidence).toContain("three or more seeds");
+		});
+		expect(stored.current.suggestedComposition?.exploration).toEqual(override);
+		expect(hook.result.current.phase).toBe("ready");
 	});
 });

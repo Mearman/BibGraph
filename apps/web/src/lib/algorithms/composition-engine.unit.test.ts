@@ -5,8 +5,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { SuggestedComposition } from "../../stores/review-store";
-import { oneHopCoverage } from "./algorithm-comparison";
-import { suggestComposition } from "./composition-engine";
+import { compareAlgorithms, oneHopCoverage } from "./algorithm-comparison";
+import { adoptMeasured, defaultComposition, suggestComposition } from "./composition-engine";
 import { algorithmsByStage } from "./registry";
 import { buildPoolAssociation,type PoolWork } from "./screening-engine";
 import { selectSeeds } from "./seed-engine";
@@ -88,5 +88,47 @@ describe("composition engine", () => {
 		const first: SuggestedComposition = suggestComposition(hubPool, ["hub", "n7"], { selectionSize: SELECTION_SIZE });
 		const second = suggestComposition(hubPool, ["hub", "n7"], { selectionSize: SELECTION_SIZE });
 		expect(first).toEqual(second);
+	});
+});
+
+describe("defaultComposition", () => {
+	it("runs the first roster algorithm of exploration and ranking, marked as an unmeasured default", () => {
+		const composition = defaultComposition(null);
+		expect(composition.exploration?.algorithmId).toBe("standard-bfs");
+		expect(composition.exploration?.chosenBy).toBe("app");
+		expect(composition.exploration?.evidence).toContain("default");
+		expect(composition.ranking?.algorithmId).toBe("parse-structural");
+		expect(composition.ranking?.evidence).toContain("default");
+		expect(composition.seedSelection).toBeNull();
+	});
+});
+
+describe("adoptMeasured", () => {
+	const comparison = compareAlgorithms(hubPool, ["hub", "n7", "n3"], { selectionSize: SELECTION_SIZE });
+
+	it("replaces app-made picks with the measured best", () => {
+		const adopted = adoptMeasured(defaultComposition(null), comparison);
+		const measuredExploration = comparison.exploration.find((row) => row.chosen);
+		expect(adopted.exploration?.algorithmId).toBe(measuredExploration?.algorithmId);
+		expect(adopted.exploration?.evidence).toBe(measuredExploration?.evidence);
+		expect(adopted.exploration?.chosenBy).toBe("app");
+	});
+
+	it("never replaces a reviewer override", () => {
+		const overridden = {
+			...defaultComposition(null),
+			ranking: { algorithmId: "path-katz", evidence: "chosen by reviewer", chosenBy: "reviewer" as const },
+		};
+		expect(adoptMeasured(overridden, comparison).ranking).toEqual(overridden.ranking);
+	});
+
+	it("returns the same composition object once it already matches the measurement", () => {
+		const once = adoptMeasured(defaultComposition(null), comparison);
+		expect(adoptMeasured(once, comparison)).toBe(once);
+	});
+
+	it("leaves the seed selection alone", () => {
+		const selection = { algorithmId: "grasp", evidence: "picked at start", chosenBy: "app" as const };
+		expect(adoptMeasured(defaultComposition(selection), comparison).seedSelection).toEqual(selection);
 	});
 });

@@ -6,6 +6,7 @@ import { keepPreviousData, skipToken, useMutation, useQuery, useQueryClient } fr
 import { useMemo } from "react";
 
 import { type AlgorithmComparison, compareAlgorithms } from "@/lib/algorithms/algorithm-comparison";
+import { adoptMeasured } from "@/lib/algorithms/composition-engine";
 import { loadReviewPool, type PoolFetcher } from "@/lib/algorithms/pool-loader";
 import type { AlgorithmStage } from "@/lib/algorithms/registry";
 import type { PoolWork } from "@/lib/algorithms/screening-engine";
@@ -152,6 +153,24 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 					},
 	});
 
+	// Reconciles the stored composition with the measurement: app-made picks (the starting defaults) become the measured best, reviewer overrides stay. Once adopted, the next run finds nothing to change, so it converges.
+	const stored = review?.suggestedComposition;
+	const measuredComparison = comparisonQuery.data;
+	useQuery({
+		queryKey: ["review-adopt", reviewId, stored, measuredComparison],
+		staleTime: Infinity,
+		queryFn:
+			stored == null || measuredComparison === undefined
+				? skipToken
+				: async () => {
+						const adopted = adoptMeasured(stored, measuredComparison);
+						if (adopted === stored) return false;
+						await deps.store.updateReview(reviewId, { suggestedComposition: adopted });
+						await queryClient.invalidateQueries({ queryKey: ["review", reviewId] });
+						return true;
+					},
+	});
+
 	const decision = useMutation({
 		mutationFn: async (input: Readonly<{ workId: string; decision: ScreeningDecision }>) => {
 			await deps.store.setDecision(reviewId, input.workId, input.decision);
@@ -168,7 +187,7 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 			const evidence = measured === undefined ? "chosen by reviewer" : `${measured.evidence} (chosen by reviewer)`;
 			const suggestedComposition: SuggestedComposition = {
 				...review.suggestedComposition,
-				[COMPOSITION_KEY[input.stage]]: { algorithmId: input.algorithmId, evidence },
+				[COMPOSITION_KEY[input.stage]]: { algorithmId: input.algorithmId, evidence, chosenBy: "reviewer" },
 			};
 			await deps.store.updateReview(reviewId, { suggestedComposition });
 		},

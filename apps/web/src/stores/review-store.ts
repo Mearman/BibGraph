@@ -16,6 +16,10 @@ One stage's suggested algorithm and the measurement that earned the pick.
 export interface CompositionPick {
 	algorithmId: string;
 	evidence: string;
+	/**
+	 * Who made the pick: the app (a default or a measured suggestion, which later measurement may replace) or the reviewer (an override that measurement never replaces).
+	 */
+	chosenBy: "app" | "reviewer";
 }
 
 /**
