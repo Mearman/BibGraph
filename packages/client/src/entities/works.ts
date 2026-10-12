@@ -12,6 +12,7 @@ import type {
   WorksFilters,
 } from "@bibgraph/types";
 import { AutocompleteBaseResponseSchema, workSchema } from "@bibgraph/types";
+import type { z } from "zod";
 
 import type { OpenAlexBaseClient } from "../client";
 import { buildFilterString } from "../utils/query-builder";
@@ -113,6 +114,19 @@ export class WorksApi {
   ): Promise<OpenAlexResponse<Work>> {
     const queryParameters = this.buildQueryParams(params);
     return this.client.getResponse<Work>("works", queryParameters, workSchema);
+  }
+
+  /**
+   * List works with a caller-supplied result schema, for requests whose `select` projects only some fields. getWorks validates every result against the full Work schema, which rejects a projection that omits required fields; this validates only what the caller asked for.
+   * @param params - Query parameters, including the `select` projection
+   * @param schema - Schema of one projected result
+   * @returns Promise resolving to the projected results
+   */
+  async getWorksProjection<T>(
+    params: WorksQueryParameters,
+    schema: z.ZodType<T>,
+  ): Promise<OpenAlexResponse<T>> {
+    return this.client.getResponse<T>("works", this.buildQueryParams(params), schema);
   }
 
   /**
