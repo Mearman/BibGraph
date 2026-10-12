@@ -48,20 +48,13 @@ export const AppActivityProvider: React.FC<AppActivityProviderProperties> = ({
     void loadEvents();
   }, []);
 
-  const addEvent = useCallback(
-    (event: Omit<AppActivityEvent, "id" | "timestamp">): string => {
-      const id = generateEventId();
-      dispatch({ type: "ADD_EVENT", payload: event });
-
-      const currentEventCount = Object.keys(state.events).length + 1;
-      if (currentEventCount > state.maxHistorySize) {
-        dispatch({ type: "CLEAR_OLD_EVENTS" });
-      }
-
-      return id;
-    },
-    [state.events, state.maxHistorySize],
-  );
+  // Reads no state, so its identity never changes. Consumers such as NavigationTracker list it as an effect dependency and call it; an identity that tracked the stored events re-fired that effect on every event it added. The reducer ignores CLEAR_OLD_EVENTS while the history is within its cap.
+  const addEvent = useCallback((event: Omit<AppActivityEvent, "id" | "timestamp">): string => {
+    const id = generateEventId();
+    dispatch({ type: "ADD_EVENT", payload: event });
+    dispatch({ type: "CLEAR_OLD_EVENTS" });
+    return id;
+  }, []);
 
   const updateEvent = useCallback(
     (id: string, updates: Partial<AppActivityEvent>) => {
