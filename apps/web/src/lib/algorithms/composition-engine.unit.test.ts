@@ -58,10 +58,10 @@ describe("composition engine", () => {
 		expect(suggestion.exploration?.evidence).toContain("no seeds to measure against");
 	});
 
-	it("names the sole ranking algorithm with its evidence", () => {
+	it("names the roster-default ranking with its evidence when seeds cannot be held out", () => {
 		const suggestion = suggestComposition(chainPool, ["s1", "s2"], { selectionSize: SELECTION_SIZE });
-		expect(suggestion.ranking?.algorithmId).toBe("association");
-		expect(suggestion.ranking?.evidence).toContain("sole ranking algorithm");
+		expect(suggestion.ranking?.algorithmId).toBe("parse-structural");
+		expect(suggestion.ranking?.evidence).toContain("three or more seeds");
 	});
 
 	it("leaves seed selection unsuggested while the review has seeds", () => {

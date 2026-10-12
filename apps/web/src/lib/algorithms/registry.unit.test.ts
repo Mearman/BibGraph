@@ -45,8 +45,9 @@ describe("algorithm registry", () => {
 		expect(baselines).toEqual(["random", "high-degree", "diverse-degree", "eigenvector"]);
 	});
 
-	it("exposes the PARSE ranking and unique ids across the registry", () => {
-		expect(algorithmById("association")?.family).toBe("novel");
+	it("exposes the ranking roster and unique ids across the registry", () => {
+		expect(algorithmById("parse-structural")?.family).toBe("novel");
+		expect(algorithmById("path-katz")?.family).toBe("baseline");
 		const ids = ALGORITHMS.map((a) => a.id);
 		expect(new Set(ids).size).toBe(ids.length);
 	});
@@ -55,6 +56,12 @@ describe("algorithm registry", () => {
 		for (const spec of algorithmsByStage("exploration")) {
 			expect(typeof spec.run).toBe("function");
 			expect(spec.description.length).toBeGreaterThan(0);
+		}
+	});
+
+	it("gives every ranking entry a runnable ranker", () => {
+		for (const spec of algorithmsByStage("ranking")) {
+			expect(typeof spec.rank).toBe("function");
 		}
 	});
 });

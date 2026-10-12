@@ -33,10 +33,10 @@ const comparison: AlgorithmComparison = {
 		row({ algorithmId: "dome", stage: "exploration", label: "DOME", family: "novel", value: RECOVERED_ALL, evidence: "recovered 2 of 2 held-out seeds on this pool", chosen: true }),
 	],
 	"seed-selection": [row({ algorithmId: "random", stage: "seed-selection" })],
-	ranking: [row({ algorithmId: "association", stage: "ranking", label: "association (PARSE)", family: "novel", chosen: true })],
+	ranking: [row({ algorithmId: "parse-structural", stage: "ranking", label: "PARSE + structural MI", family: "novel", chosen: true })],
 };
 
-const IN_USE = { exploration: "standard-bfs", "seed-selection": null, ranking: "association" } as const;
+const IN_USE = { exploration: "standard-bfs", "seed-selection": null, ranking: "parse-structural" } as const;
 
 const renderTable = () => {
 	const onChoose = vi.fn<(stage: AlgorithmStage, algorithmId: string) => void>();

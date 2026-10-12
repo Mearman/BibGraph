@@ -20,6 +20,9 @@ import {
 } from "graphwise/exploration";
 import type { ReadableGraph } from "graphwise/graph";
 
+import { RANKING_ROSTER } from "./ranking-roster";
+import type { RankingRunner } from "./ranking-types";
+
 export type AlgorithmFamily = "novel" | "baseline";
 
 export type AlgorithmStage = "exploration" | "seed-selection" | "ranking";
@@ -34,6 +37,10 @@ export interface AlgorithmSpec {
 	Runs the algorithm over a citation graph from the given seeds; undefined for selectors handled by the seed engine.
 	 */
 	readonly run?: (graph: Readonly<ReadableGraph>, seeds: readonly Seed[], config?: ExplorationConfig) => ExplorationResult;
+	/**
+	 * Scores seed-to-seed paths for the ranking stage; undefined for the other stages.
+	 */
+	readonly rank?: RankingRunner;
 }
 
 const EXPLORATION_ROSTER: readonly AlgorithmSpec[] = [
@@ -61,13 +68,6 @@ const SELECTION_ROSTER: readonly AlgorithmSpec[] = [
 	{ id: "spine", label: "SPINE", family: "novel", stage: "seed-selection", description: "Balances picks across degree-distribution skew." },
 	{ id: "crisp", label: "CRISP", family: "novel", stage: "seed-selection", description: "Greedy co-citation-informed selection with Jaccard diversity." },
 	{ id: "brisk", label: "BRISK", family: "novel", stage: "seed-selection", description: "Rank-aggregation ensemble of the other selectors." },
-] as const;
-
-/**
- * The ranking roster: the association ranking the screening order defaults to. PARSE itself is wired by the screening engine (graphwise/ranking parse).
- */
-const RANKING_ROSTER: readonly AlgorithmSpec[] = [
-	{ id: "association", label: "association (PARSE)", family: "novel", stage: "ranking", description: "Scores each candidate by the mutual-information weight of its best connecting path to the seeds." },
 ] as const;
 
 export const ALGORITHMS: readonly AlgorithmSpec[] = [

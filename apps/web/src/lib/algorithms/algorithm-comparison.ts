@@ -1,9 +1,21 @@
 /**
- * Algorithm comparison: every roster algorithm of every stage, measured on the review's own pool and marked novel or baseline, so a reviewer can compare them all side by side. The composition suggestion is derived from these same rows (the chosen flag), which keeps what the app recommends and what the comparison shows from ever disagreeing. Measurements: exploration by held-out seed recovery, seed selection by one-hop pool coverage, ranking has a single roster entry and no measurement.
+ * Algorithm comparison: every roster algorithm of every stage, measured on the review's own pool and marked novel or baseline, so a reviewer can compare them all side by side. The composition suggestion is derived from these same rows (the chosen flag), which keeps what the app recommends and what the comparison shows from ever disagreeing. Measurements: exploration by held-out seed recovery, seed selection by one-hop pool coverage, ranking by held-out seed recovery in the top of the ranked pool, on the exploration the comparison chose.
  */
 
-import { type AlgorithmFamily, algorithmsByStage,type AlgorithmSpec, type AlgorithmStage } from "./registry";
-import { buildPoolAssociation, type PoolWork } from "./screening-engine";
+import {
+	algorithmById,
+	type AlgorithmFamily,
+	algorithmsByStage,
+	type AlgorithmSpec,
+	type AlgorithmStage,
+} from "./registry";
+import {
+	buildPoolAssociation,
+	explorationBudget,
+	exploredCore,
+	type PoolWork,
+	rankCandidates,
+} from "./screening-engine";
 import { selectSeeds } from "./seed-engine";
 
 export interface ComparisonRow {
@@ -38,9 +50,14 @@ export interface CompareOptions {
 const MIN_SEEDS_FOR_HOLDOUT = 2;
 
 /**
- * Share of the pool each held-out exploration may expand. With no budget every algorithm eventually reaches every connected seed and the measure cannot tell them apart; a fixed share of the pool follows association chains far enough to find related works yet stays small enough that the algorithms differ, and it bounds the cost of measuring on a large pool.
+ * Ranking measurement drops one seed, explores from the rest and ranks the pool: it needs two remaining seeds to have a seed-to-seed path at all.
  */
-const EXPLORATION_BUDGET_FRACTION = 0.25;
+const MIN_SEEDS_FOR_RANKING_HOLDOUT = 3;
+
+/**
+ * Share of the pool a reviewer would plausibly screen first; a held-out seed ranked inside this top share counts as recovered.
+ */
+const RANKING_TOP_FRACTION = 0.1;
 
 /**
  * Fraction of the pool reachable within one hop of the picks (picks included), the coverage a zero-seeds selection buys before any screening decision exists.
@@ -103,7 +120,7 @@ const compareExploration = (pool: readonly PoolWork[], seeds: readonly string[])
 		return markChosen(roster.map((spec) => rowFor(spec, { value: null, evidence })));
 	}
 	const { graph } = buildPoolAssociation(pool);
-	const budget = Math.ceil(pool.length * EXPLORATION_BUDGET_FRACTION);
+	const budget = explorationBudget(pool.length);
 	return markChosen(
 		roster.map((spec) => {
 			if (!spec.run) {
@@ -134,20 +151,69 @@ const compareSeedSelection = (pool: readonly PoolWork[], options: CompareOptions
 	return markChosen(rows);
 };
 
-const compareRanking = (): readonly ComparisonRow[] => {
+const compareRanking = (
+	pool: readonly PoolWork[],
+	seeds: readonly string[],
+	exploration: readonly ComparisonRow[],
+): readonly ComparisonRow[] => {
 	const roster = algorithmsByStage("ranking");
-	if (roster.length !== 1) {
-		throw new Error(["ranking roster must hold exactly the association ranking, found", roster.length].join(" "));
+	if (roster.length === 0) {
+		throw new Error("ranking roster is empty");
 	}
-	return markChosen(roster.map((spec) => rowFor(spec, { value: null, evidence: "sole ranking algorithm in the roster" })));
+	if (seeds.length < MIN_SEEDS_FOR_RANKING_HOLDOUT) {
+		const evidence =
+			seeds.length === 0
+				? "no seeds to measure against; roster default"
+				: "needs three or more seeds to measure; roster default";
+		return markChosen(roster.map((spec) => rowFor(spec, { value: null, evidence })));
+	}
+	const chosen = exploration.find((row) => row.chosen);
+	const run = chosen === undefined ? undefined : algorithmById(chosen.algorithmId)?.run;
+	if (run === undefined) {
+		throw new Error("ranking is measured on the chosen exploration, which has no runnable implementation");
+	}
+	const { graph, structuralMi } = buildPoolAssociation(pool);
+	const budget = explorationBudget(pool.length);
+	const topK = Math.ceil(pool.length * RANKING_TOP_FRACTION);
+	const recovered = new Map<string, number>(roster.map((spec) => [spec.id, 0]));
+	for (const heldOut of seeds) {
+		const remaining = seeds.filter((seed) => seed !== heldOut);
+		// One exploration per held-out seed, shared by every ranker: they differ only in how they score the same paths.
+		const explored = run(graph, remaining.map((id) => ({ id })), { maxNodes: budget });
+		const context = { graph: exploredCore(graph, explored.sampledNodes), structuralMi };
+		const remainingSet = new Set(remaining);
+		for (const spec of roster) {
+			if (!spec.rank) {
+				throw new Error(`ranking algorithm without a runnable implementation: ${spec.id}`);
+			}
+			const candidates = rankCandidates(spec.rank(context, explored.paths), remainingSet);
+			const position = candidates.findIndex((candidate) => candidate.workId === heldOut);
+			if (position !== -1 && position < topK) {
+				recovered.set(spec.id, (recovered.get(spec.id) ?? 0) + 1);
+			}
+		}
+	}
+	return markChosen(
+		roster.map((spec) => {
+			const count = recovered.get(spec.id) ?? 0;
+			return rowFor(spec, {
+				value: count,
+				evidence: ["recovered", count, "of", seeds.length, "held-out seeds in the top", topK, "candidates"].join(" "),
+			});
+		}),
+	);
 };
 
 export const compareAlgorithms = (
 	pool: readonly PoolWork[],
 	seeds: readonly string[],
 	options: CompareOptions,
-): AlgorithmComparison => ({
-	exploration: compareExploration(pool, seeds),
-	"seed-selection": compareSeedSelection(pool, options),
-	ranking: compareRanking(),
-});
+): AlgorithmComparison => {
+	const exploration = compareExploration(pool, seeds);
+	return {
+		exploration,
+		"seed-selection": compareSeedSelection(pool, options),
+		// Staged like the pipeline: the ranking is measured on the exploration the comparison chose.
+		ranking: compareRanking(pool, seeds, exploration),
+	};
+};

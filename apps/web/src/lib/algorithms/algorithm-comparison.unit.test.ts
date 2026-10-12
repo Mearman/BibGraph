@@ -78,4 +78,19 @@ describe("compareAlgorithms", () => {
 			compareAlgorithms(pool, ["hub", "n7"], { selectionSize: SELECTION_SIZE }),
 		);
 	});
+
+	it("measures rankers by held-out recovery once there are three seeds, and not before", () => {
+		const measured = compareAlgorithms(pool, ["hub", "n7", "n3"], { selectionSize: SELECTION_SIZE });
+		for (const row of measured.ranking) {
+			expect(row.value).not.toBeNull();
+			expect(row.evidence).toMatch(/^recovered \d+ of 3 held-out seeds in the top \d+ candidates$/);
+		}
+		expect(measured.ranking.filter((row) => row.chosen)).toHaveLength(1);
+		const unmeasured = compareAlgorithms(pool, ["hub", "n7"], { selectionSize: SELECTION_SIZE });
+		for (const row of unmeasured.ranking) {
+			expect(row.value).toBeNull();
+			expect(row.evidence).toContain("three or more seeds");
+		}
+		expect(unmeasured.ranking.filter((row) => row.chosen)).toHaveLength(1);
+	});
 });

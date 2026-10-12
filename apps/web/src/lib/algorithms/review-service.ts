@@ -12,7 +12,13 @@ import { toPoolGraph } from "./algorithm-comparison";
 import { suggestComposition } from "./composition-engine";
 import { loadReviewPool, type PoolFetcher } from "./pool-loader";
 import { algorithmById } from "./registry";
-import { type PoolWork, type RankedCandidate, screenSemantically } from "./screening-engine";
+import {
+	explorationBudget,
+	type PoolWork,
+	type RankedCandidate,
+	type ScreeningOptions,
+	screenSemantically,
+} from "./screening-engine";
 import { selectSeeds } from "./seed-engine";
 
 /**
@@ -78,23 +84,34 @@ export const startReview = async (
 	return { review: { ...created, suggestedComposition: composition }, pool, composition };
 };
 
-const explorationRunnerFor = (review: LiteratureReview) => {
-	const id = review.suggestedComposition?.exploration?.algorithmId;
+const algorithmFor = (review: LiteratureReview, stage: "exploration" | "ranking") => {
+	const id = review.suggestedComposition?.[stage]?.algorithmId;
 	if (id === undefined) {
-		throw new Error(`review ${review.id} has no exploration algorithm; start it with startReview`);
+		throw new Error(`review ${review.id} has no ${stage} algorithm; start it with startReview`);
 	}
-	const run = algorithmById(id)?.run;
-	if (run === undefined) {
-		throw new Error(`exploration algorithm is not runnable: ${id}`);
+	const spec = algorithmById(id);
+	if (spec === undefined) {
+		throw new Error(`unknown ${stage} algorithm: ${id}`);
 	}
-	return run;
+	return spec;
+};
+
+/**
+ * The screening options a review runs with: its composition's exploration and ranking algorithms under the shared exploration budget.
+ */
+const screeningOptionsFor = (review: LiteratureReview, pool: readonly PoolWork[]): ScreeningOptions => {
+	const { run } = algorithmFor(review, "exploration");
+	const { rank } = algorithmFor(review, "ranking");
+	if (run === undefined || rank === undefined) {
+		throw new Error(`review ${review.id} composition names an algorithm that is not runnable`);
+	}
+	return { exploration: run, ranking: rank, explorationConfig: { maxNodes: explorationBudget(pool.length) } };
 };
 
 export const screenReview = (
 	review: LiteratureReview,
 	pool: readonly PoolWork[],
-): readonly RankedCandidate[] =>
-	screenSemantically(pool, review.seeds, { exploration: explorationRunnerFor(review) });
+): readonly RankedCandidate[] => screenSemantically(pool, review.seeds, screeningOptionsFor(review, pool));
 
 export const refineReview = (review: LiteratureReview, pool: readonly PoolWork[]): RefinedReview => {
 	const known = new Set(review.seeds);
@@ -104,7 +121,7 @@ export const refineReview = (review: LiteratureReview, pool: readonly PoolWork[]
 		.sort();
 	const seeds = [...review.seeds, ...included];
 	const decided = new Set(Object.keys(review.decisions));
-	const candidates = screenSemantically(pool, seeds, { exploration: explorationRunnerFor(review) }).filter(
+	const candidates = screenSemantically(pool, seeds, screeningOptionsFor(review, pool)).filter(
 		(candidate) => !decided.has(candidate.workId),
 	);
 	return { seeds, candidates };

@@ -7,6 +7,7 @@
 import { standardBfs } from "graphwise/exploration";
 import { describe, expect, it } from "vitest";
 
+import { algorithmById } from "./registry";
 import { buildPoolAssociation, type PoolWork, screenSemantically } from "./screening-engine";
 
 /**
@@ -25,9 +26,15 @@ const pool: readonly PoolWork[] = [
 
 const SEED_IDS = ["s1", "s2"];
 
+const structuralRanking = () => {
+	const rank = algorithmById("parse-structural")?.rank;
+	if (rank === undefined) throw new Error("parse-structural ranker missing");
+	return rank;
+};
+
 describe("screening engine", () => {
 	it("ranks the stronger association bridge first with seed-pair evidence", () => {
-		const candidates = screenSemantically(pool, SEED_IDS, { exploration: standardBfs });
+		const candidates = screenSemantically(pool, SEED_IDS, { exploration: standardBfs, ranking: structuralRanking() });
 		expect(candidates.map((c) => c.workId)).toEqual(["a", "b"]);
 		expect(candidates[0].score).toBeGreaterThan(candidates[1].score);
 		const top = candidates[0];
@@ -38,7 +45,7 @@ describe("screening engine", () => {
 	});
 
 	it("never returns a seed as a candidate", () => {
-		const candidates = screenSemantically(pool, SEED_IDS, { exploration: standardBfs });
+		const candidates = screenSemantically(pool, SEED_IDS, { exploration: standardBfs, ranking: structuralRanking() });
 		expect(candidates.map((c) => c.workId)).not.toContain("s1");
 		expect(candidates.map((c) => c.workId)).not.toContain("s2");
 	});
@@ -48,12 +55,12 @@ describe("screening engine", () => {
 			{ id: "s1", references: ["r1"] },
 			{ id: "s2", references: ["r2"] },
 		];
-		expect(screenSemantically(isolated, ["s1", "s2"], { exploration: standardBfs })).toEqual([]);
+		expect(screenSemantically(isolated, ["s1", "s2"], { exploration: standardBfs, ranking: structuralRanking() })).toEqual([]);
 	});
 
 	it("is deterministic across calls", () => {
-		const first = screenSemantically(pool, SEED_IDS, { exploration: standardBfs });
-		const second = screenSemantically(pool, SEED_IDS, { exploration: standardBfs });
+		const first = screenSemantically(pool, SEED_IDS, { exploration: standardBfs, ranking: structuralRanking() });
+		const second = screenSemantically(pool, SEED_IDS, { exploration: standardBfs, ranking: structuralRanking() });
 		expect(first).toEqual(second);
 	});
 });

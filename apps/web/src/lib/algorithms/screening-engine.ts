@@ -6,7 +6,8 @@
 
 import type { ExplorationConfig, ExplorationResult, Seed } from "graphwise/exploration";
 import { AdjacencyMapGraph, type NodeId, type ReadableGraph } from "graphwise/graph";
-import { parse, type RankedPath } from "graphwise/ranking";
+
+import type { RankingRunner, ScoredPath } from "./ranking-types";
 
 /**
  * A pool work: its OpenAlex id and the works it cites (OpenAlex referenced_works, external ids included).
@@ -47,11 +48,28 @@ export type ExplorationRunner = (
 
 export interface ScreeningOptions {
 	/**
-	 * The exploration algorithm whose paths feed PARSE; the registry's run functions satisfy this.
+	 * The exploration algorithm whose paths feed the ranking; the registry's run functions satisfy this.
 	 */
 	readonly exploration: ExplorationRunner;
 	readonly explorationConfig?: ExplorationConfig;
+	/**
+	 * The ranking algorithm that scores the discovered paths; the registry's rank functions satisfy this.
+	 */
+	readonly ranking: RankingRunner;
 }
+
+/**
+ * Share of the pool one exploration may expand. Used both when measuring algorithms and when screening, so what the comparison reports is exactly the protocol the screen runs. Without a budget every algorithm eventually reaches every connected work and the measure cannot tell them apart; a fixed share follows association chains far enough to find related works yet stays small enough that the algorithms differ, and it bounds the cost of exploring a large pool.
+ */
+export const EXPLORATION_BUDGET_FRACTION = 0.25;
+
+/**
+ * Pools this small are explored in full: a quarter of a handful of works could not follow even a short association chain.
+ */
+export const MIN_EXPLORATION_BUDGET = 32;
+
+export const explorationBudget = (poolSize: number): number =>
+	Math.max(MIN_EXPLORATION_BUDGET, Math.ceil(poolSize * EXPLORATION_BUDGET_FRACTION));
 
 // Direct citation is the strongest structural association.
 const DIRECT_CITATION_MI = 1;
@@ -185,6 +203,57 @@ export const buildPoolAssociation = (pool: readonly PoolWork[]): PoolAssociation
 	return association;
 };
 
+/**
+ * The subgraph induced by the works an exploration sampled. Ranking runs on this core rather than the whole pool: the paths lie inside it, and the heavier path-ranking baselines (resistance distance, communicability) cost more than quadratic in the graph's size.
+ */
+export const exploredCore = (
+	graph: Readonly<ReadableGraph>,
+	sampled: ReadonlySet<NodeId>,
+): Readonly<ReadableGraph> => {
+	const core = AdjacencyMapGraph.undirected();
+	for (const id of [...sampled].sort()) {
+		core.addNode({ id });
+	}
+	for (const edge of graph.edges()) {
+		if (sampled.has(edge.source) && sampled.has(edge.target)) {
+			core.addEdge({ source: edge.source, target: edge.target });
+		}
+	}
+	return core;
+};
+
+/**
+ * Folds scored seed-to-seed paths onto the works that bridge them: each non-seed work scores the best path through it, with that path as its evidence and a count of the paths that pass through it. Ordered by score then id, so equal scores break deterministically.
+ */
+export const rankCandidates = (
+	scored: readonly ScoredPath[],
+	seeds: ReadonlySet<string>,
+): readonly RankedCandidate[] => {
+	const best = new Map<string, { score: number; path: ScoredPath; count: number }>();
+	for (const path of scored) {
+		for (const node of path.nodes) {
+			if (seeds.has(node)) continue;
+			const current = best.get(node);
+			if (current && path.score <= current.score) {
+				current.count++;
+				continue;
+			}
+			best.set(node, { score: path.score, path, count: current ? current.count + 1 : 1 });
+		}
+	}
+	const candidates: RankedCandidate[] = [];
+	for (const [workId, entry] of best) {
+		const via = entry.path.nodes.filter((node) => !seeds.has(node));
+		candidates.push({
+			workId,
+			score: entry.score,
+			evidence: { fromSeed: entry.path.fromSeed.id, toSeed: entry.path.toSeed.id, via },
+			pathsConnected: entry.count,
+		});
+	}
+	return candidates.sort((a, b) => (a.score !== b.score ? (a.score > b.score ? -1 : 1) : a.workId < b.workId ? -1 : 1));
+};
+
 export const screenSemantically = (
 	pool: readonly PoolWork[],
 	seeds: readonly string[],
@@ -196,41 +265,8 @@ export const screenSemantically = (
 			throw new Error(`seed not in pool: ${seed}`);
 		}
 	}
-
 	const seedObjects: readonly Seed[] = seeds.map((id) => ({ id }));
 	const exploration = options.exploration(graph, seedObjects, options.explorationConfig);
-	const ranked = parse(graph, exploration.paths, {
-		mi: (miGraph, u, v) => {
-			if (!miGraph.hasNode(u) || !miGraph.hasNode(v)) {
-				throw new Error(`PARSE MI requested for a node outside the graph: ${miGraph.hasNode(u) ? v : u}`);
-			}
-			return structuralMi(u, v);
-		},
-	});
-
-	const seedSet = new Set(seeds);
-	const best = new Map<string, { score: number; path: RankedPath; count: number }>();
-	for (const path of ranked.paths) {
-		for (const node of path.nodes) {
-			if (seedSet.has(node)) continue;
-			const current = best.get(node);
-			if (current && path.salience <= current.score) {
-				current.count++;
-				continue;
-			}
-			best.set(node, { score: path.salience, path, count: current ? current.count + 1 : 1 });
-		}
-	}
-
-	const candidates: RankedCandidate[] = [];
-	for (const [workId, entry] of best) {
-		const via = entry.path.nodes.filter((node) => !seedSet.has(node));
-		candidates.push({
-			workId,
-			score: entry.score,
-			evidence: { fromSeed: entry.path.fromSeed.id, toSeed: entry.path.toSeed.id, via },
-			pathsConnected: entry.count,
-		});
-	}
-	return candidates.sort((a, b) => (a.score !== b.score ? (a.score > b.score ? -1 : 1) : a.workId < b.workId ? -1 : 1));
+	const scored = options.ranking({ graph: exploredCore(graph, exploration.sampledNodes), structuralMi }, exploration.paths);
+	return rankCandidates(scored, new Set(seeds));
 };
