@@ -86,9 +86,42 @@ export interface PoolAssociation {
 }
 
 /**
- * Builds the pool's undirected citation-association graph with its structural MI, shared by every algorithm surface that reasons over pool association (screening, composition suggestion).
+ * Pairs of works that can have non-zero structural MI: a direct citation, a shared reference (coupling), or a shared citer (co-citation). Every other pair scores zero and carries no edge, so enumerating these through inverted indices replaces testing all n-squared pairs.
  */
-export const buildPoolAssociation = (pool: readonly PoolWork[]): PoolAssociation => {
+const candidatePairs = (
+	pool: readonly PoolWork[],
+	citesInPool: ReadonlyMap<string, ReadonlySet<string>>,
+): Map<string, Set<string>> => {
+	const pairs = new Map<string, Set<string>>();
+	const addPair = (a: string, b: string) => {
+		if (a === b) return;
+		const [low, high] = a < b ? [a, b] : [b, a];
+		const partners = pairs.get(low) ?? new Set<string>();
+		partners.add(high);
+		pairs.set(low, partners);
+	};
+	const addAll = (group: readonly string[]) => {
+		group.forEach((a, i) => {
+			for (const b of group.slice(i + 1)) addPair(a, b);
+		});
+	};
+	const citersOfReference = new Map<string, string[]>();
+	for (const work of pool) {
+		for (const ref of new Set(work.references)) {
+			const citers = citersOfReference.get(ref) ?? [];
+			citers.push(work.id);
+			citersOfReference.set(ref, citers);
+		}
+	}
+	for (const citers of citersOfReference.values()) addAll(citers);
+	for (const [citer, cited] of citesInPool) {
+		for (const target of cited) addPair(citer, target);
+		addAll([...cited]);
+	}
+	return pairs;
+};
+
+const computePoolAssociation = (pool: readonly PoolWork[]): PoolAssociation => {
 	const refsById = new Map<string, ReadonlySet<string>>();
 	for (const work of pool) {
 		refsById.set(work.id, new Set(work.references));
@@ -128,16 +161,28 @@ export const buildPoolAssociation = (pool: readonly PoolWork[]): PoolAssociation
 	for (const work of pool) {
 		graph.addNode({ id: work.id });
 	}
-	const ordered = [...poolIds].sort();
-	for (let i = 0; i < ordered.length; i++) {
-		for (let j = i + 1; j < ordered.length; j++) {
-			const u = ordered[i];
-			const v = ordered[j];
-			if (structuralMi(u, v) === 0) continue;
-			graph.addEdge({ source: u, target: v });
+	// Edges are inserted in sorted pair order so neighbour iteration, and every exploration tie-break that follows it, is deterministic.
+	const pairs = candidatePairs(pool, citesInPool);
+	for (const low of [...pairs.keys()].sort()) {
+		for (const high of [...required(pairs, low, "candidate pairs")].sort()) {
+			if (structuralMi(low, high) === 0) continue;
+			graph.addEdge({ source: low, target: high });
 		}
 	}
 	return { graph, poolIds, structuralMi };
+};
+
+const associationCache = new WeakMap<readonly PoolWork[], PoolAssociation>();
+
+/**
+ * The pool's undirected citation-association graph with its structural MI, shared by every algorithm surface that reasons over pool association (screening, comparison, composition suggestion). Memoised per pool object: pools are immutable once loaded, so one pool is analysed once however many surfaces ask.
+ */
+export const buildPoolAssociation = (pool: readonly PoolWork[]): PoolAssociation => {
+	const cached = associationCache.get(pool);
+	if (cached) return cached;
+	const association = computePoolAssociation(pool);
+	associationCache.set(pool, association);
+	return association;
 };
 
 export const screenSemantically = (
