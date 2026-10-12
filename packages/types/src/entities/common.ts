@@ -13,7 +13,7 @@ export const OpenAlexResponseSchema = <T extends z.ZodType>(resultSchema: T) =>
 			db_response_time_ms: z.number(),
 			page: z.number(),
 			per_page: z.number(),
-			groups_count: z.number().optional(),
+			groups_count: z.number().nullable().optional(),
 		}),
 		group_by: z
 			.array(
@@ -36,7 +36,7 @@ export interface OpenAlexResponse<T> {
 		db_response_time_ms: number
 		page: number
 		per_page: number
-		groups_count?: number
+		groups_count?: number | null
 	}
 	group_by?: {
 		key: string

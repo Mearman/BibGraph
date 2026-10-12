@@ -26,7 +26,7 @@ export const metaSchema = z.object({
 	db_response_time_ms: z.number().min(0),
 	page: z.number().int().min(1),
 	per_page: z.number().int().min(1).max(MAX_META_PER_PAGE),
-	groups_count: z.number().int().min(0).optional(),
+	groups_count: z.number().int().min(0).nullable().optional(),
 })
 
 // Group by schema for aggregated responses
