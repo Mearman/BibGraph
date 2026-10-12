@@ -47,6 +47,8 @@ import { Route as KeywordsKeywordIdRouteImport } from './routes/keywords/$keywor
 import { Route as OpenalexUrlSplatRouteImport } from './routes/openalex-url/$'
 import { Route as PublishersIndexRouteImport } from './routes/publishers/index'
 import { Route as PublishersPublisherIdRouteImport } from './routes/publishers/$publisherId'
+import { Route as ReviewsIndexRouteImport } from './routes/reviews/index'
+import { Route as ReviewsReviewIdRouteImport } from './routes/reviews/$reviewId'
 import { Route as SourcesIndexRouteImport } from './routes/sources/index'
 import { Route as SourcesSourceIdRouteImport } from './routes/sources/$sourceId'
 import { Route as SubfieldsSubfieldIdRouteImport } from './routes/subfields/$subfieldId'
@@ -288,6 +290,18 @@ const PublishersPublisherIdRoute = PublishersPublisherIdRouteImport.update({
 } as any).lazy(() =>
   import('./routes/publishers/$publisherId.lazy').then((d) => d.Route),
 )
+const ReviewsIndexRoute = ReviewsIndexRouteImport.update({
+  id: '/reviews/',
+  path: '/reviews/',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/reviews/index.lazy').then((d) => d.Route))
+const ReviewsReviewIdRoute = ReviewsReviewIdRouteImport.update({
+  id: '/reviews/$reviewId',
+  path: '/reviews/$reviewId',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/reviews/$reviewId.lazy').then((d) => d.Route),
+)
 const SourcesIndexRoute = SourcesIndexRouteImport.update({
   id: '/sources/',
   path: '/sources/',
@@ -457,6 +471,7 @@ export interface FileRoutesByFullPath {
   '/keywords/$keywordId': typeof KeywordsKeywordIdRoute
   '/openalex-url/$': typeof OpenalexUrlSplatRoute
   '/publishers/$publisherId': typeof PublishersPublisherIdRoute
+  '/reviews/$reviewId': typeof ReviewsReviewIdRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/subfields/$subfieldId': typeof SubfieldsSubfieldIdRoute
   '/topics/$topicId': typeof TopicsTopicIdRoute
@@ -468,6 +483,7 @@ export interface FileRoutesByFullPath {
   '/institutions/': typeof InstitutionsIndexRoute
   '/keywords/': typeof KeywordsIndexRoute
   '/publishers/': typeof PublishersIndexRoute
+  '/reviews/': typeof ReviewsIndexRoute
   '/sources/': typeof SourcesIndexRoute
   '/text/': typeof TextIndexRoute
   '/topics/': typeof TopicsIndexRoute
@@ -519,6 +535,7 @@ export interface FileRoutesByTo {
   '/keywords/$keywordId': typeof KeywordsKeywordIdRoute
   '/openalex-url/$': typeof OpenalexUrlSplatRoute
   '/publishers/$publisherId': typeof PublishersPublisherIdRoute
+  '/reviews/$reviewId': typeof ReviewsReviewIdRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/subfields/$subfieldId': typeof SubfieldsSubfieldIdRoute
   '/topics/$topicId': typeof TopicsTopicIdRoute
@@ -530,6 +547,7 @@ export interface FileRoutesByTo {
   '/institutions': typeof InstitutionsIndexRoute
   '/keywords': typeof KeywordsIndexRoute
   '/publishers': typeof PublishersIndexRoute
+  '/reviews': typeof ReviewsIndexRoute
   '/sources': typeof SourcesIndexRoute
   '/text': typeof TextIndexRoute
   '/topics': typeof TopicsIndexRoute
@@ -582,6 +600,7 @@ export interface FileRoutesById {
   '/keywords/$keywordId': typeof KeywordsKeywordIdRoute
   '/openalex-url/$': typeof OpenalexUrlSplatRoute
   '/publishers/$publisherId': typeof PublishersPublisherIdRoute
+  '/reviews/$reviewId': typeof ReviewsReviewIdRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/subfields/$subfieldId': typeof SubfieldsSubfieldIdRoute
   '/topics/$topicId': typeof TopicsTopicIdRoute
@@ -593,6 +612,7 @@ export interface FileRoutesById {
   '/institutions/': typeof InstitutionsIndexRoute
   '/keywords/': typeof KeywordsIndexRoute
   '/publishers/': typeof PublishersIndexRoute
+  '/reviews/': typeof ReviewsIndexRoute
   '/sources/': typeof SourcesIndexRoute
   '/text/': typeof TextIndexRoute
   '/topics/': typeof TopicsIndexRoute
@@ -646,6 +666,7 @@ export interface FileRouteTypes {
     | '/keywords/$keywordId'
     | '/openalex-url/$'
     | '/publishers/$publisherId'
+    | '/reviews/$reviewId'
     | '/sources/$sourceId'
     | '/subfields/$subfieldId'
     | '/topics/$topicId'
@@ -657,6 +678,7 @@ export interface FileRouteTypes {
     | '/institutions/'
     | '/keywords/'
     | '/publishers/'
+    | '/reviews/'
     | '/sources/'
     | '/text/'
     | '/topics/'
@@ -708,6 +730,7 @@ export interface FileRouteTypes {
     | '/keywords/$keywordId'
     | '/openalex-url/$'
     | '/publishers/$publisherId'
+    | '/reviews/$reviewId'
     | '/sources/$sourceId'
     | '/subfields/$subfieldId'
     | '/topics/$topicId'
@@ -719,6 +742,7 @@ export interface FileRouteTypes {
     | '/institutions'
     | '/keywords'
     | '/publishers'
+    | '/reviews'
     | '/sources'
     | '/text'
     | '/topics'
@@ -770,6 +794,7 @@ export interface FileRouteTypes {
     | '/keywords/$keywordId'
     | '/openalex-url/$'
     | '/publishers/$publisherId'
+    | '/reviews/$reviewId'
     | '/sources/$sourceId'
     | '/subfields/$subfieldId'
     | '/topics/$topicId'
@@ -781,6 +806,7 @@ export interface FileRouteTypes {
     | '/institutions/'
     | '/keywords/'
     | '/publishers/'
+    | '/reviews/'
     | '/sources/'
     | '/text/'
     | '/topics/'
@@ -830,6 +856,7 @@ export interface RootRouteChildren {
   KeywordsKeywordIdRoute: typeof KeywordsKeywordIdRoute
   OpenalexUrlSplatRoute: typeof OpenalexUrlSplatRoute
   PublishersPublisherIdRoute: typeof PublishersPublisherIdRoute
+  ReviewsReviewIdRoute: typeof ReviewsReviewIdRoute
   SourcesSourceIdRoute: typeof SourcesSourceIdRoute
   SubfieldsSubfieldIdRoute: typeof SubfieldsSubfieldIdRoute
   TopicsTopicIdRoute: typeof TopicsTopicIdRoute
@@ -841,6 +868,7 @@ export interface RootRouteChildren {
   InstitutionsIndexRoute: typeof InstitutionsIndexRoute
   KeywordsIndexRoute: typeof KeywordsIndexRoute
   PublishersIndexRoute: typeof PublishersIndexRoute
+  ReviewsIndexRoute: typeof ReviewsIndexRoute
   SourcesIndexRoute: typeof SourcesIndexRoute
   TextIndexRoute: typeof TextIndexRoute
   TopicsIndexRoute: typeof TopicsIndexRoute
@@ -1123,6 +1151,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublishersPublisherIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reviews/': {
+      id: '/reviews/'
+      path: '/reviews'
+      fullPath: '/reviews/'
+      preLoaderRoute: typeof ReviewsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reviews/$reviewId': {
+      id: '/reviews/$reviewId'
+      path: '/reviews/$reviewId'
+      fullPath: '/reviews/$reviewId'
+      preLoaderRoute: typeof ReviewsReviewIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sources/': {
       id: '/sources/'
       path: '/sources'
@@ -1340,6 +1382,7 @@ const rootRouteChildren: RootRouteChildren = {
   KeywordsKeywordIdRoute: KeywordsKeywordIdRoute,
   OpenalexUrlSplatRoute: OpenalexUrlSplatRoute,
   PublishersPublisherIdRoute: PublishersPublisherIdRoute,
+  ReviewsReviewIdRoute: ReviewsReviewIdRoute,
   SourcesSourceIdRoute: SourcesSourceIdRoute,
   SubfieldsSubfieldIdRoute: SubfieldsSubfieldIdRoute,
   TopicsTopicIdRoute: TopicsTopicIdRoute,
@@ -1351,6 +1394,7 @@ const rootRouteChildren: RootRouteChildren = {
   InstitutionsIndexRoute: InstitutionsIndexRoute,
   KeywordsIndexRoute: KeywordsIndexRoute,
   PublishersIndexRoute: PublishersIndexRoute,
+  ReviewsIndexRoute: ReviewsIndexRoute,
   SourcesIndexRoute: SourcesIndexRoute,
   TextIndexRoute: TextIndexRoute,
   TopicsIndexRoute: TopicsIndexRoute,

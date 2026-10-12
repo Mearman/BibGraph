@@ -4,10 +4,12 @@
 
 import { cachedOpenAlex } from "@bibgraph/client";
 
-import { createReview, updateReview } from "@/stores/review-store";
+import type { ReviewSessionDeps } from "@/hooks/use-review-session";
+import type { ReviewsDeps } from "@/hooks/use-reviews";
+import { createReview, getReview, listReviews, setDecision, updateReview } from "@/stores/review-store";
 
 import { createOpenAlexPoolFetcher } from "../algorithms/openalex-pool-fetcher";
-import type { ReviewServiceDeps } from "../algorithms/review-service";
+import { type ReviewServiceDeps, startReview } from "../algorithms/review-service";
 import { createWorkLabelFetcher } from "../algorithms/work-labels";
 import { MAX_REVIEW_POOL_SIZE } from "./review-constants";
 
@@ -41,3 +43,14 @@ export const fetchWorkLabels = createWorkLabelFetcher({
 		};
 	},
 });
+
+export const reviewsDeps: ReviewsDeps = {
+	listReviews,
+	startReview: async (input) => startReview(input, reviewServiceDeps),
+};
+
+export const reviewSessionDeps: ReviewSessionDeps = {
+	fetcher: reviewServiceDeps.fetcher,
+	fetchLabels: fetchWorkLabels,
+	store: { getReview, setDecision, updateReview },
+};

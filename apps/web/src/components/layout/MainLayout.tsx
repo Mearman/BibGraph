@@ -402,6 +402,13 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
                 <Menu.Divider />
                 <Menu.Item
                   component={Link}
+                  to="/reviews"
+                  leftSection={<IconSearch size={ICON_SIZE.MD} />}
+                >
+                  Reviews
+                </Menu.Item>
+                <Menu.Item
+                  component={Link}
                   to="/history"
                   leftSection={<IconSearch size={ICON_SIZE.MD} />}
                 >
@@ -441,6 +448,14 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
 
             {/* Desktop navigation - additional buttons */}
             <Group gap={rem(SPACING_XS_PX)} visibleFrom="xl">
+              <Button
+                component={Link}
+                to="/reviews"
+                variant="subtle"
+                size="xs"
+              >
+                Reviews
+              </Button>
               <Button
                 component={Link}
                 to="/history"
