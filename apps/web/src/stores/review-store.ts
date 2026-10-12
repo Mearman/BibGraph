@@ -5,6 +5,8 @@
 import { logger } from "@bibgraph/utils/logger";
 import Dexie, { type Table } from "dexie";
 
+import type { PoolWork } from "@/lib/algorithms/screening-engine";
+
 /**
 A per-work screening decision the refine loop feeds back as signal.
  */
@@ -52,13 +54,26 @@ interface ReviewRecord extends LiteratureReview {
 	id: string;
 }
 
+/**
+ * The pool a review was started with, kept as a snapshot: screening a review must give the same answer every time it is opened, and OpenAlex results drift, so the pool is fetched once, not on every open.
+ */
+interface PoolSnapshot {
+	reviewId: string;
+	works: PoolWork[];
+}
+
 class ReviewDB extends Dexie {
 	reviews!: Table<ReviewRecord, string>;
+	pools!: Table<PoolSnapshot, string>;
 
 	constructor() {
 		super("bibgraph-reviews");
 		this.version(1).stores({
 			reviews: "id, name, createdAt",
+		});
+		this.version(2).stores({
+			reviews: "id, name, createdAt",
+			pools: "reviewId",
 		});
 	}
 }
@@ -119,7 +134,20 @@ export const listReviews = async (): Promise<LiteratureReview[]> =>
 	getDB().reviews.orderBy("createdAt").toArray();
 
 export const deleteReview = async (id: string): Promise<void> => {
-	await getDB().reviews.delete(id);
+	const db = getDB();
+	await db.transaction("rw", db.reviews, db.pools, async () => {
+		await db.reviews.delete(id);
+		await db.pools.delete(id);
+	});
+};
+
+export const savePool = async (reviewId: string, pool: readonly PoolWork[]): Promise<void> => {
+	await getDB().pools.put({ reviewId, works: [...pool] });
+};
+
+export const getPool = async (reviewId: string): Promise<PoolWork[] | undefined> => {
+	const snapshot = await getDB().pools.get(reviewId);
+	return snapshot?.works;
 };
 
 export interface UpdateReviewInput {
@@ -150,5 +178,9 @@ export const setDecision = async (
 Test-only helper: wipes the table so each unit test starts empty.
  */
 export const clearAllReviewsForTests = async (): Promise<void> => {
-	await getDB().reviews.clear();
+	const db = getDB();
+	await db.transaction("rw", db.reviews, db.pools, async () => {
+		await db.reviews.clear();
+		await db.pools.clear();
+	});
 };

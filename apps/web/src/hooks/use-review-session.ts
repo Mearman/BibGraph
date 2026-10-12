@@ -27,6 +27,8 @@ export interface SessionStorePort {
 	readonly getReview: (id: string) => Promise<LiteratureReview | undefined>;
 	readonly setDecision: (id: string, workId: string, decision: ScreeningDecision) => Promise<void>;
 	readonly updateReview: (id: string, patch: UpdateReviewInput) => Promise<void>;
+	readonly getPool: (reviewId: string) => Promise<readonly PoolWork[] | undefined>;
+	readonly savePool: (reviewId: string, pool: readonly PoolWork[]) => Promise<void>;
 }
 
 export interface ReviewSessionDeps {
@@ -110,7 +112,14 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 		queryFn:
 			review === undefined
 				? skipToken
-				: async () => loadReviewPool({ query: review.query, seeds: review.seeds }, deps.fetcher),
+				: async () => {
+						// A review keeps the pool it was started with: fetched once, then read from its snapshot, so screening it again gives the same answer and costs no requests.
+						const saved = await deps.store.getPool(reviewId);
+						if (saved !== undefined) return saved;
+						const loaded = await loadReviewPool({ query: review.query, seeds: review.seeds }, deps.fetcher);
+						await deps.store.savePool(reviewId, loaded);
+						return loaded;
+					},
 	});
 	const pool = poolQuery.data;
 

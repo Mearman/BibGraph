@@ -28,6 +28,7 @@ import { selectSeeds } from "./seed-engine";
 export interface ReviewStorePort {
 	readonly createReview: (input: CreateReviewInput) => Promise<LiteratureReview>;
 	readonly updateReview: (id: string, patch: UpdateReviewInput) => Promise<void>;
+	readonly savePool: (reviewId: string, pool: readonly PoolWork[]) => Promise<void>;
 }
 
 export interface ReviewServiceDeps {
@@ -83,6 +84,7 @@ export const startReview = async (
 	// Exploration and ranking start from defaults so the review opens at once; measuring every algorithm is far slower than loading the pool, and the session replaces the defaults with the measured best (adoptMeasured).
 	const composition = defaultComposition(seedSelection);
 	const created = await deps.store.createReview({ name: input.name, query: input.query, seeds });
+	await deps.store.savePool(created.id, pool);
 	await deps.store.updateReview(created.id, { suggestedComposition: composition });
 	return { review: { ...created, suggestedComposition: composition }, pool, composition };
 };

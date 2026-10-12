@@ -26,8 +26,9 @@ const fetcher: PoolFetcher = {
 	},
 };
 
-const makeStore = (): { store: ReviewStorePort; saved: Map<string, LiteratureReview> } => {
+const makeStore = (): { store: ReviewStorePort; saved: Map<string, LiteratureReview>; pools: Map<string, readonly unknown[]> } => {
 	const saved = new Map<string, LiteratureReview>();
+	const pools = new Map<string, readonly unknown[]>();
 	let counter = 0;
 	const store: ReviewStorePort = {
 		createReview: async (input) => {
@@ -46,6 +47,10 @@ const makeStore = (): { store: ReviewStorePort; saved: Map<string, LiteratureRev
 			saved.set(review.id, review);
 			return review;
 		},
+		savePool: async (reviewId, pool) => {
+			await Promise.resolve();
+			pools.set(reviewId, pool);
+		},
 		updateReview: async (id, patch) => {
 			await Promise.resolve();
 			const current = saved.get(id);
@@ -53,7 +58,7 @@ const makeStore = (): { store: ReviewStorePort; saved: Map<string, LiteratureRev
 			saved.set(id, { ...current, ...patch });
 		},
 	};
-	return { store, saved };
+	return { store, saved, pools };
 };
 
 describe("review service", () => {
@@ -98,5 +103,11 @@ describe("review service", () => {
 		const standard = screenStandard(decided, started.pool);
 		expect(standard.map((c) => c.workId)).toEqual(["W2", "W4"]);
 		expect(standard.map((c) => c.rank)).toEqual([1, 2]);
+	});
+
+	it("stores the pool snapshot with the review so it is never refetched", async () => {
+		const { store, pools } = makeStore();
+		const started = await startReview({ name: "r", query: "q", seeds: ["W1", "W3"], selectionSize: SELECTION_SIZE }, { fetcher, store });
+		expect(pools.get(started.review.id)).toEqual(started.pool);
 	});
 });

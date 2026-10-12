@@ -7,7 +7,15 @@ import { z } from "zod";
 
 import type { ReviewSessionDeps } from "@/hooks/use-review-session";
 import type { ReviewsDeps } from "@/hooks/use-reviews";
-import { createReview, getReview, listReviews, setDecision, updateReview } from "@/stores/review-store";
+import {
+	createReview,
+	getPool,
+	getReview,
+	listReviews,
+	savePool,
+	setDecision,
+	updateReview,
+} from "@/stores/review-store";
 
 import { createOpenAlexPoolFetcher } from "../algorithms/openalex-pool-fetcher";
 import { type ReviewServiceDeps, startReview } from "../algorithms/review-service";
@@ -29,7 +37,7 @@ export const reviewServiceDeps: ReviewServiceDeps = {
 		{ getWorks: async (params) => cachedOpenAlex.client.works.getWorksProjection(params, poolWorkSchema) },
 		{ maxPoolSize: MAX_REVIEW_POOL_SIZE },
 	),
-	store: { createReview, updateReview },
+	store: { createReview, updateReview, savePool },
 };
 
 export const fetchWorkLabels = createWorkLabelFetcher({
@@ -44,5 +52,5 @@ export const reviewsDeps: ReviewsDeps = {
 export const reviewSessionDeps: ReviewSessionDeps = {
 	fetcher: reviewServiceDeps.fetcher,
 	fetchLabels: fetchWorkLabels,
-	store: { getReview, setDecision, updateReview },
+	store: { getReview, setDecision, updateReview, getPool, savePool },
 };

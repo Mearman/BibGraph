@@ -31,7 +31,9 @@ const fetcher: PoolFetcher = {
 	},
 };
 
-const makeDeps = (): { deps: ReviewSessionDeps; stored: { current: LiteratureReview } } => {
+const makeDeps = (savedPool?: readonly { id: string; references: readonly string[] }[]): { deps: ReviewSessionDeps; stored: { current: LiteratureReview }; searches: { count: number }; pool: { current: readonly { id: string; references: readonly string[] }[] | undefined } } => {
+	const searches = { count: 0 };
+	const pool: { current: readonly { id: string; references: readonly string[] }[] | undefined } = { current: savedPool };
 	const poolForComposition = [
 		{ id: "W1", references: [] },
 		{ id: "W2", references: ["W1", "W3"] },
@@ -52,12 +54,26 @@ const makeDeps = (): { deps: ReviewSessionDeps; stored: { current: LiteratureRev
 	};
 	const labels = new Map<string, WorkLabel>([["W2", { title: "Bridge paper", year: 2021 }]]);
 	const deps: ReviewSessionDeps = {
-		fetcher,
+		fetcher: {
+			search: async (query) => {
+				searches.count++;
+				return fetcher.search(query);
+			},
+			byIds: async (ids) => fetcher.byIds(ids),
+		},
 		fetchLabels: async () => {
 			await Promise.resolve();
 			return labels;
 		},
 		store: {
+			getPool: async () => {
+				await Promise.resolve();
+				return pool.current;
+			},
+			savePool: async (_id, saved) => {
+				await Promise.resolve();
+				pool.current = saved;
+			},
 			getReview: async () => {
 				await Promise.resolve();
 				return stored.current;
@@ -72,18 +88,18 @@ const makeDeps = (): { deps: ReviewSessionDeps; stored: { current: LiteratureRev
 			},
 		},
 	};
-	return { deps, stored };
+	return { deps, stored, searches, pool };
 };
 
 const wrapperFor = (client: QueryClient) =>
 	({ children }: { readonly children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 
 const setup = (mutate?: (review: LiteratureReview) => LiteratureReview) => {
-	const { deps, stored } = makeDeps();
+	const { deps, stored, searches, pool } = makeDeps();
 	if (mutate) stored.current = mutate(stored.current);
 	const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 	const hook = renderHook(() => useReviewSession("r1", deps), { wrapper: wrapperFor(client) });
-	return { hook, stored };
+	return { hook, stored, searches, pool };
 };
 
 describe("useReviewSession", () => {
@@ -158,5 +174,23 @@ describe("useReviewSession", () => {
 		});
 		expect(stored.current.suggestedComposition?.exploration).toEqual(override);
 		expect(hook.result.current.phase).toBe("ready");
+	});
+
+	it("fetches the pool once, then reads the saved snapshot", async () => {
+		const first = setup();
+		await waitFor(() => {
+			expect(first.hook.result.current.phase).toBe("ready");
+		});
+		expect(first.searches.count).toBe(1);
+		expect(first.pool.current).toBeDefined();
+		first.hook.unmount();
+		const reopened = makeDeps(first.pool.current);
+		const second = renderHook(() => useReviewSession("r1", reopened.deps), {
+			wrapper: wrapperFor(new QueryClient({ defaultOptions: { queries: { retry: false } } })),
+		});
+		await waitFor(() => {
+			expect(second.result.current.phase).toBe("ready");
+		});
+		expect(reopened.searches.count).toBe(0);
 	});
 });

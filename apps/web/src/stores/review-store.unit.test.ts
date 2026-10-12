@@ -7,9 +7,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
 	createReview,
 	deleteReview,
+	getPool,
 	getReview,
 	listReviews,
 	type LiteratureReview,
+	savePool,
 	setDecision,
 	updateReview,
 } from "./review-store";
@@ -62,8 +64,8 @@ describe("review store", () => {
 	it("persists a suggested composition with its evidence", async () => {
 		const review = await createReview({ name: "composed", query: "" });
 		const composition = {
-			exploration: { algorithmId: "frontier-balanced", evidence: "top-10 recovery 56%" },
-			ranking: { algorithmId: "association", evidence: "recovery 50% at top-10" },
+			exploration: { algorithmId: "frontier-balanced", evidence: "top-10 recovery 56%", chosenBy: "app" as const },
+			ranking: { algorithmId: "association", evidence: "recovery 50% at top-10", chosenBy: "app" as const },
 			seedSelection: null,
 		};
 		await updateReview(review.id, { suggestedComposition: composition });
@@ -73,5 +75,18 @@ describe("review store", () => {
 		expect(suggested?.exploration?.algorithmId).toBe("frontier-balanced");
 		expect(suggested?.ranking?.evidence).toBe("recovery 50% at top-10");
 		expect(suggested?.seedSelection).toBeNull();
+	});
+
+	it("keeps the pool snapshot of a review and removes it with the review", async () => {
+		const review = await createReview({ name: "pooled", query: "q" });
+		expect(await getPool(review.id)).toBeUndefined();
+		const pool = [
+			{ id: "W1", references: ["W2"] },
+			{ id: "W2", references: [] },
+		];
+		await savePool(review.id, pool);
+		expect(await getPool(review.id)).toEqual(pool);
+		await deleteReview(review.id);
+		expect(await getPool(review.id)).toBeUndefined();
 	});
 });
