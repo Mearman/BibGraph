@@ -11,6 +11,7 @@ import {
 } from "./registry";
 import {
 	buildPoolAssociation,
+	candidatePaths,
 	explorationBudget,
 	exploredCore,
 	type PoolWork,
@@ -50,7 +51,7 @@ export interface CompareOptions {
 const MIN_SEEDS_FOR_HOLDOUT = 2;
 
 /**
- * Ranking measurement drops one seed, explores from the rest and ranks the pool: it needs two remaining seeds to have a seed-to-seed path at all.
+ * Ranking measurement drops one seed, explores from the rest and ranks the works they reach; two remaining seeds keep the held-out measure from resting on a single seed's neighbourhood.
  */
 const MIN_SEEDS_FOR_RANKING_HOLDOUT = 3;
 
@@ -180,13 +181,15 @@ const compareRanking = (
 		const remaining = seeds.filter((seed) => seed !== heldOut);
 		// One exploration per held-out seed, shared by every ranker: they differ only in how they score the same paths.
 		const explored = run(graph, remaining.map((id) => ({ id })), { maxNodes: budget });
-		const context = { graph: exploredCore(graph, explored.sampledNodes), structuralMi };
+		const core = exploredCore(graph, explored.sampledNodes);
+		const context = { graph: core, structuralMi };
+		const paths = candidatePaths(core, remaining);
 		const remainingSet = new Set(remaining);
 		for (const spec of roster) {
 			if (!spec.rank) {
 				throw new Error(`ranking algorithm without a runnable implementation: ${spec.id}`);
 			}
-			const candidates = rankCandidates(spec.rank(context, explored.paths), remainingSet);
+			const candidates = rankCandidates(spec.rank(context, paths), remainingSet);
 			const position = candidates.findIndex((candidate) => candidate.workId === heldOut);
 			if (position !== -1 && position < topK) {
 				recovered.set(spec.id, (recovered.get(spec.id) ?? 0) + 1);

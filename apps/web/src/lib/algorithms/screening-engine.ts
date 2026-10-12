@@ -4,7 +4,7 @@
  * The association weight ports the thesis's structural MI (eq:mi_structural, mirrored in tools/association_search.py): direct citation floors at 1, otherwise half the sum of the bibliographic-coupling Jaccard over full reference lists and the within-pool co-citation Jaccard.
  */
 
-import type { ExplorationConfig, ExplorationResult, Seed } from "graphwise/exploration";
+import type { ExplorationConfig, ExplorationPath, ExplorationResult, Seed } from "graphwise/exploration";
 import { AdjacencyMapGraph, type NodeId, type ReadableGraph } from "graphwise/graph";
 
 import type { RankingRunner, ScoredPath } from "./ranking-types";
@@ -18,24 +18,24 @@ export interface PoolWork {
 }
 
 /**
- * One screened candidate: the association score that earned its position and the path that evidence comes from.
+ * One screened candidate: the association score that earned its position and the best seed-to-candidate path it comes from.
  */
 export interface RankedCandidate {
 	readonly workId: string;
 	/**
-	 * Highest PARSE salience over seed-to-seed paths passing through this work.
+	 * Mean over all seeds of the best path score from that seed.
 	 */
 	readonly score: number;
 	readonly evidence: {
 		readonly fromSeed: string;
 		readonly toSeed: string;
 		/**
-		 * The bridging works of the best path, endpoints excluded, in path order.
+		 * The works between the seed and the candidate on the best path (none when they are directly associated), in path order.
 		 */
 		readonly via: readonly string[];
 	};
 	/**
-	 * How many seed-to-seed paths pass through this work.
+	 * How many seeds have a path to this work.
 	 */
 	readonly pathsConnected: number;
 }
@@ -223,36 +223,86 @@ export const exploredCore = (
 };
 
 /**
- * Folds scored seed-to-seed paths onto the works that bridge them: each non-seed work scores the best path through it, with that path as its evidence and a count of the paths that pass through it. Ordered by score then id, so equal scores break deterministically.
+ * How far association is followed from a seed. Association between works fades quickly along a citation chain, and the thesis's screening tool ranks by at most two hops.
+ */
+export const MAX_PATH_HOPS = 2;
+
+/**
+ * Shortest connecting paths from every seed to every other work within MAX_PATH_HOPS, found by breadth-first search in sorted neighbour order so the path chosen between two works never depends on insertion order. Each path runs from a seed to a candidate; the ranking algorithms score paths, so this is what they are asked to rank.
+ */
+export const candidatePaths = (core: Readonly<ReadableGraph>, seeds: readonly string[]): readonly ExplorationPath[] => {
+	const seedSet = new Set(seeds);
+	const paths: ExplorationPath[] = [];
+	for (const seed of [...seeds].sort()) {
+		const via = new Map<string, readonly string[]>([[seed, [seed]]]);
+		let frontier = [seed];
+		for (let hop = 0; hop < MAX_PATH_HOPS; hop++) {
+			const next: string[] = [];
+			for (const node of frontier) {
+				const upTo = via.get(node);
+				if (upTo === undefined) continue;
+				for (const neighbour of [...core.neighbours(node)].sort()) {
+					if (via.has(neighbour)) continue;
+					const path = [...upTo, neighbour];
+					via.set(neighbour, path);
+					next.push(neighbour);
+					if (!seedSet.has(neighbour)) {
+						paths.push({ fromSeed: { id: seed }, toSeed: { id: neighbour }, nodes: path });
+					}
+				}
+			}
+			frontier = next;
+		}
+	}
+	return paths;
+};
+
+/**
+ * Folds scored seed-to-candidate paths into one score per candidate: the mean over all seeds of the best path from that seed (a seed with no path counts zero, as in the thesis's tool). The evidence is the best-scoring seed path; ties break on the seed id, so equal scores order deterministically.
  */
 export const rankCandidates = (
 	scored: readonly ScoredPath[],
 	seeds: ReadonlySet<string>,
 ): readonly RankedCandidate[] => {
-	const best = new Map<string, { score: number; path: ScoredPath; count: number }>();
+	const bestBySeed = new Map<string, Map<string, ScoredPath>>();
 	for (const path of scored) {
-		for (const node of path.nodes) {
-			if (seeds.has(node)) continue;
-			const current = best.get(node);
-			if (current && path.score <= current.score) {
-				current.count++;
-				continue;
-			}
-			best.set(node, { score: path.score, path, count: current ? current.count + 1 : 1 });
-		}
+		const candidate = path.toSeed.id;
+		if (seeds.has(candidate)) continue;
+		const perSeed = bestBySeed.get(candidate) ?? new Map<string, ScoredPath>();
+		const current = perSeed.get(path.fromSeed.id);
+		if (current === undefined || path.score > current.score) perSeed.set(path.fromSeed.id, path);
+		bestBySeed.set(candidate, perSeed);
 	}
 	const candidates: RankedCandidate[] = [];
-	for (const [workId, entry] of best) {
-		const via = entry.path.nodes.filter((node) => !seeds.has(node));
+	for (const [workId, perSeed] of bestBySeed) {
+		let total = 0;
+		let best: ScoredPath | undefined;
+		for (const seed of [...perSeed.keys()].sort()) {
+			const path = required(perSeed, seed, "seed path");
+			total += path.score;
+			if (best === undefined || path.score > best.score) best = path;
+		}
+		if (best === undefined) continue;
 		candidates.push({
 			workId,
-			score: entry.score,
-			evidence: { fromSeed: entry.path.fromSeed.id, toSeed: entry.path.toSeed.id, via },
-			pathsConnected: entry.count,
+			score: total / seeds.size,
+			evidence: { fromSeed: best.fromSeed.id, toSeed: workId, via: best.nodes.slice(1, -1) },
+			pathsConnected: perSeed.size,
 		});
 	}
 	return candidates.sort((a, b) => (a.score !== b.score ? (a.score > b.score ? -1 : 1) : a.workId < b.workId ? -1 : 1));
 };
+
+/**
+ * Ranks every work reachable from the seeds on an explored core with the given ranking algorithm.
+ */
+export const rankOnCore = (
+	core: Readonly<ReadableGraph>,
+	structuralMi: PoolAssociation["structuralMi"],
+	seeds: readonly string[],
+	ranking: RankingRunner,
+): readonly RankedCandidate[] =>
+	rankCandidates(ranking({ graph: core, structuralMi }, candidatePaths(core, seeds)), new Set(seeds));
 
 export const screenSemantically = (
 	pool: readonly PoolWork[],
@@ -267,6 +317,5 @@ export const screenSemantically = (
 	}
 	const seedObjects: readonly Seed[] = seeds.map((id) => ({ id }));
 	const exploration = options.exploration(graph, seedObjects, options.explorationConfig);
-	const scored = options.ranking({ graph: exploredCore(graph, exploration.sampledNodes), structuralMi }, exploration.paths);
-	return rankCandidates(scored, new Set(seeds));
+	return rankOnCore(exploredCore(graph, exploration.sampledNodes), structuralMi, seeds, options.ranking);
 };

@@ -52,7 +52,7 @@ export const buildScreeningView = (review: LiteratureReview, pool: readonly Pool
 	const semantic = refined.candidates.slice(0, VISIBLE_ROWS).map((candidate) => ({
 		workId: candidate.workId,
 		detail: `Association ${candidate.score.toFixed(SCORE_DECIMALS)}, ${
-			candidate.evidence.via.length > 1 ? `via ${candidate.evidence.via.filter((id) => id !== candidate.workId).join(", ")}` : "direct"
+			candidate.evidence.via.length > 0 ? `via ${candidate.evidence.via.join(", ")}` : "direct"
 		}`,
 	}));
 	const standard = screenStandard(review, pool)

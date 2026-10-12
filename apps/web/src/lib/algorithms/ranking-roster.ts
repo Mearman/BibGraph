@@ -68,6 +68,11 @@ const entry = (
 const miEntry = (id: string, label: string, family: AlgorithmFamily, description: string, mi: MIFunction) =>
 	entry(`parse-${id}`, `PARSE + ${label}`, family, description, parseWith(() => mi));
 
+/**
+ * Hitting time is estimated by random walks, each path costing walks times steps. The screens score every candidate path, so the walk budget is set to keep that tractable: far fewer walks than graphwise's default of a thousand, with the seed fixed so the estimate is repeatable.
+ */
+const HITTING_TIME_WALK_BUDGET = { mode: "approximate", walks: 60, maxSteps: 400, seed: 42 } as const;
+
 const NO_TYPES = " Needs typed nodes or edges; on an untyped citation graph it matches Jaccard.";
 
 export const RANKING_ROSTER: readonly AlgorithmSpec[] = [
@@ -101,5 +106,5 @@ export const RANKING_ROSTER: readonly AlgorithmSpec[] = [
 	entry("path-communicability", "communicability", "baseline", "Scores a path by the communicability between its endpoints.", baselineRunner(communicability)),
 	entry("path-resistance-distance", "resistance distance", "baseline", "Scores a path by the effective electrical resistance between its endpoints.", baselineRunner(resistanceDistance)),
 	entry("path-random", "random", "baseline", "Orders paths at random with a fixed seed, the chance reference.", baselineRunner(randomRanking)),
-	entry("path-hitting-time", "hitting time", "baseline", "Scores a path by the expected random-walk hitting time between its endpoints.", baselineRunner(hittingTime)),
+	entry("path-hitting-time", "hitting time", "baseline", "Scores a path by the expected random-walk hitting time between its endpoints.", baselineRunner((graph, paths) => hittingTime(graph, paths, HITTING_TIME_WALK_BUDGET))),
 ];
