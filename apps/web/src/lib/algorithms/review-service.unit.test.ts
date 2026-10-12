@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LiteratureReview, SuggestedComposition } from "../../stores/review-store";
 import type { PoolFetcher } from "./pool-loader";
-import { refineReview, type ReviewStorePort, screenReview, startReview } from "./review-service";
+import { refineReview, type ReviewStorePort, screenReview, screenStandard, startReview } from "./review-service";
 
 const SELECTION_SIZE = 2;
 
@@ -90,5 +90,13 @@ describe("review service", () => {
 		expect(refined.seeds).toEqual(["W1", "W3", "W2"]);
 		expect(refined.candidates.map((c) => c.workId)).not.toContain("W2");
 		expect(refined.candidates.map((c) => c.workId)).not.toContain("W4");
+	});
+	it("screens the standard path in query order, skipping seeds and decided works", async () => {
+		const { store } = makeStore();
+		const started = await startReview({ name: "r", query: "q", seeds: ["W1"], selectionSize: SELECTION_SIZE }, { fetcher, store });
+		const decided: LiteratureReview = { ...started.review, decisions: { W3: "exclude" } };
+		const standard = screenStandard(decided, started.pool);
+		expect(standard.map((c) => c.workId)).toEqual(["W2", "W4"]);
+		expect(standard.map((c) => c.rank)).toEqual([1, 2]);
 	});
 });

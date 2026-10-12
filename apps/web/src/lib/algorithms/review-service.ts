@@ -44,6 +44,14 @@ export interface StartedReview {
 	readonly composition: SuggestedComposition;
 }
 
+/**
+ * A work on the standard screening path: the query's own result order, with no association ranking.
+ */
+export interface StandardCandidate {
+	readonly workId: string;
+	readonly rank: number;
+}
+
 export interface RefinedReview {
 	readonly seeds: readonly string[];
 	readonly candidates: readonly RankedCandidate[];
@@ -100,4 +108,15 @@ export const refineReview = (review: LiteratureReview, pool: readonly PoolWork[]
 		(candidate) => !decided.has(candidate.workId),
 	);
 	return { seeds, candidates };
+};
+
+/**
+ * The standard path: the Boolean query's results in the order the search returned them, minus the review's seeds and every decided work. The pool lists query results first, so pool order is search order.
+ */
+export const screenStandard = (review: LiteratureReview, pool: readonly PoolWork[]): readonly StandardCandidate[] => {
+	const seeds = new Set(review.seeds);
+	const decided = new Set(Object.keys(review.decisions));
+	return pool
+		.filter((work) => !seeds.has(work.id) && !decided.has(work.id))
+		.map((work, index) => ({ workId: work.id, rank: index + 1 }));
 };
