@@ -44,6 +44,8 @@ export default defineConfig(
             name: "unit",
             include: ["src/**/*.unit.test.ts"],
             environment: "node",
+            // Disk caching is on unless disabled; tests must never write responses into the tracked static data.
+            env: { BIBGRAPH_DISK_CACHE_ENABLED: "false" },
           },
         },
         {
@@ -51,6 +53,7 @@ export default defineConfig(
             name: "integration",
             include: ["src/**/*.integration.test.ts"],
             environment: "node",
+            env: { BIBGRAPH_DISK_CACHE_ENABLED: "false" },
             testTimeout: 30000,
           },
         },
