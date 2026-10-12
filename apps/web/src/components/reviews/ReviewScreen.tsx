@@ -24,6 +24,7 @@ const AlgorithmsTab = ({ session }: ReviewScreenProps) => {
 		<AlgorithmComparisonTable
 			comparison={session.comparison}
 			inUse={session.inUse}
+			readOnlyStages={session.seedSelectionEditable ? [] : ["seed-selection"]}
 			onChoose={(stage, algorithmId) => {
 				void session.chooseAlgorithm(stage, algorithmId);
 			}}

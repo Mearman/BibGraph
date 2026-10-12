@@ -38,11 +38,11 @@ const comparison: AlgorithmComparison = {
 
 const IN_USE = { exploration: "standard-bfs", "seed-selection": null, ranking: "parse-structural" } as const;
 
-const renderTable = () => {
+const renderTable = (readOnlyStages: readonly AlgorithmStage[] = []) => {
 	const onChoose = vi.fn<(stage: AlgorithmStage, algorithmId: string) => void>();
 	render(
 		<MantineProvider>
-			<AlgorithmComparisonTable comparison={comparison} inUse={IN_USE} onChoose={onChoose} />
+			<AlgorithmComparisonTable comparison={comparison} inUse={IN_USE} onChoose={onChoose} readOnlyStages={readOnlyStages} />
 		</MantineProvider>,
 	);
 	return onChoose;
@@ -71,5 +71,12 @@ describe("AlgorithmComparisonTable", () => {
 		const exploration = screen.getByRole("region", { name: "Exploration" });
 		fireEvent.click(within(exploration).getByRole("button", { name: "Use DOME" }));
 		expect(onChoose).toHaveBeenCalledWith("exploration", "dome");
+	});
+
+	it("offers no switch in a stage shown for comparison only", () => {
+		renderTable(["exploration"]);
+		const exploration = screen.getByRole("region", { name: "Exploration" });
+		expect(within(exploration).queryByRole("button", { name: "Use DOME" })).toBeNull();
+		expect(within(exploration).getByText("recovered 2 of 2 held-out seeds on this pool")).toBeInTheDocument();
 	});
 });

@@ -41,6 +41,7 @@ const session = (overrides: Partial<ReadyReviewSession> = {}): ReadyReviewSessio
 	comparison,
 	comparisonError: null,
 	inUse: { exploration: "dome", "seed-selection": null, ranking: null },
+	seedSelectionEditable: false,
 	decide: vi.fn<ReadyReviewSession["decide"]>(async () => {
 		await Promise.resolve();
 	}),

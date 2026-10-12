@@ -3,8 +3,9 @@
  */
 
 import type { AlgorithmComparison } from "@/lib/algorithms/algorithm-comparison";
-import { compareAlgorithms } from "@/lib/algorithms/algorithm-comparison";
+import { compareAlgorithms, toPoolGraph } from "@/lib/algorithms/algorithm-comparison";
 import type { PoolWork } from "@/lib/algorithms/screening-engine";
+import { selectSeeds } from "@/lib/algorithms/seed-engine";
 import type { LiteratureReview } from "@/stores/review-store";
 
 import { buildScreeningView, type ScreeningView } from "./screening-view";
@@ -16,11 +17,13 @@ export type ComputeRequest =
 			readonly seeds: readonly string[];
 			readonly selectionSize: number;
 	  }
-	| { readonly kind: "screen"; readonly review: LiteratureReview; readonly pool: readonly PoolWork[] };
+	| { readonly kind: "screen"; readonly review: LiteratureReview; readonly pool: readonly PoolWork[] }
+	| { readonly kind: "select"; readonly pool: readonly PoolWork[]; readonly selectorId: string; readonly size: number };
 
 export type ComputeResponse =
 	| { readonly kind: "compare"; readonly comparison: AlgorithmComparison }
 	| { readonly kind: "screen"; readonly view: ScreeningView }
+	| { readonly kind: "select"; readonly seeds: readonly string[] }
 	| { readonly kind: "error"; readonly message: string };
 
 export const handleCompute = (request: ComputeRequest): ComputeResponse => {
@@ -30,6 +33,9 @@ export const handleCompute = (request: ComputeRequest): ComputeResponse => {
 				kind: "compare",
 				comparison: compareAlgorithms(request.pool, request.seeds, { selectionSize: request.selectionSize }),
 			};
+		}
+		if (request.kind === "select") {
+			return { kind: "select", seeds: selectSeeds(request.selectorId, toPoolGraph(request.pool), request.size) };
 		}
 		return { kind: "screen", view: buildScreeningView(request.review, request.pool) };
 	} catch (error) {
@@ -47,6 +53,7 @@ export interface ReviewCompute {
 		selectionSize: number,
 	) => Promise<AlgorithmComparison>;
 	readonly screen: (review: LiteratureReview, pool: readonly PoolWork[]) => Promise<ScreeningView>;
+	readonly select: (pool: readonly PoolWork[], selectorId: string, size: number) => Promise<readonly string[]>;
 }
 
 /**
@@ -64,5 +71,11 @@ export const createReviewCompute = (run: (request: ComputeRequest) => Promise<Co
 		if (response.kind === "error") throw new Error(response.message);
 		if (response.kind !== "screen") throw new Error("unexpected compute response");
 		return response.view;
+	},
+	select: async (pool, selectorId, size) => {
+		const response = await run({ kind: "select", pool, selectorId, size });
+		if (response.kind === "error") throw new Error(response.message);
+		if (response.kind !== "select") throw new Error("unexpected compute response");
+		return response.seeds;
 	},
 });

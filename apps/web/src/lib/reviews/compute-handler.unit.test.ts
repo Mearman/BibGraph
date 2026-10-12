@@ -53,4 +53,12 @@ describe("handleCompute", () => {
 		if (response.kind !== "error") throw new Error("unexpected response");
 		expect(response.message).toContain("no exploration algorithm");
 	});
+
+	it("answers a select request with the seeds the chosen selector picks", () => {
+		const response = handleCompute({ kind: "select", pool, selectorId: "high-degree", size: SELECTION_SIZE });
+		expect(response.kind).toBe("select");
+		if (response.kind !== "select") throw new Error("unexpected response");
+		expect(response.seeds).toHaveLength(SELECTION_SIZE);
+		expect(response.seeds[0]).toBe("W2");
+	});
 });

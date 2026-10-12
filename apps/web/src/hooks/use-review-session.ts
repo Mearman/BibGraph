@@ -59,6 +59,10 @@ export interface ReadyReviewSession {
 	 */
 	readonly comparisonError: string | null;
 	readonly inUse: AlgorithmInUse;
+	/**
+	 * Whether the reviewer can switch the seed selector: only for a review that began with no seeds, whose seeds the app picked. A review with supplied seeds shows the selectors for comparison only.
+	 */
+	readonly seedSelectionEditable: boolean;
 	readonly decide: (workId: string, decision: ScreeningDecision) => Promise<void>;
 	readonly chooseAlgorithm: (stage: AlgorithmStage, algorithmId: string) => Promise<void>;
 }
@@ -206,7 +210,16 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 				...review.suggestedComposition,
 				[COMPOSITION_KEY[input.stage]]: { algorithmId: input.algorithmId, evidence, chosenBy: "reviewer" },
 			};
-			await deps.store.updateReview(reviewId, { suggestedComposition });
+			if (input.stage !== "seed-selection") {
+				await deps.store.updateReview(reviewId, { suggestedComposition });
+				return;
+			}
+			if (review.suggestedComposition.seedSelection === null) {
+				throw new Error("this review's seeds were supplied, so there is no seed selector to switch");
+			}
+			// Switching the selector re-picks the seeds the app chose at the start.
+			const seeds = [...(await deps.compute.select(readPool(), input.algorithmId, ZERO_SEEDS_SELECTION_SIZE))];
+			await deps.store.updateReview(reviewId, { suggestedComposition, seeds });
 		},
 		onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["review", reviewId] }),
 	});
@@ -226,6 +239,7 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 		comparison: comparisonQuery.data ?? null,
 		comparisonError: comparisonQuery.error === null ? null : errorMessage(comparisonQuery.error),
 		inUse: inUseFrom(review.suggestedComposition),
+		seedSelectionEditable: review.suggestedComposition?.seedSelection != null,
 		decide: async (workId, chosen) => {
 			await decision.mutateAsync({ workId, decision: chosen });
 		},

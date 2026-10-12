@@ -198,4 +198,36 @@ describe("useReviewSession", () => {
 		});
 		expect(reopened.searches.count).toBe(0);
 	});
+
+	it("re-picks the seeds when the reviewer switches the selector of a zero-seeds review", async () => {
+		const selection = { algorithmId: "grasp", evidence: "picked at start", chosenBy: "app" as const };
+		const { hook, stored } = setup((review) => ({
+			...review,
+			suggestedComposition: defaultComposition(selection),
+		}));
+		await waitFor(() => {
+			expect(hook.result.current.phase).toBe("ready");
+		});
+		const session = hook.result.current;
+		if (session.phase !== "ready") throw new Error("not ready");
+		expect(session.seedSelectionEditable).toBe(true);
+		await act(async () => {
+			await session.chooseAlgorithm("seed-selection", "high-degree");
+		});
+		expect(stored.current.suggestedComposition?.seedSelection?.algorithmId).toBe("high-degree");
+		expect(stored.current.suggestedComposition?.seedSelection?.chosenBy).toBe("reviewer");
+		// high-degree picks the most connected works, W2 first in this pool, so the seeds change.
+		expect(stored.current.seeds[0]).toBe("W2");
+	});
+
+	it("does not offer a selector switch for a review whose seeds were supplied", async () => {
+		const { hook } = setup();
+		await waitFor(() => {
+			expect(hook.result.current.phase).toBe("ready");
+		});
+		const session = hook.result.current;
+		if (session.phase !== "ready") throw new Error("not ready");
+		expect(session.seedSelectionEditable).toBe(false);
+		await expect(act(async () => session.chooseAlgorithm("seed-selection", "grasp"))).rejects.toThrow("seeds were supplied");
+	});
 });

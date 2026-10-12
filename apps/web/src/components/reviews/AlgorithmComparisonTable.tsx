@@ -24,17 +24,23 @@ export interface AlgorithmComparisonTableProps {
 	 */
 	readonly inUse: Readonly<Record<AlgorithmStage, string | null>>;
 	readonly onChoose: (stage: AlgorithmStage, algorithmId: string) => void;
+	/**
+	 * Stages shown for comparison only, with no way to switch the algorithm.
+	 */
+	readonly readOnlyStages: readonly AlgorithmStage[];
 }
 
 const StageTable = ({
 	stage,
 	rows,
 	inUse,
+	readOnly,
 	onChoose,
 }: {
 	readonly stage: AlgorithmStage;
 	readonly rows: readonly ComparisonRow[];
 	readonly inUse: string | null;
+	readonly readOnly: boolean;
 	readonly onChoose: AlgorithmComparisonTableProps["onChoose"];
 }) => (
 	<section aria-label={STAGE_TITLES[stage]}>
@@ -69,7 +75,7 @@ const StageTable = ({
 									{row.chosen && <Badge variant="outline">suggested</Badge>}
 									{row.algorithmId === inUse ? (
 										<Badge variant="filled">in use</Badge>
-									) : (
+									) : readOnly ? null : (
 										<Button
 											size="xs"
 											variant="subtle"
@@ -91,10 +97,17 @@ const StageTable = ({
 	</section>
 );
 
-export const AlgorithmComparisonTable = ({ comparison, inUse, onChoose }: AlgorithmComparisonTableProps) => (
+export const AlgorithmComparisonTable = ({ comparison, inUse, onChoose, readOnlyStages }: AlgorithmComparisonTableProps) => (
 	<Stack gap="lg">
 		{STAGE_ORDER.map((stage) => (
-			<StageTable key={stage} stage={stage} rows={comparison[stage]} inUse={inUse[stage]} onChoose={onChoose} />
+			<StageTable
+				key={stage}
+				stage={stage}
+				rows={comparison[stage]}
+				inUse={inUse[stage]}
+				readOnly={readOnlyStages.includes(stage)}
+				onChoose={onChoose}
+			/>
 		))}
 	</Stack>
 );
