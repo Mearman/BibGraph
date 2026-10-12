@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import { defaultComposition, suggestComposition } from "@/lib/algorithms/composition-engine";
 import type { PoolFetcher } from "@/lib/algorithms/pool-loader";
 import type { WorkLabel } from "@/lib/algorithms/work-labels";
+import { createReviewCompute, handleCompute } from "@/lib/reviews/compute-handler";
 import type { LiteratureReview, ScreeningDecision } from "@/stores/review-store";
 
 import { type ReviewSessionDeps, useReviewSession } from "./use-review-session";
@@ -54,6 +55,10 @@ const makeDeps = (savedPool?: readonly { id: string; references: readonly string
 	};
 	const labels = new Map<string, WorkLabel>([["W2", { title: "Bridge paper", year: 2021 }]]);
 	const deps: ReviewSessionDeps = {
+		compute: createReviewCompute(async (request) => {
+			await Promise.resolve();
+			return handleCompute(request);
+		}),
 		fetcher: {
 			search: async (query) => {
 				searches.count++;

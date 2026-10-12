@@ -112,6 +112,10 @@ function createWebConfig(): UserConfig {
     ],
 
     // Esbuild options - keep function names for better error stack traces
+    // Module workers (new Worker(url, { type: "module" })) bundle as ES modules; the default IIFE format cannot code-split the worker's dependencies.
+    worker: {
+      format: 'es',
+    },
     esbuild: {
       keepNames: true,
     },

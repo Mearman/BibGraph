@@ -2,17 +2,18 @@
  * Review session hook: the container logic behind the screening screen. It loads a review and its pool, derives the labelled semantic and standard rows and the algorithm comparison through the tested view-model and comparison modules, and exposes the two writes a reviewer makes (a screening decision, an algorithm override). All I/O arrives through the injected deps, so presentation components stay free of storage and network and the hook tests with in-memory fakes.
  */
 
-import { keepPreviousData, skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { keepPreviousData, type QueryClient, skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
 
-import { type AlgorithmComparison, compareAlgorithms } from "@/lib/algorithms/algorithm-comparison";
+import type { AlgorithmComparison } from "@/lib/algorithms/algorithm-comparison";
 import { adoptMeasured } from "@/lib/algorithms/composition-engine";
 import { loadReviewPool, type PoolFetcher } from "@/lib/algorithms/pool-loader";
 import type { AlgorithmStage } from "@/lib/algorithms/registry";
 import type { PoolWork } from "@/lib/algorithms/screening-engine";
 import type { WorkLabel, WorkLabelFetcher } from "@/lib/algorithms/work-labels";
+import type { ReviewCompute } from "@/lib/reviews/compute-handler";
 import { ZERO_SEEDS_SELECTION_SIZE } from "@/lib/reviews/review-constants";
-import { buildScreeningView, type ScreeningRow, type ScreeningView, withLabels } from "@/lib/reviews/screening-view";
+import { type ScreeningRow, type ScreeningView, withLabels } from "@/lib/reviews/screening-view";
 import type {
 	LiteratureReview,
 	ScreeningDecision,
@@ -32,6 +33,10 @@ export interface SessionStorePort {
 }
 
 export interface ReviewSessionDeps {
+	/**
+	 * Runs the heavy measurement and screening, off the main thread in the app.
+	 */
+	readonly compute: ReviewCompute;
 	readonly fetcher: PoolFetcher;
 	readonly fetchLabels: WorkLabelFetcher;
 	readonly store: SessionStorePort;
@@ -72,16 +77,21 @@ const COMPOSITION_KEY: Readonly<Record<AlgorithmStage, keyof SuggestedCompositio
  */
 const poolKey = (reviewId: string): readonly string[] => ["review-pool", reviewId];
 
-const NO_LABELS: ReadonlyMap<string, WorkLabel> = new Map();
-
 /**
- * Lets the browser paint the loading state before the synchronous comparison measurement starts.
+ * The pool the review's pool query already loaded. Earlier, skipped pool queries (made before the review loaded) share the key prefix and hold no data, so the first entry with data is the pool.
  */
-const yieldToPaint = async (): Promise<void> => {
-	await new Promise<void>((resolve) => {
-		setTimeout(resolve, 0);
-	});
+const cachedPool = (queryClient: QueryClient, reviewId: string): readonly PoolWork[] => {
+	const loaded = queryClient
+		.getQueriesData<readonly PoolWork[]>({ queryKey: poolKey(reviewId) })
+		.map(([, data]) => data)
+		.find((data) => data !== undefined);
+	if (loaded === undefined) {
+		throw new Error(`pool for review ${reviewId} is not loaded`);
+	}
+	return loaded;
 };
+
+const NO_LABELS: ReadonlyMap<string, WorkLabel> = new Map();
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : "unknown error");
 
@@ -121,12 +131,21 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 						return loaded;
 					},
 	});
-	const pool = poolQuery.data;
 
-	const view = useMemo(
-		() => (review !== undefined && pool !== undefined ? buildScreeningView(review, pool) : undefined),
-		[review, pool],
-	);
+	// Reads the pool the pool query loaded; a stable function so the compute queries can list it in their keys without hashing a thousand works.
+	const readPool = useCallback(() => cachedPool(queryClient, reviewId), [queryClient, reviewId]);
+
+	const viewQuery = useQuery({
+		queryKey: ["review-view", reviewId, review, poolQuery.isSuccess, readPool],
+		staleTime: Infinity,
+		// The previous view stays on screen while a decision or a new composition is re-screened.
+		placeholderData: keepPreviousData,
+		queryFn:
+			review === undefined || !poolQuery.isSuccess
+				? skipToken
+				: async () => deps.compute.screen(review, readPool()),
+	});
+	const view = viewQuery.data;
 
 	const visibleIds = useMemo(
 		() =>
@@ -143,23 +162,12 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 	});
 
 	const comparisonQuery = useQuery({
-		queryKey: ["review-comparison", reviewId, review?.seeds, poolQuery.isSuccess],
+		queryKey: ["review-comparison", reviewId, review?.seeds, poolQuery.isSuccess, readPool],
 		staleTime: Infinity,
 		queryFn:
 			review === undefined || !poolQuery.isSuccess
 				? skipToken
-				: async () => {
-						await yieldToPaint();
-						// Earlier, skipped pool queries (made before the review loaded) share the prefix and hold no data.
-						const loaded = queryClient
-							.getQueriesData<readonly PoolWork[]>({ queryKey: poolKey(reviewId) })
-							.map(([, data]) => data)
-							.find((data) => data !== undefined);
-						if (loaded === undefined) {
-							throw new Error(`pool for review ${reviewId} is not loaded`);
-						}
-						return compareAlgorithms(loaded, review.seeds, { selectionSize: ZERO_SEEDS_SELECTION_SIZE });
-					},
+				: async () => deps.compute.compare(readPool(), review.seeds, ZERO_SEEDS_SELECTION_SIZE),
 	});
 
 	// Reconciles the stored composition with the measurement: app-made picks (the starting defaults) become the measured best, reviewer overrides stay. Once adopted, the next run finds nothing to change, so it converges.
@@ -205,6 +213,7 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 
 	if (reviewQuery.error !== null) return { phase: "error", message: errorMessage(reviewQuery.error) };
 	if (poolQuery.error !== null) return { phase: "error", message: errorMessage(poolQuery.error) };
+	if (viewQuery.error !== null) return { phase: "error", message: errorMessage(viewQuery.error) };
 	if (review === undefined || view === undefined) return { phase: "loading" };
 
 	const labels = labelsQuery.data ?? NO_LABELS;

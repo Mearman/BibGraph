@@ -20,6 +20,7 @@ import {
 import { createOpenAlexPoolFetcher } from "../algorithms/openalex-pool-fetcher";
 import { type ReviewServiceDeps, startReview } from "../algorithms/review-service";
 import { createWorkLabelFetcher } from "../algorithms/work-labels";
+import { workerCompute } from "./compute-client";
 import { MAX_REVIEW_POOL_SIZE } from "./review-constants";
 
 /**
@@ -50,6 +51,7 @@ export const reviewsDeps: ReviewsDeps = {
 };
 
 export const reviewSessionDeps: ReviewSessionDeps = {
+	compute: workerCompute,
 	fetcher: reviewServiceDeps.fetcher,
 	fetchLabels: fetchWorkLabels,
 	store: { getReview, setDecision, updateReview, getPool, savePool },
