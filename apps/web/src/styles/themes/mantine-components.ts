@@ -13,14 +13,6 @@ export const mantineComponents = {
         background: undefined, // Let Mantine handle this
         border: undefined, // Let Mantine handle this
         cursor: 'pointer',
-        '&:disabled': {
-          opacity: undefined, // Let Mantine handle this
-          cursor: 'not-allowed',
-        },
-        '&:focus-visible': {
-          outline: '2px solid var(--mantine-primary-color-filled)',
-          outlineOffset: '2px',
-        },
       },
     },
   },
@@ -50,15 +42,6 @@ export const mantineComponents = {
         background: 'var(--mantine-color-body)',
         border: '1px solid var(--mantine-color-default-border)',
         padding: '0 var(--mantine-spacing-sm)',
-        '&:focus': {
-          borderColor: 'var(--mantine-primary-color-filled)',
-          outline: 'none',
-        },
-        '&:disabled': {
-          opacity: 0.6,
-          cursor: 'not-allowed',
-          backgroundColor: 'var(--mantine-color-gray-1)',
-        },
       },
     },
   },
@@ -73,15 +56,6 @@ export const mantineComponents = {
         background: 'var(--mantine-color-body)',
         border: '1px solid var(--mantine-color-default-border)',
         padding: '0 var(--mantine-spacing-sm)',
-        '&:focus': {
-          borderColor: 'var(--mantine-primary-color-filled)',
-          outline: 'none',
-        },
-        '&:disabled': {
-          opacity: 0.6,
-          cursor: 'not-allowed',
-          backgroundColor: 'var(--mantine-color-gray-1)',
-        },
       },
     },
   },
@@ -96,15 +70,6 @@ export const mantineComponents = {
         border: '1px solid var(--mantine-color-default-border)',
         padding: 'var(--mantine-spacing-sm)',
         resize: 'vertical',
-        '&:focus': {
-          borderColor: 'var(--mantine-primary-color-filled)',
-          outline: 'none',
-        },
-        '&:disabled': {
-          opacity: 0.6,
-          cursor: 'not-allowed',
-          backgroundColor: 'var(--mantine-color-gray-1)',
-        },
       },
     },
   },
@@ -285,9 +250,6 @@ export const mantineComponents = {
         borderRadius: 'var(--accordion-radius)',
         marginBottom: 'var(--mantine-spacing-xs)',
         transition: 'var(--accordion-item-transition)',
-        '&:last-child': {
-          marginBottom: 0,
-        },
       },
       control: {
         color: 'var(--accordion-control-color)',
@@ -299,13 +261,6 @@ export const mantineComponents = {
         cursor: 'pointer',
         width: '100%',
         textAlign: 'left',
-        '&:hover': {
-          backgroundColor: 'var(--accordion-control-bg-hover)',
-        },
-        '&:focus-visible': {
-          outline: '2px solid var(--mantine-primary-color-filled)',
-          outlineOffset: '2px',
-        },
       },
       content: {
         padding: 'var(--accordion-content-padding)',

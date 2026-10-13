@@ -43,41 +43,40 @@ const NotificationBell = memo(({ onClick, unreadCount }: NotificationBellPropert
   const theme = useMantineTheme();
 
   return (
-    <UnstyledButton onClick={onClick} aria-label={`Open notifications (${String(unreadCount)} unread)`}>
-      <Box pos="relative">
-        <ActionIcon
-          variant="subtle"
-          color="gray"
-          size="lg"
-          tabIndex={-1}
+    <Box pos="relative">
+      <ActionIcon
+        variant="subtle"
+        color="gray"
+        size="lg"
+        onClick={onClick}
+        aria-label={`Open notifications (${String(unreadCount)} unread)`}
+      >
+        {unreadCount > 0 ? <IconBellRinging size={ICON_SIZE.MD} /> : <IconBell size={ICON_SIZE.MD} />}
+      </ActionIcon>
+      {unreadCount > 0 && (
+        <Box
           aria-hidden="true"
+          pos="absolute"
+          top={-4}
+          right={-4}
+          bg="red"
+          c="white"
+          style={{
+            borderRadius: '9999px',
+            minWidth: 18,
+            height: 18,
+            fontSize: 11,
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: `2px solid ${theme.colors.gray[0]}`,
+          }}
         >
-          {unreadCount > 0 ? <IconBellRinging size={ICON_SIZE.MD} /> : <IconBell size={ICON_SIZE.MD} />}
-        </ActionIcon>
-        {unreadCount > 0 && (
-          <Box
-            pos="absolute"
-            top={-4}
-            right={-4}
-            bg="red"
-            c="white"
-            style={{
-              borderRadius: '9999px',
-              minWidth: 18,
-              height: 18,
-              fontSize: 11,
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: `2px solid ${theme.colors.gray[0]}`,
-            }}
-          >
-            {unreadCount > MAX_DISPLAYED_UNREAD_COUNT ? `${String(MAX_DISPLAYED_UNREAD_COUNT)}+` : unreadCount}
-          </Box>
-        )}
-      </Box>
-    </UnstyledButton>
+          {unreadCount > MAX_DISPLAYED_UNREAD_COUNT ? `${String(MAX_DISPLAYED_UNREAD_COUNT)}+` : unreadCount}
+        </Box>
+      )}
+    </Box>
   );
 });
 
