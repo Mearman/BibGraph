@@ -5,6 +5,7 @@ import type {
   EntityType,
   Funder,
   InstitutionEntity,
+  Keyword,
   Publisher,
   Source,
   Topic,
@@ -25,7 +26,7 @@ export interface EntityGridItem {
 export type EntityListItem = EntityGridItem
 
 // Every entity type that can be rendered as a grid/list item. Kept as a single union (rather than a generic type parameter) so entityMappers below can share one function signature and be indexed/called without a type assertion.
-type MappableEntity = Work | Author | InstitutionEntity | Source | Publisher | Funder | Topic | Concept
+type MappableEntity = Work | Author | InstitutionEntity | Source | Publisher | Funder | Topic | Concept | Keyword
 
 /**
  * Base entity mapper that provides common transformation logic
@@ -46,7 +47,7 @@ export const createBaseEntityMapper = (entity: Readonly<MappableEntity>, entityT
 /**
  * Specialized entity mappers for each type
  */
-export const entityMappers: Record<Extract<EntityType, "works" | "authors" | "institutions" | "sources" | "publishers" | "funders" | "topics" | "concepts">, (entity: Readonly<MappableEntity>) => EntityGridItem> = {
+export const entityMappers: Record<Extract<EntityType, "works" | "authors" | "institutions" | "sources" | "publishers" | "funders" | "topics" | "concepts" | "keywords">, (entity: Readonly<MappableEntity>) => EntityGridItem> = {
   works: (entity) => {
     const base = createBaseEntityMapper(entity, "works")
     const hasAbstract = 'abstract_inverted_index' in entity && entity.abstract_inverted_index !== undefined
@@ -107,6 +108,10 @@ export const entityMappers: Record<Extract<EntityType, "works" | "authors" | "in
 
   concepts: (entity) => {
     return createBaseEntityMapper(entity, "concepts")
+  },
+
+  keywords: (entity) => {
+    return createBaseEntityMapper(entity, "keywords")
   },
 }
 

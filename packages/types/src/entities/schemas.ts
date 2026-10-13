@@ -8,15 +8,29 @@ import { z } from "zod"
 // Base schemas for common structures
 export const openAlexIdSchema = z.string().regex(/^https:\/\/openalex\.org\/[A-Z]\d+$/)
 
-export const dateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+// OpenAlex returns full ISO timestamps for updated_date/created_date on most entities and plain YYYY-MM-DD dates elsewhere (for example work publication_date); both formats are accepted.
+export const dateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}(?:[T ].+)?$/)
 
 const MAX_META_PER_PAGE = 200
 const MAX_CONCEPT_LEVEL = 5
 
-// Counts by year schema
+// Works and topics attach keywords as scored references rather than bare display-name strings.
+const keywordReferenceSchema = z.object({
+	id: z.string(),
+	display_name: z.string(),
+	score: z.number().optional(),
+})
+
+// Counts by year for a work: OpenAlex reports only cited_by_count per year here, so both work counts are optional.
 export const countsByYearSchema = z.object({
 	year: z.number().int(),
 	cited_by_count: z.number().int().min(0),
+	works_count: z.number().int().min(0).optional(),
+	oa_works_count: z.number().int().min(0).optional(),
+})
+
+// Counts by year for an entity that has works (authors, sources, institutions, keywords and the rest): works_count is always reported, so it stays required for consumers that chart it.
+export const entityCountsByYearSchema = countsByYearSchema.extend({
 	works_count: z.number().int().min(0),
 })
 
@@ -51,6 +65,7 @@ export const baseEntitySchema = z.object({
 
 // Entity with works schema (extends base entity)
 export const entityWithWorksSchema = baseEntitySchema.extend({
+	counts_by_year: z.array(entityCountsByYearSchema),
 	works_count: z.number().int().min(0),
 	works_api_url: z.string(),
 })
@@ -88,7 +103,8 @@ export const workSchema = baseEntitySchema.extend({
 							id: openAlexIdSchema.optional(),
 							display_name: z.string(),
 							ror: z.string().optional(),
-							country_code: z.string().optional(),
+							// Institutions without a country (for example consortia) report null
+							country_code: z.string().nullable().optional(),
 							type: z.string().optional(),
 						})
 					)
@@ -190,15 +206,16 @@ export const workSchema = baseEntitySchema.extend({
 	abstract_inverted_index: z.record(z.string(), z.array(z.number().int())).optional(),
 	biblio: z
 		.object({
-			volume: z.string().optional(),
-			issue: z.string().optional(),
-			first_page: z.string().optional(),
-			last_page: z.string().optional(),
+			// OpenAlex reports absent bibliographic fields as null
+			volume: z.string().nullable().optional(),
+			issue: z.string().nullable().optional(),
+			first_page: z.string().nullable().optional(),
+			last_page: z.string().nullable().optional(),
 		})
 		.optional(),
 	language: z.string().optional(),
 	topics: z.array(z.any()).optional(), // TopicItem schema would be complex
-	keywords: z.array(z.string()).optional(),
+	keywords: z.array(keywordReferenceSchema).optional(),
 	is_xpac: z.boolean().optional(),
 })
 
@@ -256,6 +273,7 @@ export const conceptSchema = baseEntitySchema.extend({
 
 // Author schema
 export const authorSchema = baseEntitySchema.extend({
+	counts_by_year: z.array(entityCountsByYearSchema),
 	works_count: z.number().int().min(0),
 	orcid: z.string().optional(),
 	display_name_alternatives: z.array(z.string()).optional(),
@@ -287,6 +305,7 @@ export const authorSchema = baseEntitySchema.extend({
 
 // Institution schema
 export const institutionSchema = baseEntitySchema.extend({
+	counts_by_year: z.array(entityCountsByYearSchema),
 	works_count: z.number().int().min(0),
 	ror: z.string().optional(),
 	country_code: z.string(),
@@ -453,23 +472,24 @@ export const funderSchema = entityWithWorksSchema.extend({
 // Topic schema (replacing Concepts)
 export const topicSchema = entityWithWorksSchema.extend({
 	description: z.string().optional(),
-	keywords: z.array(z.string()).optional(),
+	keywords: z.array(keywordReferenceSchema).optional(),
 	ids: z
 		.object({
 			openalex: openAlexIdSchema,
 			wikidata: z.string().optional(),
 		})
 		.optional(),
+	// Topic classification ids use lowercase collection prefixes (subfields/, fields/, domains/), unlike the entity ids openAlexIdSchema matches
 	subfield: z.object({
-		id: openAlexIdSchema,
+		id: z.string(),
 		display_name: z.string(),
 	}),
 	field: z.object({
-		id: openAlexIdSchema,
+		id: z.string(),
 		display_name: z.string(),
 	}),
 	domain: z.object({
-		id: openAlexIdSchema,
+		id: z.string(),
 		display_name: z.string(),
 	}),
 	siblings: z
@@ -583,8 +603,12 @@ export const subfieldSchema = entityWithWorksSchema.extend({
 
 // Keyword schema
 export const keywordSchema = baseEntitySchema.extend({
+	counts_by_year: z.array(entityCountsByYearSchema),
+	// Keyword ids are slugs (keywords/mental-health), not the [A-Z]\d+ entity form
+	id: z.string().regex(/^https:\/\/openalex\.org\/keywords\/[\w-]+$/),
 	description: z.string().optional(),
-	keywords: z.array(z.string()).optional(),
+	// Keyword entities expose their related keywords as null or scored references
+	keywords: z.array(keywordReferenceSchema).nullable().optional(),
 	ids: z
 		.object({
 			openalex: openAlexIdSchema,
