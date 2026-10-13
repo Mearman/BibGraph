@@ -39,6 +39,7 @@ import { KeyboardShortcutsButton, KeyboardShortcutsHelp } from "@/components/mod
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { OnboardingTutorial } from "@/components/onboarding";
 import { SyncStatusIndicator } from "@/components/sync/SyncStatusIndicator";
+import { InstallMenuItem } from "@/components/ui/InstallMenuItem";
 import { OfflineBanner } from "@/components/ui/NetworkStatus";
 import { UndoRedoControls } from "@/components/undo-redo/UndoRedoControls";
 import { ICON_SIZE } from "@/config/style-constants";
@@ -430,6 +431,8 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
                 >
                   Keyboard shortcuts
                 </Menu.Item>
+                {/* Install entry renders only where the browser offers a deferred install prompt */}
+                <InstallMenuItem />
                 <Menu.Label>Sync and history</Menu.Label>
                 <SyncStatusIndicator />
                 <UndoRedoControls />

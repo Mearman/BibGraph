@@ -186,6 +186,10 @@ export default tseslint.config([
             "import-x/no-relative-packages": "error",
             "import-x/no-cycle": "error",
             "import-x/no-default-export": "error",
+            "import-x/no-unresolved": ["error", {
+                // Vite virtual modules (e.g. vite-plugin-pwa's virtual:pwa-register) are generated at build time and have no path on disk for the resolver to find.
+                "ignore": ["^virtual:"]
+            }],
             "import-x/order": "off", // Disabled - using simple-import-sort instead (better autofix)
 
             // Promise rules (from flat/recommended)

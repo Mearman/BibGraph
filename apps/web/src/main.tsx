@@ -18,6 +18,7 @@ import { RoutePendingComponent } from "@/components/routing/LazyRoute";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { StorageProviderWrapper } from "@/contexts/storage-provider-context";
 import { ThemeProvider } from "@/contexts/theme-context";
+import { registerPwaServiceWorker } from "@/lib/service-worker";
 import { AppActivityProvider } from "@/stores/app-activity";
 import { LayoutProvider } from "@/stores/layout-store";
 import { initWebVitals } from "@/utils/web-vitals";
@@ -180,8 +181,6 @@ import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 import "@mantine/dates/styles.css";
 
-// Import { registerOpenAlexServiceWorker } from "@/lib/service-worker";
-
 
 // Initialize global error handling, network monitoring, and performance tracking
 setupGlobalErrorHandling(logger);
@@ -253,15 +252,8 @@ declare module "@tanstack/react-router" {
 
 // App activity events will be loaded by the AppActivityProvider
 
-// Service worker registration handled by VitePWA plugin
-// registerOpenAlexServiceWorker().then((registered) => {
-//   if (registered) {
-//     // Service worker registered successfully - API requests will be intercepted
-//   }
-// }).catch((error) => {
-//   // Failed to register OpenAlex Service Worker - will fall back to direct API calls
-//   void error; // Suppress unused variable warning
-// });
+// Register the PWA service worker (precached shell + OpenAlex runtime caches). No-op in development: see src/lib/service-worker.ts.
+registerPwaServiceWorker();
 
 // Create and initialize storage provider
 const storageProvider = new DexieStorageProvider(logger);
