@@ -6,6 +6,8 @@ import React from "react";
 
 import { ICON_SIZE } from "@/config/style-constants";
 
+import { CHUNK_LOAD_ERROR_TITLE, isChunkLoadError } from "./chunk-load-error";
+
 // PostHog type for window object
 interface PostHogInstance {
   capture: (event: string, properties?: Record<string, unknown>) => void;
@@ -81,6 +83,45 @@ export const RouterErrorComponent: React.FC<ErrorComponentProps> = ({
   ) {
     // Re-throw to bubble up to GlobalErrorBoundary
     throw error;
+  }
+
+  // A failed lazy-chunk import cannot be retried in place: the module registry caches the rejection, so a full reload is the working recovery.
+  if (isChunkLoadError(error)) {
+    return (
+      <Container size="md" py="xl">
+        <Stack gap="md">
+          <Alert
+            icon={<IconAlertTriangle size={ICON_SIZE.XL} />}
+            title={CHUNK_LOAD_ERROR_TITLE}
+            color="orange"
+            variant="light"
+          >
+            <Text size="sm">
+              Part of the app failed to download. Check your connection, then reload the page.
+            </Text>
+          </Alert>
+          <Group role="group" aria-label="Error recovery actions">
+            <Button
+              leftSection={<IconRefresh size={ICON_SIZE.MD} />}
+              onClick={() => { window.location.reload(); }}
+              variant="filled"
+              aria-label="Reload the page"
+            >
+              Reload
+            </Button>
+            <Button
+              leftSection={<IconHome size={ICON_SIZE.MD} />}
+              component="a"
+              href="#/"
+              variant="light"
+              aria-label="Navigate to home page"
+            >
+              Go Home
+            </Button>
+          </Group>
+        </Stack>
+      </Container>
+    );
   }
 
   // Check if this is a 404/not found error

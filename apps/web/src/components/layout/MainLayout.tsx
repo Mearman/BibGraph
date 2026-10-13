@@ -1,6 +1,5 @@
 /**
- * Main layout component - RESTORED with infinite loop safeguards
- * Carefully re-enabled components to prevent React 19 infinite loops
+ * Main layout component: app shell header, collapsible navbar and main region. The header is a single non-wrapping row at every viewport width; below the sm breakpoint the navbar renders as a drawer driven by the layout store.
  */
 
 import { getBuildInfo, getReleaseUrl } from "@bibgraph/utils";
@@ -14,17 +13,23 @@ import {
   Group,
   Menu,
   rem,
-  Stack,
   Text,
-  Title,
 } from "@mantine/core";
 import {
+  IconBookmarks,
+  IconChartDots,
+  IconHistory,
+  IconHome,
+  IconInfoCircle,
+  IconKeyboard,
   IconLayoutSidebar,
-  IconLayoutSidebarRight,
+  IconList,
   IconMenu,
   IconPin,
   IconPinned,
   IconSearch,
+  IconSettings,
+  IconWriting,
   IconX,
 } from "@tabler/icons-react";
 import { Link } from "@tanstack/react-router";
@@ -34,6 +39,7 @@ import { KeyboardShortcutsButton, KeyboardShortcutsHelp } from "@/components/mod
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { OnboardingTutorial } from "@/components/onboarding";
 import { SyncStatusIndicator } from "@/components/sync/SyncStatusIndicator";
+import { OfflineBanner } from "@/components/ui/NetworkStatus";
 import { UndoRedoControls } from "@/components/undo-redo/UndoRedoControls";
 import { ICON_SIZE } from "@/config/style-constants";
 import { useGlobalHotkeys } from "@/hooks/use-hotkeys";
@@ -50,11 +56,11 @@ import { BookmarksSidebar } from "./BookmarksSidebar";
 import { ColorSchemeSelector } from "./ColorSchemeSelector";
 import { HeaderSearchInput } from "./HeaderSearchInput";
 import { HistorySidebar } from "./HistorySidebar";
-import { LeftRibbon } from "./LeftRibbon";
-import { RightRibbon } from "./RightRibbon";
-import { RightSidebarContent } from "./RightSidebarContent";
-// import { ThemeDropdown } from "./ThemeDropdown";
-// import { ThemeSettings } from "@/components/ThemeSettings";
+import { MIN_TOUCH_TARGET_PX } from "./layout-metrics";
+
+interface MainLayoutProperties {
+  children?: React.ReactNode;
+}
 
 // Static build info - computed once at module load
 const buildInfo = getBuildInfo();
@@ -63,17 +69,20 @@ const releaseUrl = getReleaseUrl({
   version: buildInfo.version,
 });
 
-interface MainLayoutProperties {
-  children?: React.ReactNode;
-}
-
 // Sidebar sizing and spacing constants
 const DEFAULT_SIDEBAR_WIDTH_PX = 300;
 const MIN_SIDEBAR_WIDTH_PX = 200;
 const MAX_SIDEBAR_WIDTH_PX = 600;
 const SIDEBAR_RESIZE_STEP_PX = 20;
-const RIBBON_WIDTH_PX = 60;
+const SIDEBAR_RESIZE_HANDLE_PX = 4;
+const HEADER_HEIGHT_BASE_PX = 56;
+const HEADER_HEIGHT_SM_PX = 60;
+const MOBILE_SIDEBAR_WIDTH_PX = 280;
+const HEADER_SEARCH_MAX_WIDTH_PX = 420;
 const SPACING_XS_PX = 4;
+const MOBILE_SEARCH_OVERLAY_Z_INDEX = 1000;
+const SIDEBAR_RESIZE_HANDLE_Z_INDEX = 10;
+const APP_LOAD_ANNOUNCEMENT = 'BibGraph application loaded';
 
 export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
   // Initialize accessibility features on mount
@@ -85,7 +94,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
     document.body.insertBefore(skipLinks, document.body.firstChild);
 
     // Announce app load for screen readers
-    announceToScreenReader('BibGraph application loaded', 'polite');
+    announceToScreenReader(APP_LOAD_ANNOUNCEMENT, 'polite');
 
     return () => {
       if (document.body.contains(skipLinks)) {
@@ -122,42 +131,33 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
   }, []);
 
   // Layout store for sidebar state management
-  const layoutStore = useLayoutStore();
-
   const {
     leftSidebarOpen,
-    rightSidebarOpen,
     leftSidebarPinned,
-    rightSidebarPinned,
     toggleLeftSidebar,
-    toggleRightSidebar,
+    setLeftSidebarOpen,
     pinLeftSidebar,
-    pinRightSidebar,
-  } = layoutStore;
+  } = useLayoutStore();
 
   // Width state for dragging (using React state for immediate visual feedback)
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH_PX);
-  const [rightSidebarWidth, setRightSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH_PX);
-  const [isDragging, setIsDragging] = useState<"left" | "right" | null>(null);
+  const [isDragging, setIsDragging] = useState<"left" | null>(null);
   const dragStartRef = useRef<{ x: number; width: number } | null>(null);
 
-  // Mobile menu state
-  
   // Mobile search state
   const [mobileSearchExpanded, setMobileSearchExpanded] = useState(false);
 
-  
   // Drag handling for sidebar resizing
   const handleDragStart = useCallback(
-    ({ side, e }: { side: "left" | "right"; e: React.MouseEvent }) => {
+    ({ e }: { side: "left"; e: React.MouseEvent }) => {
       e.preventDefault();
-      setIsDragging(side);
+      setIsDragging("left");
       dragStartRef.current = {
         x: e.clientX,
-        width: side === "left" ? leftSidebarWidth : rightSidebarWidth,
+        width: leftSidebarWidth,
       };
     },
-    [leftSidebarWidth, rightSidebarWidth],
+    [leftSidebarWidth],
   );
 
   const handleDragMove = useCallback(
@@ -169,16 +169,11 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
         MIN_SIDEBAR_WIDTH_PX,
         Math.min(
           MAX_SIDEBAR_WIDTH_PX,
-          dragStartRef.current.width +
-            (isDragging === "left" ? deltaX : -deltaX),
+          dragStartRef.current.width + deltaX,
         ),
       );
 
-      if (isDragging === "left") {
-        setLeftSidebarWidth(newWidth);
-      } else {
-        setRightSidebarWidth(newWidth);
-      }
+      setLeftSidebarWidth(newWidth);
     },
     [isDragging],
   );
@@ -209,25 +204,39 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
 
   return (
     <AppShell
-      header={{ height: { base: 50, sm: 60 } }}
+      header={{ height: { base: HEADER_HEIGHT_BASE_PX, sm: HEADER_HEIGHT_SM_PX } }}
       navbar={{
-        width: leftSidebarOpen ? { base: 280, sm: leftSidebarWidth + RIBBON_WIDTH_PX } : RIBBON_WIDTH_PX,
+        width: { base: MOBILE_SIDEBAR_WIDTH_PX, sm: leftSidebarWidth },
         breakpoint: "sm",
-        collapsed: { mobile: true, desktop: !leftSidebarOpen },
-      }}
-      aside={{
-        width: rightSidebarOpen ? { base: 280, sm: rightSidebarWidth + RIBBON_WIDTH_PX } : RIBBON_WIDTH_PX,
-        breakpoint: "sm",
-        collapsed: { mobile: true, desktop: !rightSidebarOpen },
+        // The same store flag drives the desktop collapse and the mobile drawer, so the menu item works on phones.
+        collapsed: { mobile: !leftSidebarOpen, desktop: !leftSidebarOpen },
       }}
       padding={{ base: 0, sm: 'xs', md: 'sm' }}
     >
       {/* Header */}
-      <AppShell.Header>
-        <Group justify="space-between" h="100%" px={{ base: 'xs', sm: 'md' }}>
-          {/* Left side - Always show logo on mobile, hide version badge */}
-          <Group gap="xs" style={{ minWidth: 0, flexShrink: 0 }}>
-            <Link to="/" params={{}} style={{ textDecoration: 'none' }}>
+      <AppShell.Header aria-label="Main header">
+        <Group
+          justify="space-between"
+          align="center"
+          wrap="nowrap"
+          h="100%"
+          gap="xs"
+          px={{ base: 'xs', sm: 'md' }}
+          style={{ overflow: 'hidden' }}
+        >
+          {/* Left side - logo (always visible) and version badge (wide screens only) */}
+          <Group gap="xs" wrap="nowrap" style={{ minWidth: 0, flexShrink: 0 }}>
+            <Link
+              to="/"
+              params={{}}
+              aria-label="BibGraph home"
+              style={{
+                textDecoration: 'none',
+                minHeight: MIN_TOUCH_TARGET_PX,
+                display: 'inline-flex',
+                alignItems: 'center',
+              }}
+            >
               <Text
                 size="lg"
                 fw={600}
@@ -239,13 +248,12 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
                 BibGraph
               </Text>
             </Link>
-            {/* Version badge only on larger screens */}
             <Anchor
               href={releaseUrl}
               target="_blank"
               rel="noopener noreferrer"
               style={{ textDecoration: 'none' }}
-              visibleFrom="sm"
+              visibleFrom="xl"
             >
               <Badge
                 variant="light"
@@ -257,14 +265,72 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
             </Anchor>
           </Group>
 
-          {/* Center - Desktop search only */}
-          <Box visibleFrom="sm" style={{ flex: 1, maxWidth: 400, margin: '0 auto' }}>
+          {/* Center - search (flexes to absorb width changes so the row never wraps) */}
+          <Box
+            visibleFrom="sm"
+            id="search"
+            role="search"
+            aria-label="Search"
+            style={{ flex: 1, minWidth: 0, maxWidth: HEADER_SEARCH_MAX_WIDTH_PX, margin: '0 auto' }}
+          >
             <HeaderSearchInput />
           </Box>
 
-          {/* Right side - Controls with mobile optimization */}
-          <Group gap="xs" style={{ flexShrink: 0 }}>
-            {/* Mobile search - full width when expanded */}
+          {/* Right side controls: every group is nowrap and flexShrink 0 */}
+          <Group gap="xs" wrap="nowrap" align="center" style={{ flexShrink: 0 }}>
+            {/* Sync, undo/redo and notifications: collapsed out of the narrow header, they stay reachable through the overflow menu below md */}
+            <Group gap={rem(SPACING_XS_PX)} wrap="nowrap" visibleFrom="md">
+              <SyncStatusIndicator />
+              <UndoRedoControls />
+            </Group>
+            <NotificationCenter />
+
+            {/* Primary navigation */}
+            <Group gap={rem(SPACING_XS_PX)} wrap="nowrap" visibleFrom="lg">
+              <Button component={Link} to="/" variant="subtle" size="xs">
+                Home
+              </Button>
+              <Button component={Link} to="/about" variant="subtle" size="xs">
+                About
+              </Button>
+            </Group>
+
+            {/* Sidebar toggle */}
+            <ActionIcon
+              onClick={toggleLeftSidebar}
+              variant="subtle"
+              size={MIN_TOUCH_TARGET_PX}
+              aria-label={leftSidebarOpen ? 'Hide left sidebar' : 'Show left sidebar'}
+              color={leftSidebarOpen ? 'blue' : 'gray'}
+              visibleFrom="sm"
+            >
+              <IconLayoutSidebar size={ICON_SIZE.LG} />
+            </ActionIcon>
+
+            {/* Collection navigation */}
+            <Group gap={rem(SPACING_XS_PX)} wrap="nowrap" visibleFrom="xl">
+              <Button component={Link} to="/reviews" variant="subtle" size="xs">
+                Reviews
+              </Button>
+              <Button component={Link} to="/history" variant="subtle" size="xs">
+                History
+              </Button>
+              <Button component={Link} to="/bookmarks" variant="subtle" size="xs">
+                Bookmarks
+              </Button>
+              <Button component={Link} to="/catalogue" variant="subtle" size="xs">
+                Catalogue
+              </Button>
+            </Group>
+
+            <ColorSchemeSelector />
+            <Box visibleFrom="sm">
+              <KeyboardShortcutsButton
+                onClick={() => { setShortcutsHelpOpened(true); }}
+              />
+            </Box>
+
+            {/* Mobile search - full width overlay when expanded */}
             {mobileSearchExpanded ? (
               <Box
                 hiddenFrom="sm"
@@ -275,7 +341,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
                   top: 0,
                   bottom: 0,
                   backgroundColor: 'var(--mantine-color-body)',
-                  zIndex: 1000,
+                  zIndex: MOBILE_SEARCH_OVERLAY_Z_INDEX,
                   padding: '0 1rem',
                   display: 'flex',
                   alignItems: 'center',
@@ -285,7 +351,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
                 <ActionIcon
                   onClick={() => { setMobileSearchExpanded(false); }}
                   variant="subtle"
-                  size="lg"
+                  size={MIN_TOUCH_TARGET_PX}
                   aria-label="Close search"
                 >
                   <IconX size={ICON_SIZE.LG} />
@@ -298,7 +364,7 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
               <ActionIcon
                 onClick={() => { setMobileSearchExpanded(true); }}
                 variant="subtle"
-                size="lg"
+                size={MIN_TOUCH_TARGET_PX}
                 aria-label="Open search"
                 hiddenFrom="sm"
               >
@@ -306,60 +372,13 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
               </ActionIcon>
             )}
 
-            {/* Desktop navigation - hidden on smaller screens */}
-            <Group gap={rem(SPACING_XS_PX)} visibleFrom="lg">
-              <Button
-                component={Link}
-                to="/"
-                variant="subtle"
-                size="xs"
-              >
-                Home
-              </Button>
-              <Button
-                component={Link}
-                to="/about"
-                variant="subtle"
-                size="xs"
-              >
-                About
-              </Button>
-            </Group>
-
-            {/* Sidebar controls - simplified on mobile */}
-            <Group gap="xs" visibleFrom="sm">
-              <SyncStatusIndicator />
-              <UndoRedoControls />
-              <NotificationCenter />
-              <ActionIcon
-                onClick={toggleLeftSidebar}
-                variant="subtle"
-                size="lg"
-                aria-label="Toggle left sidebar"
-                color={leftSidebarOpen ? "blue" : "gray"}
-              >
-                <IconLayoutSidebar size={ICON_SIZE.LG} />
-              </ActionIcon>
-
-              <ActionIcon
-                onClick={toggleRightSidebar}
-                variant="subtle"
-                size="lg"
-                aria-label="Toggle right sidebar"
-                color={rightSidebarOpen ? "blue" : "gray"}
-              >
-                <IconLayoutSidebarRight size={ICON_SIZE.LG} />
-              </ActionIcon>
-            </Group>
-
-            {/* Mobile-only menu button */}
-            <Box hiddenFrom="sm">
-              <Menu shadow="md" width={200}>
+            {/* Overflow menu: owns everything the one-row header drops below md */}
+            <Menu shadow="md" width={220}>
               <Menu.Target>
                 <ActionIcon
                   variant="subtle"
-                  size="lg"
-                  aria-label="Menu"
+                  size={MIN_TOUCH_TARGET_PX}
+                  aria-label="Open menu"
                 >
                   <IconMenu size={ICON_SIZE.LG} />
                 </ActionIcon>
@@ -370,360 +389,163 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
                   leftSection={<IconLayoutSidebar size={ICON_SIZE.MD} />}
                   onClick={toggleLeftSidebar}
                 >
-                  {leftSidebarOpen ? 'Hide' : 'Show'} Left Panel
+                  {leftSidebarOpen ? 'Hide Left Panel' : 'Show Left Panel'}
                 </Menu.Item>
-                <Menu.Item
-                  leftSection={<IconLayoutSidebarRight size={ICON_SIZE.MD} />}
-                  onClick={toggleRightSidebar}
-                >
-                  {rightSidebarOpen ? 'Hide' : 'Show'} Right Panel
-                </Menu.Item>
-                <Menu.Divider />
                 <Menu.Item
                   leftSection={<IconSearch size={ICON_SIZE.MD} />}
                   onClick={() => { setMobileSearchExpanded(true); }}
                 >
                   Search
                 </Menu.Item>
-                <Menu.Item
-                  component={Link}
-                  to="/"
-                  leftSection={<IconSearch size={ICON_SIZE.MD} />}
-                >
+                <Menu.Divider />
+                <Menu.Label>Navigation</Menu.Label>
+                <Menu.Item component={Link} to="/" leftSection={<IconHome size={ICON_SIZE.MD} />}>
                   Home
                 </Menu.Item>
-                <Menu.Item
-                  component={Link}
-                  to="/about"
-                  leftSection={<IconSearch size={ICON_SIZE.MD} />}
-                >
+                <Menu.Item component={Link} to="/about" leftSection={<IconInfoCircle size={ICON_SIZE.MD} />}>
                   About
+                </Menu.Item>
+                <Menu.Item component={Link} to="/reviews" leftSection={<IconWriting size={ICON_SIZE.MD} />}>
+                  Reviews
+                </Menu.Item>
+                <Menu.Item component={Link} to="/history" leftSection={<IconHistory size={ICON_SIZE.MD} />}>
+                  History
+                </Menu.Item>
+                <Menu.Item component={Link} to="/bookmarks" leftSection={<IconBookmarks size={ICON_SIZE.MD} />}>
+                  Bookmarks
+                </Menu.Item>
+                <Menu.Item component={Link} to="/catalogue" leftSection={<IconList size={ICON_SIZE.MD} />}>
+                  Catalogue
+                </Menu.Item>
+                <Menu.Item component={Link} to="/graph" leftSection={<IconChartDots size={ICON_SIZE.MD} />}>
+                  Graph
+                </Menu.Item>
+                <Menu.Item component={Link} to="/settings" leftSection={<IconSettings size={ICON_SIZE.MD} />}>
+                  Settings
                 </Menu.Item>
                 <Menu.Divider />
                 <Menu.Item
-                  component={Link}
-                  to="/reviews"
-                  leftSection={<IconSearch size={ICON_SIZE.MD} />}
+                  leftSection={<IconKeyboard size={ICON_SIZE.MD} />}
+                  onClick={() => { setShortcutsHelpOpened(true); }}
                 >
-                  Reviews
+                  Keyboard shortcuts
                 </Menu.Item>
-                <Menu.Item
-                  component={Link}
-                  to="/history"
-                  leftSection={<IconSearch size={ICON_SIZE.MD} />}
-                >
-                  History
-                </Menu.Item>
-                <Menu.Item
-                  component={Link}
-                  to="/bookmarks"
-                  leftSection={<IconSearch size={ICON_SIZE.MD} />}
-                >
-                  Bookmarks
-                </Menu.Item>
-                <Menu.Item
-                  component={Link}
-                  to="/catalogue"
-                  leftSection={<IconSearch size={ICON_SIZE.MD} />}
-                >
-                  Catalogue
-                </Menu.Item>
-                <Menu.Item
-                  component={Link}
-                  to="/settings"
-                  leftSection={<IconSearch size={ICON_SIZE.MD} />}
-                >
-                  Settings
-                </Menu.Item>
-                <Menu.Item
-                  component={Link}
-                  to="/graph"
-                  leftSection={<IconSearch size={ICON_SIZE.MD} />}
-                >
-                  Graph
-                </Menu.Item>
+                <Menu.Label>Sync and history</Menu.Label>
+                <SyncStatusIndicator />
+                <UndoRedoControls />
               </Menu.Dropdown>
-              </Menu>
-            </Box>
-
-            {/* Desktop navigation - additional buttons */}
-            <Group gap={rem(SPACING_XS_PX)} visibleFrom="xl">
-              <Button
-                component={Link}
-                to="/reviews"
-                variant="subtle"
-                size="xs"
-              >
-                Reviews
-              </Button>
-              <Button
-                component={Link}
-                to="/history"
-                variant="subtle"
-                size="xs"
-              >
-                History
-              </Button>
-              <Button
-                component={Link}
-                to="/bookmarks"
-                variant="subtle"
-                size="xs"
-              >
-                Bookmarks
-              </Button>
-              <Button
-                component={Link}
-                to="/catalogue"
-                variant="subtle"
-                size="xs"
-              >
-                Catalogue
-              </Button>
-            </Group>
-
-            {/* Theme selector and help - visible on all screen sizes */}
-            <ColorSchemeSelector />
-            <KeyboardShortcutsButton
-              onClick={() => { setShortcutsHelpOpened(true); }}
-            />
+            </Menu>
           </Group>
         </Group>
       </AppShell.Header>
 
       {/* Left Sidebar */}
-      <AppShell.Navbar p={0}>
-        <div
-          className={sprinkles({ display: 'flex', height: 'full', position: 'relative' })}
-          style={{ overflow: "hidden" }}
+      <AppShell.Navbar id="navigation" aria-label="Primary navigation" p={0}>
+        <Box
+          className={sprinkles({ display: 'flex', flexDirection: 'column', height: 'full', position: 'relative' })}
+          style={{ overflow: 'hidden' }}
         >
-          {/* Always visible left ribbon */}
-          <LeftRibbon />
+          {/* Panel header: title, mobile close (the drawer has no built-in close affordance) and pin toggle */}
+          <Group justify="space-between" align="center" wrap="nowrap" mb="sm" px="xs" pt="xs">
+            <Text size="xs" c="dimmed">
+              Left Panel
+            </Text>
+            <Group gap="xs" wrap="nowrap">
+              <ActionIcon
+                onClick={() => { setLeftSidebarOpen(false); }}
+                variant="subtle"
+                size={MIN_TOUCH_TARGET_PX}
+                aria-label="Close left panel"
+                hiddenFrom="sm"
+              >
+                <IconX size={ICON_SIZE.LG} />
+              </ActionIcon>
+              <ActionIcon
+                onClick={() => {
+                  pinLeftSidebar(!leftSidebarPinned);
+                }}
+                variant="subtle"
+                size={MIN_TOUCH_TARGET_PX}
+                aria-label={
+                  leftSidebarPinned
+                    ? 'Unpin left sidebar'
+                    : 'Pin left sidebar'
+                }
+                color={leftSidebarPinned ? 'blue' : 'gray'}
+              >
+                {leftSidebarPinned ? (
+                  <IconPinned size={ICON_SIZE.MD} />
+                ) : (
+                  <IconPin size={ICON_SIZE.MD} />
+                )}
+              </ActionIcon>
+            </Group>
+          </Group>
 
-          {/* Expandable sidebar content */}
+          {/* Upper half: Bookmarks */}
+          <Box style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+            <BookmarksSidebar />
+          </Box>
+
+          {/* Lower half: History */}
+          <Box style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+            <HistorySidebar />
+          </Box>
+
+          {/* Drag handle - desktop only */}
           {leftSidebarOpen && (
-            <>
-              <Box
-                flex={1}
-                p={{ base: 'xs', sm: 'sm' }}
-                data-testid="left-sidebar-content"
-                className={sprinkles({ flexDirection: 'column', height: 'full' })}
-                style={{ overflow: "hidden" }}
-              >
-                {/* Pinning controls */}
-                <Group justify="space-between" mb="sm" px="xs">
-                  <Text size="xs" c="dimmed">
-                    Left Panel
-                  </Text>
-                  <Group gap="xs">
-                    <ActionIcon
-                      onClick={() => {
-                        pinLeftSidebar(!leftSidebarPinned);
-                      }}
-                      variant="subtle"
-                      size="sm"
-                      aria-label={
-                        leftSidebarPinned
-                          ? "Unpin left sidebar"
-                          : "Pin left sidebar"
-                      }
-                      color={leftSidebarPinned ? "blue" : "gray"}
-                    >
-                      {leftSidebarPinned ? (
-                        <IconPinned size={ICON_SIZE.SM} />
-                      ) : (
-                        <IconPin size={ICON_SIZE.SM} />
-                      )}
-                    </ActionIcon>
-                  </Group>
-                </Group>
-
-                {/* Upper half: Bookmarks */}
-                <Box
-                  style={{
-                    flex: 1,
-                    minHeight: 0,
-                    overflow: "auto",
-                    marginBottom: "1rem",
-                  }}
-                >
-                  <BookmarksSidebar />
-                </Box>
-
-                {/* Lower half: History */}
-                <Box
-                  style={{
-                    flex: 1,
-                    minHeight: 0,
-                    overflow: "auto",
-                  }}
-                >
-                  <HistorySidebar />
-                </Box>
-              </Box>
-              {/* Left drag handle - desktop only */}
-              <Box
-                role="slider"
-                aria-label="Resize left sidebar"
-                aria-orientation="horizontal"
-                aria-valuenow={leftSidebarWidth}
-                aria-valuemin={200}
-                aria-valuemax={600}
-                tabIndex={0}
-                visibleFrom="md"
-                w={rem(SPACING_XS_PX)}
-                h="100%"
-                bg={isDragging === "left" ? "blue" : "transparent"}
-                style={{ position: "absolute", right: 0, top: 0, zIndex: 10 }}
-                className={sprinkles({ cursor: 'resize' })}
-                bd={`1px solid var(--mantine-color-gray-3)`}
-                onMouseDown={(e) => {
-                  handleDragStart({ side: "left", e });
-                }}
-                onKeyDown={(e) => {
-                  // Handle keyboard resize with arrow keys
-                  if (e.key === "ArrowLeft") {
-                    e.preventDefault();
-                    setLeftSidebarWidth((previous) => Math.max(MIN_SIDEBAR_WIDTH_PX, previous - SIDEBAR_RESIZE_STEP_PX));
-                  } else if (e.key === "ArrowRight") {
-                    e.preventDefault();
-                    setLeftSidebarWidth((previous) => Math.min(MAX_SIDEBAR_WIDTH_PX, previous + SIDEBAR_RESIZE_STEP_PX));
-                  }
-                }}
-                onMouseEnter={(e) => {
-                  if (!isDragging) {
-                    e.currentTarget.style.background = "var(--mantine-color-gray-3)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isDragging) {
-                    e.currentTarget.style.background = "transparent";
-                  }
-                }}
-              />
-            </>
+            <Box
+              role="slider"
+              aria-label="Resize left sidebar"
+              aria-orientation="horizontal"
+              aria-valuenow={leftSidebarWidth}
+              aria-valuemin={MIN_SIDEBAR_WIDTH_PX}
+              aria-valuemax={MAX_SIDEBAR_WIDTH_PX}
+              tabIndex={0}
+              visibleFrom="md"
+              w={rem(SIDEBAR_RESIZE_HANDLE_PX)}
+              h="100%"
+              bg={isDragging === 'left' ? 'blue' : 'transparent'}
+              style={{ position: 'absolute', right: 0, top: 0, zIndex: SIDEBAR_RESIZE_HANDLE_Z_INDEX }}
+              className={sprinkles({ cursor: 'resize' })}
+              bd={`1px solid var(--mantine-color-default-border)`}
+              onMouseDown={(e) => {
+                handleDragStart({ side: 'left', e });
+              }}
+              onKeyDown={(e) => {
+                // Handle keyboard resize with arrow keys
+                if (e.key === 'ArrowLeft') {
+                  e.preventDefault();
+                  setLeftSidebarWidth((previous) => Math.max(MIN_SIDEBAR_WIDTH_PX, previous - SIDEBAR_RESIZE_STEP_PX));
+                } else if (e.key === 'ArrowRight') {
+                  e.preventDefault();
+                  setLeftSidebarWidth((previous) => Math.min(MAX_SIDEBAR_WIDTH_PX, previous + SIDEBAR_RESIZE_STEP_PX));
+                }
+              }}
+              onMouseEnter={(e) => {
+                if (!isDragging) {
+                  e.currentTarget.style.background = 'var(--mantine-color-default-border)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isDragging) {
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
+            />
           )}
-        </div>
+        </Box>
       </AppShell.Navbar>
-
-      {/* Right Sidebar */}
-      <AppShell.Aside p={0}>
-        <div
-          style={{
-            display: "flex",
-            height: "100%",
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-          {/* Expandable sidebar content */}
-          {rightSidebarOpen && (
-            <>
-              {/* Right drag handle - desktop only */}
-              <Box
-                role="slider"
-                aria-label="Resize right sidebar"
-                aria-orientation="horizontal"
-                aria-valuenow={rightSidebarWidth}
-                aria-valuemin={200}
-                aria-valuemax={600}
-                tabIndex={0}
-                visibleFrom="md"
-                w={rem(SPACING_XS_PX)}
-                h="100%"
-                bg={isDragging === "right" ? "blue" : "transparent"}
-                style={{ position: "absolute", left: 0, top: 0, zIndex: 10 }}
-                className={sprinkles({ cursor: 'resize' })}
-                bd={`1px solid var(--mantine-color-gray-3)`}
-                onMouseDown={(e) => {
-                  handleDragStart({ side: "right", e });
-                }}
-                onKeyDown={(e) => {
-                  // Handle keyboard resize with arrow keys
-                  if (e.key === "ArrowLeft") {
-                    e.preventDefault();
-                    setRightSidebarWidth((previous) => Math.min(MAX_SIDEBAR_WIDTH_PX, previous + SIDEBAR_RESIZE_STEP_PX));
-                  } else if (e.key === "ArrowRight") {
-                    e.preventDefault();
-                    setRightSidebarWidth((previous) => Math.max(MIN_SIDEBAR_WIDTH_PX, previous - SIDEBAR_RESIZE_STEP_PX));
-                  }
-                }}
-                onMouseEnter={(e) => {
-                  if (!isDragging) {
-                    e.currentTarget.style.background = "var(--mantine-color-gray-3)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isDragging) {
-                    e.currentTarget.style.background = "transparent";
-                  }
-                }}
-              />
-              <Box
-                flex={1}
-                p={{ base: 'xs', sm: 'sm' }}
-                style={{ marginLeft: rem(SPACING_XS_PX) }}
-                data-testid="right-sidebar-content"
-              >
-                {/* Pinning controls */}
-                <Group justify="space-between" mb="sm" px="xs">
-                  <Text size="xs" c="dimmed">
-                    Graph Analysis
-                  </Text>
-                  <Group gap="xs">
-                    <ActionIcon
-                      onClick={() => {
-                        pinRightSidebar(!rightSidebarPinned);
-                      }}
-                      variant="subtle"
-                      size="sm"
-                      aria-label={
-                        rightSidebarPinned
-                          ? "Unpin right sidebar"
-                          : "Pin right sidebar"
-                      }
-                      color={rightSidebarPinned ? "blue" : "gray"}
-                    >
-                      {rightSidebarPinned ? (
-                        <IconPinned size={ICON_SIZE.SM} />
-                      ) : (
-                        <IconPin size={ICON_SIZE.SM} />
-                      )}
-                    </ActionIcon>
-                  </Group>
-                </Group>
-
-                {/* Graph Algorithms Panel */}
-                <Box
-                  style={{
-                    flex: 1,
-                    minHeight: 0,
-                    overflow: "auto",
-                  }}
-                >
-                  <RightSidebarContent />
-                </Box>
-              </Box>
-            </>
-          )}
-
-          {/* Always visible right ribbon */}
-          <RightRibbon />
-        </div>
-      </AppShell.Aside>
 
       {/* Main Content Area */}
       <AppShell.Main
         id="main-content"
+        tabIndex={-1}
         data-testid="main-content"
         className={sprinkles({ flexDirection: 'column', overflow: 'auto' })}
       >
-        {children ?? (
-          <Stack align="center" justify="center" h="100%" gap="md" c="dimmed">
-            <Title order={2}>BibGraph</Title>
-            <Text>Sidebars restored - Navigate to view content</Text>
-          </Stack>
-        )}
+        <OfflineBanner />
+        {children}
       </AppShell.Main>
 
       {/* Keyboard Shortcuts Help Modal */}
@@ -738,6 +560,6 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
         onClose={closeOnboarding}
       />
 
-      </AppShell>
+    </AppShell>
   );
 };

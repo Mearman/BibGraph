@@ -137,9 +137,13 @@
   color: white;
   padding: 8px 16px;
   text-decoration: none;
+  border: 0;
   border-radius: 4px;
   z-index: 10000;
   font-weight: 500;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
   transition: top 0.2s ease-out;
 }
 

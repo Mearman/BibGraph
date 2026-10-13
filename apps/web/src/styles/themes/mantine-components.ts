@@ -41,7 +41,6 @@ export const mantineComponents = {
         minHeight: '36px',
         background: 'var(--mantine-color-body)',
         border: '1px solid var(--mantine-color-default-border)',
-        padding: '0 var(--mantine-spacing-sm)',
       },
     },
   },
@@ -55,7 +54,6 @@ export const mantineComponents = {
         minHeight: '36px',
         background: 'var(--mantine-color-body)',
         border: '1px solid var(--mantine-color-default-border)',
-        padding: '0 var(--mantine-spacing-sm)',
       },
     },
   },
@@ -163,23 +161,18 @@ export const mantineComponents = {
       navbar: {
         '--navbar-bg': 'var(--mantine-color-body)',
         '--navbar-border-color': 'var(--mantine-color-default-border)',
-        '--navbar-padding': 'var(--mantine-spacing-md)',
       },
       header: {
         '--header-bg': 'var(--mantine-color-body)',
         '--header-border-color': 'var(--mantine-color-default-border)',
-        '--header-height': 'rem(60px)',
-        '--header-padding': 'var(--mantine-spacing-md)',
       },
       aside: {
         '--aside-bg': 'var(--mantine-color-body)',
         '--aside-border-color': 'var(--mantine-color-default-border)',
-        '--aside-padding': 'var(--mantine-spacing-md)',
       },
       footer: {
         '--footer-bg': 'var(--mantine-color-body)',
         '--footer-border-color': 'var(--mantine-color-default-border)',
-        '--footer-padding': 'var(--mantine-spacing-md)',
       },
     }),
     styles: {
@@ -189,23 +182,18 @@ export const mantineComponents = {
       navbar: {
         backgroundColor: 'var(--navbar-bg)',
         borderRight: '1px solid var(--navbar-border-color)',
-        padding: 'var(--navbar-padding)',
       },
       header: {
         backgroundColor: 'var(--header-bg)',
         borderBottom: '1px solid var(--header-border-color)',
-        height: 'var(--header-height)',
-        padding: 'var(--header-padding)',
       },
       aside: {
         backgroundColor: 'var(--aside-bg)',
         borderLeft: '1px solid var(--aside-border-color)',
-        padding: 'var(--aside-padding)',
       },
       footer: {
         backgroundColor: 'var(--footer-bg)',
         borderTop: '1px solid var(--footer-border-color)',
-        padding: 'var(--footer-padding)',
       },
     },
   },
@@ -271,9 +259,6 @@ export const mantineComponents = {
         width: 'var(--accordion-chevron-size)',
         height: 'var(--accordion-chevron-size)',
         transition: 'var(--accordion-chevron-transition)',
-        '[data-open]': {
-          transform: 'rotate(180deg)',
-        },
       },
     },
   },

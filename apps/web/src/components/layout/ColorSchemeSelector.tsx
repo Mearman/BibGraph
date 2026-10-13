@@ -8,6 +8,7 @@ import {
   IconSun} from '@tabler/icons-react'
 import { useMemo } from 'react'
 
+import { MIN_TOUCH_TARGET_PX } from '@/components/layout/layout-metrics'
 import { SplitButton } from '@/components/ui/SplitButton'
 import { ICON_SIZE } from '@/config/style-constants'
 import { useTheme } from '@/contexts/theme-context'
@@ -322,7 +323,7 @@ export const ColorSchemeSelector = () => {
 
   return (
     <SplitButton
-      height={34}
+      height={MIN_TOUCH_TARGET_PX}
       mainButtonProps={{
         variant: 'outline',
         size: 'sm',

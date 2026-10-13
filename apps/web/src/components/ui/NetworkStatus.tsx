@@ -5,7 +5,7 @@
  * and basic offline detection capabilities.
  */
 
-import { Badge, Group, Stack, Text, Tooltip } from "@mantine/core";
+import { Alert, Badge, Group, Stack, Text, Tooltip } from "@mantine/core";
 import {
   IconAlertTriangle,
   IconCloudCheck,
@@ -13,6 +13,8 @@ import {
   IconWifi,
   IconWifiOff} from "@tabler/icons-react";
 import { useEffect, useState } from "react";
+
+import { ICON_SIZE } from "@/config/style-constants";
 
 import { useNetwork } from "./NetworkProvider";
 
@@ -301,4 +303,38 @@ export const useNetworkConnectivity = () => {
     isOnline,
     status
   };
+};
+
+/**
+ * Slim offline banner for the app shell. Renders nothing while online so it costs no header space, and a single role="status" row the moment the browser reports offline, so the state is visible on every screen size (the sync badge alone is hidden on small viewports).
+ */
+export const OfflineBanner = () => {
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => { setIsOnline(true); };
+    const handleOffline = () => { setIsOnline(false); };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  if (isOnline) return null;
+
+  return (
+    <Alert
+      role="status"
+      icon={<IconCloudOff size={ICON_SIZE.MD} />}
+      color="orange"
+      variant="filled"
+      radius={0}
+      py={6}
+      data-testid="offline-banner"
+    >
+      You are offline. Data may be out of date until the connection returns.
+    </Alert>
+  );
 };

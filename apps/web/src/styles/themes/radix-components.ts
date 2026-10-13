@@ -15,14 +15,6 @@ export const radixComponents = {
         backgroundColor: 'transparent',
         border: '1px solid transparent',
         cursor: 'pointer',
-        '&:disabled': {
-          opacity: '0.5',
-          cursor: 'not-allowed',
-        },
-        '&:focus-visible': {
-          outline: '2px solid var(--mantine-color-blue-6)',
-          outlineOffset: '2px',
-        },
       },
     },
   },
@@ -53,17 +45,6 @@ export const radixComponents = {
         // Radix is unstyled - use Mantine body color for proper theme support
         backgroundColor: 'var(--mantine-color-body)',
         border: '1px solid var(--mantine-color-default-border)',
-        padding: '0 8px',
-        '&:focus': {
-          outline: '2px solid var(--mantine-color-blue-6)',
-          outlineOffset: '2px',
-          borderColor: 'var(--mantine-color-blue-6)',
-        },
-        '&:disabled': {
-          opacity: '0.5',
-          cursor: 'not-allowed',
-          backgroundColor: 'var(--mantine-color-gray-1)',
-        },
       },
     },
   },
@@ -78,17 +59,6 @@ export const radixComponents = {
         // Radix is unstyled - use Mantine body color for proper theme support
         backgroundColor: 'var(--mantine-color-body)',
         border: '1px solid var(--mantine-color-default-border)',
-        padding: '0 8px',
-        '&:focus': {
-          outline: '2px solid var(--mantine-color-blue-6)',
-          outlineOffset: '2px',
-          borderColor: 'var(--mantine-color-blue-6)',
-        },
-        '&:disabled': {
-          opacity: '0.5',
-          cursor: 'not-allowed',
-          backgroundColor: 'var(--mantine-color-gray-1)',
-        },
       },
     },
   },
@@ -104,16 +74,6 @@ export const radixComponents = {
         border: '1px solid var(--mantine-color-default-border)',
         padding: '8px',
         resize: 'vertical',
-        '&:focus': {
-          outline: '2px solid var(--mantine-color-blue-6)',
-          outlineOffset: '2px',
-          borderColor: 'var(--mantine-color-blue-6)',
-        },
-        '&:disabled': {
-          opacity: '0.5',
-          cursor: 'not-allowed',
-          backgroundColor: 'var(--mantine-color-gray-1)',
-        },
       },
     },
   },
@@ -237,23 +197,18 @@ export const radixComponents = {
       navbar: {
         '--navbar-bg': 'transparent',
         '--navbar-border-color': 'var(--mantine-color-default-border)',
-        '--navbar-padding': 'var(--mantine-spacing-md)',
       },
       header: {
         '--header-bg': 'transparent',
         '--header-border-color': 'var(--mantine-color-default-border)',
-        '--header-height': 'rem(60px)',
-        '--header-padding': 'var(--mantine-spacing-md)',
       },
       aside: {
         '--aside-bg': 'transparent',
         '--aside-border-color': 'var(--mantine-color-default-border)',
-        '--aside-padding': 'var(--mantine-spacing-md)',
       },
       footer: {
         '--footer-bg': 'transparent',
         '--footer-border-color': 'var(--mantine-color-default-border)',
-        '--footer-padding': 'var(--mantine-spacing-md)',
       },
     }),
     styles: {
@@ -263,23 +218,18 @@ export const radixComponents = {
       navbar: {
         backgroundColor: 'var(--navbar-bg)',
         borderRight: '1px solid var(--navbar-border-color)',
-        padding: 'var(--navbar-padding)',
       },
       header: {
         backgroundColor: 'var(--header-bg)',
         borderBottom: '1px solid var(--header-border-color)',
-        height: 'var(--header-height)',
-        padding: 'var(--header-padding)',
       },
       aside: {
         backgroundColor: 'var(--aside-bg)',
         borderLeft: '1px solid var(--aside-border-color)',
-        padding: 'var(--aside-padding)',
       },
       footer: {
         backgroundColor: 'var(--footer-bg)',
         borderTop: '1px solid var(--footer-border-color)',
-        padding: 'var(--footer-padding)',
       },
     },
   },
@@ -324,9 +274,6 @@ export const radixComponents = {
         borderRadius: 'var(--accordion-radius)',
         marginBottom: 'var(--mantine-spacing-xs)',
         transition: 'var(--accordion-item-transition)',
-        '&:last-child': {
-          marginBottom: 0,
-        },
       },
       control: {
         color: 'var(--accordion-control-color)',
@@ -338,13 +285,6 @@ export const radixComponents = {
         cursor: 'pointer',
         width: '100%',
         textAlign: 'left',
-        '&:hover': {
-          backgroundColor: 'var(--accordion-control-bg-hover)',
-        },
-        '&:focus-visible': {
-          outline: '2px solid var(--mantine-color-blue-6)',
-          outlineOffset: '2px',
-        },
       },
       content: {
         padding: 'var(--accordion-content-padding)',
@@ -355,9 +295,6 @@ export const radixComponents = {
         width: 'var(--accordion-chevron-size)',
         height: 'var(--accordion-chevron-size)',
         transition: 'var(--accordion-chevron-transition)',
-        '[data-open]': {
-          transform: 'rotate(180deg)',
-        },
       },
     },
   },

@@ -10,4 +10,4 @@ export * from './essential-components';
 export * from './mantine-components';
 export * from './radix-components';
 export * from './shadcn-components';
-export * from './shared-components';
+export * from './css-variables-resolver';

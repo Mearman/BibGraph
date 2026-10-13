@@ -14,6 +14,7 @@ import posthog from "posthog-js";
 import { createRoot } from "react-dom/client";
 
 import { PostHogProvider } from "@/components/PostHogProvider";
+import { RoutePendingComponent } from "@/components/routing/LazyRoute";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { StorageProviderWrapper } from "@/contexts/storage-provider-context";
 import { ThemeProvider } from "@/contexts/theme-context";
@@ -229,10 +230,16 @@ const queryClient = new QueryClient({
   },
 });
 
+// Fast navigations that resolve within the pending window render the old page
+// until the new one is ready instead of flashing a loading fallback.
+const ROUTER_PENDING_MS = 300;
+
 // Create a new router instance with hash-based history for GitHub Pages
 const router = createRouter({
   routeTree,
   history: createHashHistory(),
+  defaultPendingComponent: RoutePendingComponent,
+  defaultPendingMs: ROUTER_PENDING_MS,
 });
 
 // Register the router instance for type safety

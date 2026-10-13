@@ -9,13 +9,6 @@ export const shadcnComponents = {
       root: {
         fontWeight: 500,
         transition: "all 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
-        '&:hover': {
-          transform: 'translateY(-1px)',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-        },
-        '&:active': {
-          transform: 'translateY(0)',
-        },
       },
     },
   },
@@ -37,9 +30,6 @@ export const shadcnComponents = {
         position: 'relative',
         overflow: 'hidden',
         transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-        '&:hover': {
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-        },
       },
     },
   }),
@@ -53,15 +43,6 @@ export const shadcnComponents = {
         minHeight: "40px", // h-10 in shadcn
         backgroundColor: 'hsl(var(--shadcn-background))',
         border: '1px solid hsl(var(--shadcn-border))',
-        '&:focus': {
-          borderColor: 'hsl(var(--shadcn-ring))',
-          boxShadow: '0 0 0 3px hsl(var(--shadcn-ring) / 0.1)',
-          outline: 'none',
-        },
-        '&:focus-visible': {
-          outline: '2px solid hsl(var(--shadcn-ring))',
-          outlineOffset: '2px',
-        },
       },
     },
   },
@@ -75,15 +56,6 @@ export const shadcnComponents = {
         minHeight: "40px", // h-10 in shadcn
         backgroundColor: 'hsl(var(--shadcn-background))',
         border: '1px solid hsl(var(--shadcn-border))',
-        '&:focus': {
-          borderColor: 'hsl(var(--shadcn-ring))',
-          boxShadow: '0 0 0 3px hsl(var(--shadcn-ring) / 0.1)',
-          outline: 'none',
-        },
-        '&:focus-visible': {
-          outline: '2px solid hsl(var(--shadcn-ring))',
-          outlineOffset: '2px',
-        },
       },
     },
   },
@@ -96,15 +68,6 @@ export const shadcnComponents = {
         lineHeight: "1.5",
         backgroundColor: 'hsl(var(--shadcn-background))',
         border: '1px solid hsl(var(--shadcn-border))',
-        '&:focus': {
-          borderColor: 'hsl(var(--shadcn-ring))',
-          boxShadow: '0 0 0 3px hsl(var(--shadcn-ring) / 0.1)',
-          outline: 'none',
-        },
-        '&:focus-visible': {
-          outline: '2px solid hsl(var(--shadcn-ring))',
-          outlineOffset: '2px',
-        },
       },
     },
   },
@@ -205,23 +168,18 @@ export const shadcnComponents = {
       navbar: {
         '--navbar-bg': 'hsl(var(--shadcn-background))',
         '--navbar-border-color': 'hsl(var(--shadcn-border))',
-        '--navbar-padding': 'var(--mantine-spacing-md)',
       },
       header: {
         '--header-bg': 'hsl(var(--shadcn-background))',
         '--header-border-color': 'hsl(var(--shadcn-border))',
-        '--header-height': 'rem(60px)',
-        '--header-padding': 'var(--mantine-spacing-md)',
       },
       aside: {
         '--aside-bg': 'hsl(var(--shadcn-background))',
         '--aside-border-color': 'hsl(var(--shadcn-border))',
-        '--aside-padding': 'var(--mantine-spacing-md)',
       },
       footer: {
         '--footer-bg': 'hsl(var(--shadcn-background))',
         '--footer-border-color': 'hsl(var(--shadcn-border))',
-        '--footer-padding': 'var(--mantine-spacing-md)',
       },
     }),
     styles: {
@@ -231,23 +189,18 @@ export const shadcnComponents = {
       navbar: {
         backgroundColor: 'var(--navbar-bg)',
         borderRight: '1px solid var(--navbar-border-color)',
-        padding: 'var(--navbar-padding)',
       },
       header: {
         backgroundColor: 'var(--header-bg)',
         borderBottom: '1px solid var(--header-border-color)',
-        height: 'var(--header-height)',
-        padding: 'var(--header-padding)',
       },
       aside: {
         backgroundColor: 'var(--aside-bg)',
         borderLeft: '1px solid var(--aside-border-color)',
-        padding: 'var(--aside-padding)',
       },
       footer: {
         backgroundColor: 'var(--footer-bg)',
         borderTop: '1px solid var(--footer-border-color)',
-        padding: 'var(--footer-padding)',
       },
     },
   },
@@ -292,9 +245,6 @@ export const shadcnComponents = {
         borderRadius: 'var(--accordion-radius)',
         marginBottom: 'var(--mantine-spacing-xs)',
         transition: 'var(--accordion-item-transition)',
-        '&:last-child': {
-          marginBottom: 0,
-        },
       },
       control: {
         color: 'var(--accordion-control-color)',
@@ -306,9 +256,6 @@ export const shadcnComponents = {
         cursor: 'pointer',
         width: '100%',
         textAlign: 'left',
-        '&:hover': {
-          backgroundColor: 'var(--accordion-control-bg-hover)',
-        },
       },
       content: {
         padding: 'var(--accordion-content-padding)',
@@ -319,9 +266,6 @@ export const shadcnComponents = {
         width: 'var(--accordion-chevron-size)',
         height: 'var(--accordion-chevron-size)',
         transition: 'var(--accordion-chevron-transition)',
-        '[data-open]': {
-          transform: 'rotate(180deg)',
-        },
       },
     },
   },

@@ -17,6 +17,7 @@ import {
   Card,
   Container,
   Group,
+  Loader,
   Stack,
   Text,
   Title,
@@ -25,7 +26,6 @@ import {
   IconAlertTriangle,
   IconArrowLeft,
   IconGraph,
-  IconLoader,
 } from '@tabler/icons-react';
 import { createLazyFileRoute , Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -170,7 +170,7 @@ const GraphComparisonPage = () => {
     return (
       <Container size="xl" py="md">
         <Stack align="center" justify="center" h="50vh" gap="md">
-          <IconLoader size={ICON_SIZE.XL} className="animate-spin" />
+          <Loader size={ICON_SIZE.XL} />
           <Text c="dimmed">Loading snapshots...</Text>
         </Stack>
       </Container>

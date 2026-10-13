@@ -28,6 +28,8 @@ import React, { Component } from 'react';
 
 import { ICON_SIZE } from '@/config/style-constants';
 
+import { CHUNK_LOAD_ERROR_TITLE, isChunkLoadError } from './chunk-load-error';
+
 interface ErrorBoundaryProperties {
   children: ReactNode;
   fallback?: ReactNode;
@@ -39,6 +41,10 @@ interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
+  /**
+   * Incremented on every reset so the children remount: without a new key React reuses the crashed subtree and stale render state.
+   */
+  resetCount: number;
 }
 
 /**
@@ -57,6 +63,7 @@ export class ErrorBoundary extends Component<
       hasError: false,
       error: null,
       errorInfo: null,
+      resetCount: 0,
     };
   }
 
@@ -90,11 +97,12 @@ export class ErrorBoundary extends Component<
   }
 
   handleReset = (): void => {
-    this.setState({
+    this.setState((previous) => ({
       hasError: false,
       error: null,
       errorInfo: null,
-    });
+      resetCount: previous.resetCount + 1,
+    }));
   };
 
   render(): ReactNode {
@@ -106,6 +114,43 @@ export class ErrorBoundary extends Component<
 
       // Default fallback UI
       const { error, errorInfo } = this.state;
+
+      // A failed dynamic import (lazy route chunk) cannot be recovered by remounting: the module registry caches the rejected import for the session, so offer the one action that actually works, a full reload.
+      if (isChunkLoadError(error)) {
+        return (
+          <Container size="md" py="xl" className={clsx(this.props.className)}>
+            <Stack gap="md" align="center">
+              <Alert
+                icon={<IconAlertTriangle size={ICON_SIZE.XL} />}
+                title={CHUNK_LOAD_ERROR_TITLE}
+                color="orange"
+                variant="light"
+              >
+                <Text size="sm">
+                  Part of the app failed to download. Check your connection, then reload the page.
+                </Text>
+              </Alert>
+              <Group>
+                <Button
+                  leftSection={<IconRefresh size={ICON_SIZE.MD} />}
+                  onClick={() => { window.location.reload(); }}
+                  variant="filled"
+                >
+                  Reload
+                </Button>
+                <Button
+                  leftSection={<IconHome size={ICON_SIZE.MD} />}
+                  component="a"
+                  href="#/"
+                  variant="light"
+                >
+                  Go Home
+                </Button>
+              </Group>
+            </Stack>
+          </Container>
+        );
+      }
 
       return (
         <Container
@@ -217,7 +262,7 @@ export class ErrorBoundary extends Component<
       );
     }
 
-    return this.props.children;
+    return <React.Fragment key={this.state.resetCount}>{this.props.children}</React.Fragment>;
   }
 }
 

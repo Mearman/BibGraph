@@ -65,25 +65,42 @@ export const createFocusTrap = (container: HTMLElement) => {
   };
 };
 
-// Skip links generator
-export const createSkipLinks = () => {
-  const skipLinks = [
-    { href: '#main-content', text: 'Skip to main content' },
-    { href: '#navigation', text: 'Skip to navigation' },
-    { href: '#search', text: 'Skip to search' },
-  ];
+// Skip-link targets, keyed by the element id the layout guarantees: main content, the navbar and the header search all carry these ids.
+export const SKIP_LINK_TARGET_IDS = ['main-content', 'navigation', 'search'] as const;
 
+const SKIP_LINK_TEXTS: Record<(typeof SKIP_LINK_TARGET_IDS)[number], string> = {
+  'main-content': 'Skip to main content',
+  navigation: 'Skip to navigation',
+  search: 'Skip to search',
+};
+
+/**
+ * Moves keyboard focus to the element with the given id. Returns true when the target existed and was focused, so callers can announce a failure instead of silently doing nothing.
+ */
+export const focusElementById = (id: string): boolean => {
+  const target = document.querySelector<HTMLElement>(`#${id}`);
+  if (target === null) return false;
+  target.focus();
+  return true;
+};
+
+// Skip links generator. The links are buttons, not anchors: the app uses hash history, so an href like "#main-content" would be parsed as a route and navigate away from the current page instead of scrolling.
+export const createSkipLinks = () => {
   const skipLinksContainer = document.createElement('div');
   skipLinksContainer.setAttribute('role', 'navigation');
   skipLinksContainer.setAttribute('aria-label', 'Skip navigation links');
   skipLinksContainer.className = 'skip-links';
 
-  for (const link of skipLinks) {
-    const anchor = document.createElement('a');
-    anchor.href = link.href;
-    anchor.className = 'skip-link';
-    anchor.textContent = link.text;
-    skipLinksContainer.append(anchor);
+  for (const id of SKIP_LINK_TARGET_IDS) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'skip-link';
+    button.textContent = SKIP_LINK_TEXTS[id];
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      focusElementById(id);
+    });
+    skipLinksContainer.append(button);
   }
 
   return skipLinksContainer;

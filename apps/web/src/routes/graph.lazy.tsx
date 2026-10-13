@@ -22,6 +22,7 @@ import {
   Card,
   Flex,
   Group,
+  Loader,
   SegmentedControl,
   Stack,
   Text,
@@ -35,7 +36,6 @@ import {
   IconFocusCentered,
   IconGraph,
   IconInfoCircle,
-  IconLoader,
   IconPencil,
   IconRefresh,
 } from '@tabler/icons-react';
@@ -471,7 +471,7 @@ const EntityGraphPage = () => {
                     </Button>
                   )}
                   {expandingNodeIds.length > 0 && (
-                    <Badge variant="light" color="blue" size="sm" leftSection={<IconLoader size={ICON_SIZE.XS} className="animate-spin" />}>
+                    <Badge variant="light" color="blue" size="sm" leftSection={<Loader size={ICON_SIZE.XS} />}>
                       Expanding {expandingNodeIds.length} node{expandingNodeIds.length === 1 ? '' : 's'}...
                     </Badge>
                   )}

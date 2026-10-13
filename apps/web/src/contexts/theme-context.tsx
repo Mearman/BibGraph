@@ -3,7 +3,7 @@ import { useColorScheme, useHotkeys, useLocalStorage } from "@mantine/hooks";
 import React, { createContext, use, useCallback, useMemo } from "react";
 
 import type { ShadcnPalette } from '@/styles/shadcn-colors'
-import { mantineTheme, radixTheme,shadcnTheme } from "@/styles/themes";
+import { bibgraphCssVariablesResolver, mantineTheme, radixTheme, shadcnTheme } from "@/styles/themes";
 
 type ComponentLibrary = 'mantine' | 'shadcn' | 'radix'
 type ColorScheme = ShadcnPalette
@@ -137,6 +137,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     <ThemeContext value={contextValue}>
       <MantineProvider
         theme={currentMantineTheme}
+        cssVariablesResolver={bibgraphCssVariablesResolver}
         defaultColorScheme={effectiveColorScheme}
         forceColorScheme={effectiveColorScheme}
       >

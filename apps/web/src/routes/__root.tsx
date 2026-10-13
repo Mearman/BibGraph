@@ -12,39 +12,56 @@ import { GraphVisualizationProvider } from "@/contexts/GraphVisualizationContext
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { SyncStatusProvider } from "@/contexts/SyncStatusContext";
 import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 import { shadcnLightTheme } from "../styles/shadcn-theme.css";
+import { routeTitle } from "./route-titles";
+
+/**
+ * Sets document.title from the current location so each route is identifiable in browser history, tabs and screen reader announcements.
+ */
+const RouteDocumentTitle = () => {
+  const location = useLocation();
+  useDocumentTitle(routeTitle(location.pathname));
+  return null;
+};
 
 const RootLayout = () => {
   logger.debug("routing", "RootLayout: Rendering", {}, "RootLayout");
   const location = useLocation();
   const isGraphPage = location.pathname === '/graph';
 
-  // MainLayout re-enabled after fixing React 19 hook violations
-  // The layout-store was refactored to ensure stable method references
+  // The error boundary sits inside the layout around the Outlet, not around
+  // the layout itself: a failed route render replaces the page area only and
+  // the header and navigation stay usable for recovery.
+  const routedContent = (
+    <ErrorBoundary>
+      <Outlet />
+    </ErrorBoundary>
+  );
+
   return (
     <div className={shadcnLightTheme}>
       <UrlFixer />
+      <RouteDocumentTitle />
       <NavigationTracker />
       <NotificationProvider>
         <ActivityProvider>
           <SyncStatusProvider>
             <UndoRedoProvider>
-              <ErrorBoundary>
-                {/* Conditionally wrap MainLayout and Outlet with GraphVisualizationProvider on graph page */}
-                {/* This allows the sidebar (in MainLayout) to access the context */}
-                {isGraphPage ? (
-                  <GraphVisualizationProvider>
-                    <MainLayout>
-                      <Outlet />
-                    </MainLayout>
-                  </GraphVisualizationProvider>
-                ) : (
+              {/* Conditionally wrap MainLayout and Outlet with GraphVisualizationProvider on graph page */}
+              {/* This allows the sidebar (in MainLayout) to access the context */}
+              {isGraphPage ? (
+                <GraphVisualizationProvider>
                   <MainLayout>
-                    <Outlet />
+                    {routedContent}
                   </MainLayout>
-                )}
-              </ErrorBoundary>
+                </GraphVisualizationProvider>
+              ) : (
+                <MainLayout>
+                  {routedContent}
+                </MainLayout>
+              )}
             </UndoRedoProvider>
           </SyncStatusProvider>
         </ActivityProvider>
