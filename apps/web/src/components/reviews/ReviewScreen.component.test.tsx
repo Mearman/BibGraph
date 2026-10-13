@@ -12,6 +12,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { describe, expect, it, vi } from "vitest";
 
 import type { ReadyReviewSession } from "@/hooks/use-review-session";
+import type { ScreeningPaging } from "@/hooks/use-screening-arrangement";
 import type { AlgorithmComparison } from "@/lib/algorithms/algorithm-comparison";
 import type { ScreeningRow } from "@/lib/reviews/screening-view";
 
@@ -118,11 +119,11 @@ const session = (overrides: Partial<ReadyReviewSession> = {}): ReadyReviewSessio
 	...overrides,
 });
 
-const renderScreen = (ready: ReadyReviewSession) => {
+const renderScreen = (ready: ReadyReviewSession, paging?: ScreeningPaging) => {
 	render(
 		<MantineProvider>
 			<Notifications />
-			<ReviewScreen session={ready} />
+			<ReviewScreen session={ready} paging={paging} />
 		</MantineProvider>,
 	);
 };
@@ -191,12 +192,14 @@ describe("ReviewScreen", () => {
 	});
 
 	it("loads more rows from a long list", () => {
-		const many = Array.from({ length: 60 }, (_, index) => semanticRow(`W${String(index + EXTRA_WORK_ID_OFFSET)}`, `Paper ${String(index + 1)}`));
-		renderScreen(session({ semanticRows: many }));
-		expect(screen.getByText("Showing 50 of 60")).toBeInTheDocument();
-		expect(screen.queryByText("Paper 60")).not.toBeInTheDocument();
+		const paging: ScreeningPaging = { initial: 2, step: 2 };
+		const many = Array.from({ length: 3 }, (_, index) => semanticRow(`W${String(index + EXTRA_WORK_ID_OFFSET)}`, `Paper ${String(index + 1)}`));
+		renderScreen(session({ semanticRows: many }), paging);
+		expect(screen.getByText("Showing 2 of 3")).toBeInTheDocument();
+		expect(screen.queryByText("Paper 3")).not.toBeInTheDocument();
 		fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-		expect(screen.getByText("Paper 60")).toBeInTheDocument();
+		expect(screen.getByText("Paper 3")).toBeInTheDocument();
+		expect(screen.getByText("Showing 3 of 3")).toBeInTheDocument();
 	});
 
 	it("filters the list over titles", () => {

@@ -7,7 +7,7 @@ import { notifications } from "@mantine/notifications";
 import { type ReactElement,useState } from "react";
 
 import type { ReadyReviewSession } from "@/hooks/use-review-session";
-import { useScreeningArrangement } from "@/hooks/use-screening-arrangement";
+import { type ScreeningPaging, useScreeningArrangement } from "@/hooks/use-screening-arrangement";
 import type { AlgorithmStage } from "@/lib/algorithms/registry";
 import type { ScreeningDecision } from "@/stores/review-store";
 
@@ -104,13 +104,17 @@ const TabLabel = ({ title, description }: { readonly title: string; readonly des
 
 export interface ReviewScreenProps {
 	readonly session: ReadyReviewSession;
+	/**
+	 * Page size of each screening list; omitted, the shared defaults apply.
+	 */
+	readonly paging?: ScreeningPaging;
 }
 
-export const ReviewScreen = ({ session }: ReviewScreenProps): ReactElement => {
+export const ReviewScreen = ({ session, paging }: ReviewScreenProps): ReactElement => {
 	const { review, view } = session;
 	const [tab, setTab] = useState(RELATED_TAB);
-	const related = useScreeningArrangement(session.semanticRows);
-	const searchOrder = useScreeningArrangement(session.standardRows);
+	const related = useScreeningArrangement(session.semanticRows, paging);
+	const searchOrder = useScreeningArrangement(session.standardRows, paging);
 
 	const titleByWorkId = new Map(
 		[...session.semanticRows, ...session.standardRows, ...session.decidedRows].map((row) => [row.workId, row.title]),
