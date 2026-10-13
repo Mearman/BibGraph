@@ -5,6 +5,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+	clearDecision,
 	createReview,
 	deleteReview,
 	getPool,
@@ -59,6 +60,16 @@ describe("review store", () => {
 		await updateReview(review.id, { name: "renamed" });
 		const renamed = await getReview(review.id);
 		expect(renamed?.name).toBe("renamed");
+	});
+
+	it("clears a decision by removing its key so the work is undecided again", async () => {
+		const review = await createReview({ name: "undo", query: "" });
+		await setDecision(review.id, "W1", "include");
+		await setDecision(review.id, "W2", "exclude");
+		await clearDecision(review.id, "W1");
+		const stored = await getReview(review.id);
+		expect(Object.keys(stored?.decisions ?? {})).toEqual(["W2"]);
+		await expect(clearDecision("missing", "W1")).rejects.toThrow("review not found");
 	});
 
 	it("persists a suggested composition with its evidence", async () => {

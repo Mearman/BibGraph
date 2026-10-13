@@ -175,6 +175,18 @@ export const setDecision = async (
 };
 
 /**
+ * Removes a work's screening decision so it returns to the screening lists. The key is deleted, not set to undefined, because the screening engines treat every key of the decisions record as decided.
+ */
+export const clearDecision = async (id: string, workId: string): Promise<void> => {
+	const review = await getDB().reviews.get(id);
+	if (!review) {
+		throw new Error(`review not found: ${id}`);
+	}
+	const decisions = Object.fromEntries(Object.entries(review.decisions).filter(([key]) => key !== workId));
+	await getDB().reviews.update(id, { decisions, updatedAt: new Date() });
+};
+
+/**
 Test-only helper: wipes the table so each unit test starts empty.
  */
 export const clearAllReviewsForTests = async (): Promise<void> => {

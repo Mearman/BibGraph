@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * Component tests for the family badge: a novel algorithm and a baseline each announce their family in words, not colour alone.
+ * Component tests for the family badge: the family name is spelled out in text and an icon differs between the families, so the marking never rests on colour alone.
  */
 
 import "@testing-library/jest-dom";
@@ -13,21 +13,32 @@ import { describe, expect, it } from "vitest";
 import { AlgorithmFamilyBadge } from "./AlgorithmFamilyBadge";
 
 describe("AlgorithmFamilyBadge", () => {
-	it("labels a novel algorithm as novel", () => {
+	it("spells out each family in text, which survives greyscale", () => {
 		render(
+			<MantineProvider>
+				<AlgorithmFamilyBadge family="novel" />
+				<AlgorithmFamilyBadge family="baseline" />
+			</MantineProvider>,
+		);
+		expect(screen.getByText("novel")).toBeInTheDocument();
+		expect(screen.getByText("baseline")).toBeInTheDocument();
+	});
+
+	it("gives the two families different icons", () => {
+		const novel = render(
 			<MantineProvider>
 				<AlgorithmFamilyBadge family="novel" />
 			</MantineProvider>,
 		);
-		expect(screen.getByText("novel")).toBeInTheDocument();
-	});
-
-	it("labels a baseline algorithm as baseline", () => {
-		render(
+		const baseline = render(
 			<MantineProvider>
 				<AlgorithmFamilyBadge family="baseline" />
 			</MantineProvider>,
 		);
-		expect(screen.getByText("baseline")).toBeInTheDocument();
+		const novelIcon = novel.container.querySelector("svg");
+		const baselineIcon = baseline.container.querySelector("svg");
+		expect(novelIcon).not.toBeNull();
+		expect(baselineIcon).not.toBeNull();
+		expect(novelIcon?.outerHTML).not.toBe(baselineIcon?.outerHTML);
 	});
 });

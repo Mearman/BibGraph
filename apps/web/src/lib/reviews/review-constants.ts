@@ -11,3 +11,8 @@ export const MAX_REVIEW_POOL_SIZE = 1000;
  * Seeds a zero-seeds start picks, and the size every seed selector is compared at.
  */
 export const ZERO_SEEDS_SELECTION_SIZE = 5;
+
+/**
+ * A review always keeps at least one seed: the ranking has nothing to be similar to without one.
+ */
+export const MIN_REVIEW_SEEDS = 1;

@@ -1,5 +1,5 @@
 /**
- * Unit tests for the work label fetcher: ids are looked up in batches under OpenAlex's OR-value limit, returned labels are keyed by short W id, and a work OpenAlex has no title for is labelled with its id so a screening row is never blank.
+ * Unit tests for the work label fetcher: ids are looked up in batches under OpenAlex's OR-value limit, returned labels are keyed by short W id, and a work OpenAlex has no title for keeps a null title so the screen marks the id as standing in.
  */
 
 import { describe, expect, it } from "vitest";
@@ -35,10 +35,10 @@ describe("createWorkLabelFetcher", () => {
 		expect(labels.get("W1")).toEqual({ title: "Title W1", year: 2020 });
 	});
 
-	it("falls back to the id when a work has no title", async () => {
+	it("keeps a null title when a work has none, so the screen can mark the id as not a title", async () => {
 		const { api } = makeApi();
 		const labels = await createWorkLabelFetcher(api)(["W5"]);
-		expect(labels.get("W5")?.title).toBe("W5");
+		expect(labels.get("W5")?.title).toBeNull();
 	});
 
 	it("omits ids OpenAlex does not return rather than inventing labels", async () => {

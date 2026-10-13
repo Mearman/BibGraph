@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * Unit tests for the review session hook: it loads the review and its pool, derives labelled semantic and standard rows and the algorithm comparison, persists a decision and refreshes, and records a reviewer's algorithm override on the stored composition. The pool fetcher, label fetcher and review store are in-memory fakes, so no network or database is touched.
+ * Unit tests for the review session hook: it loads the review and its pool, derives labelled rows (both paths, the decided works, the seeds) and the algorithm comparison, persists a decision and refreshes, undoes one, surfaces and retries a label failure, and records a reviewer's algorithm override on the stored composition. The pool fetcher, label fetcher and review store are in-memory fakes, so no network or database is touched.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -32,7 +32,7 @@ const fetcher: PoolFetcher = {
 	},
 };
 
-const makeDeps = (savedPool?: readonly { id: string; references: readonly string[] }[]): { deps: ReviewSessionDeps; stored: { current: LiteratureReview }; searches: { count: number }; pool: { current: readonly { id: string; references: readonly string[] }[] | undefined } } => {
+const makeDeps = (savedPool?: readonly { id: string; references: readonly string[] }[], fetchLabelsOverride?: ReviewSessionDeps["fetchLabels"]): { deps: ReviewSessionDeps; stored: { current: LiteratureReview }; searches: { count: number }; pool: { current: readonly { id: string; references: readonly string[] }[] | undefined } } => {
 	const searches = { count: 0 };
 	const pool: { current: readonly { id: string; references: readonly string[] }[] | undefined } = { current: savedPool };
 	const poolForComposition = [
@@ -66,10 +66,12 @@ const makeDeps = (savedPool?: readonly { id: string; references: readonly string
 			},
 			byIds: async (ids) => fetcher.byIds(ids),
 		},
-		fetchLabels: async () => {
-			await Promise.resolve();
-			return labels;
-		},
+		fetchLabels:
+			fetchLabelsOverride ??
+			(async () => {
+				await Promise.resolve();
+				return labels;
+			}),
 		store: {
 			getPool: async () => {
 				await Promise.resolve();
@@ -86,6 +88,13 @@ const makeDeps = (savedPool?: readonly { id: string; references: readonly string
 			setDecision: async (_id, workId, decision) => {
 				await Promise.resolve();
 				stored.current = { ...stored.current, decisions: { ...stored.current.decisions, [workId]: decision } };
+			},
+			clearDecision: async (_id, workId) => {
+				await Promise.resolve();
+				const decisions = Object.fromEntries(
+					Object.entries(stored.current.decisions).filter(([key]) => key !== workId),
+				);
+				stored.current = { ...stored.current, decisions };
 			},
 			updateReview: async (_id, patch) => {
 				await Promise.resolve();
@@ -218,6 +227,85 @@ describe("useReviewSession", () => {
 		expect(stored.current.suggestedComposition?.seedSelection?.chosenBy).toBe("reviewer");
 		// high-degree picks the most connected works, W2 first in this pool, so the seeds change.
 		expect(stored.current.seeds[0]).toBe("W2");
+	});
+
+	it("undoes a decision so the work returns to the screening lists", async () => {
+		const { hook, stored } = setup();
+		await waitFor(() => {
+			expect(hook.result.current.phase).toBe("ready");
+		});
+		const session = hook.result.current;
+		if (session.phase !== "ready") throw new Error("not ready");
+		await act(async () => {
+			await session.decide("W2", "exclude");
+		});
+		await waitFor(() => {
+			const current = hook.result.current;
+			if (current.phase !== "ready") throw new Error("not ready");
+			expect(current.decidedRows.map((row) => row.workId)).toEqual(["W2"]);
+		});
+		await act(async () => {
+			await session.undo("W2");
+		});
+		expect(stored.current.decisions.W2).toBeUndefined();
+		await waitFor(() => {
+			const current = hook.result.current;
+			if (current.phase !== "ready") throw new Error("not ready");
+			expect(current.standardRows.map((row) => row.workId)).toContain("W2");
+			expect(current.decidedRows).toEqual([]);
+		});
+	});
+
+	it("exposes a label failure with a retry that recovers", async () => {
+		let failures = 0;
+		const labels = new Map<string, WorkLabel>([["W2", { title: "Bridge paper", year: 2021 }]]);
+		const fetchLabels = async (): Promise<ReadonlyMap<string, WorkLabel>> => {
+			await Promise.resolve();
+			failures++;
+			if (failures === 1) throw new Error("titles unavailable");
+			return labels;
+		};
+		const { deps } = makeDeps(undefined, fetchLabels);
+		const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+		const { result } = renderHook(() => useReviewSession("r1", deps), { wrapper: wrapperFor(client) });
+		await waitFor(() => {
+			expect(result.current.phase).toBe("ready");
+		});
+		await waitFor(() => {
+			if (result.current.phase !== "ready") throw new Error("not ready");
+			expect(result.current.labelsError).toBe("titles unavailable");
+			expect(result.current.semanticRows.find((row) => row.workId === "W2")?.title).toBe("W2");
+		});
+		act(() => {
+			if (result.current.phase === "ready") result.current.retryLabels();
+		});
+		await waitFor(() => {
+			if (result.current.phase !== "ready") throw new Error("not ready");
+			expect(result.current.labelsError).toBeNull();
+			expect(result.current.semanticRows.find((row) => row.workId === "W2")?.title).toBe("Bridge paper");
+		});
+	});
+
+	it("lists the seeds and the decided works with titles", async () => {
+		const { hook, stored } = setup();
+		await waitFor(() => {
+			expect(hook.result.current.phase).toBe("ready");
+		});
+		await act(async () => {
+			const current = hook.result.current;
+			if (current.phase !== "ready") throw new Error("not ready");
+			await current.decide("W4", "include");
+		});
+		expect(stored.current.decisions.W4).toBe("include");
+		await waitFor(() => {
+			const current = hook.result.current;
+			if (current.phase !== "ready") throw new Error("not ready");
+			// Including W4 folds it into the seeds the ranking runs from.
+			expect(current.seedRefs.map((seed) => seed.id)).toEqual(["W1", "W3", "W4"]);
+			const decided = current.decidedRows.find((row) => row.workId === "W4");
+			expect(decided?.decision).toBe("include");
+			expect(decided?.titleKnown).toBe(false);
+		});
 	});
 
 	it("does not offer a selector switch for a review whose seeds were supplied", async () => {

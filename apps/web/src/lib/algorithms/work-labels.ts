@@ -1,5 +1,5 @@
 /**
- * Work label fetcher: titles and years for the works a screening list shows. Kept apart from the pool loader because the engines rank on citation structure alone; labels are presentation data fetched only for the rows a reviewer can see.
+ * Work label fetcher: titles and years for the works the review screens show, their seeds and their evidence paths. Kept apart from the pool loader because the engines rank on citation structure alone; labels are presentation data fetched only for what a reviewer can see.
  */
 
 import { normalizeOpenAlexId } from "@bibgraph/utils";
@@ -7,7 +7,10 @@ import { normalizeOpenAlexId } from "@bibgraph/utils";
 import { ID_LOOKUP_BATCH_SIZE } from "./openalex-pool-fetcher";
 
 export interface WorkLabel {
-	readonly title: string;
+	/**
+	 * The work's title, or null when OpenAlex has none, so the screen can mark the id as standing in for a missing title instead of presenting it as a title.
+	 */
+	readonly title: string | null;
 	readonly year: number | null;
 }
 
@@ -45,7 +48,7 @@ export const createWorkLabelFetcher =
 			});
 			for (const work of response.results) {
 				const id = normalizeOpenAlexId(work.id);
-				labels.set(id, { title: work.display_name ?? id, year: work.publication_year });
+				labels.set(id, { title: work.display_name, year: work.publication_year });
 			}
 		}
 		return labels;

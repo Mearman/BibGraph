@@ -1,5 +1,5 @@
 /**
- * Review session hook: the container logic behind the screening screen. It loads a review and its pool, derives the labelled semantic and standard rows and the algorithm comparison through the tested view-model and comparison modules, and exposes the two writes a reviewer makes (a screening decision, an algorithm override). All I/O arrives through the injected deps, so presentation components stay free of storage and network and the hook tests with in-memory fakes.
+ * Review session hook: the container logic behind the screening screen. It loads a review and its pool, derives the labelled screening rows (both paths, the decided works and the seeds), the algorithm comparison and the label fetch state through the tested view-model and comparison modules, and exposes the writes a reviewer makes (a screening decision, undoing one, an algorithm override). All I/O arrives through the injected deps, so presentation components stay free of storage and network and the hook tests with in-memory fakes.
  */
 
 import { keepPreviousData, type QueryClient, skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,7 +13,14 @@ import type { PoolWork } from "@/lib/algorithms/screening-engine";
 import type { WorkLabel, WorkLabelFetcher } from "@/lib/algorithms/work-labels";
 import type { ReviewCompute } from "@/lib/reviews/compute-handler";
 import { ZERO_SEEDS_SELECTION_SIZE } from "@/lib/reviews/review-constants";
-import { type ScreeningRow, type ScreeningView, withLabels } from "@/lib/reviews/screening-view";
+import {
+	type DecidedRow,
+	labelIdsFor,
+	type LabelledRef,
+	type ScreeningRow,
+	type ScreeningView,
+	withLabels,
+} from "@/lib/reviews/screening-view";
 import type {
 	LiteratureReview,
 	ScreeningDecision,
@@ -27,6 +34,10 @@ import type {
 export interface SessionStorePort {
 	readonly getReview: (id: string) => Promise<LiteratureReview | undefined>;
 	readonly setDecision: (id: string, workId: string, decision: ScreeningDecision) => Promise<void>;
+	/**
+	 * Removes a work's decision, returning it to the screening lists.
+	 */
+	readonly clearDecision: (id: string, workId: string) => Promise<void>;
 	readonly updateReview: (id: string, patch: UpdateReviewInput) => Promise<void>;
 	readonly getPool: (reviewId: string) => Promise<readonly PoolWork[] | undefined>;
 	readonly savePool: (reviewId: string, pool: readonly PoolWork[]) => Promise<void>;
@@ -51,6 +62,23 @@ export interface ReadyReviewSession {
 	readonly semanticRows: readonly ScreeningRow[];
 	readonly standardRows: readonly ScreeningRow[];
 	/**
+	 * Every decided work, titled, for the Decided list.
+	 */
+	readonly decidedRows: readonly DecidedRow[];
+	/**
+	 * The seeds the semantic ranking runs from, titled, for the header.
+	 */
+	readonly seedRefs: readonly LabelledRef[];
+	/**
+	 * True while the first label fetch is in flight; titles are not yet known.
+	 */
+	readonly labelsPending: boolean;
+	/**
+	 * Why the labels could not be loaded, when the fetch failed; the lists still work without titles.
+	 */
+	readonly labelsError: string | null;
+	readonly retryLabels: () => void;
+	/**
 	 * Null while the comparison is still being measured on the pool.
 	 */
 	readonly comparison: AlgorithmComparison | null;
@@ -64,6 +92,10 @@ export interface ReadyReviewSession {
 	 */
 	readonly seedSelectionEditable: boolean;
 	readonly decide: (workId: string, decision: ScreeningDecision) => Promise<void>;
+	/**
+	 * Removes a work's decision so it returns to the screening lists.
+	 */
+	readonly undo: (workId: string) => Promise<void>;
 	readonly chooseAlgorithm: (stage: AlgorithmStage, algorithmId: string) => Promise<void>;
 }
 
@@ -151,18 +183,12 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 	});
 	const view = viewQuery.data;
 
-	const visibleIds = useMemo(
-		() =>
-			view === undefined
-				? []
-				: [...new Set([...view.semantic, ...view.standard].map((row) => row.workId))].sort(),
-		[view],
-	);
+	const labelIds = useMemo(() => (view === undefined ? [] : labelIdsFor(view)), [view]);
 	const labelsQuery = useQuery({
-		queryKey: ["review-labels", visibleIds.join(",")],
+		queryKey: ["review-labels", labelIds.join(",")],
 		staleTime: Infinity,
 		placeholderData: keepPreviousData,
-		queryFn: visibleIds.length === 0 ? skipToken : async () => deps.fetchLabels(visibleIds),
+		queryFn: labelIds.length === 0 ? skipToken : async () => deps.fetchLabels(labelIds),
 	});
 
 	const comparisonQuery = useQuery({
@@ -199,6 +225,13 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 		onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["review", reviewId] }),
 	});
 
+	const undo = useMutation({
+		mutationFn: async (workId: string) => {
+			await deps.store.clearDecision(reviewId, workId);
+		},
+		onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["review", reviewId] }),
+	});
+
 	const override = useMutation({
 		mutationFn: async (input: Readonly<{ stage: AlgorithmStage; algorithmId: string }>) => {
 			if (review?.suggestedComposition == null) {
@@ -229,19 +262,29 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 	if (viewQuery.error !== null) return { phase: "error", message: errorMessage(viewQuery.error) };
 	if (review === undefined || view === undefined) return { phase: "loading" };
 
-	const labels = labelsQuery.data ?? NO_LABELS;
+	const labelled = withLabels(view, labelsQuery.data ?? NO_LABELS);
 	return {
 		phase: "ready",
 		review,
 		view,
-		semanticRows: withLabels(view.semantic, labels),
-		standardRows: withLabels(view.standard, labels),
+		semanticRows: labelled.semantic,
+		standardRows: labelled.standard,
+		decidedRows: labelled.decided,
+		seedRefs: labelled.seeds,
+		labelsPending: labelsQuery.isPending,
+		labelsError: labelsQuery.error === null ? null : errorMessage(labelsQuery.error),
+		retryLabels: () => {
+			void labelsQuery.refetch();
+		},
 		comparison: comparisonQuery.data ?? null,
 		comparisonError: comparisonQuery.error === null ? null : errorMessage(comparisonQuery.error),
 		inUse: inUseFrom(review.suggestedComposition),
 		seedSelectionEditable: review.suggestedComposition?.seedSelection != null,
 		decide: async (workId, chosen) => {
 			await decision.mutateAsync({ workId, decision: chosen });
+		},
+		undo: async (workId) => {
+			await undo.mutateAsync(workId);
 		},
 		chooseAlgorithm: async (stage, algorithmId) => {
 			await override.mutateAsync({ stage, algorithmId });

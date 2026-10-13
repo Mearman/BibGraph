@@ -15,6 +15,34 @@ interface UseHotkeysOptions {
   scope?: string;
 }
 
+/**
+ * Moves focus to the previous or next element carrying role="listitem". The current item is the focused element itself when it is a list item (rows are made focusable), or the list item containing focus (for example when a button inside a row holds it).
+ */
+const focusSiblingListitem = (direction: 1 | -1): void => {
+  const items = [...document.querySelectorAll('[role="listitem"]')];
+  if (items.length === 0) return;
+  const active = document.activeElement;
+  const current =
+    active !== null && items.includes(active) ? active : (active?.parentElement ?? null);
+  const currentIndex = current !== null ? items.indexOf(current) : -1;
+  const nextIndex =
+    direction === 1 ? (currentIndex + 1) % items.length : currentIndex <= 0 ? items.length - 1 : currentIndex - 1;
+  const next = items[nextIndex];
+  if (next instanceof HTMLElement) {
+    next.focus();
+  }
+};
+
+/**
+ * Whether a key press is plain typing into a form field: a bare single character (no modifier chord, no multi-key sequence) aimed at an input, textarea, select or editable element. Such presses must reach the field, so a bare-letter shortcut such as "j" must not claim them.
+ */
+const isTypingIntoField = (event: Readonly<KeyboardEvent>, hotkeyKey: string): boolean => {
+  const isBareCharacter = hotkeyKey.length === 1;
+  const { target } = event;
+  if (!isBareCharacter || !(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+};
+
 export const useGlobalHotkeys = (options: Readonly<UseHotkeysOptions> = {}) => {
   const { enabled = true } = options;
 
@@ -130,14 +158,7 @@ export const useGlobalHotkeys = (options: Readonly<UseHotkeysOptions> = {}) => {
       key: 'j',
       description: 'Next result',
       action: () => {
-        const results = document.querySelectorAll('[role="listitem"]');
-        const activeParent = document.activeElement?.parentElement;
-        const currentIndex = activeParent ? [...results].indexOf(activeParent) : -1;
-        const nextIndex = (currentIndex + 1) % results.length;
-        const nextElement = results[nextIndex];
-        if (nextElement instanceof HTMLElement) {
-          nextElement.focus();
-        }
+        focusSiblingListitem(1);
       },
       category: 'content',
       preventDefault: true,
@@ -146,14 +167,7 @@ export const useGlobalHotkeys = (options: Readonly<UseHotkeysOptions> = {}) => {
       key: 'k',
       description: 'Previous result',
       action: () => {
-        const results = document.querySelectorAll('[role="listitem"]');
-        const activeParent = document.activeElement?.parentElement;
-        const currentIndex = activeParent ? [...results].indexOf(activeParent) : -1;
-        const previousIndex = currentIndex <= 0 ? results.length - 1 : currentIndex - 1;
-        const previousElement = results[previousIndex];
-        if (previousElement instanceof HTMLElement) {
-          previousElement.focus();
-        }
+        focusSiblingListitem(-1);
       },
       category: 'content',
       preventDefault: true,
@@ -221,7 +235,7 @@ export const useGlobalHotkeys = (options: Readonly<UseHotkeysOptions> = {}) => {
       // Check if the key combination matches
       const isMatch = checkKeyMatch(event, hotkey.key);
 
-      if (isMatch) {
+      if (isMatch && !isTypingIntoField(event, hotkey.key)) {
         if (hotkey.preventDefault === true) {
           event.preventDefault();
         }
@@ -295,25 +309,40 @@ export const useSearchHotkeys = (onSearch?: () => void, onClear?: () => void) =>
 export const useNavigationHotkeys = () => {
   useHotkeys('j', (e) => {
     e.preventDefault();
-    const results = document.querySelectorAll('[role="listitem"]');
-    const activeParent = document.activeElement?.parentElement;
-    const currentIndex = activeParent ? [...results].indexOf(activeParent) : -1;
-    const nextIndex = (currentIndex + 1) % results.length;
-    const nextElement = results[nextIndex];
-    if (nextElement instanceof HTMLElement) {
-      nextElement.focus();
-    }
+    focusSiblingListitem(1);
   });
 
   useHotkeys('k', (e) => {
     e.preventDefault();
-    const results = document.querySelectorAll('[role="listitem"]');
-    const activeParent = document.activeElement?.parentElement;
-    const currentIndex = activeParent ? [...results].indexOf(activeParent) : -1;
-    const previousIndex = currentIndex <= 0 ? results.length - 1 : currentIndex - 1;
-    const previousElement = results[previousIndex];
-    if (previousElement instanceof HTMLElement) {
-      previousElement.focus();
-    }
+    focusSiblingListitem(-1);
   });
+};
+
+/**
+ * Screening shortcuts: i includes and x excludes the screening row that currently holds focus (the row itself, or a control inside it). react-hotkeys-hook leaves form fields alone by default, so typing in the title filter never triggers them.
+ */
+export const useScreeningDecisionHotkeys = (options: Readonly<{
+  onDecide: (workId: string, decision: 'include' | 'exclude') => void;
+  enabled?: boolean;
+}>) => {
+  const { onDecide, enabled = true } = options;
+
+  const decideFocusedRow = useCallback((decision: 'include' | 'exclude') => {
+    const active = document.activeElement;
+    const row = active instanceof Element ? active.closest<HTMLElement>('[data-screening-row]') : null;
+    const workId = row?.dataset.workId ?? null;
+    if (workId !== null) {
+      onDecide(workId, decision);
+    }
+  }, [onDecide]);
+
+  useHotkeys('i', (e) => {
+    e.preventDefault();
+    decideFocusedRow('include');
+  }, { enabled });
+
+  useHotkeys('x', (e) => {
+    e.preventDefault();
+    decideFocusedRow('exclude');
+  }, { enabled });
 };
