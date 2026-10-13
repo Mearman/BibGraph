@@ -30,9 +30,10 @@ import {
   IconRefresh,
   IconServer,
 } from '@tabler/icons-react';
-import { useCallback,useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { ICON_SIZE } from '@/config/style-constants';
+import { NARROW_VIEWPORT_MEDIA_QUERY, useNarrowViewport } from '@/hooks/use-narrow-viewport';
 
 export interface GraphSourcePanelProps {
   /**
@@ -169,7 +170,12 @@ export const GraphSourcePanel = ({
   onRefresh,
   loading = false,
 }: GraphSourcePanelProps) => {
-  const [collapsed, setCollapsed] = useState(false);
+  // On phone-width viewports the panel defaults to collapsed and, when expanded, overlays the graph instead of squeezing the canvas to a sliver.
+  const isNarrowViewport = useNarrowViewport();
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+    return window.matchMedia(NARROW_VIEWPORT_MEDIA_QUERY).matches;
+  });
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((previous) => !previous);
@@ -197,7 +203,7 @@ export const GraphSourcePanel = ({
         }}
       >
         <Tooltip label="Show data sources" position="right">
-          <ActionIcon variant="subtle" onClick={toggleCollapsed}>
+          <ActionIcon variant="subtle" onClick={toggleCollapsed} aria-label="Show data sources">
             <IconChevronRight size={ICON_SIZE.LG} />
           </ActionIcon>
         </Tooltip>
@@ -215,6 +221,13 @@ export const GraphSourcePanel = ({
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
+        ...(isNarrowViewport && {
+          position: 'absolute' as const,
+          left: 0,
+          top: 0,
+          bottom: 0,
+          zIndex: 10,
+        }),
       }}
     >
       {/* Header */}

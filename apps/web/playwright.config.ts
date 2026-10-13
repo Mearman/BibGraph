@@ -11,6 +11,9 @@ const IS_CI = process.env.CI !== undefined;
 const CI_WORKER_COUNT = 3;
 const LOCAL_WORKER_COUNT = 4;
 
+// Phone-width graph spec: runs only in the mobile project (touch context), so the desktop chromium project excludes it.
+const GRAPH_MOBILE_SPEC_GLOB = "**/graph-mobile.e2e.test.ts";
+
 export default defineConfig({
   // Test directory - using src and e2e for all tests
   testDir: "./",
@@ -93,34 +96,27 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      // The phone-width graph spec belongs to the mobile project below (it asserts phone-width layout and touch behaviour).
+      testIgnore: IS_CI ? ["**/manual/**", GRAPH_MOBILE_SPEC_GLOB] : [GRAPH_MOBILE_SPEC_GLOB],
       use: {
         ...devices["Desktop Chrome"],
-        // Reuse storage state for faster tests (cached cookies, localStorage, IndexedDB)
-        // Disabled in CI to prevent stale state with preview server caching
+        // Reuse storage state for faster tests (cached cookies, localStorage, IndexedDB) Disabled in CI to prevent stale state with preview server caching
         storageState: IS_CI ? undefined : (fs.existsSync("./test-results/storage-state/state.json") ? "./test-results/storage-state/state.json" : undefined),
       },
     },
 
-    // Uncomment for cross-browser testing
-    // {
-    //   name: 'firefox',
-    //   use: { ...devices['Desktop Firefox'] },
-    // },
+    // Phone-width coverage for the force-graph surfaces: an iPhone-class touch device running the focused graph-mobile spec (2D/3D canvases, touch pan/pinch, tap, long-press, WebGL fallback, in-app navigation).
+    {
+      name: "mobile-chromium",
+      // iPhone 13 descriptor defaults to WebKit; pin Chromium so the project runs on the browser CI installs (`playwright install chromium`).
+      use: { ...devices["iPhone 13"], defaultBrowserType: "chromium" },
+      testMatch: [GRAPH_MOBILE_SPEC_GLOB],
+      testIgnore: IS_CI ? ["**/manual/**"] : [],
+    },
 
-    // {
-    //   name: 'webkit',
-    //   use: { ...devices['Desktop Safari'] },
-    // },
+    // Uncomment for cross-browser testing { name: 'firefox', use: { ...devices['Desktop Firefox'] }, },
 
-    // Mobile testing
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
+    // { name: 'webkit', use: { ...devices['Desktop Safari'] }, },
   ],
 
   // Output directories

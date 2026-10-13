@@ -26,6 +26,14 @@ import {
   TIMING,
 } from './constants';
 import { getEdgeStyle } from './edge-styles';
+import {
+  findNearestNode,
+  graphToCssPoint,
+  LONG_PRESS_NODE_HIT_RADIUS_PX,
+  readCanvasTransform,
+} from './graph-touch';
+import { useCanvasPanPolling } from './use-canvas-pan-polling';
+import { useNodeLongPress } from './use-node-long-press';
 
 // Performance monitoring
 interface PerformanceMetrics {
@@ -41,11 +49,7 @@ const DEFAULT_HIGHLIGHTED_NODE_IDS = new Set<string>();
 const DEFAULT_HIGHLIGHTED_PATH: string[] = [];
 const DEFAULT_EXPANDING_NODE_IDS = new Set<string>();
 
-const DEFAULT_PROGRESSIVE_LOADING = {
-  enabled: true,
-  batchSize: 50,
-  batchDelayMs: 16,
-} as const;
+const DEFAULT_PROGRESSIVE_LOADING = { enabled: true, batchSize: 50, batchDelayMs: 16 } as const;
 
 // Node for the force graph (extends NodeObject)
 interface ForceGraphNode extends NodeObject {
@@ -212,8 +216,6 @@ const LABEL_MAX_LENGTH_DIVISOR = 4;
 const LABEL_VERTICAL_OFFSET_PX = 12;
 // Line-width multiplier applied to a highlighted link relative to its base width.
 const HIGHLIGHTED_LINK_WIDTH_MULTIPLIER = 1.5;
-// Polling interval (ms) for reading the canvas pan transform (react-force-graph exposes no pan-change event).
-const PAN_POLL_INTERVAL_MS = 100;
 // Converts a per-frame duration (ms) to frames-per-second for the stats overlay.
 const MS_PER_SECOND = 1000;
 // Converts a 0-1 ratio (culling efficiency, load progress) to a percentage for display.
@@ -226,7 +228,7 @@ export const OptimizedForceGraphVisualization = ({
   edges,
   visible = true,
   width,
-  height = 500,
+  height,
   _displayMode = 'highlight',
   highlightedNodeIds = DEFAULT_HIGHLIGHTED_NODE_IDS,
   highlightedPath = DEFAULT_HIGHLIGHTED_PATH,
@@ -296,7 +298,11 @@ export const OptimizedForceGraphVisualization = ({
   );
 
   // Use culled nodes if optimizations are enabled, otherwise use all nodes
-  const renderNodes = enableOptimizations ? culledNodes.map(n => n.originalNode) : progressiveNodes;
+  // Memoised so the force-graph data identity only changes when the visible set does: a fresh array every render re-feeds ForceGraph2D new graph data, whose finish-update re-zoom calls onZoom, which sets state and renders again (an unbounded update loop that left the canvas blank).
+  const renderNodes = useMemo(
+    () => (enableOptimizations ? culledNodes.map(n => n.originalNode) : progressiveNodes),
+    [enableOptimizations, culledNodes, progressiveNodes]
+  );
 
   // Notify parent when graph methods become available
   useEffect(() => {
@@ -310,15 +316,19 @@ export const OptimizedForceGraphVisualization = ({
     return () => { clearTimeout(timeoutId); };
   }, [onGraphReady]);
 
-  // Track container width for responsive sizing and viewport calculation
+  // Track container size for responsive sizing: the canvas fills its container (the graph page card gives it a viewport-fraction height) instead of a fixed pixel height that clips at phone sizes.
   const [containerWidth, setContainerWidth] = React.useState(width ?? CONTAINER.DEFAULT_WIDTH);
+  const [containerHeight, setContainerHeight] = React.useState(height ?? CONTAINER.DEFAULT_HEIGHT);
 
   useEffect(() => {
-    if (!containerRef.current || width !== undefined) return undefined;
+    const shouldTrackWidth = width === undefined;
+    const shouldTrackHeight = height === undefined;
+    if (!containerRef.current || (!shouldTrackWidth && !shouldTrackHeight)) return undefined;
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
+        if (shouldTrackWidth) setContainerWidth(entry.contentRect.width);
+        if (shouldTrackHeight) setContainerHeight(entry.contentRect.height);
 
         // Update viewport bounds when container resizes
         if (graphRef.current) {
@@ -333,7 +343,7 @@ export const OptimizedForceGraphVisualization = ({
               DEFAULT_CAMERA_Z_DISTANCE,
               zoom,
               entry.contentRect.width,
-              height
+              entry.contentRect.height
             ));
           } catch {
             // Camera might not be ready yet
@@ -573,6 +583,16 @@ export const OptimizedForceGraphVisualization = ({
   }, [isEdgeHighlighted, getLinkStyle]);
 
   // Handle zoom/pan to update viewport bounds
+  // Fit the graph into view shortly after the node set changes (the 3D view does the same): the library's default zoom depends only on node count, so a phone-width canvas otherwise opens with nodes off screen.
+  const nodeSignature = useMemo(() => graphData.nodes.map((node) => node.id).sort().join('|'), [graphData.nodes]);
+  useEffect(() => {
+    if (nodeSignature === '') return undefined;
+    const timeoutId = setTimeout(() => {
+      graphRef.current?.zoomToFit(TIMING.ZOOM_TO_FIT_DURATION_MS, TIMING.ZOOM_TO_FIT_PADDING);
+    }, TIMING.AUTO_FIT_DELAY_MS);
+    return () => { clearTimeout(timeoutId); };
+  }, [nodeSignature]);
+
   const handleZoom = useCallback(() => {
     if (enableOptimizations && graphRef.current) {
       try {
@@ -582,24 +602,22 @@ export const OptimizedForceGraphVisualization = ({
         // Notify parent component of zoom change
         onZoom?.(zoom);
 
-        // For camera position, use defaults if method not available
-        const x = 0;
-        const y = 0;
-        const z = 1000;
+        // Culling bounds must track the live camera centre: centring them on the origin instead culls on-screen nodes after any fit or pan and renders off-screen ones near the origin, leaving a phone-width canvas apparently blank.
+        const center = graphRef.current.centerAt();
 
         setViewportBounds(calculateViewportBounds(
-          x,
-          y,
-          z,
+          center.x,
+          center.y,
+          DEFAULT_CAMERA_Z_DISTANCE,
           zoom,
           containerWidth,
-          height
+          height ?? containerHeight
         ));
       } catch {
         // Camera might not be ready
       }
     }
-  }, [enableOptimizations, containerWidth, height, onZoom]);
+  }, [enableOptimizations, containerWidth, containerHeight, height, onZoom]);
 
   // Performance monitoring toggle
   const handlePerformanceToggle = useCallback(() => {
@@ -607,46 +625,39 @@ export const OptimizedForceGraphVisualization = ({
   }, []);
 
   // Track camera pan position for mini-map
+  useCanvasPanPolling(containerRef, onPan);
+
+  // Long-press opens the node context menu on touch devices (the replacement for the mouse right-click, which phones cannot produce). The hit test inverts the canvas transform to find the node under the held finger.
+  const latestGraphDataRef = useRef(graphData);
   useEffect(() => {
-    if (!onPan || !containerRef.current) return undefined;
+    latestGraphDataRef.current = graphData;
+  }, [graphData]);
 
-    // Poll for camera position changes
-    const interval = setInterval(() => {
-      try {
-        // Access canvas through container
-        const canvas = containerRef.current?.querySelector('canvas');
-        if (!canvas) return;
+  const { handleNodeClick } = useNodeLongPress({
+    containerRef,
+    hitTest: (clientX, clientY) => {
+      const canvas = containerRef.current?.querySelector('canvas') ?? null;
+      const rect = canvas?.getBoundingClientRect();
+      const transform = readCanvasTransform(canvas);
+      if (rect === undefined || transform === null) return null;
 
-        // Get transformation matrix from canvas
-        const transform = canvas.style.transform;
-        if (!transform) return;
-
-        // Parse transform: "translate(x, y) scale(z)" Split by parentheses to extract translate values
-        const translatePrefix = 'translate(';
-        const translateStart = transform.indexOf(translatePrefix);
-        if (translateStart === -1) return;
-
-        const translateEnd = transform.indexOf(')', translateStart);
-        if (translateEnd === -1) return;
-
-        const valuesString = transform.slice(translateStart + translatePrefix.length, translateEnd);
-        const values = valuesString.split(',').map(v => v.trim());
-
-        if (values.length >= 2) {
-          const panX = Number.parseFloat(values[0]) || 0;
-          const panY = Number.parseFloat(values[1]) || 0;
-          onPan(panX, panY);
-        }
-      } catch {
-        // Canvas might not be ready or transform not available
-      }
-    }, PAN_POLL_INTERVAL_MS);
-
-    return () => { clearInterval(interval); };
-  }, [onPan]);
+      const devicePixelRatio = window.devicePixelRatio || 1;
+      const cssPoint = { x: clientX - rect.left, y: clientY - rect.top };
+      const positioned = latestGraphDataRef.current.nodes.map((node) => {
+        const css = graphToCssPoint({ x: node.x ?? 0, y: node.y ?? 0 }, transform, devicePixelRatio);
+        return { ...node, x: css.x, y: css.y };
+      });
+      return findNearestNode(positioned, cssPoint, LONG_PRESS_NODE_HIT_RADIUS_PX)?.originalNode ?? null;
+    },
+    onNodeRightClick,
+    onNodeClick,
+  });
 
   return (
-    <Box ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <Box
+      ref={containerRef}
+      style={{ position: 'relative', width: '100%', height: '100%' }}
+    >
       {visible && (
         <>
           <LoadingOverlay visible={loadingState.isLoading} />
@@ -703,13 +714,13 @@ export const OptimizedForceGraphVisualization = ({
           <ForceGraph2D
             ref={graphRef}
             graphData={graphData}
-            width={containerWidth}
-            height={height}
+            width={width ?? containerWidth}
+            height={height ?? containerHeight}
             backgroundColor={colorScheme === 'dark' ? '#1a1a1a' : '#ffffff'}
             nodeCanvasObject={nodeCanvasObject}
             linkCanvasObject={linkCanvasObject}
             onNodeClick={(node) => {
-              if (isForceGraphNode(node)) onNodeClick?.(node.originalNode);
+              if (isForceGraphNode(node)) handleNodeClick(node.originalNode);
             }}
             onNodeRightClick={(node, event) => {
               if (isForceGraphNode(node)) onNodeRightClick?.(node.originalNode, event);

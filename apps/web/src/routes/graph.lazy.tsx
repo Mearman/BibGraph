@@ -86,19 +86,9 @@ const isGraphMethods = (value: unknown): value is GraphMethods => {
 };
 
 /**
- * Entity Graph Page Component
- *
- * Displays entities from multiple sources as an interactive force-directed graph
+ * Graph page body. Rendered only once the visualization context is available, so its hook order is stable across renders.
  */
-const EntityGraphPage = () => {
-  // Get shared state from context (provided by RootLayout for graph page)
-  const context = useGraphVisualizationContext();
-
-  // This component should only be rendered within the provider, so context should never be null
-  if (!context) {
-    throw new Error('EntityGraphPage must be used within GraphVisualizationProvider');
-  }
-
+const EntityGraphPageContent = ({ context }: { context: NonNullable<ReturnType<typeof useGraphVisualizationContext>> }) => {
   const { graphData, visualization } = context;
 
   // Destructure graph data
@@ -343,7 +333,7 @@ const EntityGraphPage = () => {
   }
 
   return (
-    <Flex h={`calc(100vh - ${String(LAYOUT.HEADER_HEIGHT)}px)`} style={{ overflow: 'hidden' }}>
+    <Flex h={`calc(100vh - ${String(LAYOUT.HEADER_HEIGHT)}px)`} pos="relative" style={{ overflow: 'hidden' }}>
       {/* Left: Source Panel */}
       <GraphSourcePanel
         sources={sources}
@@ -512,6 +502,7 @@ const EntityGraphPage = () => {
                     expandingNodeIds={expandingNodeIdsSet}
                     displayMode={displayMode}
                     enableSimulation={enableSimulation}
+                    enableAdaptiveLOD
                     onNodeClick={handleNodeClick}
                     onNodeRightClick={handleNodeRightClick}
                     onBackgroundClick={handleBackgroundClick}
@@ -578,6 +569,23 @@ const EntityGraphPage = () => {
       </Box>
     </Flex>
   );
+};
+
+
+/**
+ * Entity Graph Page Component
+ *
+ * Displays entities from multiple sources as an interactive force-directed graph
+ */
+const EntityGraphPage = () => {
+  // Get shared state from context (provided by RootLayout for graph page). During same-document navigation into /graph the root layout mounts the provider a frame after this route renders, so the context is legitimately null for that frame: render the loading state instead of throwing (a throw here bricks the page behind the error boundary).
+  const context = useGraphVisualizationContext();
+
+  if (!context) {
+    return <GraphLoadingState />;
+  }
+
+  return <EntityGraphPageContent context={context} />;
 };
 
 export const Route = createLazyFileRoute('/graph')({

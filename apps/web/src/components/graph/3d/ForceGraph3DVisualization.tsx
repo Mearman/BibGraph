@@ -17,6 +17,7 @@ import { detectWebGLCapabilities, GraphLODManager } from '@bibgraph/utils';
 import { Box, LoadingOverlay, useComputedColorScheme } from '@mantine/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph3D from 'react-force-graph-3d';
+import { Vector3 } from 'three';
 
 import { useCameraPersistence } from '../../../hooks/useCameraPersistence';
 import { useGraph3DPerformance } from '../../../hooks/useGraph3DPerformance';
@@ -28,7 +29,9 @@ import {
   SIMULATION,
   TIMING,
 } from '../constants';
+import { findNearestNode, LONG_PRESS_NODE_HIT_RADIUS_PX } from '../graph-touch';
 import type { DisplayMode, LinkStyle, NodeStyle } from '../types';
+import { useNodeLongPress } from '../use-node-long-press';
 import { PerformanceOverlay } from './PerformanceOverlay';
 import type { ForceGraph3DInstanceHandle, WebGLStatus } from './types';
 import {
@@ -165,7 +168,7 @@ export const ForceGraph3DVisualization = ({
   edges,
   visible = true,
   width,
-  height = 500,
+  height,
   displayMode = 'highlight',
   highlightedNodeIds = DEFAULT_HIGHLIGHTED_NODE_IDS,
   highlightedPath = DEFAULT_HIGHLIGHTED_PATH,
@@ -269,21 +272,25 @@ export const ForceGraph3DVisualization = ({
     };
   }, [enableCursorCenteredZoom]);
 
-  // === Container Width Tracking ===
+  // === Container Size Tracking === The canvas fills its container (viewport-fraction height on the graph page) instead of a fixed pixel height that clips at phone sizes.
   const [containerWidth, setContainerWidth] = useState(width ?? CONTAINER.DEFAULT_WIDTH);
+  const [containerHeight, setContainerHeight] = useState(height ?? CONTAINER.DEFAULT_HEIGHT);
 
   useEffect(() => {
-    if (!containerRef.current || width !== undefined) return () => { /* nothing to clean up */ };
+    const shouldTrackWidth = width === undefined;
+    const shouldTrackHeight = height === undefined;
+    if (!containerRef.current || (!shouldTrackWidth && !shouldTrackHeight)) return () => { /* nothing to clean up */ };
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
+        if (shouldTrackWidth) setContainerWidth(entry.contentRect.width);
+        if (shouldTrackHeight) setContainerHeight(entry.contentRect.height);
       }
     });
 
     resizeObserver.observe(containerRef.current);
     return () => { resizeObserver.disconnect(); };
-  }, [width]);
+  }, [width, height]);
 
   // === Graph Data Transformation ===
   const filterNodeIds = displayMode === 'filter' ? highlightedNodeIds : undefined;
@@ -340,6 +347,39 @@ export const ForceGraph3DVisualization = ({
     isPathHighlightMode: highlightedPath.length > 0,
   });
 
+  // === Long-Press Context Menu (touch replacement for right-click) ===
+  // Projects every node's world position through the camera to find the node under the held finger, then raises the same context menu a right-click opens.
+  const latestGraphDataRef = useRef(graphData);
+  useEffect(() => {
+    latestGraphDataRef.current = graphData;
+  }, [graphData]);
+
+  const {
+    handleNodeClick: handleNodeClickWithLongPressGuard,
+  } = useNodeLongPress({
+    containerRef,
+    hitTest: (clientX, clientY) => {
+      const graph = graphRef.current;
+      const canvas = containerRef.current?.querySelector('canvas');
+      if (!graph || !canvas) return null;
+      const rect = canvas.getBoundingClientRect();
+
+      const camera = graph.camera();
+      const cssPoint = { x: clientX - rect.left, y: clientY - rect.top };
+      const projected = latestGraphDataRef.current.nodes.map((node) => {
+        const world = new Vector3(node.x ?? 0, node.y ?? 0, node.z ?? 0).project(camera);
+        return {
+          ...node,
+          x: ((world.x + 1) / 2) * rect.width,
+          y: ((1 - world.y) / 2) * rect.height,
+        };
+      });
+      return findNearestNode(projected, cssPoint, LONG_PRESS_NODE_HIT_RADIUS_PX)?.originalNode ?? null;
+    },
+    onNodeRightClick,
+    onNodeClick,
+  });
+
   // === Interactions ===
   const {
     handleNodeClick,
@@ -348,7 +388,7 @@ export const ForceGraph3DVisualization = ({
     handleBackgroundClick,
     handleKeyDown,
   } = useGraph3DInteractions({
-    onNodeClick,
+    onNodeClick: handleNodeClickWithLongPressGuard,
     onNodeRightClick,
     onNodeHover,
     onBackgroundClick,
@@ -478,7 +518,7 @@ export const ForceGraph3DVisualization = ({
       <ForceGraph3D
         ref={graphRef}
         width={width ?? containerWidth}
-        height={height}
+        height={height ?? containerHeight}
         graphData={graphData}
         nodeThreeObject={nodeThreeObject}
         nodeThreeObjectExtend={false}

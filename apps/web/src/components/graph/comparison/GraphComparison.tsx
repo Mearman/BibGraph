@@ -31,6 +31,7 @@ import { useCallback, useMemo } from 'react';
 
 import { OptimizedForceGraphVisualization } from '@/components/graph/OptimizedForceGraphVisualization';
 import { ICON_SIZE } from '@/config/style-constants';
+import { useNarrowViewport } from '@/hooks/use-narrow-viewport';
 import { type GraphLayoutType, useGraphLayout } from '@/hooks/useGraphLayout';
 
 interface GraphComparisonProperties {
@@ -96,6 +97,11 @@ interface GraphDiff {
 }
 
 /**
+ * Height (px) of each comparison panel when stacked at phone width.
+ */
+const COMPARISON_PANEL_PHONE_HEIGHT_PX = 420;
+
+/**
  * Graph Comparison Component
  */
 export const GraphComparison: React.FC<GraphComparisonProperties> = ({
@@ -158,6 +164,9 @@ export const GraphComparison: React.FC<GraphComparisonProperties> = ({
   const rightNodePositions = useMemo(() => {
     return layoutType === 'force' ? new Map<string, { x: number; y: number }>() : rightLayout.applyLayout(layoutType);
   }, [layoutType, rightLayout]);
+
+  // On phone-width viewports the two panels stack vertically; side by side each would be under half the viewport wide.
+  const isNarrowViewport = useNarrowViewport();
 
   // Handle swap
   const handleSwap = useCallback(() => {
@@ -237,10 +246,22 @@ export const GraphComparison: React.FC<GraphComparisonProperties> = ({
           </Group>
         </Card>
 
-        {/* Side-by-side graphs */}
-        <Flex gap="md" style={{ height: 'calc(100vh - 300px)', minHeight: 500 }}>
+        {/* Side-by-side graphs (stacked vertically at phone width) */}
+        <Flex
+          gap="md"
+          direction={isNarrowViewport ? 'column' : 'row'}
+          style={isNarrowViewport ? { minHeight: 500 } : { height: 'calc(100vh - 300px)', minHeight: 500 }}
+        >
           {/* Left graph */}
-          <Box flex={1} style={{ border: '1px solid var(--mantine-color-gray-2)', borderRadius: '4px', overflow: 'hidden' }}>
+          <Box
+            flex={1}
+            style={{
+              border: '1px solid var(--mantine-color-gray-2)',
+              borderRadius: '4px',
+              overflow: 'hidden',
+              ...(isNarrowViewport && { height: COMPARISON_PANEL_PHONE_HEIGHT_PX, flex: 'none' }),
+            }}
+          >
             <Box p="xs" bg="var(--mantine-color-gray-0)" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)' }}>
               <Group justify="space-between">
                 <Text size="sm" fw={500}>
@@ -278,7 +299,15 @@ export const GraphComparison: React.FC<GraphComparisonProperties> = ({
           </Box>
 
           {/* Right graph */}
-          <Box flex={1} style={{ border: '1px solid var(--mantine-color-gray-2)', borderRadius: '4px', overflow: 'hidden' }}>
+          <Box
+            flex={1}
+            style={{
+              border: '1px solid var(--mantine-color-gray-2)',
+              borderRadius: '4px',
+              overflow: 'hidden',
+              ...(isNarrowViewport && { height: COMPARISON_PANEL_PHONE_HEIGHT_PX, flex: 'none' }),
+            }}
+          >
             <Box p="xs" bg="var(--mantine-color-gray-0)" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)' }}>
               <Group justify="space-between">
                 <Text size="sm" fw={500}>
