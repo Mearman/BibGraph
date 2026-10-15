@@ -40,6 +40,10 @@ interface SearchInterfaceProperties {
   placeholder?: string;
   showHelp?: boolean;
   showAdvancedFilters?: boolean;
+  /**
+   * True once a search for the current filters has completed; hides the pre-search status line so it cannot sit beside a results verdict
+   */
+  hasExecutedSearch?: boolean;
 }
 
 export const SearchInterface = ({
@@ -47,7 +51,8 @@ export const SearchInterface = ({
   isLoading = false,
   placeholder = "Search academic works, authors, institutions...",
   showHelp = false,
-  showAdvancedFilters = false
+  showAdvancedFilters = false,
+  hasExecutedSearch = false
 }: SearchInterfaceProperties) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -239,6 +244,11 @@ export const SearchInterface = ({
             onChange={(e) => {
               handleQueryChange(e.target.value);
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && query.trim() && !isLoading) {
+                handleSearch();
+              }
+            }}
             disabled={isLoading}
             flex={1}
             size="md"
@@ -273,8 +283,8 @@ export const SearchInterface = ({
           <SearchHistoryDropdown onSearchQuerySelect={handleHistoryQuerySelect} />
         </Group>
 
-        {/* Search Status */}
-        {query && !isLoading && (
+        {/* Search Status: only before a search has executed, never beside a results verdict */}
+        {query && !isLoading && !hasExecutedSearch && (
           <Text size="sm" c="dimmed" ta="center">
             {isValidSearchQuery(query)
               ? `Ready to search for "${normalizeSearchQuery(query)}"`

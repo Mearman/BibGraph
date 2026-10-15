@@ -33,14 +33,14 @@ type MappableEntity = Work | Author | InstitutionEntity | Source | Publisher | F
  */
 export const createBaseEntityMapper = (entity: Readonly<MappableEntity>, entityType: EntityType): EntityGridItem => {
   // Some entities (e.g. Concept) don't carry a works_count field at all
-  const worksCount = 'works_count' in entity && typeof entity.works_count === 'number' ? entity.works_count : undefined
+  const worksCount = 'works_count' in entity && entity.works_count != null ? entity.works_count : undefined
 
   return {
     id: entity.id.replace("https://openalex.org/", ""),
     displayName: entity.display_name,
     entityType,
     worksCount,
-    citedByCount: entity.cited_by_count,
+    citedByCount: entity.cited_by_count ?? undefined,
   }
 };
 
@@ -60,7 +60,7 @@ export const entityMappers: Record<Extract<EntityType, "works" | "authors" | "in
   authors: (entity) => {
     const base = createBaseEntityMapper(entity, "authors")
     const orcid = 'orcid' in entity ? entity.orcid : undefined
-    if (orcid === undefined || orcid === '') {
+    if (orcid == null || orcid === '') {
       return base
     }
     return {
@@ -78,14 +78,14 @@ export const entityMappers: Record<Extract<EntityType, "works" | "authors" | "in
     const base = createBaseEntityMapper(entity, "sources")
     const tags: { label: string; color?: string }[] = []
 
-    if ('is_oa' in entity && entity.is_oa) {
+    if ('is_oa' in entity && entity.is_oa === true) {
       tags.push({ label: "Open Access", color: "green" })
     }
-    const sourceType = 'type' in entity ? entity.type : undefined
+    const sourceType = 'type' in entity && entity.type != null ? entity.type : undefined
     if (sourceType !== undefined && sourceType !== '') {
       tags.push({ label: sourceType, color: "gray" })
     }
-    const publisher = 'publisher' in entity ? entity.publisher : undefined
+    const publisher = 'publisher' in entity && entity.publisher != null ? entity.publisher : undefined
 
     return {
       ...base,
@@ -174,8 +174,8 @@ export const transformAutocompleteResultToGridItem = (result: Readonly<Autocompl
     id,
     displayName: result.display_name,
     entityType,
-    worksCount: result.works_count,
+    worksCount: result.works_count ?? undefined,
     citedByCount: result.cited_by_count,
-    description: result.hint,
+    description: result.hint ?? undefined,
   }
 };

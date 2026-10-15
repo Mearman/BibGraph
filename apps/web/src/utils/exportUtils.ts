@@ -65,7 +65,7 @@ const workToBibTeX = (result: Readonly<AutocompleteResult>): string => {
   let bibtex = `@misc{${bibKey},\n`;
   bibtex += `  title = {${result.display_name}},\n`;
 
-  if (result.hint !== undefined && result.hint !== '') {
+  if (result.hint != null && result.hint !== '') {
     bibtex += `  howpublished = {${result.hint}},\n`;
   }
 

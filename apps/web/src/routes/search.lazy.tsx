@@ -101,6 +101,10 @@ const SearchPage = () => {
     }
 
     if (!hasResults) {
+      // "No entities found" asserts a completed search returned zero; while no fetch has completed (results still undefined) there is no verdict to show
+      if (searchResults === undefined) {
+        return null;
+      }
       return <SearchNoResultsStateRenderer query={searchFilters.query} onQuickSearch={handleQuickSearch} />;
     }
 
@@ -191,6 +195,7 @@ const SearchPage = () => {
         <SearchInterface
           onSearch={handleSearch}
           isLoading={isLoading}
+          hasExecutedSearch={searchResults !== undefined}
           placeholder="Search for works, authors, institutions, topics... e.g. 'machine learning', 'Marie Curie', 'MIT'"
         />
 

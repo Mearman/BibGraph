@@ -92,14 +92,14 @@ export const GroupParamsSchema = QueryParamsSchema.extend({
 
 export type GroupParams = z.infer<typeof GroupParamsSchema>
 
-// Autocomplete types - schema-based types Base result shape returned by the per-entity autocomplete endpoints (`autocomplete/works`, etc.), which omit entity_type because the requested entity type is implied by the endpoint itself
+// Autocomplete types - schema-based types Base result shape returned by the per-entity autocomplete endpoints (`autocomplete/works`, etc.), which omit entity_type because the requested entity type is implied by the endpoint itself. The live endpoints send null (not absent keys) for missing hint/external_id, and the works endpoint sends null works_count, so those fields are nullable.
 export const AutocompleteBaseResultSchema = z.object({
 	id: z.string(),
 	display_name: z.string(),
-	hint: z.string().optional(),
+	hint: z.string().nullable().optional(),
 	cited_by_count: z.number().optional(),
-	works_count: z.number().optional(),
-	external_id: z.string().optional(),
+	works_count: z.number().nullable().optional(),
+	external_id: z.string().nullable().optional(),
 	filter_key: z.string().optional(),
 })
 

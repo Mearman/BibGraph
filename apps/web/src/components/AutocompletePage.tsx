@@ -105,7 +105,7 @@ const AutocompleteResultCard = ({ result, entityType }: AutocompleteResultCardPr
           </Badge>
         </Group>
 
-        {result.hint !== undefined && result.hint !== "" && (
+        {result.hint != null && result.hint !== "" && (
           <Text size="sm" c="dimmed" lineClamp={2}>
             {decodeHtmlEntities(result.hint)}
           </Text>
@@ -117,7 +117,7 @@ const AutocompleteResultCard = ({ result, entityType }: AutocompleteResultCardPr
               Citations: {result.cited_by_count.toLocaleString()}
             </Text>
           )}
-          {result.works_count !== undefined && (
+          {result.works_count != null && (
             <Text size="xs" c="dimmed">
               Works: {result.works_count.toLocaleString()}
             </Text>

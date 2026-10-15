@@ -74,7 +74,7 @@ export const SearchResultsTableView = ({
                 ) : (
                   <Text size="sm" fw={500}>{result.display_name}</Text>
                 )}
-                {result.hint !== undefined && result.hint !== "" && (
+                {result.hint != null && result.hint !== "" && (
                   <Text size="xs" c="dimmed" lineClamp={1}>
                     {result.hint}
                   </Text>
@@ -161,7 +161,7 @@ export const SearchResultsCardView = ({
             <Text size="sm" fw={500} lineClamp={2}>
               {result.display_name}
             </Text>
-            {result.hint !== undefined && result.hint !== "" && (
+            {result.hint != null && result.hint !== "" && (
               <Text size="xs" c="dimmed" lineClamp={1}>
                 {result.hint}
               </Text>
@@ -205,7 +205,7 @@ export const SearchResultsListView = ({
                 <Text size="sm" fw={500}>
                   {result.display_name}
                 </Text>
-                {result.hint !== undefined && result.hint !== "" && (
+                {result.hint != null && result.hint !== "" && (
                   <Text size="xs" c="dimmed" lineClamp={1}>
                     {result.hint}
                   </Text>
