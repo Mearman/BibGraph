@@ -17,6 +17,7 @@ import {
   TextInput,
   Title,
   Tooltip,
+  UnstyledButton,
 } from "@mantine/core";
 import {
   IconBook,
@@ -162,20 +163,19 @@ export const BookmarksSidebar = ({ onClose }: BookmarksSidebarProperties) => {
             justify="space-between"
             align="center"
             mb="xs"
-            style={{ cursor: "pointer" }}
-            onClick={() => { setListsExpanded(!listsExpanded); }}
-            role="button"
-            aria-expanded={listsExpanded}
-            aria-label="Toggle lists section"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setListsExpanded(!listsExpanded); }}
           >
-            <Group gap="xs">
-              {listsExpanded ? <IconChevronDown size={ICON_SIZE.SM} /> : <IconChevronRight size={ICON_SIZE.SM} />}
-              <IconList size={ICON_SIZE.SM} />
-              <Text size="sm" fw={600}>Lists</Text>
-              <Text size="xs" c="dimmed">({userLists.length})</Text>
-            </Group>
+            <UnstyledButton
+              onClick={() => { setListsExpanded(!listsExpanded); }}
+              aria-expanded={listsExpanded}
+              aria-label="Toggle lists section"
+            >
+              <Group gap="xs">
+                {listsExpanded ? <IconChevronDown size={ICON_SIZE.SM} /> : <IconChevronRight size={ICON_SIZE.SM} />}
+                <IconList size={ICON_SIZE.SM} />
+                <Text size="sm" fw={600}>Lists</Text>
+                <Text size="xs" c="dimmed">({userLists.length})</Text>
+              </Group>
+            </UnstyledButton>
             <Group gap="xs">
               <Tooltip label="Create new list">
                 <ActionIcon
@@ -244,20 +244,19 @@ export const BookmarksSidebar = ({ onClose }: BookmarksSidebarProperties) => {
             justify="space-between"
             align="center"
             mb="xs"
-            style={{ cursor: "pointer" }}
-            onClick={() => { setBookmarksExpanded(!bookmarksExpanded); }}
-            role="button"
-            aria-expanded={bookmarksExpanded}
-            aria-label="Toggle bookmarks section"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setBookmarksExpanded(!bookmarksExpanded); }}
           >
-            <Group gap="xs">
-              {bookmarksExpanded ? <IconChevronDown size={ICON_SIZE.SM} /> : <IconChevronRight size={ICON_SIZE.SM} />}
-              <IconBookmark size={ICON_SIZE.SM} />
-              <Text size="sm" fw={600}>Bookmarks</Text>
-              <Text size="xs" c="dimmed">({bookmarks.length})</Text>
-            </Group>
+            <UnstyledButton
+              onClick={() => { setBookmarksExpanded(!bookmarksExpanded); }}
+              aria-expanded={bookmarksExpanded}
+              aria-label="Toggle bookmarks section"
+            >
+              <Group gap="xs">
+                {bookmarksExpanded ? <IconChevronDown size={ICON_SIZE.SM} /> : <IconChevronRight size={ICON_SIZE.SM} />}
+                <IconBookmark size={ICON_SIZE.SM} />
+                <Text size="sm" fw={600}>Bookmarks</Text>
+                <Text size="xs" c="dimmed">({bookmarks.length})</Text>
+              </Group>
+            </UnstyledButton>
             <Tooltip label="Manage bookmarks">
               <ActionIcon
                 size="xs"
