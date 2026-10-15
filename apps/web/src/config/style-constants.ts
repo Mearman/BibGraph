@@ -324,6 +324,14 @@ export const LOADING_CONSTANTS = {
 	Progress update interval in milliseconds (10 updates per second)
 	 */
 	PROGRESS_UPDATE_INTERVAL_MS: 100,
+	/**
+	Elapsed time after which an unresolved load is treated as stalled and the
+	fabricated progress is replaced by an offline message. 15 s is five times
+	the default 3 s estimated duration, so genuinely slow loads still finish
+	inside the window while a fetch hung on an unreachable origin surfaces an
+	honest message instead of a bar parked near completion.
+	 */
+	STALL_TIMEOUT_MS: 15_000,
 } as const;
 
 // =============================================================================

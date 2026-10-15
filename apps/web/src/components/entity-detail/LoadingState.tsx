@@ -1,10 +1,11 @@
 import { isEntityType } from "@bibgraph/types";
 import { useLiveRegion, useReducedMotion } from "@bibgraph/ui";
 import { logger } from "@bibgraph/utils";
-import { Alert, Badge,Code, Container, Flex, Group, Loader, Paper, Progress, Skeleton, Stack, Text, Title } from "@mantine/core";
+import { Alert, Badge, Button, Code, Container, Flex, Group, Loader, Paper, Progress, Skeleton, Stack, Text, Title } from "@mantine/core";
+import { IconRefresh, IconWifiOff } from "@tabler/icons-react";
 import React, { useEffect,useRef,useState } from "react";
 
-import { BORDER_STYLE_GRAY_3, LOADING_CONSTANTS } from "@/config/style-constants";
+import { BORDER_STYLE_GRAY_3, ICON_SIZE, LOADING_CONSTANTS } from "@/config/style-constants";
 
 import type { EntityTypeConfig } from "./EntityTypeConfig";
 import { getMantineColor } from "./EntityTypeConfig";
@@ -16,6 +17,7 @@ interface LoadingStateProperties {
   operation?: string;
   showProgress?: boolean;
   estimatedDuration?: number; // in milliseconds
+  onRetry?: () => void;
 }
 
 interface LoadingStep {
@@ -59,7 +61,8 @@ export const LoadingState = ({
   config: _config,
   operation = "load",
   showProgress = true,
-  estimatedDuration = 3000 // Default 3 seconds
+  estimatedDuration = 3000, // Default 3 seconds
+  onRetry
 }: LoadingStateProperties) => {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
@@ -73,9 +76,28 @@ export const LoadingState = ({
   const isPrefersReducedMotion = useReducedMotion();
   const loadingElementRef = useRef<HTMLDivElement>(null);
 
-  // Simulate progress with accessibility announcements
+  // An unresolved load past the stall timeout is treated as offline. Derived rather than stored so the flip cannot desynchronise from elapsed time
+  const isStalled = timeElapsed >= LOADING_CONSTANTS.STALL_TIMEOUT_MS;
+  const stallAnnouncedRef = useRef(false);
+
+  // Announce the stall to screen readers exactly once
   useEffect(() => {
+    if (isStalled && !stallAnnouncedRef.current) {
+      stallAnnouncedRef.current = true;
+      announce(
+        `Loading ${entityType} is taking longer than expected. This record may not be available offline.`,
+        'assertive'
+      );
+    }
+  }, [isStalled, entityType, announce]);
+
+  // Simulate progress with accessibility announcements, bounded by the stall timeout: once stalled the effect schedules no further ticks, so progress cannot claim to advance while the underlying request is hung
+  useEffect(() => {
+    if (isStalled) {
+      return undefined;
+    }
     const interval = setInterval(() => {
+      // Functional update so elapsed keeps climbing even when React batches multiple ticks together
       setTimeElapsed(previous => previous + LOADING_CONSTANTS.PROGRESS_UPDATE_INTERVAL_MS);
 
       // Calculate progress based on elapsed time and steps
@@ -111,15 +133,63 @@ export const LoadingState = ({
     }, LOADING_CONSTANTS.PROGRESS_UPDATE_INTERVAL_MS);
 
     return () => { clearInterval(interval); };
-  }, [timeElapsed, estimatedDuration, steps, entityType, lastAnnouncedStep, announce]);
+  }, [timeElapsed, estimatedDuration, steps, entityType, lastAnnouncedStep, announce, isStalled]);
+
+  const handleRetry = () => {
+    if (onRetry) {
+      onRetry();
+    } else {
+      // Fallback: reload the current page
+      window.location.reload();
+    }
+  };
 
   // Debug logging
   logger.debug("ui", "LoadingState rendering", {
     entityType,
     operation,
     progress,
+    isStalled,
     currentStep: steps[currentStep]?.label
   });
+
+  // Stalled surface: no fabricated progress, no elapsed/estimated readout, just the honest offline message and a retry action
+  if (isStalled) {
+    return (
+      <>
+        <LiveRegionComponent />
+        <Container size="md" p="xl" data-testid="loading-stalled-state" role="alert">
+          <Flex h="100vh" justify="center" align="center">
+            <Paper p="xl" radius="xl" style={{ border: BORDER_STYLE_GRAY_3 }} w="100%" maw="48rem">
+              <Stack gap="lg">
+                <Group justify="center" mb="md">
+                  <Alert variant="light" color="orange" radius="xl" p="lg" w="fit-content">
+                    <IconWifiOff size={ICON_SIZE.HERO} />
+                  </Alert>
+                </Group>
+                <Title order={2} ta="center">
+                  This record is not available offline.
+                </Title>
+                <Text size="sm" c="dimmed" ta="center">
+                  It will load when the connection returns.
+                </Text>
+                <Group justify="center" gap="md" mt="md">
+                  <Button
+                    variant="filled"
+                    color="blue"
+                    leftSection={<IconRefresh size={16} />}
+                    onClick={handleRetry}
+                  >
+                    Retry
+                  </Button>
+                </Group>
+              </Stack>
+            </Paper>
+          </Flex>
+        </Container>
+      </>
+    );
+  }
 
   // Generate loading tip
   const getLoadingTip = () => {
