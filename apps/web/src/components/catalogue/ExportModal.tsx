@@ -21,6 +21,20 @@ import { useCatalogue } from "@/hooks/useCatalogue";
 
 type ExportFormat = "compressed" | "json" | "csv" | "bibtex";
 
+interface ExportFormatOption {
+  value: ExportFormat;
+  label: string;
+  description: string;
+}
+
+// Radio cards render each format as one labelled control: the name, the description and the indicator all select the format.
+const EXPORT_FORMAT_OPTIONS: readonly ExportFormatOption[] = [
+  { value: "json", label: "JSON", description: "Standard JSON format with full metadata" },
+  { value: "compressed", label: "Compressed Data", description: "Compact format for sharing via URL" },
+  { value: "csv", label: "CSV", description: "Spreadsheet-compatible format" },
+  { value: "bibtex", label: "BibTeX", description: "Bibliography format (works only)" },
+] as const;
+
 interface ExportModalProperties {
   listId: string;
   listTitle: string;
@@ -85,30 +99,22 @@ export const ExportModal = ({ listId, listTitle, onClose }: ExportModalPropertie
         aria-required="true"
       >
         <Stack gap="xs" mt="xs">
-          <Radio
-            value="json"
-            label="JSON"
-            description="Standard JSON format with full metadata"
-            aria-describedby="json-description"
-          />
-          <Radio
-            value="compressed"
-            label="Compressed Data"
-            description="Compact format for sharing via URL"
-            aria-describedby="compressed-description"
-          />
-          <Radio
-            value="csv"
-            label="CSV"
-            description="Spreadsheet-compatible format"
-            aria-describedby="csv-description"
-          />
-          <Radio
-            value="bibtex"
-            label="BibTeX"
-            description="Bibliography format (works only)"
-            aria-describedby="bibtex-description"
-          />
+          {EXPORT_FORMAT_OPTIONS.map((option) => (
+            <Radio.Card
+              key={option.value}
+              value={option.value}
+              aria-label={option.label}
+              p="sm"
+            >
+              <Group wrap="nowrap" align="flex-start" gap="sm">
+                <Radio.Indicator mt={3} />
+                <Stack gap={2}>
+                  <Text size="sm" fw={500}>{option.label}</Text>
+                  <Text size="xs" c="dimmed">{option.description}</Text>
+                </Stack>
+              </Group>
+            </Radio.Card>
+          ))}
         </Stack>
       </Radio.Group>
 
