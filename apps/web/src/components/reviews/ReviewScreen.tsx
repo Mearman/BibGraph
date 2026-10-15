@@ -84,7 +84,10 @@ const AlgorithmsTab = ({
 	onChoose,
 }: {
 	readonly session: ReadyReviewSession;
-	readonly onChoose: (stage: AlgorithmStage, algorithmId: string) => void;
+	/**
+	 * Receives the tab's language mode, so the switch notification names the codename only when the reviewer asked for it.
+	 */
+	readonly onChoose: (stage: AlgorithmStage, algorithmId: string, technical: boolean) => void;
 }): ReactElement => {
 	const [showTechnical, setShowTechnical] = useState(false);
 	const measuring = STAGES.some((stage) => session.comparison[stage] === null && session.comparisonError[stage] === null);
@@ -107,7 +110,9 @@ const AlgorithmsTab = ({
 				stages={stagePanels(session)}
 				inUse={session.inUse}
 				readOnlyStages={session.seedSelectionEditable ? [] : ["seed-selection"]}
-				onChoose={onChoose}
+				onChoose={(stage, algorithmId) => {
+					onChoose(stage, algorithmId, showTechnical);
+				}}
 				showTechnical={showTechnical}
 			/>
 		</Stack>
@@ -182,11 +187,16 @@ export const ReviewScreen = ({ session, paging }: ReviewScreenProps): ReactEleme
 		}
 	};
 
-	const runChoice = async (stage: AlgorithmStage, algorithmId: string): Promise<void> => {
-		const label = session.comparison[stage]?.find((row) => row.algorithmId === algorithmId)?.label ?? algorithmId;
+	const runChoice = async (stage: AlgorithmStage, algorithmId: string, technical: boolean): Promise<void> => {
+		const row = session.comparison[stage]?.find((candidate) => candidate.algorithmId === algorithmId);
+		const plainMessage = `${STAGE_TITLES[stage]} algorithm switched. ${STAGE_EFFECT[stage]}`;
+		const technicalMessage =
+			row === undefined
+				? plainMessage
+				: `${STAGE_TITLES[stage]} now runs ${row.label}. ${STAGE_EFFECT[stage]}`;
 		try {
 			await session.chooseAlgorithm(stage, algorithmId);
-			notifications.show({ message: `${STAGE_TITLES[stage]} now runs ${label}. ${STAGE_EFFECT[stage]}` });
+			notifications.show({ message: technical ? technicalMessage : plainMessage });
 		} catch (error) {
 			notifications.show({
 				color: "red",
@@ -215,8 +225,8 @@ export const ReviewScreen = ({ session, paging }: ReviewScreenProps): ReactEleme
 		void runDecision(workId, decision);
 	};
 
-	const chooseWithFeedback = (stage: AlgorithmStage, algorithmId: string): void => {
-		void runChoice(stage, algorithmId);
+	const chooseWithFeedback = (stage: AlgorithmStage, algorithmId: string, technical: boolean): void => {
+		void runChoice(stage, algorithmId, technical);
 	};
 
 	// Both lists empty with decisions present means the reviewer has been through everything, which deserves its own message; otherwise each list explains its own emptiness. A non-empty list with no visible rows means the title filter matched nothing.

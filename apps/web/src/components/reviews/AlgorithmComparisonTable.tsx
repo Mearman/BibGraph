@@ -21,9 +21,9 @@ import {
 import { IconCheck, IconStar } from "@tabler/icons-react";
 import { type ReactElement,useState } from "react";
 
-import type { ComparisonRow } from "@/lib/algorithms/algorithm-comparison";
+import type { ComparisonRow, MeasureProgress } from "@/lib/algorithms/algorithm-comparison";
 import { smallPoolSuspected } from "@/lib/algorithms/algorithm-comparison";
-import type { AlgorithmFamily, AlgorithmStage } from "@/lib/algorithms/registry";
+import { algorithmById, type AlgorithmFamily, type AlgorithmStage } from "@/lib/algorithms/registry";
 
 import { AlgorithmFamilyBadge } from "./AlgorithmFamilyBadge";
 
@@ -49,7 +49,7 @@ const VALUE_HEADER: Readonly<Record<AlgorithmStage, string>> = {
  */
 export type StagePanel =
 	| { readonly kind: "ready"; readonly rows: readonly ComparisonRow[] }
-	| { readonly kind: "measuring"; readonly progress: string | null }
+	| { readonly kind: "measuring"; readonly progress: MeasureProgress | null }
 	| { readonly kind: "error"; readonly message: string };
 
 const READ_ONLY_NOTE = "You supplied your own starting works, so this is for comparison only.";
@@ -295,7 +295,7 @@ const StageTable = ({
 												<Button
 													size="xs"
 													variant="subtle"
-													aria-label={`Use ${row.label}`}
+													aria-label={`Use ${showTechnical ? row.label : row.description}`}
 													onClick={() => {
 														onChoose(stage, row.algorithmId);
 													}}
@@ -314,15 +314,25 @@ const StageTable = ({
 };
 
 /**
- * A measurement still running for this stage: which algorithm is up and how far through, rather than one global spinner for the whole tab.
+ * A measurement still running for this stage: which algorithm is up and how far through, rather than one global spinner for the whole tab. The count always shows; the codename beside it waits for the technical toggle.
  */
-const MeasuringPanel = ({ stage, progress }: { readonly stage: AlgorithmStage; readonly progress: string | null }): ReactElement => (
+const MeasuringPanel = ({
+	stage,
+	progress,
+	showTechnical,
+}: {
+	readonly stage: AlgorithmStage;
+	readonly progress: MeasureProgress | null;
+	readonly showTechnical: boolean;
+}): ReactElement => (
 	<Group gap="xs">
 		<Loader role="status" aria-label={`Measuring the ${stage} algorithms`} size="sm" />
 		<Text c="dimmed" component="span">{`Measuring the ${stage} algorithms on this review's works...`}</Text>
 		{progress !== null && (
 			<Text c="dimmed" component="span">
-				{progress}
+				{showTechnical
+					? `${algorithmById(progress.algorithmId)?.label ?? progress.algorithmId} (${String(progress.done + 1)} of ${String(progress.total)})`
+					: `${String(progress.done + 1)} of ${String(progress.total)}`}
 			</Text>
 		)}
 	</Group>
@@ -394,7 +404,7 @@ export const AlgorithmComparisonTable = ({
 								/>
 							</>
 						) : panel.kind === "measuring" ? (
-							<MeasuringPanel stage={stage} progress={panel.progress} />
+							<MeasuringPanel stage={stage} progress={panel.progress} showTechnical={showTechnical} />
 						) : (
 							<Alert color="red">{panel.message}</Alert>
 						)}

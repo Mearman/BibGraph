@@ -128,6 +128,19 @@ describe("AlgorithmComparisonTable", () => {
 		const exploration = explorationRegion();
 		const inUseRow = within(exploration).getByText("in use").closest("tr");
 		expect(inUseRow).toHaveAttribute("aria-current", "true");
+		// Plain language first: with the technical toggle off, the action names the algorithm by its description.
+		fireEvent.click(
+			within(exploration).getByRole("button", { name: "Use Expands evenly outward from every seed in turn." }),
+		);
+		expect(onChoose).toHaveBeenCalledWith("exploration", "standard-bfs");
+	});
+
+	it("names the override button by codename only on the technical toggle", () => {
+		const { onChoose } = renderTable({ showTechnical: true });
+		const exploration = explorationRegion();
+		expect(
+			within(exploration).queryByRole("button", { name: "Use Expands evenly outward from every seed in turn." }),
+		).not.toBeInTheDocument();
 		fireEvent.click(within(exploration).getByRole("button", { name: "Use standard-bfs" }));
 		expect(onChoose).toHaveBeenCalledWith("exploration", "standard-bfs");
 	});
@@ -198,14 +211,25 @@ describe("AlgorithmComparisonTable", () => {
 	});
 
 	it("shows a measuring stage under its own title with the algorithm and count, beside ready stages' tables", () => {
-		renderTable({ stages: stages({ ranking: { kind: "measuring", progress: "association (2 of 25)" } }) });
+		renderTable({ stages: stages({ ranking: { kind: "measuring", progress: { stage: "ranking",  algorithmId: "association", done: 1, total: 25 } } }) });
 		const ranking = screen.getByRole("region", { name: "Ranking" });
 		expect(within(ranking).getByRole("status")).toBeInTheDocument();
 		expect(within(ranking).getByText(/Measuring the ranking algorithms/)).toBeInTheDocument();
-		expect(within(ranking).getByText("association (2 of 25)")).toBeInTheDocument();
+		expect(within(ranking).getByText("2 of 25")).toBeInTheDocument();
 		expect(within(ranking).queryByRole("row")).not.toBeInTheDocument();
 		// The other stages' measured tables stand untouched beside it.
 		expect(explorationRegion().querySelector("table")).toBeInTheDocument();
+	});
+
+	it("keeps codenames out of the measuring progress unless the technical toggle is on", () => {
+		renderTable({ stages: stages({ ranking: { kind: "measuring", progress: { stage: "ranking",  algorithmId: "association", done: 1, total: 25 } } }) });
+		const ranking = screen.getByRole("region", { name: "Ranking" });
+		expect(within(ranking).queryByText(/association/)).not.toBeInTheDocument();
+	});
+
+	it("names the measuring algorithm by codename on the technical toggle", () => {
+		renderTable({ showTechnical: true, stages: stages({ ranking: { kind: "measuring", progress: { stage: "ranking",  algorithmId: "association", done: 1, total: 25 } } }) });
+		expect(within(screen.getByRole("region", { name: "Ranking" })).getByText("association (2 of 25)")).toBeInTheDocument();
 	});
 
 	it("shows a failed stage's error beside the stages that still measured", () => {

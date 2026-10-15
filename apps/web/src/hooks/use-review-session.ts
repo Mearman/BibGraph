@@ -9,13 +9,13 @@ import {
 	type AlgorithmComparison,
 	chosenExplorationOf,
 	type ComparisonRow,
+	type MeasureProgress,
 	rowsForStage,
 	type StageMeasurements,
 } from "@/lib/algorithms/algorithm-comparison";
 import { adoptMeasured } from "@/lib/algorithms/composition-engine";
 import { loadReviewPool, type PoolFetcher } from "@/lib/algorithms/pool-loader";
 import {
-	algorithmById,
 	algorithmsByStage,
 	type AlgorithmSpec,
 	type AlgorithmStage,
@@ -83,9 +83,9 @@ export interface ReviewSessionDeps {
 export type AlgorithmInUse = Readonly<Record<AlgorithmStage, string | null>>;
 
 /**
- * One stage's measurements while they are still being taken: which algorithm is running and how many are done, already in display words.
+ * One stage's measurement run in numbers: which algorithm is up and how far through. The screen renders it to words in whichever language mode it is in, so codenames stay behind the technical toggle.
  */
-export type ComparisonProgress = Readonly<Record<AlgorithmStage, string | null>>;
+export type ComparisonProgress = Readonly<Record<AlgorithmStage, MeasureProgress | null>>;
 
 export interface ReadyReviewSession {
 	readonly phase: "ready";
@@ -182,14 +182,6 @@ const inUseFrom = (composition: SuggestedComposition | null): AlgorithmInUse => 
 });
 
 /**
- * What a progress event says on screen: the algorithm's display label and where it sits in the run. done counts finished algorithms, so the one starting is the next of total.
- */
-const progressLabel = (progress: ComputeProgress): string => {
-	const label = algorithmById(progress.algorithmId)?.label ?? progress.algorithmId;
-	return `${label} (${String(progress.done + 1)} of ${String(progress.total)})`;
-};
-
-/**
  * Assembles one stage's rows from the stored measurements plus the cells still missing, measuring only those and storing what they came out as. A stage whose every cell is cached measures nothing, which is what a reopen or an unrelated stage switch comes to.
  */
 const stageRows = async (input: {
@@ -234,8 +226,8 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 	const queryClient = useQueryClient();
 	const [progress, setProgress] = useState<ComparisonProgress>(NO_PROGRESS);
 
-	const setStageProgress = (stage: AlgorithmStage, label: string): void => {
-		setProgress((current) => ({ ...current, [stage]: label }));
+	const setStageProgress = (stage: AlgorithmStage, fact: MeasureProgress): void => {
+		setProgress((current) => ({ ...current, [stage]: fact }));
 	};
 	const clearStageProgress = (stage: AlgorithmStage): void => {
 		setProgress((current) => (current[stage] === null ? current : { ...current, [stage]: null }));
@@ -316,7 +308,7 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 									await deps.store.saveMeasurements(reviewId, cells);
 								},
 								onProgress: (event): void => {
-									setStageProgress("exploration", progressLabel(event));
+									setStageProgress("exploration", event);
 								},
 							});
 						} finally {
@@ -351,7 +343,7 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 									await deps.store.saveMeasurements(reviewId, cells);
 								},
 								onProgress: (event): void => {
-									setStageProgress("seed-selection", progressLabel(event));
+									setStageProgress("seed-selection", event);
 								},
 							});
 						} finally {
@@ -384,7 +376,7 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 									await deps.store.saveMeasurements(reviewId, cells);
 								},
 								onProgress: (event): void => {
-									setStageProgress("ranking", progressLabel(event));
+									setStageProgress("ranking", event);
 								},
 							});
 						} finally {

@@ -279,7 +279,7 @@ describe("ReviewScreen", () => {
 		// Switching the selector re-picks the seeds, so exploration and ranking re-measure; seed selection keeps its measured table.
 		const switched = session({
 			comparison: comparison({ exploration: null, ranking: null }),
-			comparisonProgress: { exploration: "DOME (1 of 9)", "seed-selection": null, ranking: null },
+			comparisonProgress: { exploration: { stage: "exploration",  algorithmId: "dome", done: 0, total: 9 }, "seed-selection": null, ranking: null },
 		});
 		rerender(switched);
 		const selection = screen.getByRole("region", { name: "Seed selection" });
@@ -288,7 +288,9 @@ describe("ReviewScreen", () => {
 		expect(within(selection).getByText("Clusters pool works on structural features and picks per cluster.")).toBeInTheDocument();
 		const exploration = screen.getByRole("region", { name: "Exploration" });
 		expect(within(exploration).getByRole("status")).toBeInTheDocument();
-		expect(within(exploration).getByText("DOME (1 of 9)")).toBeInTheDocument();
+		// The technical toggle is off, so the progress counts without naming a codename.
+		expect(within(exploration).getByText("1 of 9")).toBeInTheDocument();
+		expect(within(exploration).queryByText(/DOME/)).not.toBeInTheDocument();
 	});
 
 	it("hides codenames behind the technical toggle and notifies what re-ranks on a switch", async () => {
@@ -297,13 +299,22 @@ describe("ReviewScreen", () => {
 		fireEvent.click(screen.getByRole("tab", { name: /Algorithms/ }));
 		const exploration = screen.getByRole("region", { name: "Exploration" });
 		expect(within(exploration).queryByText("DOME")).not.toBeInTheDocument();
+		// Plain mode: the override button names the algorithm by its description, and the notification carries no codename.
+		fireEvent.click(
+			within(exploration).getByRole("button", { name: "Use Always expands the smallest frontier, keeping seeds' coverage even." }),
+		);
+		await waitFor(() => {
+			expect(ready.chooseAlgorithm).toHaveBeenCalledWith("exploration", "frontier-balanced");
+		});
+		expect(await screen.findByText(/Exploration algorithm switched\. Works related to your starting works will be re-ranked/)).toBeInTheDocument();
+		expect(screen.queryByText(/now runs/)).not.toBeInTheDocument();
 		fireEvent.click(screen.getByRole("switch", { name: /Technical details/ }));
 		expect(within(exploration).getByText("DOME")).toBeInTheDocument();
 		fireEvent.click(within(exploration).getByRole("button", { name: "Use frontier-balanced" }));
 		await waitFor(() => {
 			expect(ready.chooseAlgorithm).toHaveBeenCalledWith("exploration", "frontier-balanced");
 		});
-		expect(await screen.findByText(/Works related to your starting works will be re-ranked/)).toBeInTheDocument();
+		expect(await screen.findByText(/Exploration now runs frontier-balanced/)).toBeInTheDocument();
 	});
 
 	it("offers a retry when titles fail to load", () => {
