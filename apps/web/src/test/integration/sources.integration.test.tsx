@@ -11,6 +11,7 @@ import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { StorageProviderWrapper } from "@/contexts/storage-provider-context";
+import { SyncStatusProvider } from "@/contexts/SyncStatusContext";
 import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
 
 const { getSourceMock } = vi.hoisted(() => ({
@@ -97,7 +98,7 @@ describe("SourceRoute Integration Tests", () => {
         <NotificationProvider>
           <UndoRedoProvider>
             <MantineProvider>
-              {children}
+              <SyncStatusProvider>{children}</SyncStatusProvider>
             </MantineProvider>
           </UndoRedoProvider>
         </NotificationProvider>
