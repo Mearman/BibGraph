@@ -42,6 +42,10 @@ export interface LiteratureReview {
 	OpenAlex work ids the review started from; empty for a zero-seeds start.
 	 */
 	seeds: string[];
+	/**
+	The seeds the app's seed selector picked, as of the last pick. Switching the selector replaces exactly these and keeps every other seed (the reviewer's own additions). Absent when the app picked nothing: a supplied-seeds review, or a review from before this was tracked, so every seed counts as the reviewer's.
+	 */
+	pickedSeeds?: string[];
 	decisions: Record<string, ScreeningDecision | undefined>;
 	suggestedComposition: SuggestedComposition | null;
 	createdAt: Date;

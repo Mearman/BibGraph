@@ -266,6 +266,28 @@ describe("useReviewSession", () => {
 		expect(stored.current.seeds[0]).toBe("W2");
 	});
 
+	it("keeps manually added starting works when the selector switch re-picks the seeds", async () => {
+		// W9 was added by hand after the app picked W1 and W3; a re-pick replaces the app's picks, not the reviewer's additions.
+		const selection = { algorithmId: "grasp", evidence: "picked at start", chosenBy: "app" as const };
+		const { hook, stored } = setup((review) => ({
+			...review,
+			seeds: ["W1", "W3", "W9"],
+			pickedSeeds: ["W1", "W3"],
+			suggestedComposition: defaultComposition(selection),
+		}));
+		await waitFor(() => {
+			expect(hook.result.current.phase).toBe("ready");
+		});
+		const session = hook.result.current;
+		if (session.phase !== "ready") throw new Error("not ready");
+		await act(async () => {
+			await session.chooseAlgorithm("seed-selection", "high-degree");
+		});
+		// high-degree picks W2 first and covers the whole pool, so the picked set is replaced while W9 survives.
+		expect(stored.current.seeds).toEqual(["W2", "W1", "W3", "W4", "W9"]);
+		expect(stored.current.pickedSeeds).toEqual(["W2", "W1", "W3", "W4"]);
+	});
+
 	it("reuses stored measurements when the review is reopened, without measuring again", async () => {
 		const first = setup();
 		await waitFor(() => {

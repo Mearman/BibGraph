@@ -324,6 +324,38 @@ describe("ReviewScreen", () => {
 		expect(retryLabels).toHaveBeenCalled();
 	});
 
+	it("shows a loading placeholder per starting work while the titles are still being fetched", () => {
+		// Before the first label fetch lands, every seed is untitled; the ids must not be presented as works OpenAlex has no title for.
+		renderScreen(
+			session({
+				labelsPending: true,
+				seedRefs: [
+					{ id: "W1", title: "W1", known: false },
+					{ id: "W3", title: "W3", known: false },
+				],
+			}),
+		);
+		expect(screen.getAllByText("Loading...")).toHaveLength(2);
+		expect(screen.queryByText(/no title from OpenAlex/)).not.toBeInTheDocument();
+		expect(screen.queryByText("W1")).not.toBeInTheDocument();
+	});
+
+	it("keeps already fetched titles while a later label fetch is pending", () => {
+		// A work added mid-review starts a further label fetch; the titles already held must stay on screen.
+		renderScreen(
+			session({
+				labelsPending: true,
+				seedRefs: [
+					{ id: "W1", title: "Seed one", known: true },
+					{ id: "W9", title: "W9", known: false },
+				],
+			}),
+		);
+		expect(screen.getByText("Seed one")).toBeInTheDocument();
+		expect(screen.getByText("Loading...")).toBeInTheDocument();
+		expect(screen.queryByText(/no title from OpenAlex/)).not.toBeInTheDocument();
+	});
+
 	it("keeps an add-a-work-by-id affordance beside the starting works after screening has started", async () => {
 		// Decisions exist, so screening is under way: the transient check panel is long gone.
 		const ready = session({
