@@ -135,7 +135,7 @@ describe("TopicRoute Integration Tests", () => {
 
     expect(screen.getByText("Topic ID:")).toBeInTheDocument();
     expect(screen.getByText("T123")).toBeInTheDocument();
-    expect(screen.getByText("Error: API Error")).toBeInTheDocument();
+    expect(screen.getByTestId("error-headline")).toHaveTextContent(/could not be loaded/i);
   });
 
   it("renders topic data in rich view by default", async () => {
