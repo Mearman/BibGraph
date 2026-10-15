@@ -255,4 +255,42 @@ describe("OpenAlex response schema drift", () => {
 		})
 		expect(result.success).toBe(true)
 	})
+
+	it("accepts the UN SDG id shape (2026-10-15: works lists failed wholesale because real rows carry https://metadata.un.org/sdg/N, the form the OpenAlex work-object docs themselves show)", () => {
+		const result = workSchema.safeParse({
+			...BASE_WORK_FIELDS,
+			updated_date: "2026-10-12T09:40:04.860316",
+			created_date: "2025-10-10T00:00:00",
+			counts_by_year: [{ year: 2025, cited_by_count: 82 }],
+			sustainable_development_goals: [
+				{
+					id: "https://metadata.un.org/sdg/3",
+					display_name: "Good health and well-being",
+					score: 0.95,
+				},
+			],
+		})
+		expect(result.success).toBe(true)
+	})
+
+	it("accepts an institution whose associated_institutions report null country_code (2026-10-15: live i19820366 (CAS) and i1294671590 (CNRS) failed safeParse on null country codes inside associated_institutions, so those institution pages did not load; countryless consortia report null, matching the top-level institution field)", () => {
+		const result = institutionSchema.safeParse({
+			id: "https://openalex.org/I1294671590",
+			display_name: "French National Centre for Scientific Research",
+			type: "government",
+			cited_by_count: 100,
+			works_count: 1000,
+			associated_institutions: [
+				{
+					id: "https://openalex.org/I19820366",
+					display_name: "Chinese Academy of Sciences",
+					ror: "https://ror.org/034t30j35",
+					country_code: null,
+					type: "government",
+					relationship: "related",
+				},
+			],
+		})
+		expect(result.success).toBe(true)
+	})
 })
