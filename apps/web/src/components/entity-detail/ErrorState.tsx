@@ -1,9 +1,11 @@
-import { Alert, Button, Code, Container, Flex, Group, Paper, Stack, Text, Title } from "@mantine/core";
-import { IconAlertCircle, IconArrowLeft, IconRefresh } from "@tabler/icons-react";
+import { Alert, Button, Code, Container, Flex, Group, Paper, Stack, Text, Title, UnstyledButton } from "@mantine/core";
+import { IconAlertCircle, IconArrowLeft, IconChevronDown, IconRefresh } from "@tabler/icons-react";
 import { useNavigate } from "@tanstack/react-router";
-import React from "react";
+import React, { useState } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
+
+import { describeEntityError } from "./error-presentation";
 
 interface ErrorStateProperties {
   entityType: string;
@@ -14,6 +16,8 @@ interface ErrorStateProperties {
 
 export const ErrorState = ({ entityType, entityId, error, onRetry }: ErrorStateProperties) => {
   const navigate = useNavigate();
+  const [showTechnicalDetail, setShowTechnicalDetail] = useState(false);
+  const presentation = describeEntityError(error);
 
   const handleRetry = () => {
     if (onRetry) {
@@ -55,11 +59,39 @@ export const ErrorState = ({ entityType, entityId, error, onRetry }: ErrorStateP
                 </Stack>
               </Paper>
 
-              <Alert variant="light" color="red" title="Error Details">
-                <Code block style={{ wordBreak: "break-all", fontFamily: "monospace", color: "var(--mantine-color-red-8)" }}>
-                  {String(error)}
-                </Code>
-              </Alert>
+              {/* Human sentence first; raw internals only behind an explicit disclosure */}
+              <Stack gap="xs">
+                <Text size="md" data-testid="error-headline">
+                  {presentation.headline}
+                </Text>
+                <UnstyledButton
+                  onClick={() => { setShowTechnicalDetail(previous => !previous); }}
+                  aria-expanded={showTechnicalDetail}
+                  c="dimmed"
+                >
+                  <Group gap={4} align="center">
+                    <Text size="sm" c="dimmed">
+                      Technical details
+                    </Text>
+                    <IconChevronDown
+                      size={14}
+                      style={{
+                        transform: showTechnicalDetail ? "rotate(180deg)" : "none",
+                        transition: "transform 150ms ease",
+                      }}
+                    />
+                  </Group>
+                </UnstyledButton>
+                {showTechnicalDetail && (
+                  <Code
+                    block
+                    data-testid="error-technical-details"
+                    style={{ wordBreak: "break-all", fontFamily: "monospace", color: "var(--mantine-color-red-8)" }}
+                  >
+                    {presentation.technicalDetail}
+                  </Code>
+                )}
+              </Stack>
 
               {/* Action buttons for user recovery */}
               <Group justify="center" gap="md" mt="md">

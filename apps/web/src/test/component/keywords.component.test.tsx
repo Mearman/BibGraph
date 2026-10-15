@@ -220,7 +220,11 @@ describe('Keywords Route - EntityDetailLayout Migration', () => {
       });
 
       expect(screen.getByText('artificial-intelligence')).toBeInTheDocument();
-      expect(screen.getByText(/Error:.*Network error/)).toBeInTheDocument();
+      // Human-facing copy, with the technical detail kept off the main surface
+      expect(screen.getByTestId('error-headline')).toHaveTextContent(
+        /This record could not be loaded/i,
+      );
+      expect(screen.queryByTestId('error-technical-details')).not.toBeInTheDocument();
     });
 
     it('should render RelationshipCounts component', async () => {
