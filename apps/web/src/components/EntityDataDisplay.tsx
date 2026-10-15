@@ -93,12 +93,20 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isUnknownArray = (value: unknown): value is unknown[] => Array.isArray(value);
 
 /**
- * Drops case-insensitive duplicates from a primitive array for display, keeping each value's first casing. OpenAlex can carry the same alternative name in two casings ("TEAHAN, WILLIAM" and "TEAHAN, William"); the raw view still shows every entry as delivered.
+ * Comparison key for display dedupe: case-insensitive, with apostrophe glyphs (curly U+2018/U+2019 and straight) folded to one form, because OpenAlex can carry the same alternative name twice differing only by apostrophe glyph. Only the comparison folds; the displayed value keeps its original spelling.
+ */
+const displayDedupeKey = (value: unknown): string =>
+  (typeof value === "string" ? value : String(value))
+    .toLowerCase()
+    .replaceAll(/[‘’]/g, "'");
+
+/**
+ * Drops case- and apostrophe-glyph-insensitive duplicates from a primitive array for display, keeping each value's first spelling. OpenAlex can carry the same alternative name in two casings ("TEAHAN, WILLIAM" and "TEAHAN, William") or with different apostrophes ("O'BRIAIN" and "O’BRIAIN"); the raw view still shows every entry as delivered.
  */
 const dedupePrimitiveArrayCaseInsensitively = (values: readonly unknown[]): unknown[] => {
   const seen = new Set<string>();
   return values.filter((item) => {
-    const key = typeof item === "string" ? item.toLowerCase() : String(item);
+    const key = displayDedupeKey(item);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
