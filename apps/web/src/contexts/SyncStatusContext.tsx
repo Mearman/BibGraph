@@ -5,8 +5,10 @@
  * Tracks active operations and shows visual indicators for sync state.
  */
 
+import { useQueryClient } from '@tanstack/react-query';
 import React, { createContext, use, useCallback, useEffect, useMemo,useState } from 'react';
 
+import { classifyRequestError, type RequestOutcome } from '@/lib/connectivity';
 import type { SyncOperation, SyncStatus, SyncStatusType } from '@/types/sync';
 
 interface SyncStatusContextValue {
@@ -26,6 +28,31 @@ const SyncStatusContext = createContext<SyncStatusContextValue | null>(null);
 export const SyncStatusProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [operations, setOperations] = useState<SyncOperation[]>([]);
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [lastRequestOutcome, setLastRequestOutcome] = useState<RequestOutcome | null>(null);
+  const queryClient = useQueryClient();
+
+  // Track the outcome of the most recently completed request through the query cache, so connectivity derives from real request results rather than the last success alone. The cache event's error is typed `any` upstream, so it flows only into classifyRequestError, whose parameter is unknown.
+  useEffect(() => {
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event.type !== 'updated') return;
+      const state = event.query.state;
+
+      if (state.status === 'error') {
+        const queryError: unknown = state.error;
+        const next = classifyRequestError(queryError);
+        setLastRequestOutcome((previous) =>
+          previous !== null && previous.kind === next.kind && previous.message === next.message
+            ? previous
+            : next,
+        );
+        return;
+      }
+      if (state.status === 'success') {
+        setLastRequestOutcome((previous) => (previous?.kind === 'success' ? previous : { kind: 'success' }));
+      }
+    });
+    return unsubscribe;
+  }, [queryClient]);
 
   // Track online/offline status
   useEffect(() => {
@@ -41,16 +68,17 @@ export const SyncStatusProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, []);
 
-  // Calculate overall sync status
-  const overall: SyncStatusType = !isOnline
-    ? 'offline'
-    : operations.some((op) => op.status === 'error')
-      ? 'error'
-      : operations.some((op) => op.status === 'syncing')
-        ? 'syncing'
-        : operations.some((op) => op.status === 'success')
-          ? 'success'
-          : 'idle';
+  // Calculate overall sync status from the browser's connectivity signal, the last completed request, and reported storage operations. A network-level request failure reads as offline even while navigator.onLine still reports online; an HTTP error reads as a sync error, never as offline.
+  const overall: SyncStatusType =
+    !isOnline || lastRequestOutcome?.kind === 'network-error'
+      ? 'offline'
+      : operations.some((op) => op.status === 'error') || lastRequestOutcome?.kind === 'http-error'
+        ? 'error'
+        : operations.some((op) => op.status === 'syncing')
+          ? 'syncing'
+          : operations.some((op) => op.status === 'success')
+            ? 'success'
+            : 'idle';
 
   const startOperation = useCallback((name: string): string => {
     const id = crypto.randomUUID();
@@ -126,7 +154,8 @@ export const SyncStatusProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     operations,
     lastSyncTime: operations.find((op) => op.status === 'success')?.endTime,
     isOnline,
-  }), [overall, operations, isOnline]);
+    lastRequestOutcome,
+  }), [overall, operations, isOnline, lastRequestOutcome]);
 
   const value: SyncStatusContextValue = useMemo(() => ({
     syncStatus,

@@ -15,6 +15,8 @@ import {
 import { useEffect, useState } from "react";
 
 import { ICON_SIZE } from "@/config/style-constants";
+import { useSyncStatus } from "@/contexts/SyncStatusContext";
+import { deriveConnectivity, serverErrorMessage } from "@/lib/connectivity";
 
 import { useNetwork } from "./NetworkProvider";
 
@@ -308,33 +310,50 @@ export const useNetworkConnectivity = () => {
 /**
  * Slim offline banner for the app shell. Renders nothing while online so it costs no header space, and a single role="status" row the moment the browser reports offline, so the state is visible on every screen size (the sync badge alone is hidden on small viewports).
  */
+/**
+ * Global connectivity banner. Only a network-level failure (the browser offline, or requests failing before any server answer) claims the user is offline; an HTTP error status from a reachable server gets its own message naming the retry behaviour, because throttling is not a connectivity problem.
+ */
 export const OfflineBanner = () => {
-  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const { syncStatus } = useSyncStatus();
+  const { banner } = deriveConnectivity({
+    isOnline: syncStatus.isOnline,
+    lastOutcome: syncStatus.lastRequestOutcome,
+  });
 
-  useEffect(() => {
-    const handleOnline = () => { setIsOnline(true); };
-    const handleOffline = () => { setIsOnline(false); };
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
+  if (banner === 'none') return null;
 
-  if (isOnline) return null;
+  const outcome = syncStatus.lastRequestOutcome;
+  if (banner === 'server-error' && outcome?.kind === 'http-error') {
+    return (
+      <Alert
+        role="status"
+        icon={<IconAlertTriangle size={ICON_SIZE.MD} />}
+        color="red"
+        variant="filled"
+        radius={0}
+        py={6}
+        data-testid="server-error-banner"
+      >
+        {serverErrorMessage(outcome)}
+      </Alert>
+    );
+  }
 
-  return (
-    <Alert
-      role="status"
-      icon={<IconCloudOff size={ICON_SIZE.MD} />}
-      color="orange"
-      variant="filled"
-      radius={0}
-      py={6}
-      data-testid="offline-banner"
-    >
-      You are offline. Data may be out of date until the connection returns.
-    </Alert>
-  );
+  if (banner === 'offline') {
+    return (
+      <Alert
+        role="status"
+        icon={<IconCloudOff size={ICON_SIZE.MD} />}
+        color="orange"
+        variant="filled"
+        radius={0}
+        py={6}
+        data-testid="offline-banner"
+      >
+        You are offline. Data may be out of date until the connection returns.
+      </Alert>
+    );
+  }
+
+  return null;
 };

@@ -3,10 +3,24 @@
  */
 
 import { MantineProvider } from '@mantine/core'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { SyncStatusProvider } from '@/contexts/SyncStatusContext'
+
 import { OfflineBanner } from './NetworkStatus'
+
+// The banner reads the shared sync status (browser signal plus last request outcome).
+const BannerHost = () => (
+  <MantineProvider>
+    <QueryClientProvider client={new QueryClient()}>
+      <SyncStatusProvider>
+        <OfflineBanner />
+      </SyncStatusProvider>
+    </QueryClientProvider>
+  </MantineProvider>
+)
 
 const setNavigatorOnline = (online: boolean) => {
   Object.defineProperty(window.navigator, 'onLine', {
@@ -22,31 +36,19 @@ describe('OfflineBanner', () => {
 
   it('renders nothing while online', () => {
     setNavigatorOnline(true)
-    render(
-      <MantineProvider>
-        <OfflineBanner />
-      </MantineProvider>,
-    )
+    render(<BannerHost />)
     expect(screen.queryByTestId('offline-banner')).not.toBeInTheDocument()
   })
 
   it('renders a status announcement when the browser reports offline on mount', () => {
     setNavigatorOnline(false)
-    render(
-      <MantineProvider>
-        <OfflineBanner />
-      </MantineProvider>,
-    )
+    render(<BannerHost />)
     expect(screen.getByRole('status')).toHaveTextContent(/offline/i)
   })
 
   it('appears and disappears with the online and offline events', async () => {
     setNavigatorOnline(true)
-    render(
-      <MantineProvider>
-        <OfflineBanner />
-      </MantineProvider>,
-    )
+    render(<BannerHost />)
     expect(screen.queryByTestId('offline-banner')).not.toBeInTheDocument()
 
     setNavigatorOnline(false)
