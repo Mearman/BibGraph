@@ -4,7 +4,7 @@
 
 import { cachedOpenAlex } from "@bibgraph/client";
 import type { Work } from "@bibgraph/types";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 /**
@@ -37,6 +37,7 @@ export interface AuthorWorksResult extends AuthorWorksViewData {
  */
 export const useAuthorWorks = (authorId: string, enabled: boolean): AuthorWorksResult => {
   const [page, setPage] = useState(1);
+  const queryClient = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["author-works", authorId, page],
@@ -62,6 +63,12 @@ export const useAuthorWorks = (authorId: string, enabled: boolean): AuthorWorksR
     isLoading,
     error: error ?? null,
     setPage,
-    retry: () => { void refetch(); },
+    // Cancel-then-refetch: react-query cannot restart a fetch that is still in flight (the final walk found Retry on the stalled surface a no-op while the transport's backoff loop held the query pending), so cancel first to make the button take effect immediately.
+    retry: () => {
+      void (async () => {
+        await queryClient.cancelQueries({ queryKey: ["author-works", authorId] });
+        await refetch();
+      })();
+    },
   };
 };
