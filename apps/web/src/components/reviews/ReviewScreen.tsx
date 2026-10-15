@@ -54,7 +54,7 @@ const SEED_TITLE_PENDING = "Loading...";
  */
 const STAGE_EFFECT: Readonly<Record<AlgorithmStage, string>> = {
 	exploration: "Works related to your starting works will be re-ranked.",
-	"seed-selection": "A new set of starting works will be picked.",
+	"seed-selection": "A new set of starting works will be picked; works you added yourself stay.",
 	ranking: "Works related to your starting works will be re-ranked.",
 };
 

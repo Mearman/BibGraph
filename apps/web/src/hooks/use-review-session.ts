@@ -469,9 +469,13 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 			if (review.suggestedComposition.seedSelection === null) {
 				throw new Error("this review's seeds were supplied, so there is no seed selector to switch");
 			}
-			// Switching the selector re-picks the seeds the app chose at the start.
-			const seeds = [...(await deps.compute.select(readPool(), input.algorithmId, ZERO_SEEDS_SELECTION_SIZE))];
-			await deps.store.updateReview(reviewId, { suggestedComposition, seeds });
+			// Switching the selector replaces the seeds the app picked, keeping every seed the reviewer added by hand: a manual addition is any seed outside the last picked set.
+			const previousPicked = new Set(review.pickedSeeds);
+			const manual = review.seeds.filter((seed) => !previousPicked.has(seed));
+			const picked = await deps.compute.select(readPool(), input.algorithmId, ZERO_SEEDS_SELECTION_SIZE);
+			const pickedSet = new Set(picked);
+			const seeds = [...picked, ...manual.filter((seed) => !pickedSet.has(seed))];
+			await deps.store.updateReview(reviewId, { suggestedComposition, seeds, pickedSeeds: [...picked] });
 		},
 		onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["review", reviewId] }),
 	});

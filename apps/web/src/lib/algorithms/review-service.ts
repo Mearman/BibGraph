@@ -148,6 +148,8 @@ export const startReview = async (
   const inPool = new Set(pool.map((work) => work.id));
   const missingSeeds = input.seeds.filter((seed) => !inPool.has(seed));
   let seeds = [...input.seeds];
+  // Null for a supplied-seeds start (the app picked nothing); the seeds the app picked once a selector has chosen them, so a later switch replaces exactly these.
+  let pickedSeeds: string[] | undefined;
   let seedSelection: CompositionPick | null = null;
   if (seeds.length === 0) {
     onProgress?.("choosing-seeds");
@@ -168,6 +170,7 @@ export const startReview = async (
       toPoolGraph(pool),
       input.selectionSize,
     );
+    pickedSeeds = [...seeds];
     seedSelection = {
       algorithmId: selection.algorithmId,
       evidence: selection.evidence,
@@ -182,6 +185,7 @@ export const startReview = async (
     name: input.name,
     query: input.query,
     seeds,
+    pickedSeeds,
   });
   await deps.store.savePool(created.id, pool);
   await deps.store.updateReview(created.id, {
@@ -220,8 +224,10 @@ export const removeSeed = async (
     );
   }
   const seeds = review.seeds.filter((seed) => seed !== seedId);
-  await store.updateReview(review.id, { seeds });
-  return { ...review, seeds };
+  // Keep the picked set a subset of the seeds, so a removed pick is not recorded as still picked.
+  const pickedSeeds = review.pickedSeeds?.filter((seed) => seed !== seedId);
+  await store.updateReview(review.id, { seeds, pickedSeeds });
+  return { ...review, seeds, pickedSeeds };
 };
 
 /**

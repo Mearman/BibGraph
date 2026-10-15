@@ -249,6 +249,8 @@ describe("useReviewSession", () => {
 		const selection = { algorithmId: "grasp", evidence: "picked at start", chosenBy: "app" as const };
 		const { hook, stored } = setup((review) => ({
 			...review,
+			// A zero-seeds review: W1 and W3 are the app's picks, not the reviewer's.
+			pickedSeeds: ["W1", "W3"],
 			suggestedComposition: defaultComposition(selection),
 		}));
 		await waitFor(() => {
@@ -267,14 +269,26 @@ describe("useReviewSession", () => {
 	});
 
 	it("keeps manually added starting works when the selector switch re-picks the seeds", async () => {
-		// W9 was added by hand after the app picked W1 and W3; a re-pick replaces the app's picks, not the reviewer's additions.
+		// W6 was added by hand after the app picked W1 and W3 (addSeed fetches a work into the pool, so the pool holds it); high-degree over this seven-work pool picks five works and never W6, so a re-pick that dropped manual additions would show it disappearing.
+		const sevenWorkPool = [
+			{ id: "W1", references: [] },
+			{ id: "W2", references: ["W1", "W3"] },
+			{ id: "W3", references: [] },
+			{ id: "W4", references: ["W2"] },
+			{ id: "W5", references: [] },
+			{ id: "W6", references: ["W5"] },
+			{ id: "W7", references: [] },
+		];
 		const selection = { algorithmId: "grasp", evidence: "picked at start", chosenBy: "app" as const };
-		const { hook, stored } = setup((review) => ({
-			...review,
-			seeds: ["W1", "W3", "W9"],
+		const { deps, stored } = makeDeps(sevenWorkPool);
+		stored.current = {
+			...stored.current,
+			seeds: ["W1", "W3", "W6"],
 			pickedSeeds: ["W1", "W3"],
 			suggestedComposition: defaultComposition(selection),
-		}));
+		};
+		const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+		const hook = renderHook(() => useReviewSession("r1", deps), { wrapper: wrapperFor(client) });
 		await waitFor(() => {
 			expect(hook.result.current.phase).toBe("ready");
 		});
@@ -283,9 +297,9 @@ describe("useReviewSession", () => {
 		await act(async () => {
 			await session.chooseAlgorithm("seed-selection", "high-degree");
 		});
-		// high-degree picks W2 first and covers the whole pool, so the picked set is replaced while W9 survives.
-		expect(stored.current.seeds).toEqual(["W2", "W1", "W3", "W4", "W9"]);
-		expect(stored.current.pickedSeeds).toEqual(["W2", "W1", "W3", "W4"]);
+		// The picked set is replaced (W2 first, W1 and W3 re-picked, W4 and W5 newly picked) while the manual W6 survives without duplicating.
+		expect(stored.current.seeds).toEqual(["W2", "W1", "W3", "W4", "W5", "W6"]);
+		expect(stored.current.pickedSeeds).toEqual(["W2", "W1", "W3", "W4", "W5"]);
 	});
 
 	it("reuses stored measurements when the review is reopened, without measuring again", async () => {
@@ -320,6 +334,7 @@ describe("useReviewSession", () => {
 		const selection = { algorithmId: "grasp", evidence: "picked at start", chosenBy: "app" as const };
 		const { hook, measured } = setup((review) => ({
 			...review,
+			pickedSeeds: ["W1", "W3"],
 			suggestedComposition: defaultComposition(selection),
 		}));
 		await waitFor(() => {

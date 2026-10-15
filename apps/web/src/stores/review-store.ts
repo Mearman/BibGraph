@@ -114,6 +114,10 @@ export interface CreateReviewInput {
 	name: string;
 	query?: string;
 	seeds?: string[];
+	/**
+	 * The seeds the app's selector picked, recorded when a zero-seeds start chooses its own seeds.
+	 */
+	pickedSeeds?: string[];
 }
 
 let lastCreatedAtMs = 0;
@@ -184,6 +188,7 @@ export interface UpdateReviewInput {
 	name?: string;
 	query?: string;
 	seeds?: string[];
+	pickedSeeds?: string[];
 	suggestedComposition?: SuggestedComposition;
 }
 

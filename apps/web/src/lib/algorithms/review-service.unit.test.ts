@@ -71,6 +71,7 @@ const makeStore = (): {
         name: input.name,
         query: input.query ?? "",
         seeds: input.seeds ?? [],
+        ...(input.pickedSeeds !== undefined && { pickedSeeds: input.pickedSeeds }),
         decisions: {},
         suggestedComposition: null,
         createdAt: new Date(0),
@@ -143,6 +144,10 @@ describe("review service", () => {
     const { started, made } = await runStart({ input: { seeds: [] } });
     expect(started.review.seeds).toHaveLength(SELECTION_SIZE);
     expect(made.saved.get(started.review.id)?.seeds).toEqual(
+      started.review.seeds,
+    );
+    // The picks are recorded as the app's, so a later selector switch replaces exactly them.
+    expect(made.saved.get(started.review.id)?.pickedSeeds).toEqual(
       started.review.seeds,
     );
     expect(started.composition.seedSelection?.algorithmId).toBeDefined();
@@ -285,6 +290,15 @@ describe("seed edits", () => {
     const edited = await removeSeed(started.review, "W3", made.store);
     expect(edited.seeds).toEqual(["W1"]);
     expect(made.saved.get(started.review.id)?.seeds).toEqual(["W1"]);
+  });
+
+  it("removes a picked seed from the picked set too, keeping it a subset of the seeds", async () => {
+    const { started, made } = await runStart({ input: { seeds: [], selectionSize: 2 } });
+    const removed = started.review.seeds[0] ?? "";
+    const remaining = started.review.seeds.filter((seed) => seed !== removed);
+    const edited = await removeSeed(started.review, removed, made.store);
+    expect(edited.seeds).toEqual(remaining);
+    expect(made.saved.get(started.review.id)?.pickedSeeds).toEqual(remaining);
   });
 
   it("refuses to remove the last seed", async () => {

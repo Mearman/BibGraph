@@ -56,6 +56,8 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   return {
     ...actual,
     useSearch: vi.fn(),
+    // The page now writes the executed query into the route URL; without a live router there is nothing to navigate, so the call is a no-op stub.
+    useNavigate: vi.fn(() => vi.fn()),
     Link: ({ children }: { children: ReactNode }) => <span>{children}</span>,
   };
 });
