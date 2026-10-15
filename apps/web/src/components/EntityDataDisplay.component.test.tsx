@@ -53,4 +53,16 @@ describe("EntityDataDisplay primitive arrays", () => {
     expect(screen.getByText("W. Teahan")).toBeVisible();
     expect(screen.getByText("Bill Teahan")).toBeVisible();
   });
+
+  it("renders apostrophe-glyph duplicates once, keeping the first spelling", () => {
+    renderData({
+      id: "https://openalex.org/A5020251281",
+      display_name: "Dara O'Briain",
+      display_name_alternatives: ["O'BRIAIN, DARA", "O’BRIAIN, DARA"],
+    });
+
+    const badges = screen.getAllByText(/O.?BRIAIN, DARA/i);
+    expect(badges).toHaveLength(1);
+    expect(badges[0]).toHaveTextContent("O'BRIAIN, DARA");
+  });
 });
