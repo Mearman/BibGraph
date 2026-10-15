@@ -248,13 +248,13 @@ const EntityGraphPageContent = ({ context }: { context: NonNullable<ReturnType<t
     }
   }, [layout, setEnableSimulation]);
 
-  // Handle camera position changes for mini-map
+  // Handle camera position changes for mini-map. Returning the previous object when the value is unchanged skips the re-render: the force graph emits zoom events during its own render (on re-feeding graph data), and an unconditional new-object update both warns ("cannot update a component while rendering a different component") and re-renders the whole page for no visual change.
   const handleZoomChange = useCallback((zoom: number) => {
-    setCameraPosition(previous => ({ ...previous, zoom }));
+    setCameraPosition(previous => (previous.zoom === zoom ? previous : { ...previous, zoom }));
   }, []);
 
   const handlePanChange = useCallback((panX: number, panY: number) => {
-    setCameraPosition(previous => ({ ...previous, panX, panY }));
+    setCameraPosition(previous => (previous.panX === panX && previous.panY === panY ? previous : { ...previous, panX, panY }));
   }, []);
 
   // Handle mini-map pan click

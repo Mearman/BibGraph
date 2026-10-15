@@ -72,6 +72,8 @@ export const useProgressiveGraphLoading = <T>(
   const timeoutReference = useRef<NodeJS.Timeout | null>(null);
   const animationFrameReference = useRef<number | null>(null);
   const isMountedReference = useRef(true);
+  // The current load's start time. Kept in a ref, not the loading state: the batch callback reads it to enforce the max-loading window, and keying that callback on a state field it updates would change its identity every load pass, restarting the load effect forever (the /graph page re-rendered thousands of times per second before this was a ref).
+  const startTimeReference = useRef(0);
 
   // Cancel any ongoing loading
   const cancelLoading = useCallback(() => {
@@ -110,7 +112,7 @@ export const useProgressiveGraphLoading = <T>(
 
       // Schedule next batch if items remain
       if (newRemaining.length > 0) {
-        const elapsedTime = performance.now() - loadingState.startTime;
+        const elapsedTime = performance.now() - startTimeReference.current;
 
         // Force load all if max time exceeded
         if (elapsedTime > finalConfig.maxLoadingTimeMs) {
@@ -142,13 +144,13 @@ export const useProgressiveGraphLoading = <T>(
       finalConfig.batchSize,
       finalConfig.batchDelayMs,
       finalConfig.maxLoadingTimeMs,
-      loadingState.startTime,
     ]
   );
 
   // Start progressive loading
   const startLoading = useCallback(() => {
     if (!finalConfig.enabled || items.length === 0) {
+      startTimeReference.current = performance.now();
       setVisibleItems([...items]);
       setLoadingState({
         isLoading: false,
@@ -156,7 +158,7 @@ export const useProgressiveGraphLoading = <T>(
         totalCount: items.length,
         progress: 1,
         currentBatch: 0,
-        startTime: performance.now(),
+        startTime: startTimeReference.current,
       });
       return;
     }
@@ -164,14 +166,14 @@ export const useProgressiveGraphLoading = <T>(
     // Cancel any existing loading
     cancelLoading();
 
-    const startTime = performance.now();
+    startTimeReference.current = performance.now();
     setLoadingState({
       isLoading: true,
       loadedCount: 0,
       totalCount: items.length,
       progress: 0,
       currentBatch: 0,
-      startTime,
+      startTime: startTimeReference.current,
     });
 
     // Start loading first batch

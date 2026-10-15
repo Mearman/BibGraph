@@ -599,22 +599,25 @@ export const OptimizedForceGraphVisualization = ({
         // Use zoom method if available, otherwise use default
         const zoom = typeof graphRef.current.zoom === 'function' ? graphRef.current.zoom() : 1;
 
-        // Notify parent component of zoom change
-        onZoom?.(zoom);
-
-        // Culling bounds must track the live camera centre: centring them on the origin instead culls on-screen nodes after any fit or pan and renders off-screen ones near the origin, leaving a phone-width canvas apparently blank.
-        const center = graphRef.current.centerAt();
-
-        setViewportBounds(calculateViewportBounds(
-          center.x,
-          center.y,
-          DEFAULT_CAMERA_Z_DISTANCE,
-          zoom,
-          containerWidth,
-          height ?? containerHeight
-        ));
+        // The library emits zoom events during its own render (re-feeding graph data auto-adjusts the camera); deferring the updates past the render phase avoids "cannot update a component while rendering a different component".
+        queueMicrotask(() => {
+          // Notify parent component of zoom change
+          onZoom?.(zoom);
+          // Culling bounds must track the live camera centre: centring them on the origin instead culls on-screen nodes after any fit or pan and renders off-screen ones near the origin, leaving a phone-width canvas apparently blank.
+          const center = graphRef.current?.centerAt();
+          if (center !== undefined) {
+            setViewportBounds(calculateViewportBounds(
+              center.x,
+              center.y,
+              DEFAULT_CAMERA_Z_DISTANCE,
+              zoom,
+              containerWidth,
+              height ?? containerHeight
+            ));
+          }
+        });
       } catch {
-        // Camera might not be ready
+        // Camera might not be ready yet
       }
     }
   }, [enableOptimizations, containerWidth, containerHeight, height, onZoom]);
