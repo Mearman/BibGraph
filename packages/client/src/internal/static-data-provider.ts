@@ -89,6 +89,13 @@ export interface CachedEntityEntry {
 }
 
 /**
+ * A cached entity entry enriched with the entity's display name, parsed from the stored data for preview lists (US-26)
+ */
+export interface CachedEntityPreview extends CachedEntityEntry {
+	displayName: string | null;
+}
+
+/**
  * Multi-tier static data provider with automatic fallback and environment detection
  */
 class StaticDataProvider {
@@ -462,6 +469,13 @@ class StaticDataProvider {
 	 */
 	async enumerateIndexedDBEntities(): Promise<CachedEntityEntry[]> {
 		return this.indexedDBCacheTier.enumerateEntities();
+	}
+
+	/**
+	 * Get the most recently accessed IndexedDB entities with display names (US-26)
+	 */
+	async getIndexedDBEntityPreviews(limit: number): Promise<CachedEntityPreview[]> {
+		return this.indexedDBCacheTier.getEntityPreviews(limit);
 	}
 
 	/**

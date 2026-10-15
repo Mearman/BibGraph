@@ -773,6 +773,9 @@ importers:
       eslint:
         specifier: 10.10.0
         version: 10.10.0(jiti@2.7.0)(supports-color@8.1.1)
+      fake-indexeddb:
+        specifier: 6.2.5
+        version: 6.2.5
       immer:
         specifier: 11.1.18
         version: 11.1.18

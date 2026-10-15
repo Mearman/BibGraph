@@ -33,12 +33,14 @@ import {
 } from "./internal/graph-indexing";
 import {
   type CachedEntityEntry,
+  type CachedEntityPreview,
   type CacheStatistics,
   type EnvironmentInfo,
   staticDataProvider,
 } from "./internal/static-data-provider";
 import {
   cleanOpenAlexId,
+  type StaticEntityType,
   toStaticEntityType,
 } from "./internal/static-data-utils";
 import { AutocompleteApi } from "./utils/autocomplete";
@@ -522,6 +524,20 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
 
   async enumerateIndexedDBEntities(): Promise<CachedEntityEntry[]> {
     return staticDataProvider.enumerateIndexedDBEntities();
+  }
+
+  /**
+   * Get the most recently accessed IndexedDB entities with display names (US-26)
+   */
+  async getIndexedDBEntityPreviews(limit: number): Promise<CachedEntityPreview[]> {
+    return staticDataProvider.getIndexedDBEntityPreviews(limit);
+  }
+
+  /**
+   * Clear persistent IndexedDB cache entries of one entity type (US-26)
+   */
+  async clearIndexedDBCacheByType(entityType: StaticEntityType): Promise<number> {
+    return staticDataProvider.clearIndexedDBByType(entityType);
   }
 
   async getCacheTierSummary(): Promise<{

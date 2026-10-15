@@ -8,7 +8,7 @@ import { logger } from "@bibgraph/utils";
 import { DexieCacheTier } from "../../../cache/dexie/dexie-cache-tier";
 import { isIndexedDBAvailable } from "../../../cache/dexie/entity-cache-db";
 import type { CacheTierInterface } from "../../cache-tiers-types";
-import type { CachedEntityEntry , StaticDataResult } from "../../static-data-provider";
+import type { CachedEntityEntry, CachedEntityPreview, StaticDataResult } from "../../static-data-provider";
 import { CacheTier } from "../../static-data-provider";
 import type { StaticEntityType } from "../../static-data-utils";
 
@@ -37,6 +37,26 @@ const calculateCacheStats = (stats: Readonly<CacheStats>): {
 		averageLoadTime:
 			stats.requests > 0 ? stats.totalLoadTime / stats.requests : 0,
 	});
+
+/**
+ * Extract an OpenAlex entity's display_name from its serialised cache data, returning null when the stored value has no display name
+ */
+const extractDisplayName = (data: string): string | null => {
+	try {
+		const parsed: unknown = JSON.parse(data);
+		if (
+			typeof parsed === "object" &&
+			parsed !== null &&
+			"display_name" in parsed &&
+			typeof parsed.display_name === "string"
+		) {
+			return parsed.display_name;
+		}
+	} catch {
+		// Unparsable data has no display name to extract.
+	}
+	return null;
+};
 
 /**
  * IndexedDB cache implementation using Dexie
@@ -202,6 +222,41 @@ export class IndexedDBCacheTier implements CacheTierInterface {
 			}));
 		} catch (error) {
 			logger.warn(this.LOG_PREFIX, "Failed to enumerate IndexedDB entities", { error });
+			return [];
+		}
+	}
+
+	/**
+	 * Get the most recently accessed entities with their display names, for cache-management previews (US-26). Only the requested slice of records has its data parsed, so a full cache is never deserialised.
+	 */
+	async getEntityPreviews(limit: number): Promise<CachedEntityPreview[]> {
+		if (!isIndexedDBAvailable()) {
+			return [];
+		}
+
+		try {
+			const database = await import("../../../cache/dexie/entity-cache-db").then(m => m.getEntityCacheDB());
+			if (!database) {
+				return [];
+			}
+
+			const records = await database.entities
+				.orderBy("lastAccessedAt")
+				.reverse()
+				.limit(limit)
+				.toArray();
+
+			return records.map(record => ({
+				entityType: record.entityType,
+				entityId: record.entityId,
+				cachedAt: record.cachedAt,
+				lastAccessedAt: record.lastAccessedAt,
+				accessCount: record.accessCount,
+				dataSize: record.dataSize,
+				displayName: extractDisplayName(record.data),
+			}));
+		} catch (error) {
+			logger.warn(this.LOG_PREFIX, "Failed to read IndexedDB entity previews", { error });
 			return [];
 		}
 	}
