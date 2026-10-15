@@ -37,7 +37,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { KeyboardShortcutsButton, KeyboardShortcutsHelp } from "@/components/modals/KeyboardShortcutsHelp";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
-import { OnboardingTutorial } from "@/components/onboarding";
+import { OnboardingTutorial, TourLaunchpad } from "@/components/onboarding";
 import { SyncStatusIndicator } from "@/components/sync/SyncStatusIndicator";
 import { InstallMenuItem } from "@/components/ui/InstallMenuItem";
 import { OfflineBanner } from "@/components/ui/NetworkStatus";
@@ -107,8 +107,8 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
   // Keyboard shortcuts state
   const [shortcutsHelpOpened, setShortcutsHelpOpened] = useState(false);
 
-  // User onboarding state
-  const { showOnboarding, closeOnboarding } = useOnboarding();
+  // Tour state: the launchpad in the corner offers the tour; it never opens by itself.
+  const { tourOpen, openTour, closeTour } = useOnboarding();
 
   // Set up global keyboard shortcuts
   useGlobalHotkeys({
@@ -557,10 +557,11 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
         onClose={() => { setShortcutsHelpOpened(false); }}
       />
 
-      {/* User Onboarding Tutorial */}
+      {/* Feature tour: offered from the corner, opened on demand */}
+      <TourLaunchpad onOpen={openTour} />
       <OnboardingTutorial
-        opened={showOnboarding}
-        onClose={closeOnboarding}
+        opened={tourOpen}
+        onClose={closeTour}
       />
 
     </AppShell>

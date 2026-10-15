@@ -1,79 +1,46 @@
 /**
  * useOnboarding Hook
  *
- * Manages onboarding state and first-time user detection
+ * Holds the tour's open state and its completion mark. The tour never opens on its own, not even on a first visit: the corner launchpad offers it, and this hook opens it on demand.
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
-import {
-  hasCompletedOnboarding,
-  markOnboardingCompleted,
-  resetOnboarding,
-} from '@/components/onboarding';
-
-const ONBOARDING_DISPLAY_DELAY_MS = 1000;
+import { markOnboardingCompleted } from '@/components/onboarding';
 
 export interface UseOnboardingReturn {
   /**
-  Whether to show the onboarding tutorial
+   * Whether the tour modal is open
    */
-  showOnboarding: boolean;
+  tourOpen: boolean;
   /**
-  Close the onboarding
+   * Open the tour from the launchpad
    */
-  closeOnboarding: () => void;
+  openTour: () => void;
   /**
-  Reset onboarding (show again)
+   * Close the tour and mark it completed
    */
-  resetOnboarding: () => void;
-  /**
-  Whether user has completed onboarding
-   */
-  hasCompleted: boolean;
+  closeTour: () => void;
 }
 
 /**
- * Hook for managing onboarding state
+ * Hook for managing the tour's open state
  */
 export const useOnboarding = (): UseOnboardingReturn => {
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [hasCompleted, setHasCompleted] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
 
-  useEffect(() => {
-    // Check if user has completed onboarding
-    const isCompleted = hasCompletedOnboarding();
-    setHasCompleted(isCompleted);
-
-    // Show onboarding for first-time users
-    if (!isCompleted) {
-      // Small delay to allow app to load
-      const timer = setTimeout(() => {
-        setShowOnboarding(true);
-      }, ONBOARDING_DISPLAY_DELAY_MS);
-
-      return () => {
-        clearTimeout(timer);
-      };
-    }
-    return undefined;
+  const openTour = useCallback(() => {
+    setTourOpen(true);
   }, []);
 
-  const closeOnboarding = () => {
-    setShowOnboarding(false);
+  const closeTour = useCallback(() => {
+    setTourOpen(false);
     markOnboardingCompleted();
-  };
-
-  const handleReset = () => {
-    resetOnboarding();
-    setShowOnboarding(true);
-    setHasCompleted(false);
-  };
+  }, []);
 
   return {
-    showOnboarding,
-    closeOnboarding,
-    resetOnboarding: handleReset,
-    hasCompleted,
+    tourOpen,
+    openTour,
+    closeTour,
   };
 };

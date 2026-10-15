@@ -13,14 +13,14 @@ import { LayoutProvider } from '@/stores/layout-store'
 import { MainLayout } from './MainLayout'
 
 vi.mock('@/hooks/use-hotkeys', () => ({ useGlobalHotkeys: vi.fn() }))
-vi.mock('@/hooks/useOnboarding', () => ({ useOnboarding: vi.fn(() => ({ showOnboarding: false, closeOnboarding: vi.fn() } as const)) }))
+vi.mock('@/hooks/useOnboarding', () => ({ useOnboarding: vi.fn(() => ({ tourOpen: false, openTour: vi.fn(), closeTour: vi.fn() } as const)) }))
 vi.mock('@/components/modals/KeyboardShortcutsHelp', () => ({
   KeyboardShortcutsButton: ({ onClick }: Readonly<{ onClick: () => void }>) => (
     <button type="button" onClick={onClick}>Shortcuts</button>
   ),
   KeyboardShortcutsHelp: () => null,
 }))
-vi.mock('@/components/onboarding', () => ({ OnboardingTutorial: () => null }))
+vi.mock('@/components/onboarding', () => ({ OnboardingTutorial: () => null, TourLaunchpad: () => null }))
 vi.mock('@/components/notifications/NotificationCenter', () => ({
   NotificationCenter: () => <button type="button">Notifications</button>,
 }))

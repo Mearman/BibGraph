@@ -100,18 +100,17 @@ export const markOnboardingCompleted = (): void => {
 };
 
 /**
- * Reset onboarding (for testing or "show again" functionality)
- */
-export const resetOnboarding = (): void => {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(ONBOARDING_STORAGE_KEY);
-};
-
-/**
  * Onboarding Tutorial Component
  */
 export const OnboardingTutorial: React.FC<OnboardingTutorialProperties> = ({ opened, onClose }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [prevOpened, setPrevOpened] = useState(opened);
+
+  // Reopening the tour from the launchpad starts it from the beginning again; adjusting during render avoids a reset effect.
+  if (prevOpened !== opened) {
+    setPrevOpened(opened);
+    if (opened) setCurrentStepIndex(0);
+  }
 
   const currentStep = ONBOARDING_STEPS[currentStepIndex];
   const progress = ((currentStepIndex + 1) / ONBOARDING_STEPS.length) * PERCENTAGE_MULTIPLIER;
@@ -137,11 +136,6 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProperties> = ({ ope
 
   const handleSkip = () => {
     handleComplete();
-  };
-
-  const handleShowAgain = () => {
-    resetOnboarding();
-    setCurrentStepIndex(0);
   };
 
   return (
@@ -203,15 +197,14 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProperties> = ({ ope
             </Button>
 
             <Group gap="xs">
-              {currentStepIndex < ONBOARDING_STEPS.length - 1 && (
-                <Button
-                  variant="light"
-                  color="gray"
-                  onClick={handleSkip}
-                >
-                  Skip Tour
-                </Button>
-              )}
+              {/* Skippable in place: the way out is on every step, not only the last. */}
+              <Button
+                variant="light"
+                color="gray"
+                onClick={handleSkip}
+              >
+                Skip Tour
+              </Button>
               <Button
                 onClick={handleNext}
                 rightSection={<IconCircleCheck size={ICON_SIZE.SM} />}
@@ -244,20 +237,6 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProperties> = ({ ope
           </Group>
         </Stack>
       </Modal>
-
-      {/* Show Again Button (when onboarding is closed) */}
-      {!opened && hasCompletedOnboarding() && (
-        <Group justify="center" py="md">
-          <Button
-            variant="light"
-            size="sm"
-            onClick={handleShowAgain}
-            leftSection={<IconInfoCircle size={ICON_SIZE.SM} />}
-          >
-            Show Tutorial Again
-          </Button>
-        </Group>
-      )}
     </>
   );
 };
