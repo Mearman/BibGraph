@@ -22,6 +22,7 @@ import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
 import { type ReactElement,useRef, useState } from "react";
 
 import { useScreeningDecisionHotkeys } from "@/hooks/use-hotkeys";
+import { useNarrowViewport } from "@/hooks/use-narrow-viewport";
 import {
 	describeEvidence,
 	ordinal,
@@ -116,6 +117,8 @@ export const ScreeningList = ({
 	const [expandedId, setExpandedId] = useState<string | null>(null);
 	const [focusedIndex, setFocusedIndex] = useState(0);
 	const elementsRef = useRef<(HTMLElement | null)[]>([]);
+	// The j/k/i/x hints are for a keyboard; at phone width there is none to hint at.
+	const isNarrowViewport = useNarrowViewport();
 
 	useScreeningDecisionHotkeys({ onDecide, enabled: rows.length > 0 });
 
@@ -172,9 +175,11 @@ export const ScreeningList = ({
 						}}
 					/>
 				</Group>
-				<Text size="xs" c="dimmed">
-					<Kbd>j</Kbd>/<Kbd>k</Kbd> move, <Kbd>i</Kbd> include, <Kbd>x</Kbd> exclude
-				</Text>
+				{!isNarrowViewport && (
+					<Text size="xs" c="dimmed">
+						<Kbd>j</Kbd>/<Kbd>k</Kbd> move, <Kbd>i</Kbd> include, <Kbd>x</Kbd> exclude
+					</Text>
+				)}
 			</Group>
 			<Stack component="ul" gap="sm" m={0} p={0} style={{ listStyle: "none" }}>
 				{rows.map((row, index) => {

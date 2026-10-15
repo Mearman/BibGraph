@@ -8,7 +8,7 @@ import "@testing-library/jest-dom";
 
 import { MantineProvider } from "@mantine/core";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { type EvidenceView, type LabelledRef, SCORE_DECIMALS, type ScreeningRow } from "@/lib/reviews/screening-view";
 
@@ -84,6 +84,30 @@ const renderList = (overrides: Partial<Parameters<typeof ScreeningList>[0]> = {}
 };
 
 describe("ScreeningList", () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("shows the keyboard hints on a wide viewport and hides them at phone width, where there is no keyboard", () => {
+		// jsdom without matchMedia reads as wide, so the hints show.
+		renderList();
+		expect(screen.getByText(/move,/)).toBeInTheDocument();
+		expect(screen.getByText(/include/)).toBeInTheDocument();
+	});
+
+	it("hides the keyboard hints when the viewport is phone width", () => {
+		const phoneWidthMedia = {
+			matches: true,
+			addEventListener: () => undefined,
+			removeEventListener: () => undefined,
+		};
+		vi.stubGlobal("matchMedia", vi.fn().mockReturnValue(phoneWidthMedia));
+		renderList();
+		expect(screen.queryByText(/move,/)).not.toBeInTheDocument();
+		expect(screen.queryByText(/exclude/)).not.toBeInTheDocument();
+		vi.unstubAllGlobals();
+	});
+
 	it("renders rows as list items with position and set size, title, year and titled evidence", () => {
 		renderList();
 		const first = screen.getAllByRole("listitem")[0];
