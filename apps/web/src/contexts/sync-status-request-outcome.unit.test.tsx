@@ -2,7 +2,7 @@
  * Unit tests for the sync status context's request-outcome awareness and the offline banner's split between network failures and server errors. The query cache is the source of request outcomes: a query error is classified, a query success clears it.
  */
 
-import { OpenAlexApiError } from "@bibgraph/client";
+import { emitRequestOutcome, OpenAlexApiError } from "@bibgraph/client";
 import { MantineProvider } from "@mantine/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, renderHook, waitFor } from "@testing-library/react";
@@ -86,6 +86,56 @@ const throttledError = () => {
   const error = new OpenAlexApiError({ message: "Too many requests", statusCode: 429 });
   return error;
 };
+
+describe("sync status transport outcomes", () => {
+  it("reads Sync error the moment the transport reports a 429, while the query is still pending through its retry budget", async () => {
+    const queryClient = buildQueryClient();
+    const Wrapper = wrapperWith(queryClient);
+    const { result } = renderHook(() => useSyncStatus(), { wrapper: Wrapper });
+
+    act(() => {
+      emitRequestOutcome({ kind: "http-error", status: 429, message: "Rate limit exceeded (HTTP 429)" });
+    });
+
+    await waitFor(() => {
+      expect(result.current.syncStatus.overall).toBe("error");
+    });
+  });
+
+  it("reads Offline the moment the transport reports a network-level failure", async () => {
+    const queryClient = buildQueryClient();
+    const Wrapper = wrapperWith(queryClient);
+    const { result } = renderHook(() => useSyncStatus(), { wrapper: Wrapper });
+
+    act(() => {
+      emitRequestOutcome({ kind: "network-error", message: "fetch failed" });
+    });
+
+    await waitFor(() => {
+      expect(result.current.syncStatus.overall).toBe("offline");
+    });
+  });
+
+  it("clears a transport failure once a later attempt succeeds", async () => {
+    const queryClient = buildQueryClient();
+    const Wrapper = wrapperWith(queryClient);
+    const { result } = renderHook(() => useSyncStatus(), { wrapper: Wrapper });
+
+    act(() => {
+      emitRequestOutcome({ kind: "http-error", status: 429, message: "Rate limit exceeded (HTTP 429)" });
+    });
+    await waitFor(() => {
+      expect(result.current.syncStatus.overall).toBe("error");
+    });
+
+    act(() => {
+      emitRequestOutcome({ kind: "success" });
+    });
+    await waitFor(() => {
+      expect(result.current.syncStatus.overall).not.toBe("error");
+    });
+  });
+});
 
 describe("sync status request outcomes", () => {
   it("reads Offline when the last request failed at the network level while the browser still reports online", async () => {

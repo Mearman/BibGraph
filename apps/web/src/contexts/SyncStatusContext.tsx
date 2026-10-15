@@ -5,6 +5,7 @@
  * Tracks active operations and shows visual indicators for sync state.
  */
 
+import { type ClientRequestOutcome,subscribeToRequestOutcomes } from '@bibgraph/client';
 import { useQueryClient } from '@tanstack/react-query';
 import React, { createContext, use, useCallback, useEffect, useMemo,useState } from 'react';
 
@@ -53,6 +54,20 @@ export const SyncStatusProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
     return unsubscribe;
   }, [queryClient]);
+
+  // The transport emits each attempt's outcome the moment it happens, which the query cache cannot: under rate limiting the query stays pending through the whole retry budget (tens of seconds), during which the indicator would otherwise keep reading synced.
+  useEffect(() => {
+    const messageOf = (outcome: Readonly<ClientRequestOutcome | RequestOutcome>): string | undefined =>
+      outcome.kind === 'http-error' || outcome.kind === 'network-error' ? outcome.message : undefined;
+    const applyOutcome = (outcome: ClientRequestOutcome) => {
+      setLastRequestOutcome((previous) =>
+        previous !== null && previous.kind === outcome.kind && messageOf(previous) === messageOf(outcome)
+          ? previous
+          : outcome,
+      );
+    };
+    return subscribeToRequestOutcomes(applyOutcome);
+  }, []);
 
   // Track online/offline status
   useEffect(() => {

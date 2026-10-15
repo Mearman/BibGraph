@@ -2,10 +2,12 @@ import { isEntityType } from "@bibgraph/types";
 import { useLiveRegion } from "@bibgraph/ui";
 import { logger } from "@bibgraph/utils";
 import { Alert, Button, Code, Container, Flex, Group, Loader, Paper, Skeleton, Stack, Text, Title } from "@mantine/core";
-import { IconRefresh, IconWifiOff } from "@tabler/icons-react";
+import { IconAlertCircle, IconRefresh, IconWifiOff } from "@tabler/icons-react";
 import React, { useEffect,useRef,useState } from "react";
 
 import { BORDER_STYLE_GRAY_3, ICON_SIZE, LOADING_CONSTANTS } from "@/config/style-constants";
+import { useSyncStatus } from "@/contexts/SyncStatusContext";
+import { serverErrorMessage } from "@/lib/connectivity";
 
 import type { EntityTypeConfig } from "./EntityTypeConfig";
 import { getMantineColor } from "./EntityTypeConfig";
@@ -32,26 +34,33 @@ export const LoadingState = ({
   // Accessibility hooks
   const { announce, LiveRegionComponent } = useLiveRegion();
   const loadingElementRef = useRef<HTMLDivElement>(null);
+  const { syncStatus } = useSyncStatus();
 
-  // An unresolved load past the stall timeout is treated as offline. Derived rather than stored so the flip cannot desynchronise from elapsed time
+  // An unresolved load past the stall timeout is treated as failed. Derived rather than stored so the flip cannot desynchronise from elapsed time
   const isStalled = timeElapsed >= LOADING_CONSTANTS.STALL_TIMEOUT_MS;
   const stallAnnouncedRef = useRef(false);
+
+  // A stall while the server is answering with HTTP errors is a server problem (throttling included), not a connectivity one; the wording must not claim the record is unavailable offline when the transport knows better
+  const stalledOutcome = isStalled ? syncStatus.lastRequestOutcome : null;
+  const isHttpErrorStall = stalledOutcome?.kind === 'http-error';
+  const stalledHeadline = isHttpErrorStall ? 'The server could not serve this record.' : 'This record is not available offline.';
+  const stalledDetail = stalledOutcome !== null && stalledOutcome.kind === 'http-error' ? serverErrorMessage(stalledOutcome) : 'It will load when the connection returns.';
 
   // Announce loading once, politely: no percentage or step announcements, since any number would be fabricated
   useEffect(() => {
     announce(`Loading ${entityType}.`, 'polite');
   }, [entityType, announce]);
 
-  // Announce the stall to screen readers exactly once
+  // Announce the stall to screen readers exactly once, with the same wording the panel shows
   useEffect(() => {
     if (isStalled && !stallAnnouncedRef.current) {
       stallAnnouncedRef.current = true;
       announce(
-        `Loading ${entityType} is taking longer than expected. This record may not be available offline.`,
+        `Loading ${entityType} is taking longer than expected. ${stalledHeadline} ${stalledDetail}`,
         'assertive'
       );
     }
-  }, [isStalled, entityType, announce]);
+  }, [isStalled, entityType, announce, stalledHeadline, stalledDetail]);
 
   // Count elapsed time, bounded by the stall timeout: once stalled the effect schedules no further ticks
   useEffect(() => {
@@ -92,15 +101,15 @@ export const LoadingState = ({
             <Paper p="xl" radius="xl" style={{ border: BORDER_STYLE_GRAY_3 }} w="100%" maw="48rem">
               <Stack gap="lg">
                 <Group justify="center" mb="md">
-                  <Alert variant="light" color="orange" radius="xl" p="lg" w="fit-content">
-                    <IconWifiOff size={ICON_SIZE.HERO} />
+                  <Alert variant="light" color={isHttpErrorStall ? 'red' : 'orange'} radius="xl" p="lg" w="fit-content">
+                    {isHttpErrorStall ? <IconAlertCircle size={ICON_SIZE.HERO} /> : <IconWifiOff size={ICON_SIZE.HERO} />}
                   </Alert>
                 </Group>
                 <Title order={2} ta="center">
-                  This record is not available offline.
+                  {stalledHeadline}
                 </Title>
                 <Text size="sm" c="dimmed" ta="center">
-                  It will load when the connection returns.
+                  {stalledDetail}
                 </Text>
                 <Group justify="center" gap="md" mt="md">
                   <Button
