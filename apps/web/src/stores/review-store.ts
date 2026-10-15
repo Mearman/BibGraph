@@ -6,6 +6,7 @@ import { logger } from "@bibgraph/utils/logger";
 import Dexie, { type Table } from "dexie";
 
 import type { PoolWork } from "@/lib/algorithms/screening-engine";
+import type { MeasurementRecord } from "@/lib/reviews/measurement-cache";
 
 /**
 A per-work screening decision the refine loop feeds back as signal.
@@ -62,9 +63,15 @@ interface PoolSnapshot {
 	works: PoolWork[];
 }
 
+/**
+ * Schema version that adds the measurements table, keyed by measurement key with the review id indexed for deletion.
+ */
+const MEASUREMENTS_SCHEMA_VERSION = 3;
+
 class ReviewDB extends Dexie {
 	reviews!: Table<ReviewRecord, string>;
 	pools!: Table<PoolSnapshot, string>;
+	measurements!: Table<MeasurementRecord, string>;
 
 	constructor() {
 		super("bibgraph-reviews");
@@ -74,6 +81,11 @@ class ReviewDB extends Dexie {
 		this.version(2).stores({
 			reviews: "id, name, createdAt",
 			pools: "reviewId",
+		});
+		this.version(MEASUREMENTS_SCHEMA_VERSION).stores({
+			reviews: "id, name, createdAt",
+			pools: "reviewId",
+			measurements: "key, reviewId",
 		});
 	}
 }
@@ -135,9 +147,10 @@ export const listReviews = async (): Promise<LiteratureReview[]> =>
 
 export const deleteReview = async (id: string): Promise<void> => {
 	const db = getDB();
-	await db.transaction("rw", db.reviews, db.pools, async () => {
+	await db.transaction("rw", db.reviews, db.pools, db.measurements, async () => {
 		await db.reviews.delete(id);
 		await db.pools.delete(id);
+		await db.measurements.where("reviewId").equals(id).delete();
 	});
 };
 
@@ -148,6 +161,19 @@ export const savePool = async (reviewId: string, pool: readonly PoolWork[]): Pro
 export const getPool = async (reviewId: string): Promise<PoolWork[] | undefined> => {
 	const snapshot = await getDB().pools.get(reviewId);
 	return snapshot?.works;
+};
+
+/**
+ * Every stored algorithm measurement of a review. Each record's key names the inputs it was measured under, so the caller keeps a cell only while those inputs still hold.
+ */
+export const getMeasurements = async (reviewId: string): Promise<MeasurementRecord[]> =>
+	getDB().measurements.where("reviewId").equals(reviewId).toArray();
+
+/**
+ * Stores measurements by key: re-measuring a cell overwrites its record, and the cells of stages whose inputs have not changed are left alone.
+ */
+export const saveMeasurements = async (reviewId: string, cells: readonly MeasurementRecord[]): Promise<void> => {
+	await getDB().measurements.bulkPut(cells.map((cell) => ({ ...cell, reviewId })));
 };
 
 export interface UpdateReviewInput {
@@ -191,8 +217,9 @@ Test-only helper: wipes the table so each unit test starts empty.
  */
 export const clearAllReviewsForTests = async (): Promise<void> => {
 	const db = getDB();
-	await db.transaction("rw", db.reviews, db.pools, async () => {
+	await db.transaction("rw", db.reviews, db.pools, db.measurements, async () => {
 		await db.reviews.clear();
 		await db.pools.clear();
+		await db.measurements.clear();
 	});
 };

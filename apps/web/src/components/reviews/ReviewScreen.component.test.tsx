@@ -13,7 +13,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ReadyReviewSession } from "@/hooks/use-review-session";
 import type { ScreeningPaging } from "@/hooks/use-screening-arrangement";
-import type { AlgorithmComparison } from "@/lib/algorithms/algorithm-comparison";
+import type { ComparisonRow } from "@/lib/algorithms/algorithm-comparison";
+import type { AlgorithmStage } from "@/lib/algorithms/registry";
 import type { ScreeningRow } from "@/lib/reviews/screening-view";
 
 import { ReviewScreen } from "./ReviewScreen";
@@ -23,32 +24,48 @@ import { ReviewScreen } from "./ReviewScreen";
  */
 const EXTRA_WORK_ID_OFFSET = 10;
 
-const comparison: AlgorithmComparison = {
-	exploration: [
-		{
-			algorithmId: "dome",
-			label: "DOME",
-			family: "novel",
-			stage: "exploration",
-			description: "Expands the highest-degree candidate next.",
-			value: 2,
-			evidence: "recovered 2 of 2 held-out seeds within a budget of 32 works",
-			chosen: true,
-		},
-		{
-			algorithmId: "frontier-balanced",
-			label: "frontier-balanced",
-			family: "baseline",
-			stage: "exploration",
-			description: "Always expands the smallest frontier, keeping seeds' coverage even.",
-			value: 1,
-			evidence: "recovered 1 of 2 held-out seeds within a budget of 32 works",
-			chosen: false,
-		},
-	],
-	"seed-selection": [],
+const explorationRows: readonly ComparisonRow[] = [
+	{
+		algorithmId: "dome",
+		label: "DOME",
+		family: "novel",
+		stage: "exploration",
+		description: "Expands the highest-degree candidate next.",
+		value: 2,
+		evidence: "recovered 2 of 2 held-out seeds within a budget of 32 works",
+		chosen: true,
+	},
+	{
+		algorithmId: "frontier-balanced",
+		label: "frontier-balanced",
+		family: "baseline",
+		stage: "exploration",
+		description: "Always expands the smallest frontier, keeping seeds' coverage even.",
+		value: 1,
+		evidence: "recovered 1 of 2 held-out seeds within a budget of 32 works",
+		chosen: false,
+	},
+];
+
+const selectionRows: readonly ComparisonRow[] = [
+	{
+		algorithmId: "grasp",
+		label: "GRASP",
+		family: "novel",
+		stage: "seed-selection",
+		description: "Clusters pool works on structural features and picks per cluster.",
+		value: 0.5,
+		evidence: "picks cover 2 of 4 pool works within one hop",
+		chosen: true,
+	},
+];
+
+const comparison = (overrides: Partial<Record<AlgorithmStage, readonly ComparisonRow[] | null>> = {}): Record<AlgorithmStage, readonly ComparisonRow[] | null> => ({
+	exploration: explorationRows,
+	"seed-selection": selectionRows,
 	ranking: [],
-};
+	...overrides,
+});
 
 const semanticRow = (workId: string, title: string): ScreeningRow => ({
 	workId,
@@ -103,8 +120,9 @@ const session = (overrides: Partial<ReadyReviewSession> = {}): ReadyReviewSessio
 	labelsPending: false,
 	labelsError: null,
 	retryLabels: () => undefined,
-	comparison,
-	comparisonError: null,
+	comparison: comparison(),
+	comparisonError: { exploration: null, "seed-selection": null, ranking: null },
+	comparisonProgress: { exploration: null, "seed-selection": null, ranking: null },
 	inUse: { exploration: "dome", "seed-selection": null, ranking: null },
 	seedSelectionEditable: false,
 	decide: vi.fn<ReadyReviewSession["decide"]>(async () => {
@@ -120,12 +138,18 @@ const session = (overrides: Partial<ReadyReviewSession> = {}): ReadyReviewSessio
 });
 
 const renderScreen = (ready: ReadyReviewSession, paging?: ScreeningPaging) => {
-	render(
+	const view = (next: ReadyReviewSession) => (
 		<MantineProvider>
 			<Notifications />
-			<ReviewScreen session={ready} paging={paging} />
-		</MantineProvider>,
+			<ReviewScreen session={next} paging={paging} />
+		</MantineProvider>
 	);
+	const rendered = render(view(ready));
+	return {
+		rerender: (next: ReadyReviewSession): void => {
+			rendered.rerender(view(next));
+		},
+	};
 };
 
 describe("ReviewScreen", () => {
@@ -213,11 +237,34 @@ describe("ReviewScreen", () => {
 		expect(screen.queryByText("Alpha paper")).not.toBeInTheDocument();
 	});
 
-	it("shows the measurement loading with role status and the re-rank banner", () => {
-		renderScreen(session({ comparison: null }));
+	it("shows the measurement loading per stage with role status and the re-rank banner", () => {
+		renderScreen(session({ comparison: comparison({ exploration: null }) }));
 		fireEvent.click(screen.getByRole("tab", { name: /Algorithms/ }));
 		expect(screen.getByRole("status")).toBeInTheDocument();
+		expect(screen.getByText(/Measuring the exploration algorithms/)).toBeInTheDocument();
 		expect(screen.getByText(/may be re-ranked when the measurement finishes/)).toBeInTheDocument();
+		// A stage whose measurement already exists keeps its table while another stage measures.
+		expect(screen.getByRole("region", { name: "Seed selection" }).querySelector("table")).toBeInTheDocument();
+	});
+
+	it("keeps an unchanged stage's table on a stage switch instead of blanking it into a re-measure", () => {
+		const ready = session();
+		const { rerender } = renderScreen(ready);
+		fireEvent.click(screen.getByRole("tab", { name: /Algorithms/ }));
+		expect(screen.getByRole("region", { name: "Seed selection" }).querySelector("table")).toBeInTheDocument();
+		// Switching the selector re-picks the seeds, so exploration and ranking re-measure; seed selection keeps its measured table.
+		const switched = session({
+			comparison: comparison({ exploration: null, ranking: null }),
+			comparisonProgress: { exploration: "DOME (1 of 9)", "seed-selection": null, ranking: null },
+		});
+		rerender(switched);
+		const selection = screen.getByRole("region", { name: "Seed selection" });
+		expect(selection.querySelector("table")).toBeInTheDocument();
+		expect(within(selection).queryByRole("status")).not.toBeInTheDocument();
+		expect(within(selection).getByText("Clusters pool works on structural features and picks per cluster.")).toBeInTheDocument();
+		const exploration = screen.getByRole("region", { name: "Exploration" });
+		expect(within(exploration).getByRole("status")).toBeInTheDocument();
+		expect(within(exploration).getByText("DOME (1 of 9)")).toBeInTheDocument();
 	});
 
 	it("hides codenames behind the technical toggle and notifies what re-ranks on a switch", async () => {

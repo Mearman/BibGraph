@@ -4,14 +4,18 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
+import type { MeasurementRecord } from "@/lib/reviews/measurement-cache";
+
 import {
 	clearDecision,
 	createReview,
 	deleteReview,
+	getMeasurements,
 	getPool,
 	getReview,
 	listReviews,
 	type LiteratureReview,
+	saveMeasurements,
 	savePool,
 	setDecision,
 	updateReview,
@@ -19,6 +23,13 @@ import {
 
 const emptyDecision = (review: LiteratureReview): number =>
 	Object.keys(review.decisions).length;
+
+/**
+ * Coverage fixtures: a half-covered pool, and exploration recovery counts before and after every held-out seed is found.
+ */
+const HALF_COVERED = 0.5;
+const RECOVERED_SOME = 2;
+const RECOVERED_ALL = 3;
 
 describe("review store", () => {
 	beforeEach(async () => {
@@ -99,5 +110,59 @@ describe("review store", () => {
 		expect(await getPool(review.id)).toEqual(pool);
 		await deleteReview(review.id);
 		expect(await getPool(review.id)).toBeUndefined();
+	});
+
+	it("stores measured algorithm cells per key and replaces a cell when it is measured again", async () => {
+		const review = await createReview({ name: "measured", query: "q" });
+		expect(await getMeasurements(review.id)).toEqual([]);
+		const cells: readonly MeasurementRecord[] = [
+			{
+				key: "r|exploration|dome|pool1|seeds1",
+				reviewId: review.id,
+				stage: "exploration",
+				algorithmId: "dome",
+				value: RECOVERED_SOME,
+				evidence: "recovered 2 of 3 held-out seeds within a budget of 32 works",
+			},
+			{
+				key: "r|seed-selection|grasp|pool1",
+				reviewId: review.id,
+				stage: "seed-selection",
+				algorithmId: "grasp",
+				value: HALF_COVERED,
+				evidence: "picks cover 2 of 4 pool works within one hop",
+			},
+		];
+		await saveMeasurements(review.id, cells);
+		expect(await getMeasurements(review.id)).toEqual(cells);
+		// Re-measuring one cell overwrites it by key and leaves the other untouched.
+		const remeasured: readonly MeasurementRecord[] = [
+			{
+				...cells[0],
+				value: RECOVERED_ALL,
+				evidence: "recovered 3 of 3 held-out seeds within a budget of 32 works",
+			},
+		];
+		await saveMeasurements(review.id, remeasured);
+		const stored = await getMeasurements(review.id);
+		expect(stored).toHaveLength(2);
+		expect(stored.find((cell) => cell.algorithmId === "dome")?.value).toBe(RECOVERED_ALL);
+		expect(stored.find((cell) => cell.algorithmId === "grasp")?.value).toBe(HALF_COVERED);
+	});
+
+	it("removes a review's measured cells with the review", async () => {
+		const review = await createReview({ name: "gone", query: "q" });
+		await saveMeasurements(review.id, [
+			{
+				key: "r|exploration|dome|pool1|seeds1",
+				reviewId: review.id,
+				stage: "exploration",
+				algorithmId: "dome",
+				value: 2,
+				evidence: "recovered 2 of 3 held-out seeds within a budget of 32 works",
+			},
+		]);
+		await deleteReview(review.id);
+		expect(await getMeasurements(review.id)).toEqual([]);
 	});
 });

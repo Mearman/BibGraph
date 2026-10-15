@@ -13,6 +13,7 @@ import { defaultComposition, suggestComposition } from "@/lib/algorithms/composi
 import type { PoolFetcher } from "@/lib/algorithms/pool-loader";
 import type { WorkLabel } from "@/lib/algorithms/work-labels";
 import { createReviewCompute, handleCompute } from "@/lib/reviews/compute-handler";
+import type { MeasurementRecord } from "@/lib/reviews/measurement-cache";
 import type { LiteratureReview, ScreeningDecision } from "@/stores/review-store";
 
 import { type ReviewSessionDeps, useReviewSession } from "./use-review-session";
@@ -32,9 +33,31 @@ const fetcher: PoolFetcher = {
 	},
 };
 
-const makeDeps = (savedPool?: readonly { id: string; references: readonly string[] }[], fetchLabelsOverride?: ReviewSessionDeps["fetchLabels"]): { deps: ReviewSessionDeps; stored: { current: LiteratureReview }; searches: { count: number }; pool: { current: readonly { id: string; references: readonly string[] }[] | undefined } } => {
+/**
+ * Counts of measure requests per stage, so tests can assert which stages re-measured.
+ */
+interface MeasureCounts {
+	exploration: number;
+	"seed-selection": number;
+	ranking: number;
+}
+
+const makeDeps = (
+	savedPool?: readonly { id: string; references: readonly string[] }[],
+	fetchLabelsOverride?: ReviewSessionDeps["fetchLabels"],
+	savedMeasurements?: { current: readonly MeasurementRecord[] },
+): {
+	deps: ReviewSessionDeps;
+	stored: { current: LiteratureReview };
+	searches: { count: number };
+	pool: { current: readonly { id: string; references: readonly string[] }[] | undefined };
+	measurements: { current: readonly MeasurementRecord[] };
+	measured: { current: MeasureCounts };
+} => {
 	const searches = { count: 0 };
 	const pool: { current: readonly { id: string; references: readonly string[] }[] | undefined } = { current: savedPool };
+	const measurements = savedMeasurements ?? { current: [] as readonly MeasurementRecord[] };
+	const measured: { current: MeasureCounts } = { current: { exploration: 0, "seed-selection": 0, ranking: 0 } };
 	const poolForComposition = [
 		{ id: "W1", references: [] },
 		{ id: "W2", references: ["W1", "W3"] },
@@ -57,6 +80,9 @@ const makeDeps = (savedPool?: readonly { id: string; references: readonly string
 	const deps: ReviewSessionDeps = {
 		compute: createReviewCompute(async (request) => {
 			await Promise.resolve();
+			if (request.kind === "measure-exploration") measured.current.exploration++;
+			if (request.kind === "measure-selection") measured.current["seed-selection"]++;
+			if (request.kind === "measure-ranking") measured.current.ranking++;
 			return handleCompute(request);
 		}),
 		fetcher: {
@@ -81,6 +107,16 @@ const makeDeps = (savedPool?: readonly { id: string; references: readonly string
 				await Promise.resolve();
 				pool.current = saved;
 			},
+			getMeasurements: async () => {
+				await Promise.resolve();
+				return measurements.current;
+			},
+			saveMeasurements: async (_id, cells) => {
+				await Promise.resolve();
+				const byKey = new Map(measurements.current.map((cell) => [cell.key, cell]));
+				for (const cell of cells) byKey.set(cell.key, cell);
+				measurements.current = [...byKey.values()];
+			},
 			getReview: async () => {
 				await Promise.resolve();
 				return stored.current;
@@ -102,18 +138,18 @@ const makeDeps = (savedPool?: readonly { id: string; references: readonly string
 			},
 		},
 	};
-	return { deps, stored, searches, pool };
+	return { deps, stored, searches, pool, measurements, measured };
 };
 
 const wrapperFor = (client: QueryClient) =>
 	({ children }: { readonly children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 
 const setup = (mutate?: (review: LiteratureReview) => LiteratureReview) => {
-	const { deps, stored, searches, pool } = makeDeps();
+	const { deps, stored, searches, pool, measurements, measured } = makeDeps();
 	if (mutate) stored.current = mutate(stored.current);
 	const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 	const hook = renderHook(() => useReviewSession("r1", deps), { wrapper: wrapperFor(client) });
-	return { hook, stored, searches, pool };
+	return { hook, stored, searches, pool, measurements, measured };
 };
 
 describe("useReviewSession", () => {
@@ -130,8 +166,8 @@ describe("useReviewSession", () => {
 		await waitFor(() => {
 			const current = hook.result.current;
 			if (current.phase !== "ready") throw new Error("not ready");
-			expect(current.comparisonError).toBeNull();
-			expect(current.comparison).not.toBeNull();
+			expect(current.comparisonError.exploration).toBeNull();
+			expect(current.comparison.exploration).not.toBeNull();
 			expect(current.semanticRows.find((row) => row.workId === "W2")?.title).toBe("Bridge paper");
 		});
 	});
@@ -227,6 +263,64 @@ describe("useReviewSession", () => {
 		expect(stored.current.suggestedComposition?.seedSelection?.chosenBy).toBe("reviewer");
 		// high-degree picks the most connected works, W2 first in this pool, so the seeds change.
 		expect(stored.current.seeds[0]).toBe("W2");
+	});
+
+	it("reuses stored measurements when the review is reopened, without measuring again", async () => {
+		const first = setup();
+		await waitFor(() => {
+			expect(first.hook.result.current.phase).toBe("ready");
+		});
+		await waitFor(() => {
+			const current = first.hook.result.current;
+			if (current.phase !== "ready") throw new Error("not ready");
+			expect(current.comparison["seed-selection"]).not.toBeNull();
+		});
+		expect(first.measured.current).toEqual({ exploration: 1, "seed-selection": 1, ranking: 1 });
+		expect(first.measurements.current.length).toBeGreaterThan(0);
+		first.hook.unmount();
+		// A reopen shares the persisted measurements but starts with an empty in-memory query cache, like a reload.
+		const reopened = makeDeps(first.pool.current, undefined, first.measurements);
+		const second = renderHook(() => useReviewSession("r1", reopened.deps), {
+			wrapper: wrapperFor(new QueryClient({ defaultOptions: { queries: { retry: false } } })),
+		});
+		await waitFor(() => {
+			const current = second.result.current;
+			if (current.phase !== "ready") throw new Error("not ready");
+			expect(current.comparison.exploration).not.toBeNull();
+			expect(current.comparison["seed-selection"]).not.toBeNull();
+			expect(current.comparison.ranking).not.toBeNull();
+		});
+		expect(reopened.measured.current).toEqual({ exploration: 0, "seed-selection": 0, ranking: 0 });
+	});
+
+	it("re-measures only the seed-dependent stages when the selector switch re-picks the seeds", async () => {
+		const selection = { algorithmId: "grasp", evidence: "picked at start", chosenBy: "app" as const };
+		const { hook, measured } = setup((review) => ({
+			...review,
+			suggestedComposition: defaultComposition(selection),
+		}));
+		await waitFor(() => {
+			const current = hook.result.current;
+			if (current.phase !== "ready") throw new Error("not ready");
+			expect(current.comparison.exploration).not.toBeNull();
+			expect(current.comparison["seed-selection"]).not.toBeNull();
+			expect(current.comparison.ranking).not.toBeNull();
+		});
+		expect(measured.current).toEqual({ exploration: 1, "seed-selection": 1, ranking: 1 });
+		await act(async () => {
+			const current = hook.result.current;
+			if (current.phase !== "ready") throw new Error("not ready");
+			await current.chooseAlgorithm("seed-selection", "high-degree");
+		});
+		// The new seeds re-measure exploration and ranking; seed selection is measured on the pool alone, so it neither re-measures nor blanks.
+		await waitFor(() => {
+			expect(measured.current).toEqual({ exploration: 2, "seed-selection": 1, ranking: 2 });
+		});
+		const current = hook.result.current;
+		if (current.phase !== "ready") throw new Error("not ready");
+		expect(current.comparison.exploration).not.toBeNull();
+		expect(current.comparison["seed-selection"]).not.toBeNull();
+		expect(current.comparison.ranking).not.toBeNull();
 	});
 
 	it("undoes a decision so the work returns to the screening lists", async () => {

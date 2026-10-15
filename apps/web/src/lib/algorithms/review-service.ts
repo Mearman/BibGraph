@@ -10,10 +10,10 @@ import type {
   UpdateReviewInput,
 } from "../../stores/review-store";
 import { MIN_REVIEW_SEEDS } from "../reviews/review-constants";
-import { compareSeedSelection, toPoolGraph } from "./algorithm-comparison";
+import { measureSeedSelectionStage, rowsForStage, toPoolGraph } from "./algorithm-comparison";
 import { defaultComposition } from "./composition-engine";
 import { loadReviewPool, type PoolFetcher } from "./pool-loader";
-import { algorithmById } from "./registry";
+import { algorithmById, algorithmsByStage } from "./registry";
 import {
   explorationBudget,
   type PoolWork,
@@ -152,9 +152,14 @@ export const startReview = async (
   if (seeds.length === 0) {
     onProgress?.("choosing-seeds");
     // Only the seed selectors are measured at start: they are cheap, and the review has no seeds until one is picked.
-    const selection = compareSeedSelection(pool, {
-      selectionSize: input.selectionSize,
-    }).find((row) => row.chosen);
+    const selection = rowsForStage(
+      "seed-selection",
+      measureSeedSelectionStage(
+        pool,
+        input.selectionSize,
+        algorithmsByStage("seed-selection").map((spec) => spec.id),
+      ),
+    ).find((row) => row.chosen);
     if (selection === undefined) {
       throw new Error("no seed selector was measured for a zero-seeds start");
     }

@@ -10,58 +10,63 @@ import { MantineProvider } from "@mantine/core";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { AlgorithmComparison } from "@/lib/algorithms/algorithm-comparison";
+import type { ComparisonRow } from "@/lib/algorithms/algorithm-comparison";
 import type { AlgorithmStage } from "@/lib/algorithms/registry";
 
-import { AlgorithmComparisonTable } from "./AlgorithmComparisonTable";
+import { AlgorithmComparisonTable, type StagePanel } from "./AlgorithmComparisonTable";
 
 const EXPLORATION_EVIDENCE = "recovered 2 of 3 held-out seeds within a budget of 32 works";
 const RANKING_EVIDENCE = "recovered 3 of 3 held-out seeds in the top 8 candidates";
 
-const comparison: AlgorithmComparison = {
-	exploration: [
-		{
-			algorithmId: "dome",
-			label: "DOME",
-			family: "novel",
-			stage: "exploration",
-			description: "Expands the highest-degree candidate next.",
-			value: 2,
-			evidence: EXPLORATION_EVIDENCE,
-			chosen: true,
-		},
-		{
-			algorithmId: "standard-bfs",
-			label: "standard-bfs",
-			family: "baseline",
-			stage: "exploration",
-			description: "Expands evenly outward from every seed in turn.",
-			value: 3,
-			evidence: EXPLORATION_EVIDENCE,
-			chosen: false,
-		},
-	],
-	"seed-selection": [],
-	ranking: [
-		{
-			algorithmId: "association",
-			label: "association",
-			family: "novel",
-			stage: "ranking",
-			description: "Scores paths by structural association.",
-			value: 3,
-			evidence: RANKING_EVIDENCE,
-			chosen: true,
-		},
-	],
-};
+const explorationRows: readonly ComparisonRow[] = [
+	{
+		algorithmId: "dome",
+		label: "DOME",
+		family: "novel",
+		stage: "exploration",
+		description: "Expands the highest-degree candidate next.",
+		value: 2,
+		evidence: EXPLORATION_EVIDENCE,
+		chosen: true,
+	},
+	{
+		algorithmId: "standard-bfs",
+		label: "standard-bfs",
+		family: "baseline",
+		stage: "exploration",
+		description: "Expands evenly outward from every seed in turn.",
+		value: 3,
+		evidence: EXPLORATION_EVIDENCE,
+		chosen: false,
+	},
+];
+
+const rankingRows: readonly ComparisonRow[] = [
+	{
+		algorithmId: "association",
+		label: "association",
+		family: "novel",
+		stage: "ranking",
+		description: "Scores paths by structural association.",
+		value: 3,
+		evidence: RANKING_EVIDENCE,
+		chosen: true,
+	},
+];
+
+const stages = (overrides: Partial<Record<AlgorithmStage, StagePanel>> = {}): Record<AlgorithmStage, StagePanel> => ({
+	exploration: { kind: "ready", rows: explorationRows },
+	"seed-selection": { kind: "ready", rows: [] },
+	ranking: { kind: "ready", rows: rankingRows },
+	...overrides,
+});
 
 const renderTable = (props: Partial<Parameters<typeof AlgorithmComparisonTable>[0]> = {}) => {
 	const onChoose = vi.fn<(stage: AlgorithmStage, algorithmId: string) => void>();
 	render(
 		<MantineProvider>
 			<AlgorithmComparisonTable
-				comparison={comparison}
+				stages={stages()}
 				inUse={{ exploration: "dome", "seed-selection": null, ranking: null }}
 				onChoose={onChoose}
 				readOnlyStages={["seed-selection"]}
@@ -142,5 +147,23 @@ describe("AlgorithmComparisonTable", () => {
 		expect(within(exploration).getByText("Status and action")).toBeInTheDocument();
 		const domeName = within(exploration).getAllByText("Expands the highest-degree candidate next.")[0];
 		expect(domeName.closest("th")).toHaveAttribute("scope", "row");
+	});
+
+	it("shows a measuring stage under its own title with the algorithm and count, beside ready stages' tables", () => {
+		renderTable({ stages: stages({ ranking: { kind: "measuring", progress: "association (2 of 25)" } }) });
+		const ranking = screen.getByRole("region", { name: "Ranking" });
+		expect(within(ranking).getByRole("status")).toBeInTheDocument();
+		expect(within(ranking).getByText(/Measuring the ranking algorithms/)).toBeInTheDocument();
+		expect(within(ranking).getByText("association (2 of 25)")).toBeInTheDocument();
+		expect(within(ranking).queryByRole("row")).not.toBeInTheDocument();
+		// The other stages' measured tables stand untouched beside it.
+		expect(explorationRegion().querySelector("table")).toBeInTheDocument();
+	});
+
+	it("shows a failed stage's error beside the stages that still measured", () => {
+		renderTable({ stages: stages({ ranking: { kind: "error", message: "worker failed" } }) });
+		const ranking = screen.getByRole("region", { name: "Ranking" });
+		expect(within(ranking).getByText("worker failed")).toBeInTheDocument();
+		expect(explorationRegion().querySelector("table")).toBeInTheDocument();
 	});
 });

@@ -1,17 +1,37 @@
 /**
- * Review session hook: the container logic behind the screening screen. It loads a review and its pool, derives the labelled screening rows (both paths, the decided works and the seeds), the algorithm comparison and the label fetch state through the tested view-model and comparison modules, and exposes the writes a reviewer makes (a screening decision, undoing one, an algorithm override). All I/O arrives through the injected deps, so presentation components stay free of storage and network and the hook tests with in-memory fakes.
+ * Review session hook: the container logic behind the screening screen. It loads a review and its pool, derives the labelled screening rows (both paths, the decided works and the seeds), the per-stage algorithm comparison and the label fetch state through the tested view-model and comparison modules, and exposes the writes a reviewer makes (a screening decision, undoing one, an algorithm override). Each stage's measurements are cached in the store under keys naming their inputs (pool, seeds, stage, algorithm), so a reopen measures only cache-missing cells and switching one stage's algorithm never re-measures a stage whose inputs did not change. All I/O arrives through the injected deps, so presentation components stay free of storage and network and the hook tests with in-memory fakes.
  */
 
 import { keepPreviousData, type QueryClient, skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
-import type { AlgorithmComparison } from "@/lib/algorithms/algorithm-comparison";
+import {
+	type AlgorithmComparison,
+	chosenExplorationOf,
+	type ComparisonRow,
+	rowsForStage,
+	type StageMeasurements,
+} from "@/lib/algorithms/algorithm-comparison";
 import { adoptMeasured } from "@/lib/algorithms/composition-engine";
 import { loadReviewPool, type PoolFetcher } from "@/lib/algorithms/pool-loader";
-import type { AlgorithmStage } from "@/lib/algorithms/registry";
+import {
+	algorithmById,
+	algorithmsByStage,
+	type AlgorithmSpec,
+	type AlgorithmStage,
+} from "@/lib/algorithms/registry";
 import type { PoolWork } from "@/lib/algorithms/screening-engine";
 import type { WorkLabel, WorkLabelFetcher } from "@/lib/algorithms/work-labels";
-import type { ReviewCompute } from "@/lib/reviews/compute-handler";
+import type { ComputeProgress, ReviewCompute } from "@/lib/reviews/compute-handler";
+import {
+	type CellMeasurement,
+	explorationKey,
+	type MeasurementRecord,
+	poolFingerprint,
+	rankingKey,
+	seedSelectionKey,
+	seedsFingerprint,
+} from "@/lib/reviews/measurement-cache";
 import { ZERO_SEEDS_SELECTION_SIZE } from "@/lib/reviews/review-constants";
 import {
 	type DecidedRow,
@@ -41,6 +61,11 @@ export interface SessionStorePort {
 	readonly updateReview: (id: string, patch: UpdateReviewInput) => Promise<void>;
 	readonly getPool: (reviewId: string) => Promise<readonly PoolWork[] | undefined>;
 	readonly savePool: (reviewId: string, pool: readonly PoolWork[]) => Promise<void>;
+	/**
+	 * Every measurement stored for a review; each record's key names the inputs it was measured under.
+	 */
+	readonly getMeasurements: (reviewId: string) => Promise<readonly MeasurementRecord[]>;
+	readonly saveMeasurements: (reviewId: string, cells: readonly MeasurementRecord[]) => Promise<void>;
 }
 
 export interface ReviewSessionDeps {
@@ -54,6 +79,11 @@ export interface ReviewSessionDeps {
 }
 
 export type AlgorithmInUse = Readonly<Record<AlgorithmStage, string | null>>;
+
+/**
+ * One stage's measurements while they are still being taken: which algorithm is running and how many are done, already in display words.
+ */
+export type ComparisonProgress = Readonly<Record<AlgorithmStage, string | null>>;
 
 export interface ReadyReviewSession {
 	readonly phase: "ready";
@@ -79,13 +109,17 @@ export interface ReadyReviewSession {
 	readonly labelsError: string | null;
 	readonly retryLabels: () => void;
 	/**
-	 * Null while the comparison is still being measured on the pool.
+	 * Each stage's comparison rows, null while that stage still measures. Stages measure independently, so one re-measuring never blanks another.
 	 */
-	readonly comparison: AlgorithmComparison | null;
+	readonly comparison: Readonly<Record<AlgorithmStage, readonly ComparisonRow[] | null>>;
 	/**
-	 * Why the comparison could not be measured, when it failed; the screening lists still work without it.
+	 * Why a stage's comparison could not be measured, when it failed; the screening lists still work without it.
 	 */
-	readonly comparisonError: string | null;
+	readonly comparisonError: Readonly<Record<AlgorithmStage, string | null>>;
+	/**
+	 * What a measuring stage is running right now (algorithm and count), null when nothing measures.
+	 */
+	readonly comparisonProgress: ComparisonProgress;
 	readonly inUse: AlgorithmInUse;
 	/**
 	 * Whether the reviewer can switch the seed selector: only for a review that began with no seeds, whose seeds the app picked. A review with supplied seeds shows the selectors for comparison only.
@@ -100,7 +134,9 @@ export interface ReadyReviewSession {
 }
 
 export type ReviewSession =
-	ReadyReviewSession | { readonly phase: "loading" } | { readonly phase: "error"; readonly message: string };
+	| ReadyReviewSession
+	| { readonly phase: "loading" }
+	| { readonly phase: "error"; readonly message: string };
 
 const COMPOSITION_KEY: Readonly<Record<AlgorithmStage, keyof SuggestedComposition>> = {
 	exploration: "exploration",
@@ -129,6 +165,8 @@ const cachedPool = (queryClient: QueryClient, reviewId: string): readonly PoolWo
 
 const NO_LABELS: ReadonlyMap<string, WorkLabel> = new Map();
 
+const NO_PROGRESS: ComparisonProgress = { exploration: null, "seed-selection": null, ranking: null };
+
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : "unknown error");
 
 const inUseFrom = (composition: SuggestedComposition | null): AlgorithmInUse => ({
@@ -137,8 +175,65 @@ const inUseFrom = (composition: SuggestedComposition | null): AlgorithmInUse => 
 	ranking: composition?.ranking?.algorithmId ?? null,
 });
 
+/**
+ * What a progress event says on screen: the algorithm's display label and where it sits in the run. done counts finished algorithms, so the one starting is the next of total.
+ */
+const progressLabel = (progress: ComputeProgress): string => {
+	const label = algorithmById(progress.algorithmId)?.label ?? progress.algorithmId;
+	return `${label} (${String(progress.done + 1)} of ${String(progress.total)})`;
+};
+
+/**
+ * Assembles one stage's rows from the stored measurements plus the cells still missing, measuring only those and storing what they came out as. A stage whose every cell is cached measures nothing, which is what a reopen or an unrelated stage switch comes to.
+ */
+const stageRows = async (input: {
+	readonly reviewId: string;
+	readonly stage: AlgorithmStage;
+	readonly roster: readonly AlgorithmSpec[];
+	readonly keyOf: (algorithmId: string) => string;
+	readonly stored: readonly MeasurementRecord[];
+	readonly measure: (
+		algorithmIds: readonly string[],
+		onProgress: (progress: ComputeProgress) => void,
+	) => Promise<StageMeasurements>;
+	readonly save: (cells: readonly MeasurementRecord[]) => Promise<void>;
+	readonly onProgress: (progress: ComputeProgress) => void;
+}): Promise<readonly ComparisonRow[]> => {
+	const { reviewId, stage, roster, keyOf, stored, measure, save, onProgress } = input;
+	const cached = new Map(stored.map((cell) => [cell.key, cell]));
+	const cells: Record<string, CellMeasurement> = {};
+	const missing: string[] = [];
+	for (const spec of roster) {
+		const cell = cached.get(keyOf(spec.id));
+		if (cell === undefined) missing.push(spec.id);
+		else cells[spec.id] = cell;
+	}
+	if (missing.length > 0) {
+		const measured = await measure(missing, onProgress);
+		const records: MeasurementRecord[] = [];
+		for (const algorithmId of missing) {
+			const measurement = measured[algorithmId];
+			if (measurement === undefined) {
+				throw new Error(`measurement for ${stage} algorithm ${algorithmId} did not come back`);
+			}
+			cells[algorithmId] = measurement;
+			records.push({ key: keyOf(algorithmId), reviewId, stage, algorithmId, ...measurement });
+		}
+		await save(records);
+	}
+	return rowsForStage(stage, cells);
+};
+
 export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): ReviewSession => {
 	const queryClient = useQueryClient();
+	const [progress, setProgress] = useState<ComparisonProgress>(NO_PROGRESS);
+
+	const setStageProgress = (stage: AlgorithmStage, label: string): void => {
+		setProgress((current) => ({ ...current, [stage]: label }));
+	};
+	const clearStageProgress = (stage: AlgorithmStage): void => {
+		setProgress((current) => (current[stage] === null ? current : { ...current, [stage]: null }));
+	};
 
 	const reviewQuery = useQuery({
 		queryKey: ["review", reviewId],
@@ -191,23 +286,118 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 		queryFn: labelIds.length === 0 ? skipToken : async () => deps.fetchLabels(labelIds),
 	});
 
-	const comparisonQuery = useQuery({
-		queryKey: ["review-comparison", reviewId, review?.seeds, poolQuery.isSuccess, readPool],
+	// Each stage measures independently against its own key inputs: exploration against the seeds, seed selection against the pool alone, ranking against the seeds on the chosen exploration. A stage re-measures only when the inputs in its query key change; the others' tables stand.
+	const explorationQuery = useQuery({
+		queryKey: ["review-measure", reviewId, "exploration", poolQuery.isSuccess, readPool, review?.seeds],
 		staleTime: Infinity,
 		queryFn:
 			review === undefined || !poolQuery.isSuccess
 				? skipToken
-				: async () => deps.compute.compare(readPool(), review.seeds, ZERO_SEEDS_SELECTION_SIZE),
+				: async () => {
+						const pool = readPool();
+						const poolFp = poolFingerprint(pool);
+						const seedsFp = seedsFingerprint(review.seeds);
+						try {
+							return await stageRows({
+								reviewId,
+								stage: "exploration",
+								roster: algorithmsByStage("exploration"),
+								keyOf: (algorithmId) => explorationKey(reviewId, algorithmId, poolFp, seedsFp),
+								stored: await deps.store.getMeasurements(reviewId),
+								measure: async (algorithmIds, onProgress) =>
+									deps.compute.measureExploration(pool, review.seeds, algorithmIds, onProgress),
+								save: async (cells) => {
+									await deps.store.saveMeasurements(reviewId, cells);
+								},
+								onProgress: (event): void => {
+									setStageProgress("exploration", progressLabel(event));
+								},
+							});
+						} finally {
+							clearStageProgress("exploration");
+						}
+					},
+	});
+
+	const explorationRows = explorationQuery.data;
+	const chosenExploration = explorationRows === undefined ? undefined : chosenExplorationOf(explorationRows);
+
+	const selectionQuery = useQuery({
+		// No seeds in this key: seed selection is measured on the pool alone, so a seed change never re-measures it.
+		queryKey: ["review-measure", reviewId, "seed-selection", poolQuery.isSuccess, readPool, ZERO_SEEDS_SELECTION_SIZE],
+		staleTime: Infinity,
+		queryFn:
+			review === undefined || !poolQuery.isSuccess
+				? skipToken
+				: async () => {
+						const pool = readPool();
+						const poolFp = poolFingerprint(pool);
+						try {
+							return await stageRows({
+								reviewId,
+								stage: "seed-selection",
+								roster: algorithmsByStage("seed-selection"),
+								keyOf: (algorithmId) => seedSelectionKey(reviewId, algorithmId, poolFp, ZERO_SEEDS_SELECTION_SIZE),
+								stored: await deps.store.getMeasurements(reviewId),
+								measure: async (algorithmIds, onProgress) =>
+									deps.compute.measureSelection(pool, ZERO_SEEDS_SELECTION_SIZE, algorithmIds, onProgress),
+								save: async (cells) => {
+									await deps.store.saveMeasurements(reviewId, cells);
+								},
+								onProgress: (event): void => {
+									setStageProgress("seed-selection", progressLabel(event));
+								},
+							});
+						} finally {
+							clearStageProgress("seed-selection");
+						}
+					},
+	});
+
+	const rankingQuery = useQuery({
+		// The chosen exploration is in the key because ranking is measured on it, so a re-measured exploration whose best changes re-ranks this stage.
+		queryKey: ["review-measure", reviewId, "ranking", poolQuery.isSuccess, readPool, review?.seeds, chosenExploration],
+		staleTime: Infinity,
+		queryFn:
+			review === undefined || !poolQuery.isSuccess || chosenExploration === undefined
+				? skipToken
+				: async () => {
+						const pool = readPool();
+						const poolFp = poolFingerprint(pool);
+						const seedsFp = seedsFingerprint(review.seeds);
+						try {
+							return await stageRows({
+								reviewId,
+								stage: "ranking",
+								roster: algorithmsByStage("ranking"),
+								keyOf: (algorithmId) => rankingKey(reviewId, algorithmId, poolFp, seedsFp, chosenExploration),
+								stored: await deps.store.getMeasurements(reviewId),
+								measure: async (algorithmIds, onProgress) =>
+									deps.compute.measureRanking(pool, review.seeds, chosenExploration, onProgress),
+								save: async (cells) => {
+									await deps.store.saveMeasurements(reviewId, cells);
+								},
+								onProgress: (event): void => {
+									setStageProgress("ranking", progressLabel(event));
+								},
+							});
+						} finally {
+							clearStageProgress("ranking");
+						}
+					},
 	});
 
 	// Reconciles the stored composition with the measurement: app-made picks (the starting defaults) become the measured best, reviewer overrides stay. Once adopted, the next run finds nothing to change, so it converges.
 	const stored = review?.suggestedComposition;
-	const measuredComparison = comparisonQuery.data;
+	const measuredComparison: AlgorithmComparison | null =
+		explorationRows !== undefined && selectionQuery.data !== undefined && rankingQuery.data !== undefined
+			? { exploration: explorationRows, "seed-selection": selectionQuery.data, ranking: rankingQuery.data }
+			: null;
 	useQuery({
 		queryKey: ["review-adopt", reviewId, stored, measuredComparison],
 		staleTime: Infinity,
 		queryFn:
-			stored == null || measuredComparison === undefined
+			stored == null || measuredComparison === null
 				? skipToken
 				: async () => {
 						const adopted = adoptMeasured(stored, measuredComparison);
@@ -232,12 +422,18 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 		onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["review", reviewId] }),
 	});
 
+	const rowsByStage: Readonly<Record<AlgorithmStage, readonly ComparisonRow[] | null>> = {
+		exploration: explorationQuery.data ?? null,
+		"seed-selection": selectionQuery.data ?? null,
+		ranking: rankingQuery.data ?? null,
+	};
+
 	const override = useMutation({
 		mutationFn: async (input: Readonly<{ stage: AlgorithmStage; algorithmId: string }>) => {
 			if (review?.suggestedComposition == null) {
 				throw new Error("review has no composition to override");
 			}
-			const measured = comparisonQuery.data?.[input.stage].find((row) => row.algorithmId === input.algorithmId);
+			const measured = rowsByStage[input.stage]?.find((row) => row.algorithmId === input.algorithmId);
 			const evidence = measured === undefined ? "chosen by reviewer" : `${measured.evidence} (chosen by reviewer)`;
 			const suggestedComposition: SuggestedComposition = {
 				...review.suggestedComposition,
@@ -276,8 +472,13 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 		retryLabels: () => {
 			void labelsQuery.refetch();
 		},
-		comparison: comparisonQuery.data ?? null,
-		comparisonError: comparisonQuery.error === null ? null : errorMessage(comparisonQuery.error),
+		comparison: rowsByStage,
+		comparisonError: {
+			exploration: explorationQuery.error === null ? null : errorMessage(explorationQuery.error),
+			"seed-selection": selectionQuery.error === null ? null : errorMessage(selectionQuery.error),
+			ranking: rankingQuery.error === null ? null : errorMessage(rankingQuery.error),
+		},
+		comparisonProgress: progress,
 		inUse: inUseFrom(review.suggestedComposition),
 		seedSelectionEditable: review.suggestedComposition?.seedSelection != null,
 		decide: async (workId, chosen) => {

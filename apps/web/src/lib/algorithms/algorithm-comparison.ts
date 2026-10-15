@@ -1,6 +1,8 @@
 /**
- * Algorithm comparison: every roster algorithm of every stage, measured on the review's own pool and marked novel or baseline, so a reviewer can compare them all side by side. The composition suggestion is derived from these same rows (the chosen flag), which keeps what the app recommends and what the comparison shows from ever disagreeing. Measurements: exploration by held-out seed recovery, seed selection by one-hop pool coverage, ranking by held-out seed recovery in the top of the ranked pool, on the exploration the comparison chose.
+ * Algorithm comparison: every roster algorithm of every stage, measured on the review's own pool and marked novel or baseline, so a reviewer can compare them all side by side. The composition suggestion is derived from these same rows (the chosen flag), which keeps what the app recommends and what the comparison shows from ever disagreeing. Measurements: exploration by held-out seed recovery, seed selection by one-hop pool coverage, ranking by held-out seed recovery in the top of the ranked pool, on the exploration the comparison chose. Each stage's measurements are produced by their own function, so the session can measure a stage's missing cells alone and cache the rest under measurement keys.
  */
+
+import type { CellMeasurement } from "@/lib/reviews/measurement-cache";
 
 import {
 	algorithmById,
@@ -37,6 +39,26 @@ export interface ComparisonRow {
 }
 
 export type AlgorithmComparison = Readonly<Record<AlgorithmStage, readonly ComparisonRow[]>>;
+
+/**
+ * One stage's measurements by algorithm id: the measured values and the evidence behind them, before the chosen flag is derived. An absent id was not asked for or did not come back, which consumers must fail loudly on rather than default.
+ */
+export type StageMeasurements = Readonly<Partial<Record<string, CellMeasurement>>>;
+
+/**
+ * Reports which algorithm of which stage a measurement run is starting, so the interface can say what is happening rather than spin globally.
+ */
+export interface MeasureProgress {
+	readonly stage: AlgorithmStage;
+	readonly algorithmId: string;
+	/**
+	 * Algorithms (or algorithm-by-held-out-seed steps) already finished in this run.
+	 */
+	readonly done: number;
+	readonly total: number;
+}
+
+export type ProgressReporter = (progress: MeasureProgress) => void;
 
 export interface CompareOptions {
 	/**
@@ -92,7 +114,7 @@ export const toPoolGraph = (pool: readonly PoolWork[]) => {
 
 const rowFor = (
 	spec: AlgorithmSpec,
-	measurement: Readonly<{ value: number | null; evidence: string }>,
+	measurement: CellMeasurement,
 ): Omit<ComparisonRow, "chosen"> => ({
 	algorithmId: spec.id,
 	label: spec.label,
@@ -115,69 +137,100 @@ const markChosen = (rows: readonly Omit<ComparisonRow, "chosen">[]): readonly Co
 	return rows.map((row, index) => ({ ...row, chosen: index === bestIndex }));
 };
 
-const compareExploration = (pool: readonly PoolWork[], seeds: readonly string[]): readonly ComparisonRow[] => {
+const unmeasurableEvidence = (seeds: readonly string[], needed: string): string =>
+	seeds.length === 0 ? "no seeds to measure against; roster default" : `needs ${needed} seeds to measure; roster default`;
+
+/**
+ * The exploration stage's measurements: each algorithm recovers held-out seeds within the exploration budget. Only the asked algorithms are measured, each reported as it starts, so a partially cached stage measures just its missing cells.
+ */
+export const measureExplorationStage = (
+	pool: readonly PoolWork[],
+	seeds: readonly string[],
+	algorithmIds: readonly string[],
+	onProgress?: ProgressReporter,
+): StageMeasurements => {
 	const roster = algorithmsByStage("exploration");
 	if (roster.length === 0) {
 		throw new Error("exploration roster is empty");
 	}
+	const evidence = unmeasurableEvidence(seeds, "two or more");
 	if (seeds.length < MIN_SEEDS_FOR_HOLDOUT) {
-		const evidence =
-			seeds.length === 0
-				? "no seeds to measure against; roster default"
-				: "needs two or more seeds to measure; roster default";
-		return markChosen(roster.map((spec) => rowFor(spec, { value: null, evidence })));
+		const unmeasured: Record<string, CellMeasurement> = {};
+		for (const id of algorithmIds) unmeasured[id] = { value: null, evidence };
+		return unmeasured;
 	}
 	const { graph } = buildPoolAssociation(pool);
 	const budget = explorationBudget(pool.length);
 	const heldOutSeeds = heldOutSample(seeds);
-	return markChosen(
-		roster.map((spec) => {
-			if (!spec.run) {
-				throw new Error(`exploration algorithm without a runnable implementation: ${spec.id}`);
-			}
-			let recovered = 0;
-			for (const heldOut of heldOutSeeds) {
-				const remaining = seeds.filter((seed) => seed !== heldOut).map((id) => ({ id }));
-				if (spec.run(graph, remaining, { maxNodes: budget }).sampledNodes.has(heldOut)) recovered++;
-			}
-			return rowFor(spec, {
-				value: recovered,
-				evidence: ["recovered", recovered, "of", heldOutSeeds.length, "held-out seeds within a budget of", budget, "works"].join(" "),
-			});
-		}),
-	);
+	const measurements: Record<string, CellMeasurement> = {};
+	algorithmIds.forEach((algorithmId, index) => {
+		onProgress?.({ stage: "exploration", algorithmId, done: index, total: algorithmIds.length });
+		const spec = roster.find((candidate) => candidate.id === algorithmId);
+		if (spec === undefined) {
+			throw new Error(`unknown exploration algorithm: ${algorithmId}`);
+		}
+		if (!spec.run) {
+			throw new Error(`exploration algorithm without a runnable implementation: ${spec.id}`);
+		}
+		let recovered = 0;
+		for (const heldOut of heldOutSeeds) {
+			const remaining = seeds.filter((seed) => seed !== heldOut).map((id) => ({ id }));
+			if (spec.run(graph, remaining, { maxNodes: budget }).sampledNodes.has(heldOut)) recovered++;
+		}
+		measurements[algorithmId] = {
+			value: recovered,
+			evidence: ["recovered", recovered, "of", heldOutSeeds.length, "held-out seeds within a budget of", budget, "works"].join(" "),
+		};
+	});
+	return measurements;
 };
 
-export const compareSeedSelection = (pool: readonly PoolWork[], options: CompareOptions): readonly ComparisonRow[] => {
+/**
+ * The seed-selection stage's measurements: each selector's one-hop pool coverage at the selection size. The review's seeds do not enter it, so these measurements survive a seed change.
+ */
+export const measureSeedSelectionStage = (
+	pool: readonly PoolWork[],
+	selectionSize: number,
+	algorithmIds: readonly string[],
+	onProgress?: ProgressReporter,
+): StageMeasurements => {
 	const poolGraph = toPoolGraph(pool);
-	const rows = algorithmsByStage("seed-selection").map((spec) => {
-		const coverage = oneHopCoverage(pool, selectSeeds(spec.id, poolGraph, options.selectionSize));
-		return rowFor(spec, {
+	const measurements: Record<string, CellMeasurement> = {};
+	algorithmIds.forEach((algorithmId, index) => {
+		onProgress?.({ stage: "seed-selection", algorithmId, done: index, total: algorithmIds.length });
+		const spec = algorithmsByStage("seed-selection").find((candidate) => candidate.id === algorithmId);
+		if (spec === undefined) {
+			throw new Error(`unknown seed-selection algorithm: ${algorithmId}`);
+		}
+		const coverage = oneHopCoverage(pool, selectSeeds(spec.id, poolGraph, selectionSize));
+		measurements[algorithmId] = {
 			value: coverage,
 			evidence: ["picks cover", Math.round(coverage * pool.length), "of", pool.length, "pool works within one hop"].join(" "),
-		});
+		};
 	});
-	return markChosen(rows);
+	return measurements;
 };
 
-const compareRanking = (
+/**
+ * The ranking stage's measurements: every ranker recovers held-out seeds in the top of the pool ranked on the named exploration. The roster shares one exploration per held-out seed (the rankers differ only in how they score the same paths), so the stage measures as one batch keyed on that exploration.
+ */
+export const measureRankingStage = (
 	pool: readonly PoolWork[],
 	seeds: readonly string[],
-	exploration: readonly ComparisonRow[],
-): readonly ComparisonRow[] => {
+	explorationId: string,
+	onProgress?: ProgressReporter,
+): StageMeasurements => {
 	const roster = algorithmsByStage("ranking");
 	if (roster.length === 0) {
 		throw new Error("ranking roster is empty");
 	}
+	const evidence = unmeasurableEvidence(seeds, "three or more");
 	if (seeds.length < MIN_SEEDS_FOR_RANKING_HOLDOUT) {
-		const evidence =
-			seeds.length === 0
-				? "no seeds to measure against; roster default"
-				: "needs three or more seeds to measure; roster default";
-		return markChosen(roster.map((spec) => rowFor(spec, { value: null, evidence })));
+		const unmeasured: Record<string, CellMeasurement> = {};
+		for (const spec of roster) unmeasured[spec.id] = { value: null, evidence };
+		return unmeasured;
 	}
-	const chosen = exploration.find((row) => row.chosen);
-	const run = chosen === undefined ? undefined : algorithmById(chosen.algorithmId)?.run;
+	const run = algorithmById(explorationId)?.run;
 	if (run === undefined) {
 		throw new Error("ranking is measured on the chosen exploration, which has no runnable implementation");
 	}
@@ -186,6 +239,8 @@ const compareRanking = (
 	const topK = Math.ceil(pool.length * RANKING_TOP_FRACTION);
 	const recovered = new Map<string, number>(roster.map((spec) => [spec.id, 0]));
 	const sample = heldOutSample(seeds);
+	const totalSteps = sample.length * roster.length;
+	let done = 0;
 	for (const heldOut of sample) {
 		const remaining = seeds.filter((seed) => seed !== heldOut);
 		// One exploration per held-out seed, shared by every ranker: they differ only in how they score the same paths.
@@ -198,22 +253,57 @@ const compareRanking = (
 			if (!spec.rank) {
 				throw new Error(`ranking algorithm without a runnable implementation: ${spec.id}`);
 			}
+			onProgress?.({ stage: "ranking", algorithmId: spec.id, done, total: totalSteps });
 			const candidates = rankCandidates(spec.rank(context, paths), remainingSet);
 			const position = candidates.findIndex((candidate) => candidate.workId === heldOut);
 			if (position !== -1 && position < topK) {
 				recovered.set(spec.id, (recovered.get(spec.id) ?? 0) + 1);
 			}
+			done++;
 		}
+	}
+	const measurements: Record<string, CellMeasurement> = {};
+	for (const spec of roster) {
+		const count = recovered.get(spec.id) ?? 0;
+		measurements[spec.id] = {
+			value: count,
+			evidence: ["recovered", count, "of", sample.length, "held-out seeds in the top", topK, "candidates"].join(" "),
+		};
+	}
+	return measurements;
+};
+
+/**
+ * Assembles a stage's comparison rows from its roster and a measurement per algorithm. A missing measurement is a broken cache contract, not a row to hide, so it fails loudly.
+ */
+export const rowsForStage = (
+	stage: AlgorithmStage,
+	measurements: StageMeasurements,
+): readonly ComparisonRow[] => {
+	const roster = algorithmsByStage(stage);
+	if (roster.length === 0) {
+		throw new Error(`${stage} roster is empty`);
 	}
 	return markChosen(
 		roster.map((spec) => {
-			const count = recovered.get(spec.id) ?? 0;
-			return rowFor(spec, {
-				value: count,
-				evidence: ["recovered", count, "of", sample.length, "held-out seeds in the top", topK, "candidates"].join(" "),
-			});
+			const measurement = measurements[spec.id];
+			if (measurement === undefined) {
+				throw new Error(`no measurement for ${stage} algorithm ${spec.id}`);
+			}
+			return rowFor(spec, measurement);
 		}),
 	);
+};
+
+/**
+ * The exploration the ranking stage measures on: the exploration comparison's own chosen row.
+ */
+export const chosenExplorationOf = (explorationRows: readonly ComparisonRow[]): string => {
+	const chosen = explorationRows.find((row) => row.chosen);
+	if (chosen === undefined) {
+		throw new Error("the exploration comparison marks no chosen row");
+	}
+	return chosen.algorithmId;
 };
 
 export const compareAlgorithms = (
@@ -221,11 +311,26 @@ export const compareAlgorithms = (
 	seeds: readonly string[],
 	options: CompareOptions,
 ): AlgorithmComparison => {
-	const exploration = compareExploration(pool, seeds);
+	const explorationMeasurements = measureExplorationStage(
+		pool,
+		seeds,
+		algorithmsByStage("exploration").map((spec) => spec.id),
+	);
+	const exploration = rowsForStage("exploration", explorationMeasurements);
 	return {
 		exploration,
-		"seed-selection": compareSeedSelection(pool, options),
 		// Staged like the pipeline: the ranking is measured on the exploration the comparison chose.
-		ranking: compareRanking(pool, seeds, exploration),
+		ranking: rowsForStage(
+			"ranking",
+			measureRankingStage(pool, seeds, chosenExplorationOf(exploration)),
+		),
+		"seed-selection": rowsForStage(
+			"seed-selection",
+			measureSeedSelectionStage(
+				pool,
+				options.selectionSize,
+				algorithmsByStage("seed-selection").map((spec) => spec.id),
+			),
+		),
 	};
 };

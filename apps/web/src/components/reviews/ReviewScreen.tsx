@@ -2,7 +2,7 @@
  * Review screen: one review's working surface. The header summarises the query, the titled starting works and the decisions so far; the tabs hold the two screening lists (works related to the starting works, and the search's own order), the decided works and the algorithm comparison with the app's suggested composition. Every decision confirms with an Undo notification, and a failed write surfaces as a notification instead of being dropped.
  */
 
-import { Alert, Button, Group, Loader, Stack, Switch, Tabs, Text, Title } from "@mantine/core";
+import { Alert, Button, Group, Stack, Switch, Tabs, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { type ReactElement,useState } from "react";
 
@@ -11,7 +11,7 @@ import { type ScreeningPaging, useScreeningArrangement } from "@/hooks/use-scree
 import type { AlgorithmStage } from "@/lib/algorithms/registry";
 import type { ScreeningDecision } from "@/stores/review-store";
 
-import { AlgorithmComparisonTable } from "./AlgorithmComparisonTable";
+import { AlgorithmComparisonTable, type StagePanel } from "./AlgorithmComparisonTable";
 import { DecidedList } from "./DecidedList";
 import type { ScreeningEmptyState } from "./ScreeningList";
 import { ScreeningList } from "./ScreeningList";
@@ -48,6 +48,30 @@ const STAGE_EFFECT: Readonly<Record<AlgorithmStage, string>> = {
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : "unknown error");
 
+const STAGES: readonly AlgorithmStage[] = ["exploration", "seed-selection", "ranking"];
+
+/**
+ * Each stage's panel from the session's per-stage state: measured rows stand, a measuring stage shows what is running, a failed one says why. Stages measure independently, so switching one stage's algorithm never blanks another's table.
+ */
+const stagePanels = (session: ReadyReviewSession): Readonly<Record<AlgorithmStage, StagePanel>> => {
+	const panels: Record<AlgorithmStage, StagePanel> = {
+		exploration: { kind: "ready", rows: [] },
+		"seed-selection": { kind: "ready", rows: [] },
+		ranking: { kind: "ready", rows: [] },
+	};
+	for (const stage of STAGES) {
+		const error = session.comparisonError[stage];
+		const rows = session.comparison[stage];
+		panels[stage] =
+			error !== null
+				? { kind: "error", message: error }
+				: rows === null
+					? { kind: "measuring", progress: session.comparisonProgress[stage] }
+					: { kind: "ready", rows };
+	}
+	return panels;
+};
+
 const AlgorithmsTab = ({
 	session,
 	onChoose,
@@ -56,22 +80,7 @@ const AlgorithmsTab = ({
 	readonly onChoose: (stage: AlgorithmStage, algorithmId: string) => void;
 }): ReactElement => {
 	const [showTechnical, setShowTechnical] = useState(false);
-	if (session.comparisonError !== null) {
-		return <Alert color="red">{session.comparisonError}</Alert>;
-	}
-	if (session.comparison === null) {
-		return (
-			<Stack gap="sm">
-				<Group gap="xs">
-					<Loader role="status" aria-label="Measuring algorithms" size="sm" />
-					<Text c="dimmed">Measuring every algorithm on this review's works...</Text>
-				</Group>
-				<Alert color="blue" variant="light">
-					The lists may be re-ranked when the measurement finishes.
-				</Alert>
-			</Stack>
-		);
-	}
+	const measuring = STAGES.some((stage) => session.comparison[stage] === null && session.comparisonError[stage] === null);
 	return (
 		<Stack gap="sm">
 			<Switch
@@ -82,8 +91,13 @@ const AlgorithmsTab = ({
 					setShowTechnical(event.currentTarget.checked);
 				}}
 			/>
+			{measuring && (
+				<Alert color="blue" variant="light">
+					The lists may be re-ranked when the measurement finishes.
+				</Alert>
+			)}
 			<AlgorithmComparisonTable
-				comparison={session.comparison}
+				stages={stagePanels(session)}
 				inUse={session.inUse}
 				readOnlyStages={session.seedSelectionEditable ? [] : ["seed-selection"]}
 				onChoose={onChoose}
@@ -162,7 +176,7 @@ export const ReviewScreen = ({ session, paging }: ReviewScreenProps): ReactEleme
 	};
 
 	const runChoice = async (stage: AlgorithmStage, algorithmId: string): Promise<void> => {
-		const label = session.comparison?.[stage].find((row) => row.algorithmId === algorithmId)?.label ?? algorithmId;
+		const label = session.comparison[stage]?.find((row) => row.algorithmId === algorithmId)?.label ?? algorithmId;
 		try {
 			await session.chooseAlgorithm(stage, algorithmId);
 			notifications.show({ message: `${STAGE_TITLES[stage]} now runs ${label}. ${STAGE_EFFECT[stage]}` });

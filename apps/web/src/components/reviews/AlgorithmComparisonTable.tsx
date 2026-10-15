@@ -1,11 +1,13 @@
 /**
- * Algorithm comparison table: every stage's full roster side by side, each marked novel or baseline by icon and text (never colour alone), the value measured on the review's own pool with a bar, the plain-words evidence behind it, and the app's suggestion and the stage's current pick marked. Sortable by measured value or name, filterable by family, with the current row highlighted and read-only stages explained. Presentational: the comparison, the current picks and the override handler arrive as props.
+ * Algorithm comparison table: every stage's full roster side by side, each marked novel or baseline by icon and text (never colour alone), the value measured on the review's own pool with a bar, the plain-words evidence behind it, and the app's suggestion and the stage's current pick marked. Sortable by measured value or name, filterable by family, with the current row highlighted and read-only stages explained. Each stage arrives in its own state (measuring with what is running, failed, or measured rows), so one stage re-measuring never blanks another's table. Presentational: the stage states, the current picks and the override handler arrive as props.
  */
 
 import {
+	Alert,
 	Badge,
 	Button,
 	Group,
+	Loader,
 	Progress,
 	SegmentedControl,
 	Stack,
@@ -19,7 +21,7 @@ import {
 import { IconCheck, IconStar } from "@tabler/icons-react";
 import { type ReactElement,useState } from "react";
 
-import type { AlgorithmComparison, ComparisonRow } from "@/lib/algorithms/algorithm-comparison";
+import type { ComparisonRow } from "@/lib/algorithms/algorithm-comparison";
 import type { AlgorithmFamily, AlgorithmStage } from "@/lib/algorithms/registry";
 
 import { AlgorithmFamilyBadge } from "./AlgorithmFamilyBadge";
@@ -31,6 +33,14 @@ const STAGE_TITLES: Readonly<Record<AlgorithmStage, string>> = {
 };
 
 const STAGE_ORDER: readonly AlgorithmStage[] = ["exploration", "seed-selection", "ranking"];
+
+/**
+ * What one stage's panel holds: its measured rows, a measurement still running (with what algorithm and count), or why measuring failed.
+ */
+export type StagePanel =
+	| { readonly kind: "ready"; readonly rows: readonly ComparisonRow[] }
+	| { readonly kind: "measuring"; readonly progress: string | null }
+	| { readonly kind: "error"; readonly message: string };
 
 const READ_ONLY_NOTE = "You supplied your own seeds, so this is for comparison only.";
 
@@ -136,6 +146,36 @@ const SortHeader = ({
 	</Table.Th>
 );
 
+/**
+ * The section shell every stage state renders inside: same title, same landmark, whether the table stands, the measurement runs or it failed.
+ */
+const StageSection = ({
+	stage,
+	readOnly,
+	children,
+}: {
+	readonly stage: AlgorithmStage;
+	readonly readOnly: boolean;
+	readonly children: ReactElement;
+}): ReactElement => {
+	const titleId = `algorithm-stage-${stage}`;
+	return (
+		<section aria-labelledby={titleId}>
+			<Stack gap="xs">
+				<Title id={titleId} order={4}>
+					{STAGE_TITLES[stage]}
+				</Title>
+				{readOnly && (
+					<Text size="sm" c="dimmed">
+						{READ_ONLY_NOTE}
+					</Text>
+				)}
+				{children}
+			</Stack>
+		</section>
+	);
+};
+
 const StageTable = ({
 	stage,
 	rows,
@@ -156,18 +196,8 @@ const StageTable = ({
 	const maxValue = maxValueOf(rows);
 	const titleId = `algorithm-stage-${stage}`;
 	return (
-		<section aria-labelledby={titleId}>
-			<Stack gap="xs">
-				<Title id={titleId} order={4}>
-					{STAGE_TITLES[stage]}
-				</Title>
-				{readOnly && (
-					<Text size="sm" c="dimmed">
-						{READ_ONLY_NOTE}
-					</Text>
-				)}
-				<Table.ScrollContainer minWidth={TABLE_MIN_WIDTH}>
-					<Table stickyHeader aria-labelledby={titleId}>
+		<Table.ScrollContainer minWidth={TABLE_MIN_WIDTH}>
+			<Table stickyHeader aria-labelledby={titleId}>
 						<Table.Thead>
 							<Table.Tr>
 								<SortHeader label="Algorithm" sortKey="name" sort={sort} onSortChange={setSort} />
@@ -258,13 +288,29 @@ const StageTable = ({
 						</Table.Tbody>
 					</Table>
 				</Table.ScrollContainer>
-			</Stack>
-		</section>
 	);
 };
 
+/**
+ * A measurement still running for this stage: which algorithm is up and how far through, rather than one global spinner for the whole tab.
+ */
+const MeasuringPanel = ({ stage, progress }: { readonly stage: AlgorithmStage; readonly progress: string | null }): ReactElement => (
+	<Group gap="xs">
+		<Loader role="status" aria-label={`Measuring the ${stage} algorithms`} size="sm" />
+		<Text c="dimmed" component="span">{`Measuring the ${stage} algorithms on this review's works...`}</Text>
+		{progress !== null && (
+			<Text c="dimmed" component="span">
+				{progress}
+			</Text>
+		)}
+	</Group>
+);
+
 export interface AlgorithmComparisonTableProps {
-	readonly comparison: AlgorithmComparison;
+	/**
+	 * Each stage's own state: measured rows, a running measurement, or a failure. The stages are independent, so a re-measuring stage never blanks a measured one.
+	 */
+	readonly stages: Readonly<Record<AlgorithmStage, StagePanel>>;
 	/**
 	 * The algorithm the review currently runs for each stage, which can differ from the suggested one after a reviewer override.
 	 */
@@ -281,7 +327,7 @@ export interface AlgorithmComparisonTableProps {
 }
 
 export const AlgorithmComparisonTable = ({
-	comparison,
+	stages,
 	inUse,
 	onChoose,
 	readOnlyStages,
@@ -300,21 +346,32 @@ export const AlgorithmComparisonTable = ({
 				]}
 				aria-label="Filter algorithms by family"
 			/>
-			{STAGE_ORDER.map((stage) => (
-				<StageTable
-					key={stage}
-					stage={stage}
-					rows={
-						familyFilter === "all"
-							? comparison[stage]
-							: comparison[stage].filter((row) => row.family === familyFilter)
-					}
-					inUse={inUse[stage]}
-					readOnly={readOnlyStages.includes(stage)}
-					onChoose={onChoose}
-					showTechnical={showTechnical}
-				/>
-			))}
+			{STAGE_ORDER.map((stage) => {
+				const panel = stages[stage];
+				const readOnly = readOnlyStages.includes(stage);
+				return (
+					<StageSection key={stage} stage={stage} readOnly={readOnly}>
+						{panel.kind === "ready" ? (
+							<StageTable
+								stage={stage}
+								rows={
+									familyFilter === "all"
+										? panel.rows
+										: panel.rows.filter((row) => row.family === familyFilter)
+								}
+								inUse={inUse[stage]}
+								readOnly={readOnly}
+								onChoose={onChoose}
+								showTechnical={showTechnical}
+							/>
+						) : panel.kind === "measuring" ? (
+							<MeasuringPanel stage={stage} progress={panel.progress} />
+						) : (
+							<Alert color="red">{panel.message}</Alert>
+						)}
+					</StageSection>
+				);
+			})}
 		</Stack>
 	);
 };
