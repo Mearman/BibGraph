@@ -35,6 +35,7 @@ import { useState } from "react";
 import { ICON_SIZE } from "@/config/style-constants";
 
 import {
+  extractGraphListLabel,
   formatEntityMetadata,
   formatNotesForDisplay,
 } from "./entity-metadata-formatter";
@@ -77,6 +78,9 @@ export const SortableEntityRow = ({
   const [notes, setNotes] = useState(entity.notes ?? "");
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [removing, setRemoving] = useState(false);
+
+  // Graph-list rows carry their display name inside the serialized notes; surface it as the primary label.
+  const graphListLabel = extractGraphListLabel(entity.notes);
 
   const handleSaveNotes = async () => {
     if (entity.id === undefined) return;
@@ -139,9 +143,20 @@ export const SortableEntityRow = ({
               >
                 {ENTITY_METADATA[entity.entityType].displayName}
               </Badge>
-              <Text size="sm" fw={500}>
-                {entity.entityId}
-              </Text>
+              {graphListLabel === undefined ? (
+                <Text size="sm" fw={500}>
+                  {entity.entityId}
+                </Text>
+              ) : (
+                <>
+                  <Text size="sm" fw={500}>
+                    {graphListLabel}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {entity.entityId}
+                  </Text>
+                </>
+              )}
             </Group>
             <Text size="xs" c="dimmed">
               {formatEntityMetadata(entity)}

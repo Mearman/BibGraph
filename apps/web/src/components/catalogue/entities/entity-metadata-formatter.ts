@@ -113,6 +113,20 @@ export const formatEntityMetadata = (
 };
 
 /**
+ * Extracts the display name a graph-list entry carries in its serialized notes field. The graph list's storage layer packs provenance and the node label into notes as
+ * "provenance:TYPE|label:LABEL"; this surfaces the label so rows can show a name
+ * instead of a bare entity id.
+ * @param notes - Raw notes string from entity
+ * @returns The stored display name, or undefined when the notes are not a graph-list serialization carrying a label
+ */
+export const extractGraphListLabel = (notes: string | undefined): string | undefined => {
+  if (notes === undefined || notes === "") return undefined;
+
+  const labelMatch = /^provenance:[^|]+\|label:(.+)$/.exec(notes);
+  return labelMatch?.[1];
+};
+
+/**
  * Formats notes field for user-friendly display
  * Handles graph list serialized format: "provenance:TYPE|label:LABEL"
  * @param notes - Raw notes string from entity
