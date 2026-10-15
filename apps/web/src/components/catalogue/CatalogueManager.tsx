@@ -48,6 +48,10 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
 
   const state = useCatalogueManagerState({ shareData, initialListId });
 
+  // The Lists tab and its panel show exactly the list-type entries; bibliographies have their own tab, and system lists of other types (bookmarks, history) never appear as lists.
+  const visibleLists = state.filteredLists.filter(l => l.type === "list");
+  const visibleBibliographies = state.filteredLists.filter(l => l.type === "bibliography");
+
   return (
     <Container size="xl" py="md" data-testid="catalogue-manager">
       <Stack gap="lg">
@@ -83,10 +87,10 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
         <Tabs value={state.activeTab} onChange={state.setActiveTab}>
           <Tabs.List>
             <Tabs.Tab value="lists" leftSection={<IconList size={ICON_SIZE.MD} />}>
-              Lists ({state.filteredLists.length})
+              Lists ({visibleLists.length})
             </Tabs.Tab>
             <Tabs.Tab value="bibliographies" leftSection={<IconBook size={ICON_SIZE.MD} />}>
-              Bibliographies ({state.filteredLists.filter(l => l.type === "bibliography").length})
+              Bibliographies ({visibleBibliographies.length})
             </Tabs.Tab>
             <Tabs.Tab value="cache-tiers" leftSection={<IconDatabase size={ICON_SIZE.MD} />}>
               Cache Tiers
@@ -95,7 +99,7 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
 
           <Tabs.Panel value="lists" pt="md">
             <CatalogueListComponent
-              lists={state.filteredLists.filter(l => l.type === "list")}
+              lists={visibleLists}
               selectedListId={selectedList?.id ?? null}
               onSelectList={selectList}
               onDeleteList={deleteList}
@@ -107,7 +111,7 @@ export const CatalogueManager = ({ onNavigate, shareData, initialListId }: Catal
 
           <Tabs.Panel value="bibliographies" pt="md">
             <CatalogueListComponent
-              lists={state.filteredLists.filter(l => l.type === "bibliography")}
+              lists={visibleBibliographies}
               selectedListId={selectedList?.id ?? null}
               onSelectList={selectList}
               onDeleteList={deleteList}

@@ -46,10 +46,9 @@ export const CatalogueSearchBar = ({
         </Text>
       </Group>
       <Switch
-        label="Show system catalogues"
+        label="Show system lists (Graph, Bookmarks, History)"
         checked={showSystemCatalogues}
         onChange={(e) => { onShowSystemCataloguesChange(e.currentTarget.checked); }}
-        aria-label="Toggle visibility of system catalogues like bookmarks and history"
         data-testid="show-system-catalogues-toggle"
       />
     </Group>;
