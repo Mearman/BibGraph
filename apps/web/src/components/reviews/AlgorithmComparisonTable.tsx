@@ -45,6 +45,12 @@ export type StagePanel =
 const READ_ONLY_NOTE = "You supplied your own starting works, so this is for comparison only.";
 
 /**
+ * The one-line legend for the badges the tables mark rows with, in the words a first-time reader needs; colour only reinforces what each badge already says.
+ */
+const BADGE_LEGEND =
+	"Badges: novel = this app's own research methods; baseline = an established method; suggested = the app's best-measured pick; in use = what this review runs now.";
+
+/**
  * Below this width the table scrolls sideways instead of squeezing five columns.
  */
 const TABLE_MIN_WIDTH = "42rem";
@@ -346,6 +352,9 @@ export const AlgorithmComparisonTable = ({
 				]}
 				aria-label="Filter algorithms by family"
 			/>
+			<Text size="xs" c="dimmed">
+				{BADGE_LEGEND}
+			</Text>
 			{STAGE_ORDER.map((stage) => {
 				const panel = stages[stage];
 				const readOnly = readOnlyStages.includes(stage);

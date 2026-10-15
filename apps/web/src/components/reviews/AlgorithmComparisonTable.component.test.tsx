@@ -141,6 +141,14 @@ describe("AlgorithmComparisonTable", () => {
 		expect(within(seedSelection).queryByRole("button", { name: /^Use / })).not.toBeInTheDocument();
 	});
 
+	it("explains its badges in one line where they first appear", () => {
+		renderTable();
+		const legend = screen.getByText(/^Badges: novel = this app's own research methods/);
+		expect(legend.textContent).toContain("baseline = an established method");
+		expect(legend.textContent).toContain("suggested = the app's best-measured pick");
+		expect(legend.textContent).toContain("in use = what this review runs now");
+	});
+
 	it("gives the status column a hidden header and names row headers", () => {
 		renderTable();
 		const exploration = explorationRegion();
