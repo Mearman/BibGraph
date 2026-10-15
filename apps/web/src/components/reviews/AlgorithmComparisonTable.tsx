@@ -35,6 +35,15 @@ const STAGE_TITLES: Readonly<Record<AlgorithmStage, string>> = {
 const STAGE_ORDER: readonly AlgorithmStage[] = ["exploration", "seed-selection", "ranking"];
 
 /**
+ * The measured-value header's direction clause, in the same words as each stage's evidence sentences: what a higher number means for that stage.
+ */
+const VALUE_HEADER: Readonly<Record<AlgorithmStage, string>> = {
+	exploration: "Measured on this review (higher finds more of the hidden works)",
+	"seed-selection": "Measured on this review (higher reaches more works one step away)",
+	ranking: "Measured on this review (higher finds the hidden works sooner)",
+};
+
+/**
  * What one stage's panel holds: its measured rows, a measurement still running (with what algorithm and count), or why measuring failed.
  */
 export type StagePanel =
@@ -208,7 +217,7 @@ const StageTable = ({
 							<Table.Tr>
 								<SortHeader label="Algorithm" sortKey="name" sort={sort} onSortChange={setSort} />
 								<Table.Th>Family</Table.Th>
-								<SortHeader label="Measured on this review" sortKey="value" sort={sort} onSortChange={setSort} />
+								<SortHeader label={VALUE_HEADER[stage]} sortKey="value" sort={sort} onSortChange={setSort} />
 								<Table.Th>Evidence</Table.Th>
 								<Table.Th>
 									<VisuallyHidden>Status and action</VisuallyHidden>

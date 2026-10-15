@@ -107,7 +107,7 @@ describe("AlgorithmComparisonTable", () => {
 	it("sorts by measured value when the header is pressed", () => {
 		renderTable();
 		const exploration = explorationRegion();
-		const valueHeader = within(exploration).getByText("Measured on this review");
+		const valueHeader = within(exploration).getByText("Measured on this review (higher finds more of the hidden works)");
 		const firstBefore = within(exploration).getAllByRole("row")[1];
 		expect(within(firstBefore).getByText("Expands evenly outward from every seed in turn.")).toBeInTheDocument();
 		fireEvent.click(valueHeader);
@@ -139,6 +139,23 @@ describe("AlgorithmComparisonTable", () => {
 			within(seedSelection).getByText("You supplied your own starting works, so this is for comparison only."),
 		).toBeInTheDocument();
 		expect(within(seedSelection).queryByRole("button", { name: /^Use / })).not.toBeInTheDocument();
+	});
+
+	it("says which direction is better in each stage's measured-value header", () => {
+		renderTable();
+		expect(
+			within(explorationRegion()).getByText("Measured on this review (higher finds more of the hidden works)"),
+		).toBeInTheDocument();
+		expect(
+			within(screen.getByRole("region", { name: "Seed selection" })).getByText(
+				"Measured on this review (higher reaches more works one step away)",
+			),
+		).toBeInTheDocument();
+		expect(
+			within(screen.getByRole("region", { name: "Ranking" })).getByText(
+				"Measured on this review (higher finds the hidden works sooner)",
+			),
+		).toBeInTheDocument();
 	});
 
 	it("explains its badges in one line where they first appear", () => {
