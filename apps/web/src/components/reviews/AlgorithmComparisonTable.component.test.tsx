@@ -158,6 +158,29 @@ describe("AlgorithmComparisonTable", () => {
 		).toBeInTheDocument();
 	});
 
+	it("notes when a small pool may be disguising the novel methods, and only then", () => {
+		const flatNovelRows: readonly ComparisonRow[] = [
+			{ ...explorationRows[0], value: 0, evidence: "recovered 0 of 2 held-out seeds within a budget of 32 works" },
+			{ ...explorationRows[0], algorithmId: "lace", label: "LACE", chosen: false, value: 0, evidence: "recovered 0 of 2 held-out seeds within a budget of 32 works" },
+			explorationRows[1],
+		];
+		renderTable({ stages: stages({ exploration: { kind: "ready", rows: flatNovelRows } }) });
+		expect(
+			within(explorationRegion()).getByText(/pool may be too small to tell these methods apart/),
+		).toBeInTheDocument();
+	});
+
+	it("keeps the small-pool note away when a novel method measured above zero", () => {
+		const measuringNovelRows: readonly ComparisonRow[] = [
+			{ ...explorationRows[0], value: 1, evidence: "recovered 1 of 2 held-out seeds within a budget of 32 works" },
+			explorationRows[1],
+		];
+		renderTable({ stages: stages({ exploration: { kind: "ready", rows: measuringNovelRows } }) });
+		expect(
+			within(explorationRegion()).queryByText(/pool may be too small/),
+		).not.toBeInTheDocument();
+	});
+
 	it("explains its badges in one line where they first appear", () => {
 		renderTable();
 		const legend = screen.getByText(/^Badges: novel = this app's own research methods/);

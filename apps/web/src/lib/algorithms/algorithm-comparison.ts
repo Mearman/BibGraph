@@ -141,6 +141,15 @@ const unmeasurableEvidence = (seeds: readonly string[], needed: string): string 
 	seeds.length === 0 ? "no seeds to measure against; roster default" : `needs ${needed} seeds to measure; roster default`;
 
 /**
+ * Whether a stage's measurements suggest the pool is too small to tell the novel methods apart: every measured novel method scored zero while some baseline found works. Derived from the measurements alone; zero is the structural floor of a measurement, not a tuned threshold.
+ */
+export const smallPoolSuspected = (rows: readonly ComparisonRow[]): boolean => {
+	const measuredNovel = rows.filter((row) => row.family === "novel" && row.value !== null);
+	const baselineFoundWorks = rows.some((row) => row.family === "baseline" && row.value !== null && row.value > 0);
+	return measuredNovel.length > 0 && measuredNovel.every((row) => row.value === 0) && baselineFoundWorks;
+};
+
+/**
  * The exploration stage's measurements: each algorithm recovers held-out seeds within the exploration budget. Only the asked algorithms are measured, each reported as it starts, so a partially cached stage measures just its missing cells.
  */
 export const measureExplorationStage = (

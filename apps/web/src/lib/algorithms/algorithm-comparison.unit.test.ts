@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { compareAlgorithms } from "./algorithm-comparison";
+import { compareAlgorithms, type ComparisonRow, smallPoolSuspected } from "./algorithm-comparison";
 import { algorithmsByStage } from "./registry";
 import type { PoolWork } from "./screening-engine";
 
@@ -99,5 +99,34 @@ describe("compareAlgorithms", () => {
 		for (const row of [...comparison.exploration, ...comparison.ranking]) {
 			expect(row.evidence).toContain("of 3 held-out seeds");
 		}
+	});
+});
+
+describe("smallPoolSuspected", () => {
+	const row = (family: "novel" | "baseline", value: number | null): ComparisonRow => ({
+		algorithmId: `${family}-${String(value)}`,
+		label: `${family}-${String(value)}`,
+		family,
+		stage: "exploration",
+		description: "A row built for the condition.",
+		value,
+		evidence: "measured",
+		chosen: false,
+	});
+
+	it("suspects the pool when every measured novel method is zero and a baseline found works", () => {
+		expect(smallPoolSuspected([row("novel", 0), row("novel", 0), row("baseline", 2)])).toBe(true);
+	});
+
+	it("does not suspect it when a novel method found anything at all", () => {
+		expect(smallPoolSuspected([row("novel", 0), row("novel", 1), row("baseline", 2)])).toBe(false);
+	});
+
+	it("does not suspect it when the baselines also measured zero, whatever the pool size", () => {
+		expect(smallPoolSuspected([row("novel", 0), row("baseline", 0)])).toBe(false);
+	});
+
+	it("does not suspect it when no novel method is measured", () => {
+		expect(smallPoolSuspected([row("novel", null), row("baseline", 2)])).toBe(false);
 	});
 });

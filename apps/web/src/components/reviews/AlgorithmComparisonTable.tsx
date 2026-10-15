@@ -22,6 +22,7 @@ import { IconCheck, IconStar } from "@tabler/icons-react";
 import { type ReactElement,useState } from "react";
 
 import type { ComparisonRow } from "@/lib/algorithms/algorithm-comparison";
+import { smallPoolSuspected } from "@/lib/algorithms/algorithm-comparison";
 import type { AlgorithmFamily, AlgorithmStage } from "@/lib/algorithms/registry";
 
 import { AlgorithmFamilyBadge } from "./AlgorithmFamilyBadge";
@@ -52,6 +53,12 @@ export type StagePanel =
 	| { readonly kind: "error"; readonly message: string };
 
 const READ_ONLY_NOTE = "You supplied your own starting works, so this is for comparison only.";
+
+/**
+ * The inline note for a stage whose every measured novel method scored zero while the baselines found works, so a newcomer does not read the zeros as the methods being worthless.
+ */
+const SMALL_POOL_NOTE =
+	"Every novel method here measured zero while the baselines found works. The pool may be too small to tell these methods apart on it.";
 
 /**
  * The one-line legend for the badges the tables mark rows with, in the words a first-time reader needs; colour only reinforces what each badge already says.
@@ -370,18 +377,22 @@ export const AlgorithmComparisonTable = ({
 				return (
 					<StageSection key={stage} stage={stage} readOnly={readOnly}>
 						{panel.kind === "ready" ? (
-							<StageTable
-								stage={stage}
-								rows={
-									familyFilter === "all"
-										? panel.rows
-										: panel.rows.filter((row) => row.family === familyFilter)
-								}
-								inUse={inUse[stage]}
-								readOnly={readOnly}
-								onChoose={onChoose}
-								showTechnical={showTechnical}
-							/>
+							<>
+								{/* Read from the full roster, not the family-filtered rows, so the note stands whichever family is in view. */}
+								{smallPoolSuspected(panel.rows) && <Alert color="yellow">{SMALL_POOL_NOTE}</Alert>}
+								<StageTable
+									stage={stage}
+									rows={
+										familyFilter === "all"
+											? panel.rows
+											: panel.rows.filter((row) => row.family === familyFilter)
+									}
+									inUse={inUse[stage]}
+									readOnly={readOnly}
+									onChoose={onChoose}
+									showTechnical={showTechnical}
+								/>
+							</>
 						) : panel.kind === "measuring" ? (
 							<MeasuringPanel stage={stage} progress={panel.progress} />
 						) : (
