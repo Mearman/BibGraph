@@ -12,9 +12,9 @@ import {
   getPublisherById,
   getSourceById,
   getTopicById,
-  getWorkById,
+  getWorksByIds,
 } from '@bibgraph/client';
-import type { EntityType,GraphEdge, GraphNode } from '@bibgraph/types';
+import type { EntityType, GraphEdge, GraphNode, Work } from '@bibgraph/types';
 import { RelationType } from '@bibgraph/types';
 import type { CatalogueEntity } from '@bibgraph/utils';
 import { catalogueEventEmitter, logger } from '@bibgraph/utils';
@@ -73,69 +73,63 @@ interface BookmarkFetchResult {
 }
 
 /**
- * Fetch entity data and extract relationships for a Work bookmark
+ * Extract label and relationships from an already-fetched Work, so work bookmarks can be hydrated from one batched getWorksByIds call instead of one request per bookmark
  */
-const fetchWorkBookmark = async (entityId: string): Promise<BookmarkFetchResult | null> => {
-  try {
-    const work = await getWorkById(entityId);
-    const relationships: BookmarkFetchResult['relationships'] = [];
+const workBookmarkData = (work: Work): BookmarkFetchResult => {
+  const relationships: BookmarkFetchResult['relationships'] = [];
 
-    // Authorships -> Authors
-    for (const auth of work.authorships ?? []) {
-      if (auth.author.id !== undefined) {
-        relationships.push({
-          targetId: normalizeOpenAlexId(auth.author.id),
-          targetType: 'authors',
-          relationType: RelationType.AUTHORSHIP,
-        });
-      }
-    }
-
-    // Primary location -> Source (typed `any` by the OpenAlex client, so narrow before use)
-    const primaryLocation: unknown = work.primary_location;
-    if (isPlainObject(primaryLocation)) {
-      const source = primaryLocation.source;
-      if (isPlainObject(source) && typeof source.id === 'string') {
-        relationships.push({
-          targetId: normalizeOpenAlexId(source.id),
-          targetType: 'sources',
-          relationType: RelationType.PUBLICATION,
-        });
-      }
-    }
-
-    // Referenced works
-    for (const referenceId of work.referenced_works ?? []) {
+  // Authorships -> Authors
+  for (const auth of work.authorships ?? []) {
+    if (typeof auth.author.id === 'string') {
       relationships.push({
-        targetId: normalizeOpenAlexId(referenceId),
-        targetType: 'works',
-        relationType: RelationType.REFERENCE,
+        targetId: normalizeOpenAlexId(auth.author.id),
+        targetType: 'authors',
+        relationType: RelationType.AUTHORSHIP,
       });
     }
-
-    // Topics
-    relationships.push(...extractTopicRelationships(work.topics, RelationType.TOPIC));
-
-    // Grants -> Funders
-    for (const grant of work.grants ?? []) {
-      if (grant.funder !== undefined && grant.funder !== '') {
-        relationships.push({
-          targetId: normalizeOpenAlexId(grant.funder),
-          targetType: 'funders',
-          relationType: RelationType.FUNDED_BY,
-        });
-      }
-    }
-
-    return {
-      label: work.title ?? work.display_name,
-      entityData: work,
-      relationships,
-    };
-  } catch (error) {
-    logger.debug('repository-graph', 'Failed to fetch work', { entityId, error });
-    return null;
   }
+
+  // Primary location -> Source (typed `any` by the OpenAlex client, so narrow before use)
+  const primaryLocation: unknown = work.primary_location;
+  if (isPlainObject(primaryLocation)) {
+    const source = primaryLocation.source;
+    if (isPlainObject(source) && typeof source.id === 'string') {
+      relationships.push({
+        targetId: normalizeOpenAlexId(source.id),
+        targetType: 'sources',
+        relationType: RelationType.PUBLICATION,
+      });
+    }
+  }
+
+  // Referenced works
+  for (const referenceId of work.referenced_works ?? []) {
+    relationships.push({
+      targetId: normalizeOpenAlexId(referenceId),
+      targetType: 'works',
+      relationType: RelationType.REFERENCE,
+    });
+  }
+
+  // Topics
+  relationships.push(...extractTopicRelationships(work.topics, RelationType.TOPIC));
+
+  // Grants -> Funders
+  for (const grant of work.grants ?? []) {
+    if (typeof grant.funder === 'string' && grant.funder !== '') {
+      relationships.push({
+        targetId: normalizeOpenAlexId(grant.funder),
+        targetType: 'funders',
+        relationType: RelationType.FUNDED_BY,
+      });
+    }
+  }
+
+  return {
+    label: work.title ?? work.display_name,
+    entityData: work,
+    relationships,
+  };
 };
 
 /**
@@ -214,7 +208,7 @@ const fetchSourceBookmark = async (entityId: string): Promise<BookmarkFetchResul
     const relationships: BookmarkFetchResult['relationships'] = [];
 
     // Host organization -> Publisher
-    if (source.host_organization !== undefined && source.host_organization !== '') {
+    if (typeof source.host_organization === 'string' && source.host_organization !== '') {
       relationships.push({
         targetId: normalizeOpenAlexId(source.host_organization),
         targetType: 'publishers',
@@ -308,12 +302,23 @@ const fetchPublisherBookmark = async (entityId: string): Promise<BookmarkFetchRe
 };
 
 /**
- * Fetch entity data and relationships for a bookmark based on entity type
+ * Fetch entity data and relationships for a bookmark based on entity type. Works are read from the batched lookup's map (keyed by normalised id), every other type with its single-entity getter.
  */
-const fetchBookmarkData = async (bookmark: CatalogueEntity): Promise<BookmarkFetchResult | null> => {
+const fetchBookmarkData = async (
+  bookmark: CatalogueEntity,
+  worksById: ReadonlyMap<string, Work>
+): Promise<BookmarkFetchResult | null> => {
   switch (bookmark.entityType) {
-    case 'works':
-      return fetchWorkBookmark(bookmark.entityId);
+    case 'works': {
+      const work = worksById.get(normalizeOpenAlexId(bookmark.entityId));
+      if (!work) return null;
+      try {
+        return workBookmarkData(work);
+      } catch (error) {
+        logger.debug('repository-graph', 'Failed to extract work data', { entityId: bookmark.entityId, error });
+        return null;
+      }
+    }
     case 'authors':
       return fetchAuthorBookmark(bookmark.entityId);
     case 'institutions':
@@ -447,9 +452,22 @@ export const useRepositoryGraph = (): UseRepositoryGraphResult => {
 
       // Only update state if data actually changed
       if (bookmarks.length !== previousNodeCountReference.current) {
+        // Hydrate every work bookmark through one batched lookup per hundred works; one request per bookmark rate-limits OpenAlex within seconds
+        const workIds = bookmarks
+          .filter((bookmark) => bookmark.entityType === 'works')
+          .map((bookmark) => bookmark.entityId);
+        let worksById: ReadonlyMap<string, Work> = new Map();
+        if (workIds.length > 0) {
+          try {
+            worksById = await getWorksByIds(workIds);
+          } catch (batchError) {
+            logger.debug('repository-graph', 'Failed to fetch works in batches', { error: batchError });
+          }
+        }
+
         // Fetch entity data and relationships for all bookmarks in parallel
         const fetchResults = await Promise.all(
-          bookmarks.map(async (bookmark) => fetchBookmarkData(bookmark))
+          bookmarks.map(async (bookmark) => fetchBookmarkData(bookmark, worksById))
         );
 
         // Create a map of bookmarked entity IDs for quick lookup

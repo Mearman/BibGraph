@@ -12,9 +12,9 @@ import {
   getPublisherById,
   getSourceById,
   getTopicById,
-  getWorkById,
+  getWorksByIds,
 } from '@bibgraph/client';
-import type { EntityType } from '@bibgraph/types';
+import type { EntityType, Work } from '@bibgraph/types';
 import type {
   GraphDataSource,
   GraphSourceEntity,
@@ -43,13 +43,37 @@ const staticToEntityType = (staticType: string): EntityType | null =>
   isEntityType(staticType) ? staticType : null;
 
 /**
- * Fetch entity data - will be a cache hit since we're loading from cache
+ * Fetch the works among the given entries through one batched lookup, so hydrating a cache tier with many works does not replay them as one request each (which OpenAlex rate-limits within seconds). Cached works never touch the network.
  */
-const fetchEntityData = async (entityType: EntityType, entityId: string): Promise<Record<string, unknown> | null> => {
+const fetchWorksForEntries = async (
+  entries: readonly { readonly entityType: string; readonly entityId: string }[]
+): Promise<ReadonlyMap<string, Work>> => {
+  const workIds = entries
+    .filter((entry) => staticToEntityType(entry.entityType) === 'works')
+    .map((entry) => entry.entityId);
+  if (workIds.length === 0) {
+    return new Map();
+  }
+  try {
+    return await getWorksByIds(workIds);
+  } catch (error) {
+    logger.debug('cache-source', 'Failed to fetch works in batches', { error });
+    return new Map();
+  }
+};
+
+/**
+ * Fetch entity data - works are read from the batched lookup's map, every other type with its single-entity getter
+ */
+const fetchEntityData = async (
+  entityType: EntityType,
+  entityId: string,
+  worksById: ReadonlyMap<string, Work>
+): Promise<Record<string, unknown> | null> => {
   try {
     switch (entityType) {
       case 'works':
-        return await getWorkById(entityId);
+        return worksById.get(normalizeOpenAlexId(entityId)) ?? null;
       case 'authors':
         return await getAuthorById(entityId);
       case 'institutions':
@@ -91,6 +115,7 @@ export const createIndexedDBCacheSource = (): GraphDataSource => {
     getEntities: async (): Promise<GraphSourceEntity[]> => {
       const entries = await cachedOpenAlex.enumerateIndexedDBEntities();
       const results: GraphSourceEntity[] = [];
+      const worksById = await fetchWorksForEntries(entries);
 
       // Process in batches to avoid overwhelming the browser
       const batchSize = 50;
@@ -101,7 +126,7 @@ export const createIndexedDBCacheSource = (): GraphDataSource => {
           const entityType = staticToEntityType(entry.entityType);
           if (!entityType) return null;
 
-          const entityData = await fetchEntityData(entityType, entry.entityId);
+          const entityData = await fetchEntityData(entityType, entry.entityId, worksById);
           if (!entityData) return null;
 
           const normalizedId = normalizeOpenAlexId(entry.entityId);
@@ -159,12 +184,13 @@ export const createMemoryCacheSource = (): GraphDataSource => {
     getEntities: async (): Promise<GraphSourceEntity[]> => {
       const entries = cachedOpenAlex.enumerateMemoryCacheEntities();
       const results: GraphSourceEntity[] = [];
+      const worksById = await fetchWorksForEntries(entries);
 
       const fetchPromises = entries.map(async (entry) => {
         const entityType = staticToEntityType(entry.entityType);
         if (!entityType) return null;
 
-        const entityData = await fetchEntityData(entityType, entry.entityId);
+        const entityData = await fetchEntityData(entityType, entry.entityId, worksById);
         if (!entityData) return null;
 
         const normalizedId = normalizeOpenAlexId(entry.entityId);
@@ -220,6 +246,7 @@ export const createStaticCacheSource = (): GraphDataSource => {
     getEntities: async (): Promise<GraphSourceEntity[]> => {
       const entries = await cachedOpenAlex.enumerateStaticCacheEntities();
       const results: GraphSourceEntity[] = [];
+      const worksById = await fetchWorksForEntries(entries);
 
       // Process in batches
       const batchSize = 50;
@@ -230,7 +257,7 @@ export const createStaticCacheSource = (): GraphDataSource => {
           const entityType = staticToEntityType(entry.entityType);
           if (!entityType) return null;
 
-          const entityData = await fetchEntityData(entityType, entry.entityId);
+          const entityData = await fetchEntityData(entityType, entry.entityId, worksById);
           if (!entityData) return null;
 
           const normalizedId = normalizeOpenAlexId(entry.entityId);
