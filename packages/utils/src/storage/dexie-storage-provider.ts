@@ -354,13 +354,32 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 				throw new ValidationError('url', parameters.url, 'URL cannot be empty');
 			}
 
-			return await BookmarkOps.addBookmark(
+			// History, not bookmarks: this used to delegate to BookmarkOps.addBookmark, so every entity visit silently wrote two BOOKMARKS rows and history stayed empty (found by the 2026-10-15 verification walk). Mirrors the in-memory provider's semantics: one row per entity, refreshed on re-visit, which also makes StrictMode's double-fire idempotent.
+			await this.initializeSpecialLists();
+			const historyEntities = await EntityOps.getListEntities(
 				this.db,
-				this.initializeSpecialLists.bind(this),
-				this.addEntityToList.bind(this),
-				parameters,
+				SPECIAL_LIST_IDS.HISTORY,
 				this.logger
 			);
+			const existing = historyEntities.find(
+				(entity) =>
+					entity.entityType === parameters.entityType &&
+					entity.entityId === parameters.entityId
+			);
+			if (existing?.id !== undefined) {
+				await this.updateEntityData(existing.id, {
+					entityType: parameters.entityType,
+					entityId: parameters.entityId,
+					notes: `url:${parameters.url}`,
+				});
+				return existing.id;
+			}
+			return await this.addEntityToList({
+				listId: SPECIAL_LIST_IDS.HISTORY,
+				entityType: parameters.entityType,
+				entityId: parameters.entityId,
+				notes: `url:${parameters.url}`,
+			});
 		} catch (error) {
 			const storageError = convertIndexedDBError('addToHistory', error);
 			this.logger?.error('storage', 'Failed to add to history', {

@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DexieStorageProvider } from './dexie-storage-provider.js';
 
-describe('DexieStorageProvider.removeEntityFromList', () => {
+describe('DexieStorageProvider list operations', () => {
 	it('delegates to the entity operation instead of recursing into itself', async () => {
 		const provider = new DexieStorageProvider();
 		await provider.initializeSpecialLists();
@@ -24,3 +24,21 @@ describe('DexieStorageProvider.removeEntityFromList', () => {
 		).resolves.toMatch(/.+/);
 	});
 });
+
+	describe('addToHistory', () => {
+		it('writes to the history list, not bookmarks, and is idempotent on re-visit (2026-10-15: visits wrote two bookmark rows and history stayed empty)', async () => {
+			const provider = new DexieStorageProvider();
+			await provider.initializeSpecialLists();
+			const params = {
+				entityType: 'works' as const,
+				entityId: 'W2741809807',
+				url: 'https://openalex.org/W2741809807',
+			};
+			await provider.addToHistory(params);
+			await provider.addToHistory(params);
+			const history = await provider.getHistory();
+			expect(history.filter((entity) => entity.entityId === 'W2741809807')).toHaveLength(1);
+			const bookmarks = await provider.getBookmarks();
+			expect(bookmarks.filter((entity) => entity.entityId === 'W2741809807')).toHaveLength(0);
+		});
+	});
