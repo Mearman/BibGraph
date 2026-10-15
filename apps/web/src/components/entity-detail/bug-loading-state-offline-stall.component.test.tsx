@@ -37,15 +37,21 @@ describe("LoadingState bounded wait", () => {
     cleanup();
   });
 
-  it("shows the simulated loading UI before the stall timeout", () => {
+  it("shows the loading UI before the stall timeout, without fabricated progress, steps or time readouts", () => {
     renderLoadingState();
 
     act(() => {
       vi.advanceTimersByTime(PRE_STALL_TICK_COUNT * LOADING_CONSTANTS.PROGRESS_UPDATE_INTERVAL_MS);
     });
 
-    expect(screen.getByText(/Estimated:/i)).toBeInTheDocument();
+    expect(screen.getByTestId("loading-state")).toBeInTheDocument();
+    expect(screen.getByText(/Loading Work/i)).toBeInTheDocument();
     expect(screen.queryByTestId("loading-stalled-state")).not.toBeInTheDocument();
+    // The component cannot know real progress, so none of these may appear at any point before the stall
+    expect(screen.queryByText(/Time elapsed:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Estimated:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Progress")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Finalizing display/i)).not.toBeInTheDocument();
   });
 
   it("replaces fabricated progress with an offline message once the stall timeout passes", () => {
