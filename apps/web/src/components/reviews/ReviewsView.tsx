@@ -58,7 +58,10 @@ export interface ReviewsViewProps {
   readonly pendingError: string | null;
   readonly bookmarkedWorks: readonly BookmarkedWork[];
   readonly onOpen: (id: string) => void;
-  readonly onCreate: (values: ReviewCreateValues) => void;
+  /**
+   * Starts a review; a rejecting promise means the start failed, which the form reads to keep the entered values.
+   */
+  readonly onCreate: (values: ReviewCreateValues) => void | Promise<void>;
   readonly onRemovePendingSeed: (seedId: string) => void;
   readonly onAddPendingSeed: (token: string) => void;
   readonly onContinuePending: (reviewId: string) => void;

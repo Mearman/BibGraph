@@ -49,18 +49,14 @@ const ReviewsPage = () => {
         onOpen={(reviewId) => {
           void navigate({ to: "/reviews/$reviewId", params: { reviewId } });
         }}
-        onCreate={(values) => {
-          void reviews
-            .start(values)
-            .then(async (outcome) =>
-              outcome.needsCheck
-                ? undefined
-                : navigate({
-                    to: "/reviews/$reviewId",
-                    params: { reviewId: outcome.review.id },
-                  }),
-            )
-            .catch(() => undefined); // The failure is shown through startError.
+        onCreate={async (values) => {
+          // The rejection reaches the create form, which keeps the entered values for a retry; the failure itself is shown through startError.
+          const outcome = await reviews.start(values);
+          if (outcome.needsCheck) return;
+          await navigate({
+            to: "/reviews/$reviewId",
+            params: { reviewId: outcome.review.id },
+          });
         }}
         onRemovePendingSeed={(seedId) => {
           void reviews.removePendingSeed(seedId);

@@ -33,7 +33,10 @@ export interface BookmarkedWork {
 }
 
 export interface ReviewCreateFormProps {
-  readonly onSubmit: (values: ReviewCreateValues) => void;
+  /**
+   * Starts the review; a returned promise that resolves means the start succeeded (the form clears) and one that rejects means it failed (the entered values stay).
+   */
+  readonly onSubmit: (values: ReviewCreateValues) => void | Promise<void>;
   readonly submitting: boolean;
   readonly bookmarkedWorks: readonly BookmarkedWork[];
   /**
@@ -125,7 +128,18 @@ export const ReviewCreateForm = ({
       });
       return;
     }
-    onSubmit({ name: name.trim(), query: query.trim(), seeds: parsed.valid });
+    void (async () => {
+      try {
+        await onSubmit({ name: name.trim(), query: query.trim(), seeds: parsed.valid });
+        // A successful start clears the form, so the still-live button has nothing to duplicate on a second press.
+        setName("");
+        setQuery("");
+        setSeedText("");
+        setErrors({});
+      } catch {
+        // The failure reaches the reviewer through the caller's error surface; the entered values stay for a retry.
+      }
+    })();
   };
 
   return (

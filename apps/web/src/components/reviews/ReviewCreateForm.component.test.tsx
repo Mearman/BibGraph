@@ -7,7 +7,7 @@
 import "@testing-library/jest-dom";
 
 import { MantineProvider } from "@mantine/core";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ReviewCreateForm, type ReviewCreateValues } from "./ReviewCreateForm";
@@ -185,5 +185,66 @@ describe("ReviewCreateForm", () => {
     expect(
       screen.getByPlaceholderText("Gut microbiome and malaria"),
     ).toBeInTheDocument();
+  });
+
+  it("clears the form when a start succeeds, so a second submit cannot duplicate it", async () => {
+    const onSubmit = vi.fn<(values: ReviewCreateValues) => Promise<void>>(
+      async () => {
+        await Promise.resolve();
+      },
+    );
+    const { container } = render(
+      <MantineProvider>
+        <ReviewCreateForm
+          onSubmit={onSubmit}
+          submitting={false}
+          bookmarkedWorks={[]}
+        />
+      </MantineProvider>,
+    );
+    const form = container.querySelector("form");
+    if (form === null) throw new Error("the form must render a real form element");
+    fill("Review name", "Malaria gut");
+    fill("Search terms", "malaria AND gut");
+    fill("Starting works", "W1");
+    submit(form);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Review name/)).toHaveValue("");
+      expect(screen.getByLabelText(/Search terms/)).toHaveValue("");
+      expect(screen.getByLabelText(/Starting works/)).toHaveValue("");
+    });
+    // With the fields cleared, a second press of the still-live button has nothing to submit.
+    submit(form);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the entered values when a start fails, so nothing is retyped", async () => {
+    const onSubmit = vi.fn<(values: ReviewCreateValues) => Promise<void>>(
+      async () => {
+        await Promise.reject(new Error("search failed"));
+      },
+    );
+    const { container } = render(
+      <MantineProvider>
+        <ReviewCreateForm
+          onSubmit={onSubmit}
+          submitting={false}
+          bookmarkedWorks={[]}
+        />
+      </MantineProvider>,
+    );
+    const form = container.querySelector("form");
+    if (form === null) throw new Error("the form must render a real form element");
+    fill("Review name", "Malaria gut");
+    fill("Search terms", "malaria AND gut");
+    submit(form);
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Review name/)).toHaveValue("Malaria gut");
+      expect(screen.getByLabelText(/Search terms/)).toHaveValue("malaria AND gut");
+    });
   });
 });
