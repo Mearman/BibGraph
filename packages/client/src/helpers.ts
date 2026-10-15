@@ -84,6 +84,18 @@ export const getWorkById = async (id: string, params: QueryParams = {}): Promise
 };
 
 /**
+ * Get multiple works by OpenAlex ID in batched list requests, keyed by short uppercase work ID
+ */
+export const getWorksByIds = async (
+  ids: readonly string[],
+  params: QueryParams = {},
+): Promise<ReadonlyMap<string, Work>> => {
+  const client = getSharedClient();
+  const worksApi = new WorksApi(client);
+  return worksApi.getWorksByIds(ids, params);
+};
+
+/**
  * Get multiple works with optional filtering
  */
 export const getWorks = async (params: QueryParams = {}): Promise<OpenAlexResponse<Work>> => {

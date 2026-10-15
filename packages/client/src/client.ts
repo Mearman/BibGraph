@@ -6,7 +6,7 @@
 import type { OpenAlexResponse, QueryParams } from "@bibgraph/types";
 import { OpenAlexResponseSchema, validateWithSchema } from "@bibgraph/types";
 import { validateApiResponse } from "@bibgraph/utils";
-import type { z } from "zod";
+import { z } from "zod";
 
 import { apiInterceptor, type InterceptedRequest } from "./interceptors/api-interceptor";
 // Import from extracted modules
@@ -24,10 +24,49 @@ import {
 import { isDevelopmentMode } from "./internal/environment-detection";
 import { OpenAlexApiError, OpenAlexRateLimitError } from "./internal/errors";
 import { calculateRetryDelay, RETRY_CONFIG } from "./internal/rate-limit";
+import { cleanOpenAlexId } from "./internal/static-data-utils";
 
 const HTTP_SERVER_ERROR_THRESHOLD = 500;
 const HTTP_TOO_MANY_REQUESTS = 429;
 const ERROR_BODY_PREVIEW_LENGTH = 200;
+/**
+ * Maximum number of `|`-separated values OpenAlex accepts in one filter value; `per_page` must match it or a batched id lookup silently drops results. Source: https://help.openalex.org/how-to-use-the-api/get-lists-of-entities/filter-entity-lists ("You can combine up to 100 values with `|` in a single filter. Use per_page=100 to get all results.")
+ */
+const OPENALEX_OR_FILTER_VALUE_LIMIT = 100;
+
+/**
+ * Canonical key for an entity id in multi-id lookups: the short OpenAlex form, uppercased, matching how OpenAlex echoes ids back (https://openalex.org/W123 becomes W123)
+ */
+export const canonicalEntityId = (id: string): string =>
+  cleanOpenAlexId(id).toUpperCase();
+
+/**
+ * Narrow a schema-validated entity to its id string, for keying batched results; a result without a string id cannot be keyed and is skipped
+ */
+const entityIdOf = (entity: unknown): string | null => {
+  if (
+    typeof entity === "object" &&
+    entity !== null &&
+    "id" in entity &&
+    typeof entity.id === "string"
+  ) {
+    return entity.id;
+  }
+  return null;
+};
+
+/**
+ * Envelope schema for batched id lookups: validates the OpenAlex list-response shape through the canonical envelope schema (results left unknown), then validates each result against the caller's duck-typed entity schema
+ */
+const batchEnvelopeSchema = <T>(
+  entitySchema: Readonly<ValidationSchema<T>>,
+): ValidationSchema<{ results: readonly T[] }> => ({
+  parse: (data: unknown) => ({
+    results: OpenAlexResponseSchema(z.unknown())
+      .parse(data)
+      .results.map((result) => entitySchema.parse(result)),
+  }),
+});
 import {
   buildRequestOptions,
   checkHostCooldown,
@@ -360,6 +399,49 @@ export class OpenAlexBaseClient {
     schema: ValidationSchema<T>;
   }): Promise<T> {
     return this.get(`${endpoint}/${encodeURIComponent(id)}`, params, schema);
+  }
+
+  /**
+   * GET request for several entities by ID as batched list requests (`filter=openalex_id:W1|W2|...`), instead of one single-entity request per ID, which OpenAlex rate-limits within seconds on list-sized surfaces. Ids are deduplicated and canonicalised; the returned map is keyed by the short uppercase id, and requested ids the API does not return are simply absent. `filter` and `per_page` are controlled by the method; any other params (for example `select`) are forwarded. Like every list request, a failed request rejects after the client's retries.
+   */
+  public async getByIds<T = unknown>({
+    endpoint,
+    ids,
+    params = {},
+    schema,
+  }: {
+    endpoint: string;
+    ids: readonly string[];
+    params?: QueryParams;
+    schema: ValidationSchema<T>;
+  }): Promise<ReadonlyMap<string, T>> {
+    const uniqueIds = [...new Set(ids.map(canonicalEntityId))];
+    const entities = new Map<string, T>();
+
+    for (
+      let start = 0;
+      start < uniqueIds.length;
+      start += OPENALEX_OR_FILTER_VALUE_LIMIT
+    ) {
+      const chunk = uniqueIds.slice(start, start + OPENALEX_OR_FILTER_VALUE_LIMIT);
+      const response = await this.get<{ results: readonly T[] }>(
+        endpoint,
+        {
+          ...params,
+          filter: `openalex_id:${chunk.join("|")}`,
+          per_page: chunk.length,
+        },
+        batchEnvelopeSchema(schema),
+      );
+      for (const entity of response.results) {
+        const id = entityIdOf(entity);
+        if (id !== null) {
+          entities.set(canonicalEntityId(id), entity);
+        }
+      }
+    }
+
+    return entities;
   }
 
   /**

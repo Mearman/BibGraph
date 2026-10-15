@@ -6,7 +6,7 @@ import type { OpenAlexEntity, QueryParams } from "@bibgraph/types";
 import { isOpenAlexEntity, validateWithSchema } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
 
-import { OpenAlexBaseClient, type ValidationSchema } from "./client";
+import { canonicalEntityId, OpenAlexBaseClient, type ValidationSchema } from "./client";
 import { AuthorsApi } from "./entities/authors";
 import { ConceptsApi } from "./entities/concepts";
 import { FundersApi } from "./entities/funders";
@@ -337,6 +337,44 @@ export class CachedOpenAlexClient extends OpenAlexBaseClient {
 
       throw apiError;
     }
+  }
+
+  /**
+   * Batched multi-id lookup with the same static-cache semantics as the single-entity getById: with no caller params, each id is read from the static cache first (a hit never touches the network) and only the misses go to the API as batched list requests.
+   */
+  override async getByIds<T = unknown>(parameters: {
+    endpoint: string;
+    ids: readonly string[];
+    params?: QueryParams;
+    schema: ValidationSchema<T>;
+  }): Promise<ReadonlyMap<string, T>> {
+    const { endpoint, ids, params = {}, schema } = parameters;
+
+    if (!this.staticCacheEnabled || Object.keys(params).length > 0) {
+      return super.getByIds<T>({ endpoint, ids, params, schema });
+    }
+
+    const entities = new Map<string, T>();
+    const misses: string[] = [];
+    for (const id of new Set(ids.map(canonicalEntityId))) {
+      const cached = await this.tryStaticCacheForGetById<T>(endpoint, id, schema);
+      if (cached !== null) {
+        entities.set(id, cached);
+      } else {
+        misses.push(id);
+      }
+    }
+
+    const fetched = await super.getByIds<T>({
+      endpoint,
+      ids: misses,
+      params,
+      schema,
+    });
+    for (const [id, entity] of fetched) {
+      entities.set(id, entity);
+    }
+    return entities;
   }
 
   /**

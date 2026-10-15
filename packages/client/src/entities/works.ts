@@ -97,6 +97,29 @@ export class WorksApi {
   }
 
   /**
+   * Get multiple works by OpenAlex ID in batched list requests, instead of one request per work, which OpenAlex rate-limits within seconds on list-sized surfaces (screening lists, graph hydration)
+   * @param ids - OpenAlex work IDs (short or URL form; DOI/PMID lookup is getWork's job); duplicates are collapsed
+   * @param params - Optional query parameters forwarded to each batched request (`filter` and `per_page` are controlled by the method); with no params the cached client serves each id from the static cache first
+   * @returns Promise resolving to a map keyed by short uppercase work ID; requested ids OpenAlex does not return are absent
+   * @example
+   * ```typescript
+   * const works = await worksApi.getWorksByIds(['W2741809807', 'W2751009151']);
+   * const first = works.get('W2741809807');
+   * ```
+   */
+  async getWorksByIds(
+    ids: readonly string[],
+    params: QueryParams = {},
+  ): Promise<ReadonlyMap<string, Work>> {
+    return this.client.getByIds<Work>({
+      endpoint: "works",
+      ids,
+      params,
+      schema: workSchema,
+    });
+  }
+
+  /**
    * Get multiple works with optional filtering and pagination
    * @param params - Query parameters including filters, pagination, and selection
    * @returns Promise resolving to OpenAlexResponse containing works and metadata
