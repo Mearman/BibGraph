@@ -4,7 +4,14 @@
 
 import { describe, expect, it } from "vitest"
 
-import { authorSchema, keywordSchema, topicSchema, workSchema } from "../entities/schemas"
+import {
+	authorSchema,
+	institutionSchema,
+	keywordSchema,
+	sourceSchema,
+	topicSchema,
+	workSchema,
+} from "../entities/schemas"
 
 const BASE_WORK_FIELDS = {
 	id: "https://openalex.org/W2741809807",
@@ -136,6 +143,105 @@ describe("OpenAlex response schema drift", () => {
 					author: { display_name: "An Author Without Orcid", orcid: null },
 				},
 			],
+		})
+		expect(result.success).toBe(true)
+	})
+
+	it("accepts a work row trimmed to the relationship registry's works select list (2026-10-15: the relationships panel failed with \"[{expected:array, path:[results,0,counts_by_year]}...]\" because select-parameterised rows omit every unselected field)", () => {
+		const result = workSchema.safeParse({
+			id: "https://openalex.org/W2741809807",
+			display_name: "The state of OA",
+			publication_year: 2025,
+			type: "article",
+			cited_by_count: 82,
+		})
+		expect(result.success).toBe(true)
+	})
+
+	it("accepts an author row trimmed to the relationship registry's authors select list (id, display_name, orcid, works_count, cited_by_count only)", () => {
+		const result = authorSchema.safeParse({
+			id: "https://openalex.org/A5017898742",
+			display_name: "William Teahan",
+			orcid: null,
+			works_count: 3,
+			cited_by_count: 100,
+		})
+		expect(result.success).toBe(true)
+	})
+
+	it("accepts an institution row trimmed to the relationship registry's institutions select list (id, display_name, country_code, type, works_count only)", () => {
+		const result = institutionSchema.safeParse({
+			id: "https://openalex.org/I4387153203",
+			display_name: "Public Knowledge Project",
+			country_code: "CA",
+			type: "other",
+			works_count: 12,
+		})
+		expect(result.success).toBe(true)
+	})
+
+	it("accepts an institution row trimmed to the lineage resolution select list (id, display_name, country_code, type only; no works_count)", () => {
+		const result = institutionSchema.safeParse({
+			id: "https://openalex.org/I4387153203",
+			display_name: "Public Knowledge Project",
+			country_code: "CA",
+			type: "other",
+		})
+		expect(result.success).toBe(true)
+	})
+
+	it("accepts a source row trimmed to the relationship registry's sources select list (id, display_name, issn_l, type, works_count only)", () => {
+		const result = sourceSchema.safeParse({
+			id: "https://openalex.org/S13775139",
+			display_name: "PLoS ONE",
+			issn_l: "1932-6203",
+			type: "journal",
+			works_count: 250000,
+		})
+		expect(result.success).toBe(true)
+	})
+
+	it("accepts an institution row trimmed to the institutions select list whose country_code is null (2026-10-15: live lineage:I4387153203 rows failed on a null country_code, countryless consortia report null even when country_code is selected)", () => {
+		const result = institutionSchema.safeParse({
+			id: "https://openalex.org/I136199715",
+			display_name: "OurResearch",
+			country_code: null,
+			type: "other",
+			works_count: 30,
+		})
+		expect(result.success).toBe(true)
+	})
+
+	it("still accepts a full institution response, so loosening the select-trimmable fields keeps full-response validation intact", () => {
+		const result = institutionSchema.safeParse({
+			id: "https://openalex.org/I4387153203",
+			display_name: "Public Knowledge Project",
+			cited_by_count: 204,
+			works_count: 12,
+			country_code: "CA",
+			type: "other",
+			counts_by_year: [{ year: 2025, works_count: 3, cited_by_count: 82 }],
+			updated_date: "2026-10-13T03:00:44",
+			created_date: "2016-11-02",
+			geo: { country_code: "CA", country: "Canada" },
+			international: { display_name: {} },
+		})
+		expect(result.success).toBe(true)
+	})
+
+	it("still accepts a full source response, so loosening the select-trimmable fields keeps full-response validation intact", () => {
+		const result = sourceSchema.safeParse({
+			id: "https://openalex.org/S13775139",
+			display_name: "PLoS ONE",
+			cited_by_count: 3000000,
+			works_count: 250000,
+			works_api_url: "https://api.openalex.org/works?filter=primary_location.source.id:S13775139",
+			counts_by_year: [{ year: 2025, works_count: 30000, cited_by_count: 200000 }],
+			updated_date: "2026-10-13T03:00:44",
+			created_date: "2013-01-01",
+			is_oa: true,
+			is_in_doaj: true,
+			type: "journal",
 		})
 		expect(result.success).toBe(true)
 	})

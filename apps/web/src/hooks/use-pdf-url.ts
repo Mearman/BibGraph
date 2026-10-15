@@ -45,19 +45,20 @@ export interface PdfUrlResult {
   oaStatus: string | null;
 }
 
+// The optional fields mirror OpenAlex's null encoding (absent booleans arrive as explicit null), matching the entity schemas
 interface OpenAlexLocation {
   pdf_url?: string | null;
   landing_page_url?: string | null;
-  is_oa?: boolean;
+  is_oa?: boolean | null;
   version?: string | null;
   license?: string | null;
 }
 
 interface OpenAlexOpenAccess {
-  is_oa?: boolean;
+  is_oa?: boolean | null;
   oa_status?: string | null;
   oa_url?: string | null;
-  any_repository_has_fulltext?: boolean;
+  any_repository_has_fulltext?: boolean | null;
 }
 
 interface WorkData {

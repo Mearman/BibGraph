@@ -105,10 +105,11 @@ export type Location = z.infer<typeof LocationSchema>
 export const InstitutionSchema = z.object({
 	id: z.string(),
 	display_name: z.string(),
-	ror: z.string().optional(),
-	country_code: z.string().optional(),
+	// Absent ror and country_code arrive as explicit null from OpenAlex (countryless consortia), matching the full institutionSchema's null encoding
+	ror: z.string().nullish(),
+	country_code: z.string().nullish(),
 	type: z.string(),
-	lineage: z.array(z.string()).optional(),
+	lineage: z.array(z.string()).nullish(),
 })
 
 export type Institution = z.infer<typeof InstitutionSchema>

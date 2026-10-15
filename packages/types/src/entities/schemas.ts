@@ -71,7 +71,11 @@ export const entityWithWorksSchema = baseEntitySchema.extend({
 })
 
 // Work schema
+// Rows trimmed by the relationship registry's select lists (see relationship-queries-registry) carry only the fields their list names, so every field those lists omit is nullish on the schemas that validate relationship rows (work, author, institution, source); full responses still carry all of them.
 export const workSchema = baseEntitySchema.extend({
+	counts_by_year: z.array(countsByYearSchema).nullish(),
+	updated_date: dateStringSchema.nullish(),
+	created_date: dateStringSchema.nullish(),
 	doi: z.string().nullish(),
 	title: z.string().nullish(),
 	publication_year: z.number().int().nullish(),
@@ -272,8 +276,11 @@ export const conceptSchema = baseEntitySchema.extend({
 })
 
 // Author schema
+// Nullish per the relationship registry's authors select list; works_count and cited_by_count stay required because that list selects them
 export const authorSchema = baseEntitySchema.extend({
-	counts_by_year: z.array(entityCountsByYearSchema),
+	counts_by_year: z.array(entityCountsByYearSchema).nullish(),
+	updated_date: dateStringSchema.nullish(),
+	created_date: dateStringSchema.nullish(),
 	works_count: z.number().int().min(0),
 	orcid: z.string().nullish(),
 	display_name_alternatives: z.array(z.string()).nullish(),
@@ -304,11 +311,16 @@ export const authorSchema = baseEntitySchema.extend({
 })
 
 // Institution schema
+// Nullish per the relationship registry's institutions select list (which omits cited_by_count) and the sparser lineage resolution list (which also omits works_count, geo and international); country_code and type stay required because both lists select them
 export const institutionSchema = baseEntitySchema.extend({
-	counts_by_year: z.array(entityCountsByYearSchema),
-	works_count: z.number().int().min(0),
+	cited_by_count: z.number().int().min(0).nullish(),
+	counts_by_year: z.array(entityCountsByYearSchema).nullish(),
+	updated_date: dateStringSchema.nullish(),
+	created_date: dateStringSchema.nullish(),
+	works_count: z.number().int().min(0).nullish(),
 	ror: z.string().nullish(),
-	country_code: z.string(),
+	// Countryless institutions (consortia and the like) report null here, including in select-trimmed rows
+	country_code: z.string().nullish(),
 	type: z.string(),
 	homepage_url: z.string().nullish(),
 	image_url: z.string().nullish(),
@@ -322,18 +334,22 @@ export const institutionSchema = baseEntitySchema.extend({
 			grid: z.string().nullish(),
 		})
 		.nullish(),
-	geo: z.object({
-		city: z.string().nullish(),
-		geonames_city_id: z.string().nullish(),
-		region: z.string().nullish(),
-		country_code: z.string(),
-		country: z.string(),
-		latitude: z.number().nullish(),
-		longitude: z.number().nullish(),
-	}),
-	international: z.object({
-		display_name: z.record(z.string(), z.string()),
-	}),
+	geo: z
+		.object({
+			city: z.string().nullish(),
+			geonames_city_id: z.string().nullish(),
+			region: z.string().nullish(),
+			country_code: z.string(),
+			country: z.string(),
+			latitude: z.number().nullish(),
+			longitude: z.number().nullish(),
+		})
+		.nullish(),
+	international: z
+		.object({
+			display_name: z.record(z.string(), z.string()),
+		})
+		.nullish(),
 	associated_institutions: z
 		.array(
 			z.object({
@@ -371,15 +387,21 @@ export const apiResponseSchema = z.unknown().refine((data) => {
 export const staticDataSchema = z.unknown()
 
 // Source schema
+// Nullish per the relationship registry's sources select list; works_count and type stay required because that list selects them
 export const sourceSchema = entityWithWorksSchema.extend({
+	cited_by_count: z.number().int().min(0).nullish(),
+	counts_by_year: z.array(entityCountsByYearSchema).nullish(),
+	updated_date: dateStringSchema.nullish(),
+	created_date: dateStringSchema.nullish(),
+	works_api_url: z.string().nullish(),
 	issn_l: z.string().nullish(),
 	issn: z.array(z.string()).nullish(),
 	publisher: z.string().nullish(),
 	host_organization: openAlexIdSchema.nullish(),
 	host_organization_name: z.string().nullish(),
 	host_organization_lineage: z.array(openAlexIdSchema).nullish(),
-	is_oa: z.boolean(),
-	is_in_doaj: z.boolean(),
+	is_oa: z.boolean().nullish(),
+	is_in_doaj: z.boolean().nullish(),
 	ids: z
 		.object({
 			openalex: openAlexIdSchema,

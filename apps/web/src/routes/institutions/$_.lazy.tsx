@@ -125,7 +125,7 @@ const InstitutionRoute = () => {
       data={institution}>
       <RelationshipCounts incomingCount={incomingCount} outgoingCount={outgoingCount} />
       <PublicationTimeline
-        yearData={institution.counts_by_year.map((year) => ({
+        yearData={(institution.counts_by_year ?? []).map((year) => ({
           year: year.year,
           count: year.works_count,
           citations: year.cited_by_count,
