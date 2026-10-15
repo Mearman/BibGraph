@@ -8,6 +8,12 @@ import { z } from "zod"
 // Base schemas for common structures
 export const openAlexIdSchema = z.string().regex(/^https:\/\/openalex\.org\/[A-Z]\d+$/)
 
+// SDG ids are UN Metadata registry urls (https://metadata.un.org/sdg/N), not OpenAlex entity ids; the union keeps the OpenAlex form accepted for rows built before the registry shape was observed.
+const sdgIdSchema = z.union([
+	openAlexIdSchema,
+	z.string().regex(/^https:\/\/metadata\.un\.org\/sdg\/\d+$/),
+])
+
 // OpenAlex returns full ISO timestamps for updated_date/created_date on most entities and plain YYYY-MM-DD dates elsewhere (for example work publication_date); both formats are accepted.
 export const dateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}(?:[T ].+)?$/)
 
@@ -174,7 +180,7 @@ export const workSchema = baseEntitySchema.extend({
 	sustainable_development_goals: z
 		.array(
 			z.object({
-				id: openAlexIdSchema.nullish(),
+				id: sdgIdSchema.nullish(),
 				display_name: z.string().nullish(),
 				score: z.number().nullish(),
 			})
@@ -356,7 +362,8 @@ export const institutionSchema = baseEntitySchema.extend({
 				id: openAlexIdSchema,
 				display_name: z.string(),
 				ror: z.string().nullish(),
-				country_code: z.string(),
+				// Countryless institutions (consortia and the like) report null here, matching the top-level institution country_code; observed live on i19820366 and i1294671590 associated rows
+				country_code: z.string().nullable().nullish(),
 				type: z.string(),
 				relationship: z.string(),
 			})
