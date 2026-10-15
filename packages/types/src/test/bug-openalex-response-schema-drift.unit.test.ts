@@ -147,6 +147,16 @@ describe("OpenAlex response schema drift", () => {
 		expect(result.success).toBe(true)
 	})
 
+	it("accepts an institution whose international.display_name is null (2026-10-15: live I4210126615 failed safeParse on international.display_name, so every institution page of a non-internationalised institution failed to load)", () => {
+		const result = institutionSchema.safeParse({
+			id: "https://openalex.org/I4210126615",
+			display_name: "A Consortium Without Translated Names",
+			type: "other",
+			international: { display_name: null },
+		})
+		expect(result.success).toBe(true)
+	})
+
 	it("accepts a work row trimmed to the relationship registry's works select list (2026-10-15: the relationships panel failed with \"[{expected:array, path:[results,0,counts_by_year]}...]\" because select-parameterised rows omit every unselected field)", () => {
 		const result = workSchema.safeParse({
 			id: "https://openalex.org/W2741809807",

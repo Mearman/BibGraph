@@ -247,7 +247,7 @@ export const conceptSchema = baseEntitySchema.extend({
 	image_thumbnail_url: z.string().nullish(),
 	international: z
 		.object({
-			display_name: z.record(z.string(), z.string()),
+			display_name: z.record(z.string(), z.string()).nullish(), // institutions without internationalised names report null here
 			description: z.record(z.string(), z.string()).nullish(),
 		})
 		.nullish(),
@@ -347,7 +347,7 @@ export const institutionSchema = baseEntitySchema.extend({
 		.nullish(),
 	international: z
 		.object({
-			display_name: z.record(z.string(), z.string()),
+			display_name: z.record(z.string(), z.string()).nullish(), // institutions without internationalised names report null here
 		})
 		.nullish(),
 	associated_institutions: z
