@@ -8,6 +8,8 @@ import { logger } from "@bibgraph/utils/logger";
 import Dexie, { type Table } from "dexie";
 import React, { createContext, type ReactNode, use, useEffect, useMemo, useReducer } from "react";
 
+import { NARROW_VIEWPORT_MEDIA_QUERY } from "@/hooks/use-narrow-viewport";
+
 const PROVIDER_TYPES: readonly ProviderType[] = ["xyflow", "d3", "cytoscape"];
 const PROVIDER_TYPE_SET = new Set<string>(PROVIDER_TYPES);
 const isProviderType = (value: string): value is ProviderType => PROVIDER_TYPE_SET.has(value);
@@ -316,9 +318,17 @@ type LayoutPersistedState = Partial<
   >
 >;
 
+/**
+ * True while the viewport is phone width, where the app shell renders the left sidebar as a full-screen drawer over the page. A missing matchMedia (jsdom without a stub, non-DOM environments) counts as wide.
+ */
+const isPhoneWidthViewport = (): boolean =>
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia(NARROW_VIEWPORT_MEDIA_QUERY).matches;
+
 // Initial state
 const getInitialState = (): LayoutState => ({
-  leftSidebarOpen: true,
+  leftSidebarOpen: !isPhoneWidthViewport(),
   leftSidebarPinned: false,
   rightSidebarOpen: true,
   rightSidebarPinned: false,
@@ -330,6 +340,20 @@ const getInitialState = (): LayoutState => ({
   previewEntityId: null,
   autoPinOnLayoutStabilization: false,
 });
+
+/**
+ * Adjust persisted layout state for the viewport being hydrated into. On a phone-width viewport the left sidebar is a drawer covering the page, so a desktop session's open sidebar must not reopen it there; the phone's own toggle stays session-local. Everything else hydrates unchanged.
+ */
+export const clampPersistedStateForViewport = (
+  persisted: Readonly<Partial<LayoutPersistedState>>,
+  phoneWidthViewport: boolean,
+): Partial<LayoutPersistedState> => {
+  if (!phoneWidthViewport || persisted.leftSidebarOpen === undefined) {
+    return { ...persisted };
+  }
+  const { leftSidebarOpen: _dropped, ...rest } = persisted;
+  return rest;
+};
 
 // Action types
 type LayoutAction =
@@ -406,10 +430,11 @@ export const LayoutProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         // Run migration first
         await persistenceService.migrateFromOldStorage();
 
-        // Load persisted state
+        // Load persisted state; a phone-width viewport never restores a desktop session's open left sidebar
         const persistedState = await persistenceService.getLayoutState();
-        if (Object.keys(persistedState).length > 0) {
-          dispatch({ type: "LOAD_PERSISTED_STATE", payload: persistedState });
+        const clampedState = clampPersistedStateForViewport(persistedState, isPhoneWidthViewport());
+        if (Object.keys(clampedState).length > 0) {
+          dispatch({ type: "LOAD_PERSISTED_STATE", payload: clampedState });
         }
       } catch (error) {
         logger.error("layout-store", "Failed to initialize persisted state", {
@@ -438,7 +463,13 @@ export const LayoutProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         "autoPinOnLayoutStabilization",
       ];
 
+      // A phone session's sidebar toggle stays session-local so it cannot close the desktop layout.
+      const phoneWidthViewport = isPhoneWidthViewport();
+
       for (const key of persistableKeys) {
+        if (key === "leftSidebarOpen" && phoneWidthViewport) {
+          continue;
+        }
         if (key in state) {
           await safePersist(
             persistenceService.setLayoutProperty(key, state[key]),

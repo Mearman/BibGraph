@@ -7,7 +7,7 @@ import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
 
 // Note: Dexie mock removed - fake-indexeddb is now loaded via setupFiles
 // which provides a real IndexedDB implementation for Dexie to use
-import { LayoutProvider,useLayoutActions, useLayoutStore } from "./layout-store";
+import { clampPersistedStateForViewport, LayoutProvider,useLayoutActions, useLayoutStore } from "./layout-store";
 
 // Mock localStorage for Zustand persistence
 const localStorageMock = (() => {
@@ -535,6 +535,47 @@ describe("Layout Store", () => {
       });
 
       expect(result.current.graphProvider).toBe("cytoscape");
+    });
+  });
+
+  describe("Phone-width initial state", () => {
+    const installNarrowMatchMedia = () => {
+      vi.stubGlobal(
+        "matchMedia",
+        vi.fn().mockReturnValue({ matches: true, media: "(max-width: 47.99em)", addEventListener: vi.fn(), removeEventListener: vi.fn() }),
+      );
+    };
+
+    it("should start with the left sidebar closed on a phone-width viewport", () => {
+      installNarrowMatchMedia();
+
+      const { result } = renderHook(() => useLayoutStore(), { wrapper });
+
+      expect(result.current.leftSidebarOpen).toBe(false);
+    });
+
+    it("should let the phone-width drawer be opened for the session", () => {
+      installNarrowMatchMedia();
+
+      const { result } = renderHook(() => useLayoutStore(), { wrapper });
+
+      act(() => {
+        result.current.setLeftSidebarOpen(true);
+      });
+
+      expect(result.current.leftSidebarOpen).toBe(true);
+    });
+
+    it("should drop a persisted open flag when hydrating on a phone-width viewport", () => {
+      expect(clampPersistedStateForViewport({ leftSidebarOpen: true, leftSidebarPinned: true }, true)).toEqual({
+        leftSidebarPinned: true,
+      });
+    });
+
+    it("should keep a persisted open flag when hydrating on a wide viewport", () => {
+      expect(clampPersistedStateForViewport({ leftSidebarOpen: true }, false)).toEqual({
+        leftSidebarOpen: true,
+      });
     });
   });
 
