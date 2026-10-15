@@ -246,7 +246,11 @@ export const resolveLabelBatch = async (
           per_page: batch.ids.length,
           select: selectFields,
         });
-        results = response.results;
+        results = response.results.map((work) => ({
+          id: work.id,
+          display_name: work.display_name,
+          title: work.title ?? undefined,
+        }));
         break;
       }
       case 'authors': {

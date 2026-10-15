@@ -50,7 +50,7 @@ const worksColumns: ColumnConfig[] = [
         <>
           {authorships.map((authorship, index) => {
             const { author } = authorship;
-            if (author.id === undefined) return null;
+            if (author.id == null) return null;
             const authorUrl = `#${convertOpenAlexToInternalLink(author.id).internalPath}`;
 
             return (

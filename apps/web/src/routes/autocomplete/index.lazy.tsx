@@ -170,7 +170,7 @@ const AutocompleteGeneralRoute = () => {
       header: "Works",
       cell: (info) => {
         const count = info.row.original.works_count;
-        return count !== undefined
+        return count != null
           ? count.toLocaleString()
           : "-";
       },
