@@ -13,6 +13,9 @@ import { IconChartBar } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 
 import { ICON_SIZE } from '@/config/style-constants';
+import { useMeasuredWidth } from '@/hooks/use-measured-width';
+
+import { showsYearLabel, yearLabelStride } from './year-label-stride';
 
 interface YearData {
   year: number;
@@ -94,6 +97,7 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
   const [decadeFilter, setDecadeFilter] = useState<DecadeFilter>('all');
   const [showCitations, setShowCitations] = useState(false);
   const [hoveredYear, setHoveredYear] = useState<number | null>(null);
+  const [chartAreaRef, chartAreaWidth] = useMeasuredWidth();
 
   // Filter and sort data
   const filteredData = useMemo(() => {
@@ -110,6 +114,12 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
     const citationData = filteredData.filter((d) => d.citations !== undefined);
     return Math.max(...citationData.map((d) => d.citations ?? 0), 1);
   }, [filteredData]);
+
+  // Thin the x-axis labels to the width: every stride-th year plus the last, so the axis names both ends without crowding.
+  const stride = useMemo(
+    () => yearLabelStride(filteredData.length, chartAreaWidth),
+    [filteredData.length, chartAreaWidth],
+  );
 
   if (yearData.length === 0) {
     return null;
@@ -189,6 +199,7 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
 
           {/* Chart area */}
           <Box
+            ref={chartAreaRef}
             style={{
               position: 'absolute',
               left: '50px',
@@ -201,7 +212,7 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
             {view === 'bar' ? (
               // Bar chart
               <Group gap="xs" wrap="nowrap" style={{ height: '100%' }}>
-                {filteredData.map((data) => {
+                {filteredData.map((data, index) => {
                   const height = showCitations && data.citations !== undefined
                     ? (data.citations / maxCitations) * BAR_HEIGHT_PERCENT_SCALE
                     : (data.count / maxCount) * BAR_HEIGHT_PERCENT_SCALE;
@@ -234,20 +245,22 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
                         }}
                       />
 
-                      {/* Year label */}
-                      <Text
-                        size="xs"
-                        c="dimmed"
-                        style={{
-                          position: 'absolute',
-                          bottom: -25,
-                          transform: `rotate(-45deg)`,
-                          transformOrigin: 'top left',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {data.year}
-                      </Text>
+                      {/* Year label, thinned responsively */}
+                      {showsYearLabel(index, filteredData.length, stride) && (
+                        <Text
+                          size="xs"
+                          c="dimmed"
+                          style={{
+                            position: 'absolute',
+                            bottom: -25,
+                            transform: `rotate(-45deg)`,
+                            transformOrigin: 'top left',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {data.year}
+                        </Text>
+                      )}
 
                       {/* Tooltip */}
                       {hoveredYear === data.year && (
@@ -336,16 +349,18 @@ export const PublicationTimeline: React.FC<PublicationTimelineProperties> = ({
                         onMouseEnter={() => { setHoveredYear(data.year); }}
                         onMouseLeave={() => { setHoveredYear(null); }}
                       />
-                      <text
-                        x={`${String(x)}%`}
-                        y={215}
-                        textAnchor="middle"
-                        fontSize="10"
-                        fill="var(--mantine-color-dimmed)"
-                        transform={`rotate(-45, ${String(x)}%, 215)`}
-                      >
-                        {data.year}
-                      </text>
+                      {showsYearLabel(index, filteredData.length, stride) && (
+                        <text
+                          x={`${String(x)}%`}
+                          y={215}
+                          textAnchor="middle"
+                          fontSize="10"
+                          fill="var(--mantine-color-dimmed)"
+                          transform={`rotate(-45, ${String(x)}%, 215)`}
+                        >
+                          {data.year}
+                        </text>
+                      )}
                       {hoveredYear === data.year && (
                         <g>
                           <rect
