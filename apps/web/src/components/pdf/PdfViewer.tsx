@@ -233,6 +233,14 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
         {/* PDF Viewer */}
         {isExpanded && pdfUrl !== null && pdfUrl !== undefined && pdfUrl !== "" && (
           <div style={{ position: "relative" }}>
+            {/* Cross-origin frame refusals (publisher X-Frame-Options) never fire the
+                iframe's error handler: the browser paints its own error page inside the
+                frame and logs to console where the app cannot see or suppress it, so the
+                honest affordance is a visible hint beside the embed rather than detection. */}
+            <Text size="xs" c="dimmed" mb={4}>
+              Some publishers block embedded display. If the document does not appear
+              here, use Open in new tab.
+            </Text>
             {isIframeLoading && (
               <div
                 style={{
