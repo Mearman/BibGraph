@@ -92,6 +92,19 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  */
 const isUnknownArray = (value: unknown): value is unknown[] => Array.isArray(value);
 
+/**
+ * Drops case-insensitive duplicates from a primitive array for display, keeping each value's first casing. OpenAlex can carry the same alternative name in two casings ("TEAHAN, WILLIAM" and "TEAHAN, William"); the raw view still shows every entry as delivered.
+ */
+const dedupePrimitiveArrayCaseInsensitively = (values: readonly unknown[]): unknown[] => {
+  const seen = new Set<string>();
+  return values.filter((item) => {
+    const key = typeof item === "string" ? item.toLowerCase() : String(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 const renderPrimitiveValue = (value: unknown, fieldName?: string): ReactNode => {
   // Don't render null/undefined - these fields will be filtered out
   if (value === null || value === undefined) {
@@ -381,10 +394,10 @@ const renderValueContent = (value: unknown, fieldName?: string): ReactNode => {
         );
       }
 
-      // Non-URL primitives render as badges
+      // Non-URL primitives render as badges, without case-only duplicates
       return (
         <Group wrap="wrap" gap={4}>
-          {value.map((item, index) => (
+          {dedupePrimitiveArrayCaseInsensitively(value).map((item, index) => (
             <Badge key={index} variant="light" color="gray" size="sm">
               {renderPrimitiveValue(item)}
             </Badge>
