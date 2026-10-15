@@ -1,26 +1,21 @@
 /**
  * Author Collaboration Network Mini-Graph
  *
- * Shows co-author relationships as a small force-directed graph:
- * - Co-authors as nodes
- * - Collaboration count as edge weight
+ * Shows co-author relationships as a small circle-layout graph, derived from the authorships of the works already fetched for the author page:
+ * - Co-authors as nodes (collaboration count as edge weight)
  * - Click to navigate to author pages
- * - Limited to 30 co-authors for performance
+ * - Limited to MAX_COAUTHORS co-authors for performance
  */
 
-import type { Author } from '@bibgraph/types';
-import { Group, Paper, Stack, Text, Title } from '@mantine/core';
+import type { Work } from '@bibgraph/types';
+import { Group, Loader, Paper, Stack, Text, Title } from '@mantine/core';
 import { IconNetwork } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { ICON_SIZE } from '@/config/style-constants';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
-interface CoAuthorNode {
-  id: string;
-  displayName: string;
-  collaborationCount: number;
-}
+import { extractCoAuthors } from './collaboration-data';
 
 interface CollaborationNetworkProperties {
   /**
@@ -28,9 +23,13 @@ interface CollaborationNetworkProperties {
    */
   authorId: string;
   /**
-  Author data from OpenAlex
+  The author's works whose authorships supply the co-authors
    */
-  author: Author | null;
+  works: readonly Work[];
+  /**
+  True while the works query is in flight
+   */
+  isLoading: boolean;
 }
 
 const MAX_COAUTHORS = 30;
@@ -41,62 +40,27 @@ const CIRCLE_LAYOUT_RADIUS_DIVISOR = 3;
 const HOVER_NODE_RADIUS_INCREASE = 3;
 const NODE_LABEL_OFFSET_Y = 15;
 const MAX_LABEL_LENGTH = 20;
-
-/**
- * Extract co-authors from author data
- * OpenAlex Author object includes counts_by_year but not direct co-author lists.
- * We'll need to parse the author's works to extract co-authors.
- */
-const extractCoAuthors = (author: Author | null): CoAuthorNode[] => {
-  if (!author) return [];
-
-  // Note: OpenAlex API doesn't directly provide co-author lists in the Author object.
-  // The author's works would need to be fetched and their authorships parsed.
-  // For now, return empty array - this component will need additional data fetching.
-  // Future enhancement: Add a co-authors endpoint or fetch works with authorships.
-
-  return [];
-};
+// Edge stroke scales between these widths by share of the busiest co-author's collaboration count.
+const MIN_EDGE_STROKE_WIDTH = 1;
+const MAX_EDGE_STROKE_EXTRA = 2;
 
 /**
  * CollaborationNetwork Component
  */
 export const CollaborationNetwork: React.FC<CollaborationNetworkProperties> = ({
   authorId,
-  author,
+  works,
+  isLoading,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const { getEntityColor } = useThemeColors();
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
-  // Extract co-authors from author data
-  const coAuthors = extractCoAuthors(author);
+  // Derive co-authors from the loaded works; order is stable (count desc, then name).
+  const coAuthors = extractCoAuthors(works, authorId);
 
   // Limit co-authors for performance
   const limitedCoAuthors = coAuthors.slice(0, MAX_COAUTHORS);
-
-  // Show placeholder when no co-author data available
-  if (limitedCoAuthors.length === 0) {
-    return (
-      <Paper p="xl" radius="xl">
-        <Stack gap="lg">
-          {/* Header */}
-          <Group justify="space-between" align="center">
-            <Group gap="sm">
-              <IconNetwork size={ICON_SIZE.XL} color="var(--mantine-color-blue-6)" />
-              <Title order={3}>Collaboration Network</Title>
-            </Group>
-          </Group>
-
-          {/* Placeholder */}
-          <Text size="sm" c="dimmed" ta="center" py="xl">
-            Collaboration network requires fetching co-author data from works.
-            This feature will be enhanced with additional API queries.
-          </Text>
-        </Stack>
-      </Paper>
-    );
-  }
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -115,14 +79,7 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProperties> = ({
         })),
       ];
 
-      // Create link data
-      const links = limitedCoAuthors.map((coAuthor) => ({
-        source: authorId,
-        target: coAuthor.id,
-        collaborationCount: coAuthor.collaborationCount,
-      }));
-
-      // Simple force-directed layout without D3 dependency Position nodes in a circle around center
+      // Position nodes in a circle around the centre.
       const centerX = GRAPH_WIDTH / 2;
       const centerY = GRAPH_HEIGHT / 2;
       const radius = Math.min(GRAPH_WIDTH, GRAPH_HEIGHT) / CIRCLE_LAYOUT_RADIUS_DIVISOR;
@@ -141,10 +98,11 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProperties> = ({
         });
       }
 
-      // Draw links
-      for (const link of links) {
-        const sourcePos = nodePositions.get(link.source);
-        const targetPos = nodePositions.get(link.target);
+      // Draw links, thickening with collaboration count
+      const maxCollaborationCount = limitedCoAuthors[0]?.collaborationCount ?? 1;
+      for (const coAuthor of limitedCoAuthors) {
+        const sourcePos = nodePositions.get(authorId);
+        const targetPos = nodePositions.get(coAuthor.id);
 
         if (!sourcePos || !targetPos) continue;
 
@@ -154,7 +112,7 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProperties> = ({
         line.setAttribute('x2', targetPos.x.toString());
         line.setAttribute('y2', targetPos.y.toString());
         line.setAttribute('stroke', 'var(--mantine-color-gray-3)');
-        line.setAttribute('stroke-width', '1');
+        line.setAttribute('stroke-width', (MIN_EDGE_STROKE_WIDTH + (coAuthor.collaborationCount / maxCollaborationCount) * MAX_EDGE_STROKE_EXTRA).toString());
         line.setAttribute('opacity', '0.5');
         svg.append(line);
       }
@@ -223,6 +181,39 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProperties> = ({
     };
   }, [authorId, limitedCoAuthors, getEntityColor, hoveredNode]);
 
+  if (isLoading) {
+    return (
+      <Paper p="xl" radius="xl">
+        <Stack gap="lg">
+          <Group gap="sm">
+            <IconNetwork size={ICON_SIZE.XL} color="var(--mantine-color-blue-6)" />
+            <Title order={3}>Collaboration Network</Title>
+          </Group>
+          <Group gap="sm" justify="center" py="xl">
+            <Loader size="sm" />
+            <Text size="sm" c="dimmed">Loading co-authors from the author's works...</Text>
+          </Group>
+        </Stack>
+      </Paper>
+    );
+  }
+
+  if (limitedCoAuthors.length === 0) {
+    return (
+      <Paper p="xl" radius="xl">
+        <Stack gap="lg">
+          <Group gap="sm">
+            <IconNetwork size={ICON_SIZE.XL} color="var(--mantine-color-blue-6)" />
+            <Title order={3}>Collaboration Network</Title>
+          </Group>
+          <Text size="sm" c="dimmed" ta="center" py="xl">
+            No co-authors appear in this author's works.
+          </Text>
+        </Stack>
+      </Paper>
+    );
+  }
+
   return (
     <Paper p="xl" radius="xl">
       <Stack gap="lg">
@@ -240,6 +231,8 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProperties> = ({
             ref={svgRef}
             width={GRAPH_WIDTH}
             height={GRAPH_HEIGHT}
+            role="img"
+            aria-label={`Collaboration network of ${String(coAuthors.length)} co-authors`}
             style={{
               border: '1px solid var(--mantine-color-gray-3)',
               borderRadius: '8px',
@@ -252,7 +245,7 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProperties> = ({
 
         {/* Legend */}
         <Text size="sm" c="dimmed" ta="center">
-          Showing {limitedCoAuthors.length} of {coAuthors.length} co-authors. Click nodes to navigate.
+          Showing {limitedCoAuthors.length} of {coAuthors.length} co-authors from the author's works. Click nodes to navigate.
         </Text>
       </Stack>
     </Paper>

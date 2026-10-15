@@ -3,11 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute,useParams, useSearch  } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { CollaborationNetwork, type DetailViewMode, EntityDetailLayout, ErrorState, LoadingState, PublicationTimeline, RelatedEntitiesSection } from "@/components/entity-detail";
+import { AuthorWorks, CollaborationNetwork, type DetailViewMode, EntityDetailLayout, ErrorState, LoadingState, PublicationTimeline, RelatedEntitiesSection } from "@/components/entity-detail";
 import { ENTITY_TYPE_CONFIGS } from "@/components/entity-detail/EntityTypeConfig";
 import { IncomingRelationships } from "@/components/relationship/IncomingRelationships";
 import { OutgoingRelationships } from "@/components/relationship/OutgoingRelationships";
 import { RelationshipCounts } from "@/components/relationship/RelationshipCounts";
+import { useAuthorWorks } from '@/hooks/use-author-works';
 import { useEntityRelationshipQueries } from '@/hooks/use-entity-relationship-queries';
 import { usePrettyUrl } from "@/hooks/use-pretty-url";
 import { useUrlNormalization } from "@/hooks/use-url-normalization";
@@ -69,6 +70,9 @@ const AuthorRoute = () => {
     'authors'
   );
 
+  // The works list and the collaboration network share one paginated works query.
+  const authorWorks = useAuthorWorks(decodedAuthorId ?? '', author !== undefined);
+
   const config = ENTITY_TYPE_CONFIGS.authors;
 
   if (isLoading) {
@@ -97,8 +101,10 @@ const AuthorRoute = () => {
       <RelationshipCounts incomingCount={incomingCount} outgoingCount={outgoingCount} />
       <CollaborationNetwork
         authorId={decodedAuthorId}
-        author={author}
+        works={authorWorks.works}
+        isLoading={authorWorks.isLoading}
       />
+      <AuthorWorks view={authorWorks} onPageChange={authorWorks.setPage} />
       <PublicationTimeline
         yearData={(author.counts_by_year ?? []).map((year) => ({
           year: year.year,

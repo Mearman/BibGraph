@@ -6,6 +6,7 @@ export type { DetailViewMode } from './EntityDetailLayout';
 export { EntityDetailLayout } from './EntityDetailLayout';
 export type { EntityTypeConfig } from './EntityTypeConfig';
 export { ENTITY_TYPE_CONFIGS, getMantineColor } from './EntityTypeConfig';
+export { AuthorWorks } from './AuthorWorks';
 export { CitationContextPreview } from './CitationContextPreview';
 export { CollaborationNetwork } from './CollaborationNetwork';
 export { EntityComparison } from './EntityComparison';
