@@ -4,11 +4,14 @@
 
 import type { Work } from "@bibgraph/types";
 import { MantineProvider } from "@mantine/core";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type * as ReactRouterModule from "@tanstack/react-router";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LOADING_CONSTANTS } from "@/config/style-constants";
+import { SyncStatusProvider } from "@/contexts/SyncStatusContext";
 import type { AuthorWorksViewData } from "@/hooks/use-author-works";
 
 import { AuthorWorks } from "./AuthorWorks";
@@ -95,5 +98,59 @@ describe("AuthorWorks", () => {
     renderWorks(makeViewData({ works: [], totalWorks: 0 }));
 
     expect(screen.getByText(/no works/i)).toBeVisible();
+  });
+});
+
+describe("AuthorWorks bounded wait", () => {
+  // The bound is the entity loader's stall timeout: one shared value across every loading surface, so a sub-panel never spins longer than the page-level loader would.
+  const renderPendingWorks = (onRetry: () => void) =>
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MantineProvider>
+          <SyncStatusProvider>
+            <AuthorWorks
+              view={makeViewData({ works: [], totalWorks: 0, isLoading: true })}
+              onPageChange={() => undefined}
+              onRetry={onRetry}
+            />
+          </SyncStatusProvider>
+        </MantineProvider>
+      </QueryClientProvider>,
+    );
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  it("keeps the spinner before the stall bound", () => {
+    renderPendingWorks(vi.fn(() => undefined));
+
+    act(() => {
+      vi.advanceTimersByTime(LOADING_CONSTANTS.STALL_TIMEOUT_MS - LOADING_CONSTANTS.PROGRESS_UPDATE_INTERVAL_MS);
+    });
+
+    expect(screen.getByText(/Loading works/i)).toBeVisible();
+    expect(screen.queryByTestId("subpanel-stalled-state")).not.toBeInTheDocument();
+  });
+
+  it("shows the still-waiting surface with a retry once the load outlives the stall bound", () => {
+    const onRetry = vi.fn<() => void>();
+    renderPendingWorks(onRetry);
+
+    act(() => {
+      vi.advanceTimersByTime(LOADING_CONSTANTS.STALL_TIMEOUT_MS + LOADING_CONSTANTS.PROGRESS_UPDATE_INTERVAL_MS);
+    });
+
+    expect(screen.getByTestId("subpanel-stalled-state")).toBeInTheDocument();
+    expect(screen.getByText(/Still waiting on the server/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Loading works/i)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });

@@ -13,10 +13,12 @@ import { IconNetwork } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { ICON_SIZE } from '@/config/style-constants';
+import { useLoadStall } from '@/hooks/use-load-stall';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
 import { extractCoAuthors } from './collaboration-data';
 import { describeEntityError } from './error-presentation';
+import { StalledLoadNotice } from './StalledLoadNotice';
 
 interface CollaborationNetworkProperties {
   /**
@@ -35,6 +37,10 @@ interface CollaborationNetworkProperties {
   The works query's error, if the query failed; an errored query shows the classified error copy rather than the no-co-authors empty state
    */
   error: Error | null;
+  /**
+  Re-run the works query; offered on the stalled surface once the load outlives the stall bound
+   */
+  onRetry?: () => void;
 }
 
 const MAX_COAUTHORS = 30;
@@ -57,10 +63,13 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProperties> = ({
   works,
   isLoading,
   error,
+  onRetry,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const { getEntityColor } = useThemeColors();
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  // Sustained throttling holds the works query pending through the transport's retries; past the shared stall bound the spinner yields to the honest still-waiting surface
+  const isStalled = useLoadStall(isLoading);
 
   // Derive co-authors from the loaded works; order is stable (count desc, then name).
   const coAuthors = extractCoAuthors(works, authorId);
@@ -186,6 +195,20 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProperties> = ({
       abortController.abort();
     };
   }, [authorId, limitedCoAuthors, getEntityColor, hoveredNode]);
+
+  if (isLoading && isStalled) {
+    return (
+      <Paper p="xl" radius="xl">
+        <Stack gap="lg">
+          <Group gap="sm">
+            <IconNetwork size={ICON_SIZE.XL} color="var(--mantine-color-blue-6)" />
+            <Title order={3}>Collaboration Network</Title>
+          </Group>
+          <StalledLoadNotice onRetry={onRetry} />
+        </Stack>
+      </Paper>
+    );
+  }
 
   if (isLoading) {
     return (

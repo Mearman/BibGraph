@@ -104,8 +104,9 @@ const AuthorRoute = () => {
         works={authorWorks.works}
         isLoading={authorWorks.isLoading}
         error={authorWorks.error}
+        onRetry={authorWorks.retry}
       />
-      <AuthorWorks view={authorWorks} onPageChange={authorWorks.setPage} />
+      <AuthorWorks view={authorWorks} onPageChange={authorWorks.setPage} onRetry={authorWorks.retry} />
       <PublicationTimeline
         yearData={(author.counts_by_year ?? []).map((year) => ({
           year: year.year,

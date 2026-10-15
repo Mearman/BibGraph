@@ -26,6 +26,10 @@ export interface AuthorWorksResult extends AuthorWorksViewData {
   Moves the works query to another page (1-based).
    */
   setPage: (page: number) => void;
+  /**
+  Re-runs the works query, offered by the sub-panels' stalled surface once a load outlives the stall bound.
+   */
+  retry: () => void;
 }
 
 /**
@@ -34,7 +38,7 @@ export interface AuthorWorksResult extends AuthorWorksViewData {
 export const useAuthorWorks = (authorId: string, enabled: boolean): AuthorWorksResult => {
   const [page, setPage] = useState(1);
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["author-works", authorId, page],
     queryFn: async () =>
       cachedOpenAlex.client.works.getWorks({
@@ -58,5 +62,6 @@ export const useAuthorWorks = (authorId: string, enabled: boolean): AuthorWorksR
     isLoading,
     error: error ?? null,
     setPage,
+    retry: () => { void refetch(); },
   };
 };

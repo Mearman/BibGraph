@@ -3,10 +3,11 @@ import { useLiveRegion } from "@bibgraph/ui";
 import { logger } from "@bibgraph/utils";
 import { Alert, Button, Code, Container, Flex, Group, Loader, Paper, Skeleton, Stack, Text, Title } from "@mantine/core";
 import { IconAlertCircle, IconRefresh, IconWifiOff } from "@tabler/icons-react";
-import React, { useEffect,useRef,useState } from "react";
+import React, { useEffect,useRef } from "react";
 
-import { BORDER_STYLE_GRAY_3, ICON_SIZE, LOADING_CONSTANTS } from "@/config/style-constants";
+import { BORDER_STYLE_GRAY_3, ICON_SIZE } from "@/config/style-constants";
 import { useSyncStatus } from "@/contexts/SyncStatusContext";
+import { useLoadStall } from "@/hooks/use-load-stall";
 import { serverErrorMessage } from "@/lib/connectivity";
 
 import type { EntityTypeConfig } from "./EntityTypeConfig";
@@ -27,8 +28,8 @@ export const LoadingState = ({
   operation = "load",
   onRetry
 }: LoadingStateProperties) => {
-  // Elapsed time is tracked only to drive the stall flip; it is never shown, because the component cannot know the request's real progress
-  const [timeElapsed, setTimeElapsed] = useState(0);
+  // This component is rendered only while its load is unresolved, so the load is always pending here; the shared stall clock (the same bound every loading surface uses) decides when the honest stalled surface replaces the spinner
+  const isStalled = useLoadStall(true);
   const loaderColor = isEntityType(entityType) ? getMantineColor(entityType) : 'blue';
 
   // Accessibility hooks
@@ -36,8 +37,6 @@ export const LoadingState = ({
   const loadingElementRef = useRef<HTMLDivElement>(null);
   const { syncStatus } = useSyncStatus();
 
-  // An unresolved load past the stall timeout is treated as failed. Derived rather than stored so the flip cannot desynchronise from elapsed time
-  const isStalled = timeElapsed >= LOADING_CONSTANTS.STALL_TIMEOUT_MS;
   const stallAnnouncedRef = useRef(false);
 
   // A stall while the server is answering with HTTP errors is a server problem (throttling included), not a connectivity one; the wording must not claim the record is unavailable offline when the transport knows better
@@ -61,19 +60,6 @@ export const LoadingState = ({
       );
     }
   }, [isStalled, entityType, announce, stalledHeadline, stalledDetail]);
-
-  // Count elapsed time, bounded by the stall timeout: once stalled the effect schedules no further ticks
-  useEffect(() => {
-    if (isStalled) {
-      return undefined;
-    }
-    const interval = setInterval(() => {
-      // Functional update so elapsed keeps climbing even when React batches multiple ticks together
-      setTimeElapsed(previous => previous + LOADING_CONSTANTS.PROGRESS_UPDATE_INTERVAL_MS);
-    }, LOADING_CONSTANTS.PROGRESS_UPDATE_INTERVAL_MS);
-
-    return () => { clearInterval(interval); };
-  }, [isStalled]);
 
   const handleRetry = () => {
     if (onRetry) {

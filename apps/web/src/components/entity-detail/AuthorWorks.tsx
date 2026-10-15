@@ -8,8 +8,10 @@ import { Link } from '@tanstack/react-router';
 
 import { ICON_SIZE } from '@/config/style-constants';
 import type { AuthorWorksViewData } from '@/hooks/use-author-works';
+import { useLoadStall } from '@/hooks/use-load-stall';
 
 import { toShortOpenAlexId } from './collaboration-data';
+import { StalledLoadNotice } from './StalledLoadNotice';
 
 interface AuthorWorksProperties {
   /**
@@ -20,10 +22,16 @@ interface AuthorWorksProperties {
   Moves the query to another page (1-based)
    */
   onPageChange: (page: number) => void;
+  /**
+  Re-run the works query; offered on the stalled surface once the load outlives the stall bound
+   */
+  onRetry?: () => void;
 }
 
-export const AuthorWorks = ({ view, onPageChange }: AuthorWorksProperties) => {
+export const AuthorWorks = ({ view, onPageChange, onRetry }: AuthorWorksProperties) => {
   const { works, totalWorks, page, pageCount, isLoading, error } = view;
+  // Sustained throttling holds the works query pending through the transport's retries; past the shared stall bound the spinner yields to the honest still-waiting surface
+  const isStalled = useLoadStall(isLoading);
 
   return (
     <Paper p="xl" radius="xl">
@@ -36,7 +44,9 @@ export const AuthorWorks = ({ view, onPageChange }: AuthorWorksProperties) => {
           <Badge variant="light" size="sm">{totalWorks.toLocaleString()} works</Badge>
         </Group>
 
-        {isLoading ? (
+        {isLoading && isStalled ? (
+          <StalledLoadNotice onRetry={onRetry} />
+        ) : isLoading ? (
           <Group gap="sm" justify="center" py="xl">
             <Loader size="sm" />
             <Text size="sm" c="dimmed">Loading works...</Text>
