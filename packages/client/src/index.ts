@@ -11,6 +11,7 @@ export { CachedOpenAlexClient } from './cached-client';
 // Client configuration and errors
 export type { OpenAlexClientConfig, FullyConfiguredClient } from './internal';
 export { OpenAlexApiError, OpenAlexRateLimitError } from './internal';
+export { emitRequestOutcome, subscribeToRequestOutcomes, type ClientRequestOutcome } from './request-outcome-events';
 
 // Client instances and functions
 export { cachedOpenAlex, updateOpenAlexEmail, updateOpenAlexApiKey } from './cached-client';

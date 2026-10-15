@@ -25,6 +25,7 @@ import { isDevelopmentMode } from "./internal/environment-detection";
 import { OpenAlexApiError, OpenAlexRateLimitError } from "./internal/errors";
 import { calculateRetryDelay, RETRY_CONFIG } from "./internal/rate-limit";
 import { cleanOpenAlexId } from "./internal/static-data-utils";
+import { emitRequestOutcome } from "./request-outcome-events";
 
 const HTTP_SERVER_ERROR_THRESHOLD = 500;
 const HTTP_TOO_MANY_REQUESTS = 429;
@@ -291,6 +292,12 @@ export class OpenAlexBaseClient {
       const responseTime = Date.now() - requestStartTime;
 
       if (response.status === HTTP_TOO_MANY_REQUESTS) {
+        // Emitted on every throttled attempt, before the retry sleeps, so the app can report the throttling while the backoff is still running
+        emitRequestOutcome({
+          kind: "http-error",
+          status: response.status,
+          message: `Rate limit exceeded (HTTP ${String(response.status)})`,
+        });
         return await this.handleRateLimitResponse(
           response,
           url,
@@ -300,6 +307,11 @@ export class OpenAlexBaseClient {
       }
 
       if (!response.ok) {
+        emitRequestOutcome({
+          kind: "http-error",
+          status: response.status,
+          message: `Server responded with HTTP ${String(response.status)}`,
+        });
         return await this.handleServerError(
           response,
           url,
@@ -314,6 +326,7 @@ export class OpenAlexBaseClient {
         response,
         responseTime,
       });
+      emitRequestOutcome({ kind: "success" });
       return response;
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -326,6 +339,10 @@ export class OpenAlexBaseClient {
         throw error;
       }
 
+      emitRequestOutcome({
+        kind: "network-error",
+        message: error instanceof Error ? error.message : "Unknown network error",
+      });
       if (retryCount < maxNetworkRetries) {
         const waitTime = getRetryDelay(
           retryCount,
