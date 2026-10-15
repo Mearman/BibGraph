@@ -16,6 +16,7 @@ import { ICON_SIZE } from '@/config/style-constants';
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
 import { extractCoAuthors } from './collaboration-data';
+import { describeEntityError } from './error-presentation';
 
 interface CollaborationNetworkProperties {
   /**
@@ -30,6 +31,10 @@ interface CollaborationNetworkProperties {
   True while the works query is in flight
    */
   isLoading: boolean;
+  /**
+  The works query's error, if the query failed; an errored query shows the classified error copy rather than the no-co-authors empty state
+   */
+  error: Error | null;
 }
 
 const MAX_COAUTHORS = 30;
@@ -51,6 +56,7 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProperties> = ({
   authorId,
   works,
   isLoading,
+  error,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const { getEntityColor } = useThemeColors();
@@ -193,6 +199,24 @@ export const CollaborationNetwork: React.FC<CollaborationNetworkProperties> = ({
             <Loader size="sm" />
             <Text size="sm" c="dimmed">Loading co-authors from the author's works...</Text>
           </Group>
+        </Stack>
+      </Paper>
+    );
+  }
+
+  // An errored works query must not fall through to the empty state, which would claim the author has no co-authors
+  if (error !== null) {
+    const presentation = describeEntityError(error);
+    return (
+      <Paper p="xl" radius="xl" data-testid="collaboration-network-error">
+        <Stack gap="lg">
+          <Group gap="sm">
+            <IconNetwork size={ICON_SIZE.XL} color="var(--mantine-color-blue-6)" />
+            <Title order={3}>Collaboration Network</Title>
+          </Group>
+          <Text size="sm" c="dimmed" ta="center" py="xl">
+            {presentation.headline}
+          </Text>
         </Stack>
       </Paper>
     );

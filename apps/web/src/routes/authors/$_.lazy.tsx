@@ -103,6 +103,7 @@ const AuthorRoute = () => {
         authorId={decodedAuthorId}
         works={authorWorks.works}
         isLoading={authorWorks.isLoading}
+        error={authorWorks.error}
       />
       <AuthorWorks view={authorWorks} onPageChange={authorWorks.setPage} />
       <PublicationTimeline
