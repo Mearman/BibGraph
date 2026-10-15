@@ -45,6 +45,11 @@ const STAGE_TITLES: Readonly<Record<AlgorithmStage, string>> = {
 const ADD_WORK_INPUT_LABEL = "Add a starting work by OpenAlex id or link";
 
 /**
+ * What an untitled starting work shows while its title is still being fetched: a loading state, not a claim that OpenAlex has no title for it.
+ */
+const SEED_TITLE_PENDING = "Loading...";
+
+/**
  * What each stage's switch changes for the reviewer, said in the notification.
  */
 const STAGE_EFFECT: Readonly<Record<AlgorithmStage, string>> = {
@@ -270,7 +275,11 @@ export const ReviewScreen = ({ session, paging }: ReviewScreenProps): ReactEleme
 				</Text>
 				{session.seedRefs.map((seed) => (
 					<Text key={seed.id} size="sm" c="dimmed" fs={seed.known ? undefined : "italic"}>
-						{seed.known ? seed.title : `${seed.title} (no title from OpenAlex)`}
+						{seed.known
+							? seed.title
+							: session.labelsPending
+								? SEED_TITLE_PENDING
+								: `${seed.title} (no title from OpenAlex)`}
 					</Text>
 				))}
 				{/* Stays on the page for the whole review, so a known-relevant work can be folded in at any point, not only before screening starts. */}
