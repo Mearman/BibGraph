@@ -78,4 +78,9 @@ export interface UseEntityRelationshipQueriesResult {
   Check if a section is currently loading
    */
   isLoadingMore: (sectionId: string) => boolean;
+
+  /**
+  Re-run every relationship query for the current entity (the panels' Retry button, so a retry refires the API requests instead of reloading the page)
+   */
+  refetch: () => Promise<void>;
 }

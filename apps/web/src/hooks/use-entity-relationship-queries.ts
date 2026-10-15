@@ -175,6 +175,11 @@ export const useEntityRelationshipQueries = (
     return loadingMoreReference.current.has(sectionId);
   }, []);
 
+  // Re-run every relationship query for this entity: invalidating the shared key prefix marks all of this entity's relationship queries stale and refetches the active ones, so the loader re-invokes without a page reload
+  const refetch = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['entity-relationships'] });
+  }, [queryClient]);
+
   // Navigate to a specific page (0-indexed)
   const goToPage = useCallback(
     async (sectionId: string, page: number) => {
@@ -301,5 +306,6 @@ export const useEntityRelationshipQueries = (
     goToPage,
     setPageSize,
     isLoadingMore,
+    refetch,
   };
 };

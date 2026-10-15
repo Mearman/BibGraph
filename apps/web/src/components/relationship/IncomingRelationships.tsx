@@ -83,6 +83,7 @@ export const IncomingRelationships: React.FC<IncomingRelationshipsProps> = ({
     goToPage,
     setPageSize,
     isLoadingMore,
+    refetch,
   } = useEntityRelationshipQueries(entityId, entityType);
 
   // Fall back to embedded data-based relationships if API has no data
@@ -125,8 +126,8 @@ export const IncomingRelationships: React.FC<IncomingRelationshipsProps> = ({
 
   if (apiError) {
     const handleRetry = () => {
-      // Reload the page to retry loading
-      window.location.reload();
+      // Re-run the relationship queries; reloading the page cleared the error without refetching
+      void refetch();
     };
 
     return (

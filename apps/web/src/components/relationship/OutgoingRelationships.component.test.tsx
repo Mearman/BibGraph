@@ -5,7 +5,8 @@
 
 import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup,render, screen } from '@testing-library/react';
+import { cleanup,render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach,beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the hooks
@@ -48,13 +49,6 @@ describe('OutgoingRelationships', () => {
     // Clear all mocks before each test
     vi.clearAllMocks();
 
-    // Reset window.location.reload mock
-    Object.defineProperty(window, 'location', {
-      value: { reload: vi.fn() },
-      writable: true,
-      configurable: true,
-    });
-
     // Set default mock return values for the additional hooks
     vi.mocked(useEntityRelationshipQueries).mockReturnValue({
       incoming: [],
@@ -67,6 +61,7 @@ describe('OutgoingRelationships', () => {
       goToPage: vi.fn(),
       setPageSize: vi.fn(),
       isLoadingMore: vi.fn(() => false),
+      refetch: vi.fn(),
     });
 
     vi.mocked(useEntityRelationshipsFromData).mockReturnValue({
@@ -96,6 +91,7 @@ describe('OutgoingRelationships', () => {
         goToPage: vi.fn(),
         setPageSize: vi.fn(),
         isLoadingMore: vi.fn(() => false),
+        refetch: vi.fn(),
       });
 
       renderWithProvider(<OutgoingRelationships entityId={mockEntityId} entityType={mockEntityType} />);
@@ -116,6 +112,7 @@ describe('OutgoingRelationships', () => {
         goToPage: vi.fn(),
         setPageSize: vi.fn(),
         isLoadingMore: vi.fn(() => false),
+        refetch: vi.fn(),
       });
 
       renderWithProvider(<OutgoingRelationships entityId={mockEntityId} entityType={mockEntityType} />);
@@ -123,6 +120,34 @@ describe('OutgoingRelationships', () => {
       const retryButton = screen.getByTestId('outgoing-relationships-retry-button');
       expect(retryButton).toBeInTheDocument();
       expect(retryButton).toHaveTextContent('Retry');
+    });
+
+    it('should re-invoke the relationship query loader when retry button is clicked (2026-10-15: retry used to reload the page, which cleared the error without refetching)', async () => {
+      const user = userEvent.setup();
+      const refetchSpy = vi.fn().mockResolvedValue(undefined);
+
+      vi.mocked(useEntityRelationshipQueries).mockReturnValue({
+        incoming: [],
+        outgoing: [],
+        incomingCount: 0,
+        outgoingCount: 0,
+        loading: false,
+        error: new Error('Failed to load relationships'),
+        loadMore: vi.fn(),
+        goToPage: vi.fn(),
+        setPageSize: vi.fn(),
+        isLoadingMore: vi.fn(() => false),
+        refetch: refetchSpy,
+      });
+
+      renderWithProvider(<OutgoingRelationships entityId={mockEntityId} entityType={mockEntityType} />);
+
+      const retryButton = screen.getByTestId('outgoing-relationships-retry-button');
+      await user.click(retryButton);
+
+      await waitFor(() => {
+        expect(refetchSpy).toHaveBeenCalledOnce();
+      });
     });
   });
 
@@ -139,6 +164,7 @@ describe('OutgoingRelationships', () => {
         goToPage: vi.fn(),
         setPageSize: vi.fn(),
         isLoadingMore: vi.fn(() => false),
+        refetch: vi.fn(),
       });
 
       renderWithProvider(<OutgoingRelationships entityId={mockEntityId} entityType={mockEntityType} />);
@@ -161,6 +187,7 @@ describe('OutgoingRelationships', () => {
         goToPage: vi.fn(),
         setPageSize: vi.fn(),
         isLoadingMore: vi.fn(() => false),
+        refetch: vi.fn(),
       });
 
       renderWithProvider(<OutgoingRelationships entityId={mockEntityId} entityType={mockEntityType} />);

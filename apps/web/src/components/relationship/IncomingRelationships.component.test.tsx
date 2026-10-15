@@ -49,13 +49,6 @@ describe('IncomingRelationships', () => {
     // Clear all mocks before each test
     vi.clearAllMocks();
 
-    // Reset window.location.reload mock
-    Object.defineProperty(window, 'location', {
-      value: { reload: vi.fn() },
-      writable: true,
-      configurable: true,
-    });
-
     // Set default mock return values for the additional hooks
     vi.mocked(useEntityRelationshipQueries).mockReturnValue({
       incoming: [],
@@ -68,6 +61,7 @@ describe('IncomingRelationships', () => {
       goToPage: vi.fn(),
       setPageSize: vi.fn(),
       isLoadingMore: vi.fn(() => false),
+      refetch: vi.fn(),
     });
 
     vi.mocked(useEntityRelationshipsFromData).mockReturnValue({
@@ -97,6 +91,7 @@ describe('IncomingRelationships', () => {
         goToPage: vi.fn(),
         setPageSize: vi.fn(),
         isLoadingMore: vi.fn(() => false),
+        refetch: vi.fn(),
       });
 
       renderWithProvider(<IncomingRelationships entityId={mockEntityId} entityType={mockEntityType} />);
@@ -117,6 +112,7 @@ describe('IncomingRelationships', () => {
         goToPage: vi.fn(),
         setPageSize: vi.fn(),
         isLoadingMore: vi.fn(() => false),
+        refetch: vi.fn(),
       });
 
       renderWithProvider(<IncomingRelationships entityId={mockEntityId} entityType={mockEntityType} />);
@@ -126,10 +122,9 @@ describe('IncomingRelationships', () => {
       expect(retryButton).toHaveTextContent('Retry');
     });
 
-    it('should call window.location.reload when retry button is clicked', async () => {
+    it('should re-invoke the relationship query loader when retry button is clicked (2026-10-15: retry used to reload the page, which cleared the error without refetching)', async () => {
       const user = userEvent.setup();
-      const reloadSpy = vi.fn(() => { /* no-op */ });
-      window.location.reload = reloadSpy;
+      const refetchSpy = vi.fn().mockResolvedValue(undefined);
 
       vi.mocked(useEntityRelationshipQueries).mockReturnValue({
         incoming: [],
@@ -142,6 +137,7 @@ describe('IncomingRelationships', () => {
         goToPage: vi.fn(),
         setPageSize: vi.fn(),
         isLoadingMore: vi.fn(() => false),
+        refetch: refetchSpy,
       });
 
       renderWithProvider(<IncomingRelationships entityId={mockEntityId} entityType={mockEntityType} />);
@@ -150,7 +146,7 @@ describe('IncomingRelationships', () => {
       await user.click(retryButton);
 
       await waitFor(() => {
-        expect(reloadSpy).toHaveBeenCalledOnce();
+        expect(refetchSpy).toHaveBeenCalledOnce();
       });
     });
 
@@ -166,6 +162,7 @@ describe('IncomingRelationships', () => {
         goToPage: vi.fn(),
         setPageSize: vi.fn(),
         isLoadingMore: vi.fn(() => false),
+        refetch: vi.fn(),
       });
 
       renderWithProvider(<IncomingRelationships entityId={mockEntityId} entityType={mockEntityType} />);
@@ -188,6 +185,7 @@ describe('IncomingRelationships', () => {
         goToPage: vi.fn(),
         setPageSize: vi.fn(),
         isLoadingMore: vi.fn(() => false),
+        refetch: vi.fn(),
       });
 
       renderWithProvider(<IncomingRelationships entityId={mockEntityId} entityType={mockEntityType} />);
@@ -210,6 +208,7 @@ describe('IncomingRelationships', () => {
         goToPage: vi.fn(),
         setPageSize: vi.fn(),
         isLoadingMore: vi.fn(() => false),
+        refetch: vi.fn(),
       });
 
       renderWithProvider(<IncomingRelationships entityId={mockEntityId} entityType={mockEntityType} />);
