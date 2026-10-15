@@ -18,15 +18,15 @@ const MAX_CONCEPT_LEVEL = 5
 const keywordReferenceSchema = z.object({
 	id: z.string(),
 	display_name: z.string(),
-	score: z.number().optional(),
+	score: z.number().nullish(),
 })
 
 // Counts by year for a work: OpenAlex reports only cited_by_count per year here, so both work counts are optional.
 export const countsByYearSchema = z.object({
 	year: z.number().int(),
 	cited_by_count: z.number().int().min(0),
-	works_count: z.number().int().min(0).optional(),
-	oa_works_count: z.number().int().min(0).optional(),
+	works_count: z.number().int().min(0).nullish(),
+	oa_works_count: z.number().int().min(0).nullish(),
 })
 
 // Counts by year for an entity that has works (authors, sources, institutions, keywords and the rest): works_count is always reported, so it stays required for consumers that chart it.
@@ -40,7 +40,7 @@ export const metaSchema = z.object({
 	db_response_time_ms: z.number().min(0),
 	page: z.number().int().min(1),
 	per_page: z.number().int().min(1).max(MAX_META_PER_PAGE),
-	groups_count: z.number().int().min(0).nullable().optional(),
+	groups_count: z.number().int().min(0).nullable().nullish(),
 })
 
 // Group by schema for aggregated responses
@@ -48,9 +48,9 @@ export const groupBySchema = z.object({
 	key: z.string(),
 	key_display_name: z.string(),
 	count: z.number().int().min(0),
-	cited_by_count: z.number().int().min(0).optional(),
-	works_count: z.number().int().min(0).optional(),
-	h_index: z.number().int().min(0).optional(),
+	cited_by_count: z.number().int().min(0).nullish(),
+	works_count: z.number().int().min(0).nullish(),
+	h_index: z.number().int().min(0).nullish(),
 })
 
 // Base entity schema
@@ -72,158 +72,158 @@ export const entityWithWorksSchema = baseEntitySchema.extend({
 
 // Work schema
 export const workSchema = baseEntitySchema.extend({
-	doi: z.string().optional(),
-	title: z.string().optional(),
-	publication_year: z.number().int().optional(),
-	publication_date: dateStringSchema.optional(),
+	doi: z.string().nullish(),
+	title: z.string().nullish(),
+	publication_year: z.number().int().nullish(),
+	publication_date: dateStringSchema.nullish(),
 	ids: z
 		.object({
 			openalex: openAlexIdSchema,
-			doi: z.string().optional(),
-			pmid: z.string().optional(),
-			pmcid: z.string().optional(),
+			doi: z.string().nullish(),
+			pmid: z.string().nullish(),
+			pmcid: z.string().nullish(),
 		})
-		.optional(),
-	primary_location: z.any().optional(), // Location schema would be complex
-	best_oa_location: z.any().optional(), // Location schema would be complex
-	locations: z.array(z.any()).optional(), // Location schema would be complex
-	locations_count: z.number().int().optional(),
+		.nullish(),
+	primary_location: z.any().nullish(), // Location schema would be complex
+	best_oa_location: z.any().nullish(), // Location schema would be complex
+	locations: z.array(z.any()).nullish(), // Location schema would be complex
+	locations_count: z.number().int().nullish(),
 	authorships: z
 		.array(
 			z.object({
 				author_position: z.string(),
 				author: z.object({
-					id: openAlexIdSchema.optional(),
+					id: openAlexIdSchema.nullish(),
 					display_name: z.string(),
-					orcid: z.string().optional(),
+					orcid: z.string().nullish(),
 				}),
 				institutions: z
 					.array(
 						z.object({
-							id: openAlexIdSchema.optional(),
+							id: openAlexIdSchema.nullish(),
 							display_name: z.string(),
-							ror: z.string().optional(),
+							ror: z.string().nullish(),
 							// Institutions without a country (for example consortia) report null
-							country_code: z.string().nullable().optional(),
-							type: z.string().optional(),
+							country_code: z.string().nullable().nullish(),
+							type: z.string().nullish(),
 						})
 					)
-					.optional(),
+					.nullish(),
 			})
 		)
-		.optional(),
-	countries_distinct_count: z.number().int().optional(),
-	institutions_distinct_count: z.number().int().optional(),
-	corresponding_author_ids: z.array(openAlexIdSchema).optional(),
-	corresponding_institution_ids: z.array(openAlexIdSchema).optional(),
-	apc_list: z.any().optional(), // APCInfo schema would be complex
-	apc_paid: z.any().optional(), // APCInfo schema would be complex
-	fwci: z.number().optional(),
-	has_fulltext: z.boolean().optional(),
-	fulltext_origin: z.string().optional(),
-	cited_by_api_url: z.string().optional(),
-	type: z.string().optional(),
-	type_crossref: z.string().optional(),
-	indexed_in: z.array(z.string()).optional(),
+		.nullish(),
+	countries_distinct_count: z.number().int().nullish(),
+	institutions_distinct_count: z.number().int().nullish(),
+	corresponding_author_ids: z.array(openAlexIdSchema).nullish(),
+	corresponding_institution_ids: z.array(openAlexIdSchema).nullish(),
+	apc_list: z.any().nullish(), // APCInfo schema would be complex
+	apc_paid: z.any().nullish(), // APCInfo schema would be complex
+	fwci: z.number().nullish(),
+	has_fulltext: z.boolean().nullish(),
+	fulltext_origin: z.string().nullish(),
+	cited_by_api_url: z.string().nullish(),
+	type: z.string().nullish(),
+	type_crossref: z.string().nullish(),
+	indexed_in: z.array(z.string()).nullish(),
 	open_access: z
 		.object({
-			is_oa: z.boolean().optional(),
-			oa_status: z.string().optional(),
-			oa_url: z.string().optional(),
-			any_repository_has_fulltext: z.boolean().optional(),
+			is_oa: z.boolean().nullish(),
+			oa_status: z.string().nullish(),
+			oa_url: z.string().nullish(),
+			any_repository_has_fulltext: z.boolean().nullish(),
 		})
-		.optional(),
+		.nullish(),
 	cited_by_percentile_year: z
 		.object({
-			min: z.number().optional(),
-			max: z.number().optional(),
+			min: z.number().nullish(),
+			max: z.number().nullish(),
 		})
-		.optional(),
-	concepts: z.array(z.any()).optional(), // ConceptItem schema would be complex
+		.nullish(),
+	concepts: z.array(z.any()).nullish(), // ConceptItem schema would be complex
 	mesh: z
 		.array(
 			z.object({
-				descriptor_ui: z.string().optional(),
-				descriptor_name: z.string().optional(),
-				qualifier_ui: z.string().optional(),
-				qualifier_name: z.string().optional(),
-				is_major_topic: z.boolean().optional(),
+				descriptor_ui: z.string().nullish(),
+				descriptor_name: z.string().nullish(),
+				qualifier_ui: z.string().nullish(),
+				qualifier_name: z.string().nullish(),
+				is_major_topic: z.boolean().nullish(),
 			})
 		)
-		.optional(),
+		.nullish(),
 	alternate_host_venues: z
 		.array(
 			z.object({
-				id: openAlexIdSchema.optional(),
-				display_name: z.string().optional(),
-				type: z.string().optional(),
-				url: z.string().optional(),
-				is_oa: z.boolean().optional(),
-				version: z.string().optional(),
-				license: z.string().optional(),
+				id: openAlexIdSchema.nullish(),
+				display_name: z.string().nullish(),
+				type: z.string().nullish(),
+				url: z.string().nullish(),
+				is_oa: z.boolean().nullish(),
+				version: z.string().nullish(),
+				license: z.string().nullish(),
 			})
 		)
-		.optional(),
-	referenced_works: z.array(openAlexIdSchema).optional(),
-	referenced_works_count: z.number().int().optional(),
-	related_works: z.array(openAlexIdSchema).optional(),
+		.nullish(),
+	referenced_works: z.array(openAlexIdSchema).nullish(),
+	referenced_works_count: z.number().int().nullish(),
+	related_works: z.array(openAlexIdSchema).nullish(),
 	sustainable_development_goals: z
 		.array(
 			z.object({
-				id: openAlexIdSchema.optional(),
-				display_name: z.string().optional(),
-				score: z.number().optional(),
+				id: openAlexIdSchema.nullish(),
+				display_name: z.string().nullish(),
+				score: z.number().nullish(),
 			})
 		)
-		.optional(),
+		.nullish(),
 	grants: z
 		.array(
 			z.object({
-				funder: z.string().optional(),
-				funder_display_name: z.string().optional(),
-				award_id: z.string().optional(),
+				funder: z.string().nullish(),
+				funder_display_name: z.string().nullish(),
+				award_id: z.string().nullish(),
 			})
 		)
-		.optional(),
+		.nullish(),
 	datasets: z
 		.array(
 			z.object({
-				id: z.string().optional(),
-				display_name: z.string().optional(),
+				id: z.string().nullish(),
+				display_name: z.string().nullish(),
 			})
 		)
-		.optional(),
+		.nullish(),
 	versions: z
 		.array(
 			z.object({
-				version: z.string().optional(),
-				type: z.string().optional(),
+				version: z.string().nullish(),
+				type: z.string().nullish(),
 			})
 		)
-		.optional(),
-	is_retracted: z.boolean().optional(),
-	is_paratext: z.boolean().optional(),
-	abstract_inverted_index: z.record(z.string(), z.array(z.number().int())).optional(),
+		.nullish(),
+	is_retracted: z.boolean().nullish(),
+	is_paratext: z.boolean().nullish(),
+	abstract_inverted_index: z.record(z.string(), z.array(z.number().int())).nullish(),
 	biblio: z
 		.object({
 			// OpenAlex reports absent bibliographic fields as null
-			volume: z.string().nullable().optional(),
-			issue: z.string().nullable().optional(),
-			first_page: z.string().nullable().optional(),
-			last_page: z.string().nullable().optional(),
+			volume: z.string().nullable().nullish(),
+			issue: z.string().nullable().nullish(),
+			first_page: z.string().nullable().nullish(),
+			last_page: z.string().nullable().nullish(),
 		})
-		.optional(),
-	language: z.string().optional(),
-	topics: z.array(z.any()).optional(), // TopicItem schema would be complex
-	keywords: z.array(keywordReferenceSchema).optional(),
-	is_xpac: z.boolean().optional(),
+		.nullish(),
+	language: z.string().nullish(),
+	topics: z.array(z.any()).nullish(), // TopicItem schema would be complex
+	keywords: z.array(keywordReferenceSchema).nullish(),
+	is_xpac: z.boolean().nullish(),
 })
 
 // Concept schema
 export const conceptSchema = baseEntitySchema.extend({
-	wikidata: z.string().optional(),
+	wikidata: z.string().nullish(),
 	level: z.number().int().min(0).max(MAX_CONCEPT_LEVEL),
-	description: z.string().optional(),
+	description: z.string().nullish(),
 	works_count: z.number().int().min(0),
 	summary_stats: z
 		.object({
@@ -231,43 +231,43 @@ export const conceptSchema = baseEntitySchema.extend({
 			h_index: z.number().int().min(0),
 			i10_index: z.number().int().min(0),
 		})
-		.optional(),
+		.nullish(),
 	ids: z.object({
 		openalex: openAlexIdSchema,
-		wikidata: z.string().optional(),
-		mag: z.string().optional(),
-		wikipedia: z.string().optional(),
-		umls_cui: z.array(z.string()).optional(),
+		wikidata: z.string().nullish(),
+		mag: z.string().nullish(),
+		wikipedia: z.string().nullish(),
+		umls_cui: z.array(z.string()).nullish(),
 	}),
-	image_url: z.string().optional(),
-	image_thumbnail_url: z.string().optional(),
+	image_url: z.string().nullish(),
+	image_thumbnail_url: z.string().nullish(),
 	international: z
 		.object({
 			display_name: z.record(z.string(), z.string()),
-			description: z.record(z.string(), z.string()).optional(),
+			description: z.record(z.string(), z.string()).nullish(),
 		})
-		.optional(),
+		.nullish(),
 	ancestors: z
 		.array(
 			z.object({
 				id: openAlexIdSchema,
-				wikidata: z.string().optional(),
+				wikidata: z.string().nullish(),
 				display_name: z.string(),
 				level: z.number().int().min(0).max(MAX_CONCEPT_LEVEL),
 			})
 		)
-		.optional(),
+		.nullish(),
 	related_concepts: z
 		.array(
 			z.object({
 				id: openAlexIdSchema,
-				wikidata: z.string().optional(),
+				wikidata: z.string().nullish(),
 				display_name: z.string(),
 				level: z.number().int().min(0).max(MAX_CONCEPT_LEVEL),
 				score: z.number().min(0),
 			})
 		)
-		.optional(),
+		.nullish(),
 	works_api_url: z.string(),
 })
 
@@ -275,15 +275,15 @@ export const conceptSchema = baseEntitySchema.extend({
 export const authorSchema = baseEntitySchema.extend({
 	counts_by_year: z.array(entityCountsByYearSchema),
 	works_count: z.number().int().min(0),
-	orcid: z.string().optional(),
-	display_name_alternatives: z.array(z.string()).optional(),
+	orcid: z.string().nullish(),
+	display_name_alternatives: z.array(z.string()).nullish(),
 	ids: z
 		.object({
 			openalex: openAlexIdSchema,
-			orcid: z.string().optional(),
+			orcid: z.string().nullish(),
 		})
-		.optional(),
-	last_known_institutions: z.array(z.any()).optional(), // Institution schema would be complex
+		.nullish(),
+	last_known_institutions: z.array(z.any()).nullish(), // Institution schema would be complex
 	affiliations: z
 		.array(
 			z.object({
@@ -291,45 +291,45 @@ export const authorSchema = baseEntitySchema.extend({
 				years: z.array(z.number().int()),
 			})
 		)
-		.optional(),
+		.nullish(),
 	summary_stats: z
 		.object({
 			"2yr_mean_citedness": z.number().min(0),
 			h_index: z.number().int().min(0),
 			i10_index: z.number().int().min(0),
 		})
-		.optional(),
-	x_concepts: z.array(z.any()).optional(), // ConceptItem schema would be complex
-	topics: z.array(z.any()).optional(), // TopicItem schema would be complex
+		.nullish(),
+	x_concepts: z.array(z.any()).nullish(), // ConceptItem schema would be complex
+	topics: z.array(z.any()).nullish(), // TopicItem schema would be complex
 })
 
 // Institution schema
 export const institutionSchema = baseEntitySchema.extend({
 	counts_by_year: z.array(entityCountsByYearSchema),
 	works_count: z.number().int().min(0),
-	ror: z.string().optional(),
+	ror: z.string().nullish(),
 	country_code: z.string(),
 	type: z.string(),
-	homepage_url: z.string().optional(),
-	image_url: z.string().optional(),
-	image_thumbnail_url: z.string().optional(),
-	display_name_acronyms: z.array(z.string()).optional(),
-	display_name_alternatives: z.array(z.string()).optional(),
+	homepage_url: z.string().nullish(),
+	image_url: z.string().nullish(),
+	image_thumbnail_url: z.string().nullish(),
+	display_name_acronyms: z.array(z.string()).nullish(),
+	display_name_alternatives: z.array(z.string()).nullish(),
 	ids: z
 		.object({
 			openalex: openAlexIdSchema,
-			ror: z.string().optional(),
-			grid: z.string().optional(),
+			ror: z.string().nullish(),
+			grid: z.string().nullish(),
 		})
-		.optional(),
+		.nullish(),
 	geo: z.object({
-		city: z.string().optional(),
-		geonames_city_id: z.string().optional(),
-		region: z.string().optional(),
+		city: z.string().nullish(),
+		geonames_city_id: z.string().nullish(),
+		region: z.string().nullish(),
 		country_code: z.string(),
 		country: z.string(),
-		latitude: z.number().optional(),
-		longitude: z.number().optional(),
+		latitude: z.number().nullish(),
+		longitude: z.number().nullish(),
 	}),
 	international: z.object({
 		display_name: z.record(z.string(), z.string()),
@@ -339,16 +339,16 @@ export const institutionSchema = baseEntitySchema.extend({
 			z.object({
 				id: openAlexIdSchema,
 				display_name: z.string(),
-				ror: z.string().optional(),
+				ror: z.string().nullish(),
 				country_code: z.string(),
 				type: z.string(),
 				relationship: z.string(),
 			})
 		)
-		.optional(),
-	x_concepts: z.array(z.any()).optional(), // ConceptItem schema would be complex
-	topics: z.array(z.any()).optional(), // TopicItem schema would be complex
-	lineage: z.array(openAlexIdSchema).optional(),
+		.nullish(),
+	x_concepts: z.array(z.any()).nullish(), // ConceptItem schema would be complex
+	topics: z.array(z.any()).nullish(), // TopicItem schema would be complex
+	lineage: z.array(openAlexIdSchema).nullish(),
 })
 
 // Generic OpenAlex response schema
@@ -356,7 +356,7 @@ export const openAlexResponseSchema = <T extends z.ZodType>(resultSchema: T) =>
 	z.object({
 		results: z.array(resultSchema),
 		meta: metaSchema,
-		group_by: z.array(groupBySchema).optional(),
+		group_by: z.array(groupBySchema).nullish(),
 	})
 
 // Schema for basic API validation (non-null, object structure)
@@ -372,84 +372,84 @@ export const staticDataSchema = z.unknown()
 
 // Source schema
 export const sourceSchema = entityWithWorksSchema.extend({
-	issn_l: z.string().optional(),
-	issn: z.array(z.string()).optional(),
-	publisher: z.string().optional(),
-	host_organization: openAlexIdSchema.optional(),
-	host_organization_name: z.string().optional(),
-	host_organization_lineage: z.array(openAlexIdSchema).optional(),
+	issn_l: z.string().nullish(),
+	issn: z.array(z.string()).nullish(),
+	publisher: z.string().nullish(),
+	host_organization: openAlexIdSchema.nullish(),
+	host_organization_name: z.string().nullish(),
+	host_organization_lineage: z.array(openAlexIdSchema).nullish(),
 	is_oa: z.boolean(),
 	is_in_doaj: z.boolean(),
 	ids: z
 		.object({
 			openalex: openAlexIdSchema,
-			issn_l: z.string().optional(),
-			issn: z.array(z.string()).optional(),
-			mag: z.string().optional(),
-			wikidata: z.string().optional(),
+			issn_l: z.string().nullish(),
+			issn: z.array(z.string()).nullish(),
+			mag: z.string().nullish(),
+			wikidata: z.string().nullish(),
 		})
-		.optional(),
-	homepage_url: z.string().optional(),
+		.nullish(),
+	homepage_url: z.string().nullish(),
 	apc_prices: z
 		.array(
 			z.object({
-				price: z.number().optional(),
-				currency: z.string().optional(),
+				price: z.number().nullish(),
+				currency: z.string().nullish(),
 			})
 		)
-		.optional(),
-	apc_usd: z.number().optional(),
-	country_code: z.string().optional(),
-	societies: z.array(z.string()).optional(),
-	alternate_titles: z.array(z.string()).optional(),
-	abbreviated_title: z.string().optional(),
+		.nullish(),
+	apc_usd: z.number().nullish(),
+	country_code: z.string().nullish(),
+	societies: z.array(z.string()).nullish(),
+	alternate_titles: z.array(z.string()).nullish(),
+	abbreviated_title: z.string().nullish(),
 	type: z.string(),
-	x_concepts: z.array(z.any()).optional(), // ConceptItem schema would be complex
+	x_concepts: z.array(z.any()).nullish(), // ConceptItem schema would be complex
 	summary_stats: z
 		.object({
 			"2yr_mean_citedness": z.number().min(0),
 			h_index: z.number().int().min(0),
 			i10_index: z.number().int().min(0),
 		})
-		.optional(),
-	topics: z.array(z.any()).optional(), // TopicItem schema would be complex
+		.nullish(),
+	topics: z.array(z.any()).nullish(), // TopicItem schema would be complex
 })
 
 // Publisher schema
 export const publisherSchema = entityWithWorksSchema.extend({
-	alternate_titles: z.array(z.string()).optional(),
-	country_codes: z.array(z.string()).optional(),
+	alternate_titles: z.array(z.string()).nullish(),
+	country_codes: z.array(z.string()).nullish(),
 	hierarchy_level: z.number().int(),
-	parent_publisher: openAlexIdSchema.optional(),
+	parent_publisher: openAlexIdSchema.nullish(),
 	lineage: z.array(openAlexIdSchema),
 	sources_count: z.number().int().min(0),
 	ids: z
 		.object({
 			openalex: openAlexIdSchema,
-			ror: z.string().optional(),
-			wikidata: z.string().optional(),
+			ror: z.string().nullish(),
+			wikidata: z.string().nullish(),
 		})
-		.optional(),
+		.nullish(),
 	sources_api_url: z.string(),
 })
 
 // Funder schema
 export const funderSchema = entityWithWorksSchema.extend({
-	alternate_titles: z.array(z.string()).optional(),
-	country_code: z.string().optional(),
-	description: z.string().optional(),
-	homepage_url: z.string().optional(),
-	image_url: z.string().optional(),
-	image_thumbnail_url: z.string().optional(),
+	alternate_titles: z.array(z.string()).nullish(),
+	country_code: z.string().nullish(),
+	description: z.string().nullish(),
+	homepage_url: z.string().nullish(),
+	image_url: z.string().nullish(),
+	image_thumbnail_url: z.string().nullish(),
 	grants_count: z.number().int().min(0),
 	ids: z
 		.object({
 			openalex: openAlexIdSchema,
-			ror: z.string().optional(),
-			wikidata: z.string().optional(),
-			crossref: z.string().optional(),
+			ror: z.string().nullish(),
+			wikidata: z.string().nullish(),
+			crossref: z.string().nullish(),
 		})
-		.optional(),
+		.nullish(),
 	roles: z
 		.array(
 			z.object({
@@ -458,27 +458,27 @@ export const funderSchema = entityWithWorksSchema.extend({
 				works_count: z.number().int().min(0),
 			})
 		)
-		.optional(),
+		.nullish(),
 	summary_stats: z
 		.object({
 			"2yr_mean_citedness": z.number().min(0),
 			h_index: z.number().int().min(0),
 			i10_index: z.number().int().min(0),
 		})
-		.optional(),
-	topics: z.array(z.any()).optional(), // TopicItem schema would be complex
+		.nullish(),
+	topics: z.array(z.any()).nullish(), // TopicItem schema would be complex
 })
 
 // Topic schema (replacing Concepts)
 export const topicSchema = entityWithWorksSchema.extend({
-	description: z.string().optional(),
-	keywords: z.array(keywordReferenceSchema).optional(),
+	description: z.string().nullish(),
+	keywords: z.array(keywordReferenceSchema).nullish(),
 	ids: z
 		.object({
 			openalex: openAlexIdSchema,
-			wikidata: z.string().optional(),
+			wikidata: z.string().nullish(),
 		})
-		.optional(),
+		.nullish(),
 	// Topic classification ids use lowercase collection prefixes (subfields/, fields/, domains/), unlike the entity ids openAlexIdSchema matches
 	subfield: z.object({
 		id: z.string(),
@@ -499,20 +499,20 @@ export const topicSchema = entityWithWorksSchema.extend({
 				display_name: z.string(),
 			})
 		)
-		.optional(),
+		.nullish(),
 })
 
 // Domain schema (top level of taxonomy hierarchy)
 export const domainSchema = entityWithWorksSchema.extend({
-	description: z.string().optional(),
+	description: z.string().nullish(),
 	ids: z
 		.object({
 			openalex: openAlexIdSchema,
-			wikidata: z.string().optional(),
-			wikipedia: z.string().optional(),
+			wikidata: z.string().nullish(),
+			wikipedia: z.string().nullish(),
 		})
-		.optional(),
-	display_name_alternatives: z.array(z.string()).optional(),
+		.nullish(),
+	display_name_alternatives: z.array(z.string()).nullish(),
 	fields: z
 		.array(
 			z.object({
@@ -520,7 +520,7 @@ export const domainSchema = entityWithWorksSchema.extend({
 				display_name: z.string(),
 			})
 		)
-		.optional(),
+		.nullish(),
 	siblings: z
 		.array(
 			z.object({
@@ -528,20 +528,20 @@ export const domainSchema = entityWithWorksSchema.extend({
 				display_name: z.string(),
 			})
 		)
-		.optional(),
+		.nullish(),
 })
 
 // Field schema (middle level of taxonomy hierarchy)
 export const fieldSchema = entityWithWorksSchema.extend({
-	description: z.string().optional(),
+	description: z.string().nullish(),
 	ids: z
 		.object({
 			openalex: openAlexIdSchema,
-			wikidata: z.string().optional(),
-			wikipedia: z.string().optional(),
+			wikidata: z.string().nullish(),
+			wikipedia: z.string().nullish(),
 		})
-		.optional(),
-	display_name_alternatives: z.array(z.string()).optional(),
+		.nullish(),
+	display_name_alternatives: z.array(z.string()).nullish(),
 	domain: z.object({
 		id: openAlexIdSchema,
 		display_name: z.string(),
@@ -553,7 +553,7 @@ export const fieldSchema = entityWithWorksSchema.extend({
 				display_name: z.string(),
 			})
 		)
-		.optional(),
+		.nullish(),
 	siblings: z
 		.array(
 			z.object({
@@ -561,20 +561,20 @@ export const fieldSchema = entityWithWorksSchema.extend({
 				display_name: z.string(),
 			})
 		)
-		.optional(),
+		.nullish(),
 })
 
 // Subfield schema (below field, above topic in taxonomy hierarchy)
 export const subfieldSchema = entityWithWorksSchema.extend({
-	description: z.string().optional(),
+	description: z.string().nullish(),
 	ids: z
 		.object({
 			openalex: openAlexIdSchema,
-			wikidata: z.string().optional(),
-			wikipedia: z.string().optional(),
+			wikidata: z.string().nullish(),
+			wikipedia: z.string().nullish(),
 		})
-		.optional(),
-	display_name_alternatives: z.array(z.string()).optional(),
+		.nullish(),
+	display_name_alternatives: z.array(z.string()).nullish(),
 	field: z.object({
 		id: openAlexIdSchema,
 		display_name: z.string(),
@@ -590,7 +590,7 @@ export const subfieldSchema = entityWithWorksSchema.extend({
 				display_name: z.string(),
 			})
 		)
-		.optional(),
+		.nullish(),
 	siblings: z
 		.array(
 			z.object({
@@ -598,7 +598,7 @@ export const subfieldSchema = entityWithWorksSchema.extend({
 				display_name: z.string(),
 			})
 		)
-		.optional(),
+		.nullish(),
 })
 
 // Keyword schema
@@ -606,15 +606,15 @@ export const keywordSchema = baseEntitySchema.extend({
 	counts_by_year: z.array(entityCountsByYearSchema),
 	// Keyword ids are slugs (keywords/mental-health), not the [A-Z]\d+ entity form
 	id: z.string().regex(/^https:\/\/openalex\.org\/keywords\/[\w-]+$/),
-	description: z.string().optional(),
+	description: z.string().nullish(),
 	// Keyword entities expose their related keywords as null or scored references
-	keywords: z.array(keywordReferenceSchema).nullable().optional(),
+	keywords: z.array(keywordReferenceSchema).nullable().nullish(),
 	ids: z
 		.object({
 			openalex: openAlexIdSchema,
-			wikidata: z.string().optional(),
+			wikidata: z.string().nullish(),
 		})
-		.optional(),
+		.nullish(),
 })
 
 // Specific response schemas

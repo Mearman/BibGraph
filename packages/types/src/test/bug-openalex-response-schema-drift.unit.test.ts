@@ -105,4 +105,38 @@ describe("OpenAlex response schema drift", () => {
 		})
 		expect(result.success).toBe(true)
 	})
+
+	it("accepts an author response with null orcid, null ids.orcid and null last_known_institutions (2026-10-15: live A5017898742 failed on all three, so most author pages failed to load)", () => {
+		const result = authorSchema.safeParse({
+			id: "https://openalex.org/A5017898742",
+			display_name: "William Teahan",
+			orcid: null,
+			ids: { orcid: null, openalex: "https://openalex.org/A5017898742" },
+			last_known_institutions: null,
+			cited_by_count: 100,
+			works_count: 3,
+			works_api_url: "https://api.openalex.org/works?filter=author.id:A5017898742",
+			counts_by_year: [{ year: 2025, works_count: 3, cited_by_count: 82 }],
+			updated_date: "2025-09-21T07:40:09.928040",
+			created_date: "2023-07-21",
+		})
+		expect(result.success).toBe(true)
+	})
+
+	it("accepts a work response with null open_access.oa_url and null authorship orcid (2026-10-15: live W4234556776 and 10.1038/nature12373 failed on these, so most work pages failed to load)", () => {
+		const result = workSchema.safeParse({
+			...BASE_WORK_FIELDS,
+			updated_date: "2026-10-12T09:40:04.860316",
+			created_date: "2025-10-10T00:00:00",
+			counts_by_year: [{ year: 2025, cited_by_count: 82 }],
+			open_access: { is_oa: false, oa_status: "closed", oa_url: null },
+			authorships: [
+				{
+					author_position: "first",
+					author: { display_name: "An Author Without Orcid", orcid: null },
+				},
+			],
+		})
+		expect(result.success).toBe(true)
+	})
 })
