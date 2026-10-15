@@ -97,6 +97,15 @@ const resolveStubLabels = async (stubs: readonly { id: string; entityType: Entit
     stubsByType.set(stub.entityType, existing);
   }
 
+const toMinimalStubs = (
+	rows: readonly { id: string; display_name?: string | null; title?: string | null }[],
+): { id: string; display_name?: string; title?: string }[] =>
+	rows.map((row) => ({
+		id: row.id,
+		display_name: row.display_name ?? undefined,
+		title: row.title ?? undefined,
+	}));
+
   // Process each entity type with batch queries
   for (const [entityType, typeStubs] of stubsByType) {
     // Split into batches of BATCH_SIZE
@@ -106,7 +115,7 @@ const resolveStubLabels = async (stubs: readonly { id: string; entityType: Entit
       const selectFields = ['id', 'display_name', 'title'];
 
       try {
-        // Use batch query with OR syntax - different helpers per entity type
+        // Use batch query with OR syntax - different helpers per entity type. Entity schemas accept explicit null for absent fields (OpenAlex sends null, not undefined), so rows are projected to undefined-valued stubs at this boundary; the cache stores the minimal shape only.
         let results: { id: string; display_name?: string; title?: string }[] = [];
 
         switch (entityType) {
@@ -116,7 +125,7 @@ const resolveStubLabels = async (stubs: readonly { id: string; entityType: Entit
               select: selectFields,
               per_page: batch.length,
             });
-            results = response.results;
+            results = toMinimalStubs(response.results);
             break;
           }
           case 'authors': {
@@ -125,7 +134,7 @@ const resolveStubLabels = async (stubs: readonly { id: string; entityType: Entit
               select: selectFields,
               per_page: batch.length,
             });
-            results = response.results;
+            results = toMinimalStubs(response.results);
             break;
           }
           case 'institutions': {
@@ -134,7 +143,7 @@ const resolveStubLabels = async (stubs: readonly { id: string; entityType: Entit
               select: selectFields,
               per_page: batch.length,
             });
-            results = response.results;
+            results = toMinimalStubs(response.results);
             break;
           }
           case 'sources': {
@@ -143,7 +152,7 @@ const resolveStubLabels = async (stubs: readonly { id: string; entityType: Entit
               select: selectFields,
               per_page: batch.length,
             });
-            results = response.results;
+            results = toMinimalStubs(response.results);
             break;
           }
           case 'topics':

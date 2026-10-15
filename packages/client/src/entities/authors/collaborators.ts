@@ -93,7 +93,7 @@ export const analyzeCoauthorships = (works: readonly Work[], authorId: string): 
       const stats = collaboratorStats.get(coauthorId);
       if (!stats) continue;
       stats.count++;
-      if (work.publication_year !== undefined) {
+      if (work.publication_year !== undefined && work.publication_year !== null) {
         stats.years.push(work.publication_year);
       }
     }
