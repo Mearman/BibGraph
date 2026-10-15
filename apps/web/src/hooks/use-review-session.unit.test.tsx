@@ -7,7 +7,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { defaultComposition, suggestComposition } from "@/lib/algorithms/composition-engine";
 import type { PoolFetcher } from "@/lib/algorithms/pool-loader";
@@ -46,6 +46,7 @@ const makeDeps = (
 	savedPool?: readonly { id: string; references: readonly string[] }[],
 	fetchLabelsOverride?: ReviewSessionDeps["fetchLabels"],
 	savedMeasurements?: { current: readonly MeasurementRecord[] },
+	byIdsOverride?: PoolFetcher["byIds"],
 ): {
 	deps: ReviewSessionDeps;
 	stored: { current: LiteratureReview };
@@ -90,7 +91,7 @@ const makeDeps = (
 				searches.count++;
 				return fetcher.search(query);
 			},
-			byIds: async (ids) => fetcher.byIds(ids),
+			byIds: async (ids) => (byIdsOverride ?? fetcher.byIds)(ids),
 		},
 		fetchLabels:
 			fetchLabelsOverride ??
@@ -411,5 +412,96 @@ describe("useReviewSession", () => {
 		if (session.phase !== "ready") throw new Error("not ready");
 		expect(session.seedSelectionEditable).toBe(false);
 		await expect(act(async () => session.chooseAlgorithm("seed-selection", "grasp"))).rejects.toThrow("seeds were supplied");
+	});
+
+	it("adds a starting work mid-review, fetching it into the pool when the pool missed it", async () => {
+		const known = async (ids: readonly string[]) => {
+			await Promise.resolve();
+			return ids.map((id) => work(id, ["W2"]));
+		};
+		const { deps, stored, pool } = makeDeps(undefined, undefined, undefined, known);
+		const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+		const { result } = renderHook(() => useReviewSession("r1", deps), { wrapper: wrapperFor(client) });
+		await waitFor(() => {
+			expect(result.current.phase).toBe("ready");
+		});
+		await act(async () => {
+			const current = result.current;
+			if (current.phase !== "ready") throw new Error("not ready");
+			await current.addSeed("W9");
+		});
+		expect(stored.current.seeds).toContain("W9");
+		expect(pool.current?.map((saved) => saved.id)).toContain("W9");
+		await waitFor(() => {
+			const current = result.current;
+			if (current.phase !== "ready") throw new Error("not ready");
+			// The added work joins the set the ranking runs from, like an inclusion does.
+			expect(current.seedRefs.map((seed) => seed.id)).toContain("W9");
+		});
+	});
+
+	it("adds a starting work that already sits in the pool without fetching it", async () => {
+		const byIds = vi.fn(async () => {
+			await Promise.resolve();
+			return [] as readonly { id: string; referenced_works: readonly string[] }[];
+		});
+		const { deps, stored } = makeDeps(undefined, undefined, undefined, byIds);
+		const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+		const { result } = renderHook(() => useReviewSession("r1", deps), { wrapper: wrapperFor(client) });
+		await waitFor(() => {
+			expect(result.current.phase).toBe("ready");
+		});
+		await act(async () => {
+			const current = result.current;
+			if (current.phase !== "ready") throw new Error("not ready");
+			// W2 is in the pool already (a query result), so no lookup is needed.
+			await current.addSeed("W2");
+		});
+		expect(stored.current.seeds).toContain("W2");
+		expect(byIds).not.toHaveBeenCalled();
+	});
+
+	it("accepts an OpenAlex link as the added work's token", async () => {
+		const known = async (ids: readonly string[]) => {
+			await Promise.resolve();
+			return ids.map((id) => work(id, ["W2"]));
+		};
+		const { deps, stored } = makeDeps(undefined, undefined, undefined, known);
+		const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+		const { result } = renderHook(() => useReviewSession("r1", deps), { wrapper: wrapperFor(client) });
+		await waitFor(() => {
+			expect(result.current.phase).toBe("ready");
+		});
+		await act(async () => {
+			const current = result.current;
+			if (current.phase !== "ready") throw new Error("not ready");
+			await current.addSeed("https://openalex.org/W9");
+		});
+		expect(stored.current.seeds).toContain("W9");
+	});
+
+	it("rejects a token that is not an OpenAlex work id and stores nothing", async () => {
+		const { hook, stored } = setup();
+		await waitFor(() => {
+			expect(hook.result.current.phase).toBe("ready");
+		});
+		const session = hook.result.current;
+		if (session.phase !== "ready") throw new Error("not ready");
+		await expect(session.addSeed("nonsense")).rejects.toThrow(/is not an OpenAlex work id/);
+		expect(stored.current.seeds).toEqual(["W1", "W3"]);
+	});
+
+	it("rejects a work OpenAlex does not know", async () => {
+		const { deps } = makeDeps();
+		const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+		const { result } = renderHook(() => useReviewSession("r1", deps), { wrapper: wrapperFor(client) });
+		await waitFor(() => {
+			expect(result.current.phase).toBe("ready");
+		});
+		await act(async () => {
+			const current = result.current;
+			if (current.phase !== "ready") throw new Error("not ready");
+			await expect(current.addSeed("W9")).rejects.toThrow(/OpenAlex has no work with the id W9/);
+		});
 	});
 });

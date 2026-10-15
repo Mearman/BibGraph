@@ -12,6 +12,7 @@ import type { AlgorithmStage } from "@/lib/algorithms/registry";
 import { startingWorksCount, startingWorksLabel } from "@/lib/reviews/review-summary";
 import type { ScreeningDecision } from "@/stores/review-store";
 
+import { AddWorkById } from "./AddWorkById";
 import { AlgorithmComparisonTable, type StagePanel } from "./AlgorithmComparisonTable";
 import { DecidedList } from "./DecidedList";
 import type { ScreeningEmptyState } from "./ScreeningList";
@@ -37,6 +38,11 @@ const STAGE_TITLES: Readonly<Record<AlgorithmStage, string>> = {
 	"seed-selection": "Seed selection",
 	ranking: "Ranking",
 };
+
+/**
+ * The add-a-work input's accessible name, spelled for the starting-works section it sits in.
+ */
+const ADD_WORK_INPUT_LABEL = "Add a starting work by OpenAlex id or link";
 
 /**
  * What each stage's switch changes for the reviewer, said in the notification.
@@ -189,6 +195,22 @@ export const ReviewScreen = ({ session, paging }: ReviewScreenProps): ReactEleme
 		}
 	};
 
+	const [addingWork, setAddingWork] = useState(false);
+	const runAddSeed = async (token: string): Promise<void> => {
+		setAddingWork(true);
+		try {
+			await session.addSeed(token);
+			notifications.show({ message: "Added to your starting works. The lists will be re-ranked." });
+		} catch (error) {
+			notifications.show({
+				color: "red",
+				message: `That work was not added: ${errorMessage(error)}`,
+			});
+		} finally {
+			setAddingWork(false);
+		}
+	};
+
 	const decideWithFeedback = (workId: string, decision: ScreeningDecision): void => {
 		void runDecision(workId, decision);
 	};
@@ -241,6 +263,14 @@ export const ReviewScreen = ({ session, paging }: ReviewScreenProps): ReactEleme
 						{seed.known ? seed.title : `${seed.title} (no title from OpenAlex)`}
 					</Text>
 				))}
+				{/* Stays on the page for the whole review, so a known-relevant work can be folded in at any point, not only before screening starts. */}
+				<AddWorkById
+					inputLabel={ADD_WORK_INPUT_LABEL}
+					busy={addingWork}
+					onAdd={(token) => {
+						void runAddSeed(token);
+					}}
+				/>
 			</Stack>
 			{session.labelsError !== null && (
 				<Alert color="red">

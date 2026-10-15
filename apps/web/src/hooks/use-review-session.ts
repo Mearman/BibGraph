@@ -20,6 +20,7 @@ import {
 	type AlgorithmSpec,
 	type AlgorithmStage,
 } from "@/lib/algorithms/registry";
+import { addSeed as addSeedToReview, ReviewUserError } from "@/lib/algorithms/review-service";
 import type { PoolWork } from "@/lib/algorithms/screening-engine";
 import type { WorkLabel, WorkLabelFetcher } from "@/lib/algorithms/work-labels";
 import type { ComputeProgress, ReviewCompute } from "@/lib/reviews/compute-handler";
@@ -41,6 +42,7 @@ import {
 	type ScreeningView,
 	withLabels,
 } from "@/lib/reviews/screening-view";
+import { firstSeed, parseSeedTokens } from "@/lib/reviews/seed-input";
 import type {
 	LiteratureReview,
 	ScreeningDecision,
@@ -130,6 +132,10 @@ export interface ReadyReviewSession {
 	 * Removes a work's decision so it returns to the screening lists.
 	 */
 	readonly undo: (workId: string) => Promise<void>;
+	/**
+	 * Adds a work the reviewer knows is relevant (an OpenAlex id or link), folding it into the starting works for the rest of the review. Rejects with a plain message when the token is not a work id or OpenAlex does not know the work.
+	 */
+	readonly addSeed: (token: string) => Promise<void>;
 	readonly chooseAlgorithm: (stage: AlgorithmStage, algorithmId: string) => Promise<void>;
 }
 
@@ -422,6 +428,31 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 		onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["review", reviewId] }),
 	});
 
+	// Adds fold the work into the starting works for the rest of the review: the service brings the work into the stored pool snapshot when the pool missed it, so the ranking sees its references too.
+	const seedAdder = useMutation({
+		mutationFn: async (token: string) => {
+			const parsed = parseSeedTokens(token);
+			const seedId = firstSeed(parsed);
+			if (seedId === null || parsed.invalid.length > 0) {
+				throw new ReviewUserError(
+					`"${token.trim()}" is not an OpenAlex work id. Paste an id such as W2741809807 or a link such as https://openalex.org/W2741809807.`,
+				);
+			}
+			if (review === undefined) {
+				throw new Error(`review ${reviewId} is not loaded`);
+			}
+			await addSeedToReview(review, cachedPool(queryClient, reviewId), seedId, {
+				fetcher: deps.fetcher,
+				store: deps.store,
+			});
+		},
+		onSuccess: async () => {
+			// The pool key holds one entry per seed set, and cachedPool reads the first entry with data. Drop the entries for the old set, or the view would screen against a stale pool that predates the added work.
+			queryClient.removeQueries({ queryKey: poolKey(reviewId) });
+			await queryClient.invalidateQueries({ queryKey: ["review", reviewId] });
+		},
+	});
+
 	const rowsByStage: Readonly<Record<AlgorithmStage, readonly ComparisonRow[] | null>> = {
 		exploration: explorationQuery.data ?? null,
 		"seed-selection": selectionQuery.data ?? null,
@@ -486,6 +517,9 @@ export const useReviewSession = (reviewId: string, deps: ReviewSessionDeps): Rev
 		},
 		undo: async (workId) => {
 			await undo.mutateAsync(workId);
+		},
+		addSeed: async (token) => {
+			await seedAdder.mutateAsync(token);
 		},
 		chooseAlgorithm: async (stage, algorithmId) => {
 			await override.mutateAsync({ stage, algorithmId });

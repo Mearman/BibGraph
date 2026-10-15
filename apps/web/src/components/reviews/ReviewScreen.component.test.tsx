@@ -7,7 +7,7 @@
 import "@testing-library/jest-dom";
 
 import { MantineProvider } from "@mantine/core";
-import { Notifications } from "@mantine/notifications";
+import { Notifications,notifications } from "@mantine/notifications";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -131,6 +131,9 @@ const session = (overrides: Partial<ReadyReviewSession> = {}): ReadyReviewSessio
 	undo: vi.fn<ReadyReviewSession["undo"]>(async () => {
 		await Promise.resolve();
 	}),
+	addSeed: vi.fn<ReadyReviewSession["addSeed"]>(async () => {
+		await Promise.resolve();
+	}),
 	chooseAlgorithm: vi.fn<ReadyReviewSession["chooseAlgorithm"]>(async () => {
 		await Promise.resolve();
 	}),
@@ -138,6 +141,8 @@ const session = (overrides: Partial<ReadyReviewSession> = {}): ReadyReviewSessio
 });
 
 const renderScreen = (ready: ReadyReviewSession, paging?: ScreeningPaging) => {
+	// The notification store is module-global: earlier tests' still-live notifications would fill its slot limit and leave this test's notification queued instead of shown.
+	notifications.clean();
 	const view = (next: ReadyReviewSession) => (
 		<MantineProvider>
 			<Notifications />
@@ -306,5 +311,36 @@ describe("ReviewScreen", () => {
 		renderScreen(session({ labelsError: "titles unavailable", retryLabels }));
 		fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 		expect(retryLabels).toHaveBeenCalled();
+	});
+
+	it("keeps an add-a-work-by-id affordance beside the starting works after screening has started", async () => {
+		// Decisions exist, so screening is under way: the transient check panel is long gone.
+		const ready = session({
+			review: { ...session().review, decisions: { W7: "include" } },
+		});
+		renderScreen(ready);
+		const input = screen.getByRole("textbox", { name: "Add a starting work by OpenAlex id or link" });
+		fireEvent.change(input, { target: { value: "https://openalex.org/W9" } });
+		fireEvent.click(screen.getByRole("button", { name: "Add" }));
+		await waitFor(() => {
+			expect(ready.addSeed).toHaveBeenCalledWith("https://openalex.org/W9");
+		});
+	});
+
+	it("announces a failed add instead of dropping it", async () => {
+		const ready = session({
+			addSeed: vi.fn<ReadyReviewSession["addSeed"]>(async () => {
+				await Promise.reject(new Error("OpenAlex has no work with the id W9"));
+			}),
+		});
+		renderScreen(ready);
+		fireEvent.change(screen.getByRole("textbox", { name: "Add a starting work by OpenAlex id or link" }), {
+			target: { value: "W9" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Add" }));
+		await waitFor(() => {
+			expect(ready.addSeed).toHaveBeenCalledWith("W9");
+		});
+		expect(await screen.findByText(/That work was not added: OpenAlex has no work with the id W9/)).toBeInTheDocument();
 	});
 });

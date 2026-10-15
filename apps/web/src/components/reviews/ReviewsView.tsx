@@ -25,6 +25,7 @@ import {
 } from "@/lib/reviews/review-summary";
 import type { LiteratureReview } from "@/stores/review-store";
 
+import { AddWorkById } from "./AddWorkById";
 import {
   type BookmarkedWork,
   ReviewCreateForm,
@@ -225,80 +226,58 @@ const PendingStartPanel = ({
   readonly onRemoveSeed: (seedId: string) => void;
   readonly onAddSeed: (token: string) => void;
   readonly onContinue: (reviewId: string) => void;
-}) => {
-  const [token, setToken] = useState("");
-  return (
-    <Paper withBorder p="md" data-testid="pending-start">
-      <Stack gap="sm">
-        <Title
-          order={4}
-        >{`Check the starting works for "${pending.name}"`}</Title>
-        <Text size="sm" c="dimmed">
-          We picked these from your search results. Remove any that do not
-          belong, or add works you know are relevant, then start screening.
-        </Text>
-        {pending.notices.map((notice) => (
-          <Alert key={notice} color="yellow">
-            {notice}
-          </Alert>
-        ))}
-        <Stack gap={4}>
-          {pending.seeds.map((seed) => (
-            <Group key={seed.id} justify="space-between" wrap="nowrap" gap="xs">
-              <Text size="sm" lineClamp={1}>
-                {seed.title}
-              </Text>
-              <Button
-                variant="subtle"
-                size="compact-xs"
-                color="red"
-                disabled={busy}
-                aria-label={`Remove ${seed.title}`}
-                onClick={() => {
-                  onRemoveSeed(seed.id);
-                }}
-              >
-                Remove
-              </Button>
-            </Group>
-          ))}
-        </Stack>
-        {error !== null && <Alert color="red">{error}</Alert>}
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (token.trim() === "") return;
-            onAddSeed(token.trim());
-            setToken("");
-          }}
-        >
-          <Group gap="xs" wrap="nowrap">
-            <TextInput
-              placeholder="Add a work by OpenAlex id or link, e.g. W2741809807"
+}) => (
+  <Paper withBorder p="md" data-testid="pending-start">
+    <Stack gap="sm">
+      <Title order={4}>{`Check the starting works for "${pending.name}"`}</Title>
+      <Text size="sm" c="dimmed">
+        We picked these from your search results. Remove any that do not
+        belong, or add works you know are relevant, then start screening.
+      </Text>
+      {pending.notices.map((notice) => (
+        <Alert key={notice} color="yellow">
+          {notice}
+        </Alert>
+      ))}
+      <Stack gap={4}>
+        {pending.seeds.map((seed) => (
+          <Group key={seed.id} justify="space-between" wrap="nowrap" gap="xs">
+            <Text size="sm" lineClamp={1}>
+              {seed.title}
+            </Text>
+            <Button
+              variant="subtle"
+              size="compact-xs"
+              color="red"
               disabled={busy}
-              value={token}
-              onChange={(event) => {
-                setToken(event.currentTarget.value);
+              aria-label={`Remove ${seed.title}`}
+              onClick={() => {
+                onRemoveSeed(seed.id);
               }}
-            />
-            <Button variant="light" type="submit" disabled={busy}>
-              Add
+            >
+              Remove
             </Button>
           </Group>
-        </form>
-        <Group justify="flex-end">
-          <Button
-            onClick={() => {
-              onContinue(pending.reviewId);
-            }}
-          >
-            Start screening
-          </Button>
-        </Group>
+        ))}
       </Stack>
-    </Paper>
-  );
-};
+      {error !== null && <Alert color="red">{error}</Alert>}
+      <AddWorkById
+        inputLabel={`Add a starting work to ${pending.name} by OpenAlex id or link`}
+        busy={busy}
+        onAdd={onAddSeed}
+      />
+      <Group justify="flex-end">
+        <Button
+          onClick={() => {
+            onContinue(pending.reviewId);
+          }}
+        >
+          Start screening
+        </Button>
+      </Group>
+    </Stack>
+  </Paper>
+);
 
 export const ReviewsView = ({
   reviews,
