@@ -47,6 +47,10 @@ export interface UseInstallPromptResult {
    */
   canInstall: boolean;
   /**
+   * True while the page runs as an installed app rather than a browser tab.
+   */
+  isStandalone: boolean;
+  /**
    * Shows the browser install dialog and resolves with the user's choice.
    */
   promptInstall: () => Promise<InstallPromptOutcome>;
@@ -102,6 +106,7 @@ export const useInstallPrompt = (): UseInstallPromptResult => {
 
   return {
     canInstall: deferredPrompt !== null && !isStandalone,
+    isStandalone,
     promptInstall,
   };
 };

@@ -322,6 +322,9 @@ export const MainLayout: React.FC<MainLayoutProperties> = ({ children }) => {
               <Button component={Link} to="/catalogue" variant="subtle" size="xs">
                 Catalogue
               </Button>
+              <Button component={Link} to="/settings" variant="subtle" size="xs">
+                Settings
+              </Button>
             </Group>
 
             <ColorSchemeSelector />

@@ -22,6 +22,7 @@ const standaloneQueryList = {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("useInstallPrompt", () => {
@@ -34,6 +35,20 @@ describe("useInstallPrompt", () => {
       const outcome = await result.current.promptInstall();
       expect(outcome).toBe("unavailable");
     });
+  });
+
+  it("reports standalone while the app runs installed, whatever the deferred prompt", () => {
+    const matchMedia = vi.fn().mockReturnValue(standaloneQueryList);
+    vi.stubGlobal("matchMedia", matchMedia);
+
+    const { result } = renderHook(() => useInstallPrompt());
+
+    act(() => {
+      dispatchBeforeInstallPrompt("accepted");
+    });
+
+    expect(result.current.isStandalone).toBe(true);
+    expect(result.current.canInstall).toBe(false);
   });
 
   it("captures a beforeinstallprompt event and reports installability", () => {

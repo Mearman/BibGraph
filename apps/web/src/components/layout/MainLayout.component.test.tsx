@@ -130,6 +130,15 @@ describe('MainLayout', () => {
     })
   })
 
+  it('offers Settings in the header navigation, not only the overflow menu', () => {
+    const { container } = renderMainLayout()
+    const header = container.querySelector('header')
+    const settingsLink = [...header?.querySelectorAll<HTMLAnchorElement>('a') ?? []].find(
+      (link) => link.textContent === 'Settings',
+    )
+    expect(settingsLink).toBeDefined()
+  })
+
   it('registers global hotkeys and onboarding once mounted', () => {
     renderMainLayout()
     expect(mockedUseGlobalHotkeys).toHaveBeenCalled()
