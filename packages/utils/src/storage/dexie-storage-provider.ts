@@ -208,7 +208,7 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 	}
 
 	async removeEntityFromList(listId: string, entityRecordId: string): Promise<void> {
-		await this.removeEntityFromList(listId, entityRecordId);
+		await this.removeEntity(listId, entityRecordId);
 	}
 
 	async updateEntityNotes(entityRecordId: string, notes: string): Promise<void> {
