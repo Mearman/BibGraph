@@ -6,7 +6,7 @@ import { toEntityType } from "@bibgraph/types";
 import { logger } from "@bibgraph/utils";
 import { notifications } from "@mantine/notifications";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { SearchFilters, SortOption, ViewMode } from "@/components/search/search-page-types";
@@ -75,6 +75,7 @@ export interface UseSearchPageReturn {
 
 export const useSearchPage = (): UseSearchPageReturn => {
   const searchParameters = useSearch({ from: "/search" });
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { addActivity } = useActivity();
 
@@ -187,17 +188,27 @@ export const useSearchPage = (): UseSearchPageReturn => {
     staleTime: TIME_MS.SEARCH_STALE_TIME,
   });
 
+  // The executed query belongs in the route URL so results are shareable and a reload re-runs the search. The passthrough filter/search params serve pasted OpenAlex URLs and are dropped once the reviewer searches for themselves.
+  const writeQueryToUrl = useCallback((query: string) => {
+    void navigate({
+      to: "/search",
+      search: { q: query, filter: undefined, search: undefined },
+    });
+  }, [navigate]);
+
   const handleSearch = useCallback((filters: Readonly<SearchFilters>) => {
     setSearchStartTime(Date.now());
     setSearchFilters(filters);
     storeSearchQuery(filters.query);
-  }, []);
+    writeQueryToUrl(filters.query);
+  }, [writeQueryToUrl]);
 
   const handleQuickSearch = useCallback((query: string) => {
     setSearchFilters({ query });
     setRetryCount(0);
     storeSearchQuery(query);
-  }, []);
+    writeQueryToUrl(query);
+  }, [writeQueryToUrl]);
 
   // Retry handlers
   const handleRetry = useCallback(async () => {
