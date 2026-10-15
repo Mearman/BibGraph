@@ -317,19 +317,14 @@ export const TEXT = {
  */
 export const LOADING_CONSTANTS = {
 	/**
-	Maximum progress percentage before completion (reserve for final animation)
-	 */
-	MAX_PROGRESS_PERCENT: 95,
-	/**
-	Progress update interval in milliseconds (10 updates per second)
+	Progress update interval in milliseconds (10 updates per second); drives only the internal stall clock, never a displayed progress figure
 	 */
 	PROGRESS_UPDATE_INTERVAL_MS: 100,
 	/**
 	Elapsed time after which an unresolved load is treated as stalled and the
-	fabricated progress is replaced by an offline message. 15 s is five times
-	the default 3 s estimated duration, so genuinely slow loads still finish
-	inside the window while a fetch hung on an unreachable origin surfaces an
-	honest message instead of a bar parked near completion.
+	loading surface is replaced by an offline message. 15 s comfortably
+	covers genuinely slow loads, while a fetch hung on an unreachable origin
+	surfaces an honest message instead of a spinner that never resolves.
 	 */
 	STALL_TIMEOUT_MS: 15_000,
 } as const;

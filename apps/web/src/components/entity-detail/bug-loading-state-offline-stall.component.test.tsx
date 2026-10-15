@@ -1,5 +1,5 @@
 /**
- * Regression tests: LoadingState fabricates progress forever when the origin is unreachable. The simulated bar parks at its cap with "Estimated: 3.0s" while elapsed time climbs, never admitting the request has stalled. The wait must be bounded: past a named timeout the fabricated progress stops and an honest offline message with a Retry action takes its place.
+ * Regression tests: LoadingState must stay honest at both ends of a slow load. While the load is unresolved it shows only what it knows (the operation, the entity id, a skeleton), never a fabricated percentage, processing steps or elapsed/estimated times; past a named timeout it admits the stall with an honest offline message and a Retry action.
  */
 
 import { MantineProvider } from "@mantine/core";
