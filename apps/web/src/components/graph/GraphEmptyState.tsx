@@ -174,16 +174,19 @@ const NoEntitiesState = () => (
             to="/search"
             variant="light"
             leftSection={<IconSearch size={ICON_SIZE.MD} />}
+            aria-label="Search OpenAlex"
           >
-            Search OpenAlex
+            {/* Half-width buttons clip their labels on phone screens, so the visible text yields to the icon and aria-label below the xs breakpoint */}
+            <Box visibleFrom="xs">Search OpenAlex</Box>
           </Button>
           <Button
             component={Link}
             to="/browse"
             variant="light"
             leftSection={<IconBookmark size={ICON_SIZE.MD} />}
+            aria-label="Browse Entities"
           >
-            Browse Entities
+            <Box visibleFrom="xs">Browse Entities</Box>
           </Button>
         </Group>
         <Text size="xs" c="dimmed" ta="center">
