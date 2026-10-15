@@ -262,8 +262,7 @@ export const createHistorySource = (storage: Readonly<CatalogueStorageProvider>)
   });
 
 /**
- * Create a graph data source specifically for graph list (persistent working set)
- * T032: Graph list as a graph data source
+ * Create a graph data source specifically for graph list (persistent working set) T032: Graph list as a graph data source
  */
 export const createGraphListSource = (storage: Readonly<CatalogueStorageProvider>): GraphDataSource => ({
     id: 'catalogue:graph-list',
@@ -271,52 +270,21 @@ export const createGraphListSource = (storage: Readonly<CatalogueStorageProvider
     category: 'catalogue',
     description: 'Persistent graph working set with provenance tracking',
 
+    // The working set is storage-backed: its nodes carry their own labels, so they must reach the canvas without any network round trip. A hydration fetch here (batched works lookup) once gated node emission on the transport, so a throttled API (sustained HTTP 429 with long retry backoff) blanked the canvas behind an empty state while the panel kept reporting the stored count. Label resolution and relationship discovery for these nodes are auto-population's job, which runs once the nodes exist.
     getEntities: async (): Promise<GraphSourceEntity[]> => {
       const graphNodes = await storage.getGraphList();
-      const results: GraphSourceEntity[] = [];
-      const worksById = await fetchWorksForList(graphNodes);
 
-      const fetchPromises = graphNodes.map(async (node) => {
-        // Fetch full entity data to extract relationships
-        const entityData = await fetchEntityData(node.entityType, node.entityId, worksById);
-        if (!entityData) {
-          // If fetch fails, still return node with basic info but no relationships
-          return {
-            entityType: node.entityType,
-            entityId: normalizeOpenAlexId(node.entityId),
-            label: node.label,
-            entityData: {
-              _graphListProvenance: node.provenance,
-              _graphListAddedAt: node.addedAt,
-            },
-            sourceId: 'catalogue:graph-list',
-            relationships: [],
-          } satisfies GraphSourceEntity;
-        }
-
-        const normalizedId = normalizeOpenAlexId(node.entityId);
-        const label = extractEntityLabel(node.entityType, normalizedId, entityData);
-        const relationships = extractRelationships(node.entityType, entityData);
-
-        return {
-          entityType: node.entityType,
-          entityId: normalizedId,
-          label,
-          entityData: {
-            ...entityData,
-            // Include graph list metadata
-            _graphListProvenance: node.provenance,
-            _graphListAddedAt: node.addedAt,
-          },
-          sourceId: 'catalogue:graph-list',
-          relationships,
-        } satisfies GraphSourceEntity;
-      });
-
-      const fetched = await Promise.all(fetchPromises);
-      results.push(...fetched);
-
-      return results;
+      return graphNodes.map((node) => ({
+        entityType: node.entityType,
+        entityId: normalizeOpenAlexId(node.entityId),
+        label: node.label,
+        entityData: {
+          _graphListProvenance: node.provenance,
+          _graphListAddedAt: node.addedAt,
+        },
+        sourceId: 'catalogue:graph-list',
+        relationships: [],
+      }));
     },
 
     getEntityCount: async (): Promise<number> => await storage.getGraphListSize(),

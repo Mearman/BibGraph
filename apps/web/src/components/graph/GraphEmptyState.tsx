@@ -21,6 +21,7 @@ import {
   IconCircleNumber3,
   IconGraph,
   IconHistory,
+  IconRefresh,
   IconSearch,
   IconSettings,
 } from '@tabler/icons-react';
@@ -29,7 +30,7 @@ import type { ReactNode } from 'react';
 
 import { ICON_SIZE } from '@/config/style-constants';
 
-export type GraphEmptyStateVariant = 'no-sources' | 'no-entities';
+export type GraphEmptyStateVariant = 'no-sources' | 'no-entities' | 'load-failed';
 
 export interface GraphEmptyStateProps {
   /**
@@ -40,6 +41,10 @@ export interface GraphEmptyStateProps {
   Optional: Number of sources currently available but disabled
    */
   availableSourceCount?: number;
+  /**
+  Optional: Retry the load; wired only on the load-failed variant, whose copy admits entities exist but did not load
+   */
+  onRetry?: () => void;
 }
 
 /**
@@ -214,17 +219,52 @@ const NoEntitiesState = () => (
 );
 
 /**
+ * Settled state shown when enabled sources report entities but none reached the canvas: the load failed (a throttled or unreachable API most often), so the copy must affirm the panel's counts instead of claiming the sources are empty.
+ */
+const LoadFailedState = ({ onRetry }: { onRetry?: () => void }) => (
+  <Stack align="center" gap="xl" py="xl">
+    <DecorativeIcon>
+      <IconGraph size={ICON_SIZE.HERO_LG} stroke={1.2} />
+    </DecorativeIcon>
+
+    <Stack align="center" gap="xs">
+      <Title order={2} ta="center">
+        Entities Could Not Be Loaded
+      </Title>
+      <Text c="dimmed" ta="center" maw={500}>
+        Your enabled sources hold entities, but none could be loaded into the graph.
+        The server may be throttling requests or unreachable.
+      </Text>
+    </Stack>
+
+    <Group justify="center">
+      <Button
+        variant="light"
+        leftSection={<IconRefresh size={ICON_SIZE.MD} />}
+        aria-label="Retry loading entities"
+        onClick={onRetry}
+      >
+        Retry
+      </Button>
+    </Group>
+  </Stack>
+);
+
+/**
  * GraphEmptyState displays contextual guidance when the graph has no data to show
  */
 export const GraphEmptyState = ({
   variant,
   availableSourceCount,
+  onRetry,
 }: GraphEmptyStateProps) => {
   switch (variant) {
     case 'no-sources':
       return <NoSourcesEnabledState availableSourceCount={availableSourceCount} />;
     case 'no-entities':
       return <NoEntitiesState />;
+    case 'load-failed':
+      return <LoadFailedState onRetry={onRetry} />;
     default:
       return variant satisfies never;
   }

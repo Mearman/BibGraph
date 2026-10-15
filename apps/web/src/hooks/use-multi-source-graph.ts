@@ -255,7 +255,8 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
 
   // Track initialization
   const initializedReference = useRef(false);
-  const loadingSourcesReference = useRef<Set<string>>(new Set());
+  // Latest-wins epoch for graph loads: a load started later (a toggle mid-flight) must be able to supersede an earlier, slower one, and the superseded load must never commit its stale node set over the newer state.
+  const loadEpochReference = useRef(0);
 
   /**
    * Discover all available sources
@@ -342,8 +343,13 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
 
   /**
    * Load graph data from enabled sources
+   *
+   * Commits only while this call is still the latest load: a superseded load resolving late must not clobber the nodes a newer load already committed.
    */
   const loadGraphData = useCallback(async (sourceStates: readonly GraphDataSourceState[]) => {
+    const epoch = ++loadEpochReference.current;
+    const isLatestLoad = (): boolean => loadEpochReference.current === epoch;
+
     const enabledStates = sourceStates.filter(s => s.enabled);
 
     if (enabledStates.length === 0) {
@@ -356,20 +362,17 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
 
     // Load entities from each enabled source
     for (const state of enabledStates) {
-      if (loadingSourcesReference.current.has(state.source.id)) continue;
-
       try {
-        loadingSourcesReference.current.add(state.source.id);
         const entities = await state.source.getEntities();
 
         // Collect all entities (deduplication happens after all sources loaded)
         allEntities.push(...entities);
       } catch (error_) {
         logger.warn(LOG_PREFIX, `Failed to load from ${state.source.id}`, { error: error_ });
-      } finally {
-        loadingSourcesReference.current.delete(state.source.id);
       }
     }
+
+    if (!isLatestLoad()) return;
 
     // T041: Deduplicate entities with graph list priority
     const deduplicatedEntities = deduplicateEntities(allEntities);
@@ -428,6 +431,7 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
     nodeArray = [...nodeArray, ...persistentGraphNodes];
     const edgeArray = [...relationshipEdges, ...persistentGraphEdges];
 
+    if (!isLatestLoad()) return;
     setNodes(nodeArray);
     setEdges(edgeArray);
 
@@ -531,34 +535,10 @@ export const useMultiSourceGraph = (): UseMultiSourceGraphResult => {
     saveEnabledSources(new Set());
   }, []);
 
-  // Initial load
+  // Initial load. `refresh` is recreated whenever the enabled set changes (its `loadSourceStates` dependency closes over `enabledSourceIds`), so this effect re-runs and reloads everything with the new toggles; no separate enabled-sources effect is needed. The previous separate effect raced this one: it skipped sources still being loaded by the in-flight refresh and committed the resulting empty node set, blanking the canvas.
   useEffect(() => {
     void refresh();
   }, [refresh]);
-
-  // Reload graph data when enabled sources change
-  useEffect(() => {
-    if (sources.length === 0) {
-    	return;
-    }
-
-    // Update source states with new enabled values
-    const updatedStates = sources.map(s => ({
-      ...s,
-      enabled: enabledSourceIds.has(s.source.id),
-    }));
-    setSources(updatedStates);
-
-    // Reload graph data
-    setLoading(true);
-    void loadGraphData(updatedStates)
-      .catch((error_: unknown) => {
-        logger.error(LOG_PREFIX, 'Failed to reload graph', { error: error_ });
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [enabledSourceIds, sources.length, loadGraphData]);
 
   const isEmpty = useMemo(() => nodes.length === 0 && edges.length === 0, [nodes, edges]);
 

@@ -24,12 +24,19 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   };
 });
 
-// The entity hydration fetches would hit the live API; the offline-degraded path under test is exactly what the app does when they fail, so they are mocked to reject. Everything else the page pulls from the client stays real.
+// The entity hydration fetches would hit the live API; the offline-degraded path under test is exactly what the app does when they fail, so they are mocked. `pending` holds the promise open forever, which is the live app's state while the transport retries a throttled batched works fetch (HTTP 429 with long backoff). Everything else the page pulls from the client stays real.
+const worksByIdsBehaviour = vi.hoisted(() => ({ mode: 'reject' }));
 vi.mock('@bibgraph/client', async (importOriginal) => {
   const actual = await importOriginal<typeof ClientModule>();
   return {
     ...actual,
     getWorksByIds: async () => {
+      if (worksByIdsBehaviour.mode === 'pending') {
+        // A sustained-throttle retry chain: no settlement within any observation window.
+        await new Promise(() => {
+          return undefined;
+        });
+      }
       await Promise.reject(new Error('offline: no entity hydration in tests'));
     },
   };
@@ -58,13 +65,11 @@ describe('EntityGraphPage with a populated working set', () => {
   afterEach(() => {
     cleanup();
     window.localStorage.clear();
+    worksByIdsBehaviour.mode = 'reject';
   });
 
-  it('renders the graph surface with the working set node count', async () => {
-    window.localStorage.setItem('bibgraph:graph-source-toggles', JSON.stringify(['catalogue:graph-list']));
-    const provider = await buildPopulatedProvider();
+  const renderPage = (provider: InMemoryStorageProvider) => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-
     render(
       <QueryClientProvider client={queryClient}>
         <MantineProvider>
@@ -76,11 +81,45 @@ describe('EntityGraphPage with a populated working set', () => {
         </MantineProvider>
       </QueryClientProvider>,
     );
+  };
+
+  it('renders the graph surface with the working set node count', async () => {
+    window.localStorage.setItem('bibgraph:graph-source-toggles', JSON.stringify(['catalogue:graph-list']));
+    const provider = await buildPopulatedProvider();
+    renderPage(provider);
 
     await waitFor(() => {
       expect(screen.getByText(/1 nodes/i)).toBeInTheDocument();
     });
     expect(screen.getByTestId('force-graph-stub')).toBeInTheDocument();
     expect(screen.queryByText(/No Entities to Display/i)).toBeNull();
+  });
+
+  it('renders working-set nodes while entity hydration is still pending, so a throttled network cannot blank the canvas', async () => {
+    // The live failure: under sustained HTTP 429 the batched works fetch retries with long backoff, so its promise stays pending far past any observation window. The working set is storage-backed and must reach the canvas without waiting for that settlement.
+    worksByIdsBehaviour.mode = 'pending';
+    window.localStorage.setItem('bibgraph:graph-source-toggles', JSON.stringify(['catalogue:graph-list']));
+    const provider = await buildPopulatedProvider();
+    renderPage(provider);
+
+    await waitFor(() => {
+      expect(screen.getByText(/1 nodes/i)).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('force-graph-stub')).toBeInTheDocument();
+    expect(screen.queryByText(/No Entities to Display/i)).toBeNull();
+  });
+
+  it('does not claim enabled sources are empty when a populated source loaded zero entities', async () => {
+    // A bookmarked work whose hydration fails is dropped by the bookmarks source, so the panel reports 1 entity while the canvas holds none. The settled surface must not tell the user their sources "don't contain any entities".
+    window.localStorage.setItem('bibgraph:graph-source-toggles', JSON.stringify(['catalogue:bookmarks']));
+    const provider = new InMemoryStorageProvider();
+    await provider.initializeSpecialLists();
+    await provider.addBookmark({ entityType: 'works', entityId: WORKING_SET_WORK_ID });
+    renderPage(provider);
+
+    await waitFor(() => {
+      expect(screen.getByText(/could not be loaded/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/don't contain any entities/i)).toBeNull();
   });
 });

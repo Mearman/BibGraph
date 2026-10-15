@@ -50,6 +50,7 @@ import {
   GraphEmptyStateWithPanel,
   GraphErrorState,
   GraphLoadingState,
+  GraphLoadingWithPanelState,
 } from '@/components/graph/GraphPageStates';
 import { GraphSourcePanel } from '@/components/graph/GraphSourcePanel';
 import { LayoutSelector } from '@/components/graph/LayoutSelector';
@@ -289,10 +290,29 @@ const EntityGraphPageContent = ({ context }: { context: NonNullable<ReturnType<t
 
   // Count enabled sources with entities
   const enabledSourceCount = sources.filter(s => enabledSourceIds.has(s.source.id)).length;
+  // Enabled sources whose own count says they hold entities; the panel shows these counts, so an empty canvas beside them means a load failure, not empty sources.
+  const populatedEnabledSourceCount = sources.filter(
+    s => enabledSourceIds.has(s.source.id) && (s.entityCount ?? 0) > 0
+  ).length;
 
-  // Loading state
+  // Loading state: nothing discovered yet, so there is no panel to keep mounted
   if (loading && sources.length === 0) {
     return <GraphLoadingState />;
+  }
+
+  // Still loading with sources discovered: keep the panel usable and never assert anything about the sources' contents while the load is unresolved
+  if (loading && isEmpty) {
+    return (
+      <GraphLoadingWithPanelState
+        sources={sources}
+        enabledSourceIds={enabledSourceIds}
+        onToggleSource={toggleSource}
+        onEnableAll={enableAll}
+        onDisableAll={disableAll}
+        onRefresh={() => { void refresh(); }}
+        loading={loading}
+      />
+    );
   }
 
   // Error state
@@ -300,7 +320,7 @@ const EntityGraphPageContent = ({ context }: { context: NonNullable<ReturnType<t
     return <GraphErrorState error={error} onRetry={() => { void refresh(); }} />;
   }
 
-  // Empty state - no sources enabled or no entities
+  // Empty state - no sources enabled
   if (isEmpty && enabledSourceCount === 0) {
     return (
       <GraphEmptyStateWithPanel
@@ -316,11 +336,11 @@ const EntityGraphPageContent = ({ context }: { context: NonNullable<ReturnType<t
     );
   }
 
-  // Empty state with sources enabled but no entities
+  // Settled with sources enabled but an empty canvas: if any enabled source reports entities, they failed to load (throttled or unreachable API), which must not be worded as the sources containing nothing; only counts of zero justify that claim
   if (isEmpty) {
     return (
       <GraphEmptyStateWithPanel
-        variant="no-entities"
+        variant={populatedEnabledSourceCount > 0 ? 'load-failed' : 'no-entities'}
         sources={sources}
         enabledSourceIds={enabledSourceIds}
         onToggleSource={toggleSource}

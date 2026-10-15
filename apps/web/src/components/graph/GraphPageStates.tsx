@@ -70,8 +70,70 @@ export const GraphErrorState: React.FC<GraphErrorStateProperties> = ({
   </Container>
 );
 
+interface GraphPanelShellProperties {
+  sources: GraphDataSourceState[];
+  enabledSourceIds: Set<string>;
+  onToggleSource: (id: string) => void;
+  onEnableAll: () => void;
+  onDisableAll: () => void;
+  onRefresh: () => void;
+  loading: boolean;
+  children: React.ReactNode;
+}
+
+/**
+ * Source panel with a content area beside it, shared by every non-graph page state so the panel stays usable whatever the canvas is showing.
+ */
+const GraphPanelShell: React.FC<GraphPanelShellProperties> = ({
+  sources,
+  enabledSourceIds,
+  onToggleSource,
+  onEnableAll,
+  onDisableAll,
+  onRefresh,
+  loading,
+  children,
+}) => (
+  <Flex h={`calc(100vh - ${String(LAYOUT.HEADER_HEIGHT)}px)`}>
+    <GraphSourcePanel
+      sources={sources}
+      enabledSourceIds={enabledSourceIds}
+      onToggleSource={onToggleSource}
+      onEnableAll={onEnableAll}
+      onDisableAll={onDisableAll}
+      onRefresh={onRefresh}
+      loading={loading}
+    />
+    <Container size="md" py="xl" flex={1}>
+      {children}
+    </Container>
+  </Flex>
+);
+
+interface GraphLoadingWithPanelStateProperties {
+  sources: GraphDataSourceState[];
+  enabledSourceIds: Set<string>;
+  onToggleSource: (id: string) => void;
+  onEnableAll: () => void;
+  onDisableAll: () => void;
+  onRefresh: () => void;
+  loading: boolean;
+}
+
+/**
+ * Loading state that keeps the source panel mounted: sources are already discovered and the entity load is still in flight, so the user can adjust sources while it settles. Shown instead of an empty state, which would claim the enabled sources hold nothing while the panel beside it reports entities.
+ */
+export const GraphLoadingWithPanelState: React.FC<GraphLoadingWithPanelStateProperties> = (properties) => (
+  <GraphPanelShell {...properties}>
+    <Stack align="center" justify="center" h="50vh" gap="md">
+      <Loader size="xl" />
+      <Text c="dimmed">Loading entities from your enabled sources...</Text>
+    </Stack>
+  </GraphPanelShell>
+);
+
 interface GraphEmptyStateWithPanelProperties {
-  variant: 'no-sources' | 'no-entities';
+  variant: 'no-sources' | 'no-entities' | 'load-failed';
   sources: GraphDataSourceState[];
   enabledSourceIds: Set<string>;
   onToggleSource: (id: string) => void;
@@ -94,21 +156,19 @@ export const GraphEmptyStateWithPanel: React.FC<GraphEmptyStateWithPanelProperti
   onRefresh,
   loading,
 }) => (
-  <Flex h={`calc(100vh - ${String(LAYOUT.HEADER_HEIGHT)}px)`}>
-    <GraphSourcePanel
-      sources={sources}
-      enabledSourceIds={enabledSourceIds}
-      onToggleSource={onToggleSource}
-      onEnableAll={onEnableAll}
-      onDisableAll={onDisableAll}
-      onRefresh={onRefresh}
-      loading={loading}
+  <GraphPanelShell
+    sources={sources}
+    enabledSourceIds={enabledSourceIds}
+    onToggleSource={onToggleSource}
+    onEnableAll={onEnableAll}
+    onDisableAll={onDisableAll}
+    onRefresh={onRefresh}
+    loading={loading}
+  >
+    <GraphEmptyState
+      variant={variant}
+      availableSourceCount={variant === 'no-sources' ? sources.length : 0}
+      onRetry={onRefresh}
     />
-    <Container size="md" py="xl" flex={1}>
-      <GraphEmptyState
-        variant={variant}
-        availableSourceCount={variant === 'no-sources' ? sources.length : 0}
-      />
-    </Container>
-  </Flex>
+  </GraphPanelShell>
 );
