@@ -9,6 +9,7 @@ import { type ReactElement,useState } from "react";
 import type { ReadyReviewSession } from "@/hooks/use-review-session";
 import { type ScreeningPaging, useScreeningArrangement } from "@/hooks/use-screening-arrangement";
 import type { AlgorithmStage } from "@/lib/algorithms/registry";
+import { startingWorksCount, startingWorksLabel } from "@/lib/reviews/review-summary";
 import type { ScreeningDecision } from "@/stores/review-store";
 
 import { AlgorithmComparisonTable, type StagePanel } from "./AlgorithmComparisonTable";
@@ -22,9 +23,9 @@ const DECIDED_TAB = "decided";
 const ALGORITHMS_TAB = "algorithms";
 
 /**
- * The related-seeds list's name, also used in cross-list notes.
+ * The related-starting-works list's name, also used in cross-list notes.
  */
-const RELATED_TAB_TITLE = "Related to my seeds";
+const RELATED_TAB_TITLE = "Related to my starting works";
 
 /**
  * How long the undo notification stays, leaving time to read it and click Undo.
@@ -41,9 +42,9 @@ const STAGE_TITLES: Readonly<Record<AlgorithmStage, string>> = {
  * What each stage's switch changes for the reviewer, said in the notification.
  */
 const STAGE_EFFECT: Readonly<Record<AlgorithmStage, string>> = {
-	exploration: "Works related to your seeds will be re-ranked.",
+	exploration: "Works related to your starting works will be re-ranked.",
 	"seed-selection": "A new set of starting works will be picked.",
-	ranking: "Works related to your seeds will be re-ranked.",
+	ranking: "Works related to your starting works will be re-ranked.",
 };
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : "unknown error");
@@ -212,7 +213,7 @@ export const ReviewScreen = ({ session, paging }: ReviewScreenProps): ReactEleme
 			? { kind: "filtered" }
 			: allDecided
 				? openDecided()
-				: { kind: "nothing-found", message: "No related works found from these seeds. Add seeds or widen the query." };
+				: { kind: "nothing-found", message: "No related works found from these starting works. Add one you know is relevant, or widen the query." };
 	const standardEmpty: ScreeningEmptyState =
 		searchOrder.total > 0
 			? { kind: "filtered" }
@@ -229,7 +230,7 @@ export const ReviewScreen = ({ session, paging }: ReviewScreenProps): ReactEleme
 						{review.query}
 					</Text>
 				)}
-				<Text size="sm">{`${String(view.seeds.length)} seeds, ${String(view.includedCount)} included, ${String(view.excludedCount)} excluded`}</Text>
+				<Text size="sm">{`${startingWorksLabel(startingWorksCount(review))}, ${String(view.includedCount)} included, ${String(view.excludedCount)} excluded`}</Text>
 			</Stack>
 			<Stack gap={4}>
 				<Text size="sm" fw={500}>

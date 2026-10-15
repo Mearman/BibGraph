@@ -88,7 +88,8 @@ describe("ReviewsView", () => {
       ],
     });
     expect(screen.getByText("Malaria gut")).toBeInTheDocument();
-    expect(screen.getByText("2 starting works")).toBeInTheDocument();
+    // The inclusion folds into the starting works, so the card agrees with the review page's count.
+    expect(screen.getByText("3 starting works")).toBeInTheDocument();
     expect(screen.getByText("Search: malaria AND gut")).toBeInTheDocument();
     expect(screen.getByText("1 included of 2 screened")).toBeInTheDocument();
     expect(screen.getByText(/Created /)).toBeInTheDocument();

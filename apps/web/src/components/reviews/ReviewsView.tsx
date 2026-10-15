@@ -20,6 +20,8 @@ import { useState } from "react";
 import {
   createdLabel,
   progressLabel as progressText,
+  startingWorksCount,
+  startingWorksLabel,
 } from "@/lib/reviews/review-summary";
 import type { LiteratureReview } from "@/stores/review-store";
 
@@ -65,9 +67,6 @@ export interface ReviewsViewProps {
 
 const CARD_SKELETONS = 3;
 
-const seedLabel = (count: number): string =>
-  `${String(count)} starting ${count === 1 ? "work" : "works"}`;
-
 const queryLabel = (query: string): string =>
   query === "" ? "No search terms" : `Search: ${query}`;
 
@@ -93,7 +92,7 @@ const ReviewCard = ({
             {review.name}
           </Text>
           <Text size="sm" c="dimmed">
-            {seedLabel(review.seeds.length)}
+            {startingWorksLabel(startingWorksCount(review))}
           </Text>
           <Text size="sm" c="dimmed" lineClamp={1}>
             {queryLabel(review.query)}

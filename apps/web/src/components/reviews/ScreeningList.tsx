@@ -233,7 +233,7 @@ export const ScreeningList = ({
 														</Text>
 													</Tooltip>
 													<Badge variant="light" color="gray">
-														{`${String(row.evidence.seedsReaching)} of ${String(row.evidence.seedCount)} seeds reach this`}
+														{`${String(row.evidence.seedsReaching)} of ${String(row.evidence.seedCount)} starting works reach this`}
 													</Badge>
 												</Group>
 											)}

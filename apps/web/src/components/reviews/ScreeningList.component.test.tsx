@@ -71,7 +71,7 @@ const renderList = (overrides: Partial<Parameters<typeof ScreeningList>[0]> = {}
 		filter: "",
 		onFilterChange: () => undefined,
 		onDecide,
-		otherTabName: "Related to my seeds",
+		otherTabName: "Related to my starting works",
 		emptyState: { kind: "nothing-found", message: "Nothing left to screen." },
 		titlesPending: false,
 	};
@@ -94,10 +94,10 @@ describe("ScreeningList", () => {
 		expect(screen.getByText("Seed one -> Bridge paper -> this work")).toBeInTheDocument();
 	});
 
-	it("shows the match score and the seed-reach badge", () => {
+	it("shows the match score and the starting-works reach badge", () => {
 		renderList();
 		expect(screen.getByText(`Match ${DIRECT_SCORE.toFixed(SCORE_DECIMALS)}`)).toBeInTheDocument();
-		expect(screen.getByText("1 of 2 seeds reach this")).toBeInTheDocument();
+		expect(screen.getByText("1 of 2 starting works reach this")).toBeInTheDocument();
 	});
 
 	it("marks a work whose title never arrived instead of showing a bare id as a title", () => {
@@ -134,7 +134,7 @@ describe("ScreeningList", () => {
 		renderList();
 		expect(screen.getByText("Also result 3 from your search")).toBeInTheDocument();
 		expect(
-			screen.getByText(`Also 1st in Related to my seeds (Match ${DIRECT_SCORE.toFixed(SCORE_DECIMALS)})`),
+			screen.getByText(`Also 1st in Related to my starting works (Match ${DIRECT_SCORE.toFixed(SCORE_DECIMALS)})`),
 		).toBeInTheDocument();
 	});
 

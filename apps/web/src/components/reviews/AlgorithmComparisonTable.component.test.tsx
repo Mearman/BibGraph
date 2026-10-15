@@ -136,7 +136,7 @@ describe("AlgorithmComparisonTable", () => {
 		renderTable();
 		const seedSelection = screen.getByRole("region", { name: "Seed selection" });
 		expect(
-			within(seedSelection).getByText("You supplied your own seeds, so this is for comparison only."),
+			within(seedSelection).getByText("You supplied your own starting works, so this is for comparison only."),
 		).toBeInTheDocument();
 		expect(within(seedSelection).queryByRole("button", { name: /^Use / })).not.toBeInTheDocument();
 	});

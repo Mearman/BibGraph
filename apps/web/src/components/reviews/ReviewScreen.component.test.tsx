@@ -157,14 +157,33 @@ describe("ReviewScreen", () => {
 		renderScreen(session());
 		expect(screen.getByRole("heading", { name: "Malaria gut" })).toBeInTheDocument();
 		expect(screen.getByText("malaria AND gut")).toBeInTheDocument();
-		expect(screen.getByText("2 seeds, 1 included, 2 excluded")).toBeInTheDocument();
+		expect(screen.getByText("2 starting works, 1 included, 2 excluded")).toBeInTheDocument();
 		expect(screen.getByText("Seed one")).toBeInTheDocument();
 		expect(screen.getByText("Seed three")).toBeInTheDocument();
 	});
 
+	it("counts the starting works with inclusions folded in, matching the screening set", () => {
+		renderScreen(
+			session({
+				review: {
+					...session().review,
+					seeds: ["W1", "W3"],
+					decisions: { W7: "include" },
+				},
+				view: { ...session().view, seeds: ["W1", "W3", "W7"] },
+				seedRefs: [
+					{ id: "W1", title: "Seed one", known: true },
+					{ id: "W3", title: "Seed three", known: true },
+					{ id: "W7", title: "Decided paper", known: true },
+				],
+			}),
+		);
+		expect(screen.getByText("3 starting works, 1 included, 2 excluded")).toBeInTheDocument();
+	});
+
 	it("screens under plain tab names with a description each", () => {
 		renderScreen(session());
-		expect(screen.getByRole("tab", { name: /Related to my seeds/ })).toBeInTheDocument();
+		expect(screen.getByRole("tab", { name: /Related to my starting works/ })).toBeInTheDocument();
 		expect(screen.getByRole("tab", { name: /In search order/ })).toBeInTheDocument();
 		expect(screen.getByRole("tab", { name: /Decided/ })).toBeInTheDocument();
 		expect(screen.getByText("Works connected to your starting works, strongest first")).toBeInTheDocument();
@@ -279,7 +298,7 @@ describe("ReviewScreen", () => {
 		await waitFor(() => {
 			expect(ready.chooseAlgorithm).toHaveBeenCalledWith("exploration", "frontier-balanced");
 		});
-		expect(await screen.findByText(/Works related to your seeds will be re-ranked/)).toBeInTheDocument();
+		expect(await screen.findByText(/Works related to your starting works will be re-ranked/)).toBeInTheDocument();
 	});
 
 	it("offers a retry when titles fail to load", () => {

@@ -42,7 +42,7 @@ export type StagePanel =
 	| { readonly kind: "measuring"; readonly progress: string | null }
 	| { readonly kind: "error"; readonly message: string };
 
-const READ_ONLY_NOTE = "You supplied your own seeds, so this is for comparison only.";
+const READ_ONLY_NOTE = "You supplied your own starting works, so this is for comparison only.";
 
 /**
  * Below this width the table scrolls sideways instead of squeezing five columns.
