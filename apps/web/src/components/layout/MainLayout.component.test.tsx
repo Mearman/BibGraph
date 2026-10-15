@@ -3,9 +3,11 @@
  */
 
 import { MantineProvider } from '@mantine/core'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
+import { SyncStatusProvider } from '@/contexts/SyncStatusContext'
 import { useGlobalHotkeys } from '@/hooks/use-hotkeys'
 import { useOnboarding } from '@/hooks/useOnboarding'
 import { LayoutProvider } from '@/stores/layout-store'
@@ -55,14 +57,19 @@ const mockedUseOnboarding = vi.mocked(useOnboarding)
 
 const INTERACTIVE_SELECTOR = 'button, a, input, select, textarea, [role="button"]'
 
+// The offline banner lives in the layout and reads the shared sync status, which itself watches the query cache.
 const renderMainLayout = () =>
   render(
     <MantineProvider>
-      <LayoutProvider>
-        <MainLayout>
-          <p>Page content</p>
-        </MainLayout>
-      </LayoutProvider>
+      <QueryClientProvider client={new QueryClient()}>
+        <SyncStatusProvider>
+          <LayoutProvider>
+            <MainLayout>
+              <p>Page content</p>
+            </MainLayout>
+          </LayoutProvider>
+        </SyncStatusProvider>
+      </QueryClientProvider>
     </MantineProvider>,
   )
 
