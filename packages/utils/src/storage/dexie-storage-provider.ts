@@ -175,7 +175,7 @@ export class DexieStorageProvider implements CatalogueStorageProvider {
 			if (!parameters.entityId || parameters.entityId.trim().length === 0) {
 				throw new ValidationError('entityId', parameters.entityId, 'Entity ID cannot be empty');
 			}
-			const result = await this.addEntityToList({
+			const result = await this.addEntity({
 				listId: parameters.listId,
 				entityType: parameters.entityType,
 				entityId: parameters.entityId,

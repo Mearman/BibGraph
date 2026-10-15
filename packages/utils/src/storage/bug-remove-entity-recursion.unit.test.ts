@@ -14,4 +14,13 @@ describe('DexieStorageProvider.removeEntityFromList', () => {
 		await provider.initializeSpecialLists();
 		await expect(provider.removeEntityFromList('nonexistent-list', 'nonexistent-record')).resolves.toBeUndefined();
 	});
+
+	it('addEntityToList also terminates (the eslint refactor reintroduced the self-call there on 2026-10-15, killing bookmarks and history again)', async () => {
+		const provider = new DexieStorageProvider();
+		await provider.initializeSpecialLists();
+		const listId = await provider.createList({ title: 'Add regression list', type: 'list' });
+		await expect(
+			provider.addEntityToList({ listId, entityType: 'works', entityId: 'W2741809807' }),
+		).resolves.toMatch(/.+/);
+	});
 });
