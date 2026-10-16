@@ -3,10 +3,12 @@
  * Node-only `process` binding. A service worker that imports the client
  * barrel (the Background Sync drain does) evaluates these constructors at
  * import time in a context with no `process` global, which threw a
- * ReferenceError and failed the worker's script evaluation outright.
+ * ReferenceError and failed the worker's script evaluation outright. The
+ * binding is undefined only inside each synchronous assertion window, so
+ * vitest's own process usage between tests never sees it go missing.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 /**
  * The tiers and the provider form an import cycle (the tiers extend the
@@ -21,26 +23,30 @@ const loadProvider = async (): Promise<{ readonly getEnvironmentInfo: () => unkn
 const loadTier = async (): Promise<{ readonly GitHubPagesCacheTier: new (baseUrl?: string) => object }> =>
 	import("./cache/tiers/githubpages");
 
-describe("client code without a process binding", () => {
+const withoutProcess = (run: () => void): void => {
 	
-
-	beforeAll(async () => {
-		await loadProvider();
-		// A browser service worker has no `process` at all; simulate exactly that shape (the declared type keeps Node's Process, so the test file coerces it away, which tests may do).
-		globalThis.process = undefined as unknown as typeof globalThis.process;
-	});
-
-	afterAll(() => {
+	// A browser service worker has no `process` at all; simulate exactly that shape (the declared type keeps Node's Process, so the test file coerces it away, which tests may do).
+	globalThis.process = undefined as unknown as typeof globalThis.process;
+	try {
+		run();
+	} finally {
 		globalThis.process = process;
-	});
+	}
+};
 
+describe("client code without a process binding", () => {
 	it("builds the GitHub Pages tier's retry policy without reading process", async () => {
+		await loadProvider();
 		const { GitHubPagesCacheTier } = await loadTier();
-		expect(() => new GitHubPagesCacheTier("https://example.com/data/")).not.toThrow();
+		withoutProcess(() => {
+			expect(() => new GitHubPagesCacheTier("https://example.com/data/")).not.toThrow();
+		});
 	});
 
 	it("reads environment info from the static data provider without process", async () => {
 		const provider = await loadProvider();
-		expect(() => provider.getEnvironmentInfo()).not.toThrow();
+		withoutProcess(() => {
+			expect(() => provider.getEnvironmentInfo()).not.toThrow();
+		});
 	});
 });
