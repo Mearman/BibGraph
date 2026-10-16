@@ -201,6 +201,7 @@ GitHub Actions: validate → e2e → deploy → post-deploy verification → sem
 
 ## Key Features
 
+- **Installable PWA**: offline app shell via a service worker, plus Background Sync draining queued lookups after the app closes in installed Chromium browsers (elsewhere queued work retries when the app is open)
 - **Xpac Works**: 190M additional research outputs (datasets, software, specimens)
 - **Entity Relationships**: Filterable, direction-aware relationship visualization
 - **Literature Reviews** (`/reviews`): start from a Boolean query, seed works, or both (with no seeds the app picks them), screen by semantic association ranking or standard query order, refine by inclusion, and compare every novel and baseline algorithm side by side on the review's own pool

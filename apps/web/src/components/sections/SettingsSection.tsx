@@ -21,6 +21,7 @@ import { notifications } from "@mantine/notifications";
 import {
   IconAlertTriangle,
   IconCheck,
+  IconCloudDown,
   IconInfoCircle,
   IconKey,
   IconMail,
@@ -33,6 +34,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import React from "react";
 
 import { ICON_SIZE } from "@/config/style-constants";
+import { useBackgroundQueueStatus } from "@/hooks/use-background-queue";
 import { type BackgroundStrategy,settingsStoreInstance, usePolitePoolEmail, useSettingsStore } from "@/stores/settings-store";
 
 
@@ -64,6 +66,9 @@ export const SettingsSection: React.FC = () => {
 
   // Local state for background strategy
   const [backgroundStrategy, setBackgroundStrategy] = React.useState<BackgroundStrategy>('idle');
+
+  // Background job queue depth and retry copy (see use-background-queue.ts)
+  const backgroundQueue = useBackgroundQueueStatus();
 
   // Load settings from store on mount
   React.useEffect(() => {
@@ -661,6 +666,22 @@ export const SettingsSection: React.FC = () => {
         }}
         showDescription={true}
       />
+
+      <Divider />
+
+      {/* Deferred work: the background job queue's depth and its honest retry copy */}
+      <Group gap="xs">
+        <IconCloudDown size={ICON_SIZE.MD} />
+        <Text size="sm" fw={500}>Deferred Work</Text>
+      </Group>
+      <Text size="sm" {...(backgroundQueue.depth === 0 ? { c: "dimmed" } : {})}>
+        {backgroundQueue.depth === 0
+          ? "No queued lookups"
+          : `Queued lookups: ${String(backgroundQueue.depth)}`}
+      </Text>
+      <Text size="xs" c="dimmed">
+        {backgroundQueue.retryCopy}
+      </Text>
 
       {/* Data Version Selector - Only visible before December 2025 */}
       {isDataVersionSelectorVisible() && (
