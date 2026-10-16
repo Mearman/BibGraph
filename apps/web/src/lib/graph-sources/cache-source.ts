@@ -26,6 +26,8 @@ import {
   normalizeOpenAlexId,
 } from '@bibgraph/utils';
 
+import { queueHydrationRetry } from '@/lib/background-sync/enqueue';
+
 /**
  * Map StaticEntityType to EntityType
  * StaticEntityType is a subset used by the cache
@@ -58,6 +60,8 @@ const fetchWorksForEntries = async (
     return await getWorksByIds(workIds);
   } catch (error) {
     logger.debug('cache-source', 'Failed to fetch works in batches', { error });
+    // Degrade as before, but queue the ids so the background drain retries the hydration later.
+    await queueHydrationRetry('works', workIds);
     return new Map();
   }
 };

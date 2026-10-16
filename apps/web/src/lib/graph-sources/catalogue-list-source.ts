@@ -27,6 +27,8 @@ import {
   normalizeOpenAlexId,
 } from '@bibgraph/utils';
 
+import { queueHydrationRetry } from '@/lib/background-sync/enqueue';
+
 /**
  * Fetch the works on a catalogue list through one batched lookup, so a large list does not hydrate as one request per work (which OpenAlex rate-limits within seconds)
  */
@@ -43,6 +45,8 @@ const fetchWorksForList = async (
     return await getWorksByIds(workIds);
   } catch (error) {
     logger.debug('catalogue-list-source', 'Failed to fetch works in batches', { error });
+    // Degrade as before, but queue the ids so the background drain retries the hydration later.
+    await queueHydrationRetry('works', workIds);
     return new Map();
   }
 };

@@ -21,6 +21,7 @@ import { catalogueEventEmitter, logger } from '@bibgraph/utils';
 import { useCallback, useEffect, useRef,useState } from 'react';
 
 import { useStorageProvider } from '@/contexts/storage-provider-context';
+import { queueHydrationRetry } from '@/lib/background-sync/enqueue';
 
 import { isPlainObject } from './extractors/unknown-helpers';
 
@@ -462,6 +463,8 @@ export const useRepositoryGraph = (): UseRepositoryGraphResult => {
             worksById = await getWorksByIds(workIds);
           } catch (batchError) {
             logger.debug('repository-graph', 'Failed to fetch works in batches', { error: batchError });
+            // Degrade as before, but queue the ids so the background drain retries the hydration later.
+            await queueHydrationRetry('works', workIds);
           }
         }
 

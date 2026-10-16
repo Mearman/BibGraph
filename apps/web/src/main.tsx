@@ -18,6 +18,7 @@ import { RoutePendingComponent } from "@/components/routing/LazyRoute";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { StorageProviderWrapper } from "@/contexts/storage-provider-context";
 import { ThemeProvider } from "@/contexts/theme-context";
+import { drainBackgroundQueueOnOpen } from "@/lib/background-sync/drain-on-open";
 import { registerPwaServiceWorker } from "@/lib/service-worker";
 import { AppActivityProvider } from "@/stores/app-activity";
 import { LayoutProvider } from "@/stores/layout-store";
@@ -252,8 +253,11 @@ declare module "@tanstack/react-router" {
 
 // App activity events will be loaded by the AppActivityProvider
 
-// Register the PWA service worker (precached shell + OpenAlex runtime caches). No-op in development: see src/lib/service-worker.ts.
+// Register the PWA service worker (precached shell + OpenAlex runtime caches, Background Sync drain). No-op in development: see src/lib/service-worker.ts.
 registerPwaServiceWorker();
+
+// Drain any queued background work from the open page: the fallback for browsers without Background Sync, and harmless alongside a worker-side drain. See src/lib/background-sync/drain-on-open.ts.
+drainBackgroundQueueOnOpen();
 
 // Create and initialize storage provider
 const storageProvider = new DexieStorageProvider(logger);

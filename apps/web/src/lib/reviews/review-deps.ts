@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import type { ReviewSessionDeps } from "@/hooks/use-review-session";
 import type { ReviewsDeps } from "@/hooks/use-reviews";
+import { getBackgroundQueueDB } from "@/lib/background-sync/queue-db";
 import {
   clearDecision,
   createReview,
@@ -30,6 +31,7 @@ import {
 } from "../algorithms/review-service";
 import { createWorkLabelFetcher } from "../algorithms/work-labels";
 import { workerCompute } from "./compute-client";
+import { withHydrationRetryQueue } from "./label-retry-queue";
 import { MAX_REVIEW_POOL_SIZE } from "./review-constants";
 
 /**
@@ -56,10 +58,18 @@ export const reviewServiceDeps: ReviewServiceDeps = {
   store: { createReview, updateReview, savePool },
 };
 
-export const fetchWorkLabels = createWorkLabelFetcher({
+const baseFetchWorkLabels = createWorkLabelFetcher({
   getWorks: async (params) =>
     cachedOpenAlex.client.works.getWorksProjection(params, labelWorkSchema),
 });
+
+/**
+ * The label fetcher, wrapped so a failed batch queues its ids for the background drain while the screens degrade exactly as before.
+ */
+export const fetchWorkLabels = withHydrationRetryQueue(
+  getBackgroundQueueDB(),
+  baseFetchWorkLabels,
+);
 
 export const reviewsDeps: ReviewsDeps = {
   listReviews,
