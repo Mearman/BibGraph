@@ -15,7 +15,7 @@ import { waitForAppReady } from "@/test/helpers/app-ready";
 // Present in the committed static data cache (public/data/openalex), so the entity page renders without any live OpenAlex traffic.
 const OFFLINE_TEST_WORK_ID = "W2741809807";
 
-// Must match OPENALEX_STATIC_DATA_CACHE_NAME in apps/web/vite.config.ts, the CacheFirst cache the service worker fills when the static data tier is read.
+// Must match OPENALEX_STATIC_DATA_CACHE_NAME in apps/web/src/lib/pwa/sw-runtime-caching.ts, the CacheFirst cache the service worker fills when the static data tier is read.
 const OPENALEX_STATIC_DATA_CACHE_NAME = "openalex-static-data";
 
 const HTTP_OK_STATUS = 200;

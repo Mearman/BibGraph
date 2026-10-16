@@ -6,7 +6,7 @@ import { tanstackRouter } from '@tanstack/router-vite-plugin';
 import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type UserConfig, type PluginOption } from 'vite';
-import { VitePWA, type VitePWAOptions } from 'vite-plugin-pwa';
+import { VitePWA } from 'vite-plugin-pwa';
 
 // import { openalexCachePlugin } from "../../config/vite-plugins/openalex-cache";
 
@@ -86,6 +86,8 @@ function githubPagesPlugin(): PluginOption {
  *
  * Routing is hash-based (createHashHistory in main.tsx): every route is the same document, so the precached app shell IS the navigation fallback. There is no per-route server fallback to configure.
  *
+ * The worker is built from src/sw.ts (injectManifest strategy) rather than generated, because the Background Sync queue needs a 'sync' event handler in the worker itself: generateSW cannot add one. The plugin injects the precache manifest into that entry and still emits sw.js at the base; everything the generated worker used to do now lives in the entry and its modules (precaching plus navigation fallback there, OpenAlex runtime caches in src/lib/pwa/sw-runtime-caching.ts, Background Sync in src/lib/background-sync/).
+ *
  * In development the plugin generates nothing (devOptions stays disabled): the dev server serves no sw.js and `virtual:pwa-register` resolves to a no-op stub, so registration code paths are inert there.
  */
 
@@ -96,51 +98,16 @@ const PWA_DESCRIPTION = 'BibGraph - Explore academic research data from OpenAlex
 const APP_THEME_COLOUR = '#ffffff';
 const APP_BACKGROUND_COLOUR = '#ffffff';
 
-const SECONDS_PER_DAY = 60 * 60 * 24;
-
-// NetworkFirst caches for OpenAlex API responses: previously viewed entities render offline. Bounded so long browsing sessions cannot grow the cache without limit. The full request URL (including any mailto= politeness parameter) is the cache key, which is correct because identical query parameters return identical responses.
-const OPENALEX_API_CACHE_NAME = 'openalex-api-runtime';
-const OPENALEX_API_CACHE_MAX_ENTRIES = 100;
-const OPENALEX_API_CACHE_MAX_AGE_DAYS = 30;
-const OPENALEX_API_NETWORK_TIMEOUT_SECONDS = 8;
-const OPENALEX_API_URL_PATTERN = /^https:\/\/api\.openalex\.org\/.*$/;
-// The dev server proxies this path to api.openalex.org (see server.proxy below); the route keeps a worker enabled in development caching the identical surface.
-const OPENALEX_DEV_PROXY_URL_PATTERN = /\/api\/openalex\/.*$/;
-
-// CacheFirst caches for the committed static data tier (public/data/openalex, also deployed to mearman.github.io/BibGraph/data/openalex/ and read cross-origin from bibgraph.com). Entries are immutable per deployment, so no age limit is needed.
-const OPENALEX_STATIC_DATA_CACHE_NAME = 'openalex-static-data';
-const OPENALEX_STATIC_DATA_CACHE_MAX_ENTRIES = 500;
-const OPENALEX_STATIC_DATA_URL_PATTERN = /^https:\/\/mearman\.github\.io\/BibGraph\/data\/openalex\/.*$/;
-const OPENALEX_LOCAL_STATIC_DATA_URL_PATTERN = /^https?:\/\/[^/]+\/data\/openalex\/.*$/;
-
 // Largest emitted chunk is currently ~1.5MB (the graph lazy route); 4MiB leaves headroom for growth. The 19MB static data tree never matches the precache globs.
 const PRECACHE_MAX_FILE_SIZE_BYTES = 4 * 1024 * 1024;
-
-// Derived from the plugin's own option types so the literals below are checked against workbox's mutable shapes (an `as const` tuple for `statuses` would be readonly and rejected).
-type RuntimeCacheOptions = NonNullable<NonNullable<NonNullable<VitePWAOptions['workbox']>['runtimeCaching']>[number]['options']>;
-
-const openAlexApiCacheOptions: RuntimeCacheOptions = {
-  cacheName: OPENALEX_API_CACHE_NAME,
-  networkTimeoutSeconds: OPENALEX_API_NETWORK_TIMEOUT_SECONDS,
-  expiration: {
-    maxEntries: OPENALEX_API_CACHE_MAX_ENTRIES,
-    maxAgeSeconds: OPENALEX_API_CACHE_MAX_AGE_DAYS * SECONDS_PER_DAY,
-  },
-  cacheableResponse: { statuses: [0, 200] },
-};
-
-const openAlexStaticDataCacheOptions: RuntimeCacheOptions = {
-  cacheName: OPENALEX_STATIC_DATA_CACHE_NAME,
-  expiration: {
-    maxEntries: OPENALEX_STATIC_DATA_CACHE_MAX_ENTRIES,
-  },
-  // Status 0 covers opaque cross-origin responses (bibgraph.com reading the GitHub Pages data tier).
-  cacheableResponse: { statuses: [0, 200] },
-};
 
 function pwaPlugin(): PluginOption {
   return VitePWA({
     registerType: 'autoUpdate',
+    // The worker source is a real entry (see the PWA configuration comment above): the plugin bundles it, injects the precache manifest and emits it as sw.js.
+    strategies: 'injectManifest',
+    srcDir: 'src',
+    filename: 'sw.ts',
     // favicon.svg is not referenced from the manifest; the PNG/manifest icons are added to the precache automatically (includeManifestIcons defaults to true).
     includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
     manifest: {
@@ -164,31 +131,11 @@ function pwaPlugin(): PluginOption {
       ],
     },
     workbox: {
-      // With hash routing every route is the same document, so the precached shell is the fallback for every navigation request (verified by e2e/pwa-offline.e2e.test.ts).
-      navigateFallback: 'index.html',
       maximumFileSizeToCacheInBytes: PRECACHE_MAX_FILE_SIZE_BYTES,
-      runtimeCaching: [
-        {
-          urlPattern: OPENALEX_API_URL_PATTERN,
-          handler: 'NetworkFirst',
-          options: openAlexApiCacheOptions,
-        },
-        {
-          urlPattern: OPENALEX_DEV_PROXY_URL_PATTERN,
-          handler: 'NetworkFirst',
-          options: openAlexApiCacheOptions,
-        },
-        {
-          urlPattern: OPENALEX_STATIC_DATA_URL_PATTERN,
-          handler: 'CacheFirst',
-          options: openAlexStaticDataCacheOptions,
-        },
-        {
-          urlPattern: OPENALEX_LOCAL_STATIC_DATA_URL_PATTERN,
-          handler: 'CacheFirst',
-          options: openAlexStaticDataCacheOptions,
-        },
-      ],
+    },
+    // The plugin's production registration (virtual:pwa-register over workbox-window) always registers type: 'classic', so the worker bundle must be IIFE; the injectManifest default of 'es' produces a module the classic registration cannot evaluate.
+    injectManifest: {
+      rollupFormat: 'iife',
     },
   });
 }

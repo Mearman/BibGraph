@@ -1,7 +1,7 @@
 /**
  * Service worker registration for the PWA.
  *
- * The worker itself is generated at build time by vite-plugin-pwa (see the pwaPlugin configuration in vite.config.ts): the app shell is precached, `index.html` is the navigation fallback for the hash-history SPA, and OpenAlex requests are served from the NetworkFirst/CacheFirst runtime caches configured there.
+ * The worker is bundled at build time from src/sw.ts by vite-plugin-pwa's injectManifest strategy (see the pwaPlugin configuration in vite.config.ts): the app shell is precached, `index.html` is the navigation fallback for the hash-history SPA, OpenAlex requests are served from the NetworkFirst/CacheFirst runtime caches registered in src/lib/pwa/sw-runtime-caching.ts, and the Background Sync queue drains through the handler wired in src/lib/background-sync/sw-sync-handler.ts.
  *
  * Registration runs only in production builds. The dev server serves no sw.js and vite-plugin-pwa replaces `virtual:pwa-register` with a no-op stub in development, so this module has no effect there.
  */
