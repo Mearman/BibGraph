@@ -13,6 +13,7 @@ import {
 	MemoryCacheTier,
 } from "./cache/tiers";
 import type { CacheTierInterface } from "./cache-tiers-types";
+import { isTestRuntime, nodeEnvValue } from "./environment-detection";
 import type { StaticEntityType } from "./static-data-utils";
 
 // Shape of one static index.json entry, as fetched from a GitHub Pages/local static cache. Every field is optional, so a bare object check is a genuinely sufficient type guard.
@@ -386,13 +387,11 @@ class StaticDataProvider {
 	}
 
 	getEnvironmentInfo(): EnvironmentInfo {
-		const isTest = Boolean(
-			process.env.VITEST ??
-				(process.env.NODE_ENV === "test"),
-		);
-		const isDevelopment = (process.env.NODE_ENV === "development" ||
-				(process.env.NODE_ENV === undefined && !isTest));
-		const isProduction = (process.env.NODE_ENV === "production");
+		const nodeEnvironment = nodeEnvValue();
+		const isTest = isTestRuntime();
+		const isDevelopment = (nodeEnvironment === "development" ||
+				(nodeEnvironment === undefined && !isTest));
+		const isProduction = (nodeEnvironment === "production");
 
 		return {
 			isDevelopment,

@@ -5,6 +5,7 @@
 import { logger } from "@bibgraph/utils";
 
 import type { CacheTierInterface } from "../../cache-tiers-types";
+import { isTestRuntime } from "../../environment-detection";
 import type { StaticDataResult } from "../../static-data-provider";
 import { CacheTier } from "../../static-data-provider";
 import type { StaticEntityType } from "../../static-data-utils";
@@ -85,12 +86,9 @@ export class GitHubPagesCacheTier implements CacheTierInterface {
 	// Track recent failures per URL to avoid repeated bursts against remote
 	private readonly recentFailures = new Map<string, FailureState>();
 
-	// Configurable retry policy for remote tier
+	// Configurable retry policy for remote tier. Constructed at import time wherever the client barrel is imported, including the background-sync service worker, so it must not read the Node-only `process` binding directly.
 	private readonly retryConfig: RetryConfig = (() => {
-		const isTest = Boolean(
-			process.env.VITEST ??
-				process.env.NODE_ENV === "test",
-		);
+		const isTest = isTestRuntime();
 		return {
 			maxAttempts: RETRY_MAX_ATTEMPTS,
 			baseDelayMs: isTest ? TEST_BASE_DELAY_MS : PROD_BASE_DELAY_MS,

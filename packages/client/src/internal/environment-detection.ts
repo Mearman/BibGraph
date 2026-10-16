@@ -4,10 +4,26 @@
  */
 
 /**
+ * The value of process.env.NODE_ENV, or undefined when the host provides no `process` binding (a browser page, or the service worker that drains the background queue). Reading `process` through typeof stays safe where the identifier is never declared.
+ */
+export const nodeEnvValue = (): string | undefined =>
+  typeof process !== "undefined" ? process.env.NODE_ENV : undefined;
+
+/**
+ * Whether a test runner (Vitest or Jest) is executing the code. Guarded the same way as nodeEnvValue: the client's tiers construct at import time in contexts with no `process` at all.
+ */
+export const isTestRuntime = (): boolean =>
+  typeof process !== "undefined" &&
+  Boolean(
+    process.env.VITEST ??
+      (process.env.NODE_ENV === "test" || process.env.JEST_WORKER_ID !== undefined),
+  );
+
+/**
  * Check if running in development mode based on NODE_ENV
  */
 export const checkNodeEnv = (): boolean | null => {
-  const nodeEnvironmentValue = process.env.NODE_ENV;
+  const nodeEnvironmentValue = nodeEnvValue();
   if (nodeEnvironmentValue === undefined) {
     return null;
   }
@@ -81,8 +97,4 @@ export const isDevelopmentMode = (): boolean => {
 /**
  * Check if running in a test environment
  */
-export const isTestEnvironment = (): boolean => {
-  return process.env.NODE_ENV === 'test' ||
-    process.env.VITEST === 'true' ||
-    process.env.JEST_WORKER_ID !== undefined;
-};
+export const isTestEnvironment = (): boolean => isTestRuntime();

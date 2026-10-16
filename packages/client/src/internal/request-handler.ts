@@ -4,7 +4,7 @@
 import { hostnameMatches, logger } from "@bibgraph/utils";
 
 import type { FullyConfiguredClient, RateLimitState } from "./client-config";
-import { isTestEnvironment } from "./environment-detection";
+import { isTestEnvironment, isTestRuntime } from "./environment-detection";
 import { OpenAlexRateLimitError } from "./errors";
 import { calculateRetryDelay, RETRY_CONFIG } from "./rate-limit";
 
@@ -81,9 +81,7 @@ export const logRealApiCall = ({
   retryCount: number;
 }): void => {
   // Only warn if we're actually in a test environment (NODE_ENV=test or VITEST)
-  const isTestEnvironment_ = Boolean(
-    process.env.VITEST ?? (process.env.NODE_ENV === "test"),
-  );
+  const isTestEnvironment_ = isTestRuntime();
 
   if (isTestEnvironment_ && hostnameMatches(url, "openalex.org")) {
     logger.warn(
