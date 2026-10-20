@@ -625,8 +625,8 @@ importers:
         specifier: 4.4.5
         version: 4.4.5
       graphwise:
-        specifier: 1.12.3
-        version: 1.12.3
+        specifier: 1.12.4
+        version: 1.12.4
       idb:
         specifier: 8.0.3
         version: 8.0.3
@@ -6574,8 +6574,8 @@ packages:
     resolution: {integrity: sha512-Chq1s4CY7jmh8gO2qvLIJyfCDIN+EHLFW/9iShnp1z8FjBQMoodWP1kDC36VAMXXIvAjj4ARa7ntfAV2BrjsbA==}
     engines: {node: ^12.22.0 || ^14.16.0 || ^16.0.0 || >=17.0.0}
 
-  graphwise@1.12.3:
-    resolution: {integrity: sha512-wKtHVan+X/4wMyipg28ir3W8adhaotbgFUhjQEpDidkInTElDuvZeWIcAc/ewFkBepPb+oKrd6yoqpIa83ss3A==}
+  graphwise@1.12.4:
+    resolution: {integrity: sha512-RXx1lJpIIWzFcgN7w7ehBLxd2p0HjNAnMmSeJtXlftsf/xYqBuU1BZDPmpmeiU5it5urbbAg5k5O4UvGW13KEQ==}
     engines: {node: '>=20.19'}
 
   handlebars@4.7.10:
@@ -15846,7 +15846,7 @@ snapshots:
 
   graphql@16.14.2: {}
 
-  graphwise@1.12.3:
+  graphwise@1.12.4:
     dependencies:
       typegpu: 0.12.4
       zod: 4.5.4
