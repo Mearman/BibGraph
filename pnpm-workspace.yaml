@@ -40,7 +40,7 @@ overrides:
   "brace-expansion@^2": 2.1.7
   browserslist: 4.28.9
   effect: 3.20.0
-  fast-uri: 3.1.8
+  fast-uri: 3.1.9
   flatted: 3.4.2
   handlebars: 4.7.10
   js-yaml: 4.3.2
@@ -58,7 +58,7 @@ overrides:
   "ajv@^6": 6.14.0
   "ajv@^8": 8.18.0
   diff: 8.0.3
-  dompurify: 3.4.13
+  dompurify: 3.4.17
   "fflate@^0.4": 0.4.9
   "fflate@^0.6": 0.6.11
   "fflate@^0.8": 0.8.3
@@ -68,20 +68,22 @@ overrides:
   postcss: 8.5.23
   rollup: 4.59.0
   serialize-javascript: 7.1.1
-  seroval: 1.6.4
+  seroval: 1.6.11
   source-map-js: 1.2.2
   # unicorn 74 imports @typescript-eslint's type-graph; two different copies
   # (one under its peer suffix, one hoisted) crash with "mapTypes.union is not
   # a function". One version workspace-wide.
   "@typescript-eslint/utils": 8.69.0
   "@typescript-eslint/types": 8.69.0
-  # seroval 1.6.5+ drops the isStream export that seroval-plugins 1.6.4 and
-  # earlier import; 1.6.5/1.6.6 are inside the seven-day window anyway.
-  "seroval-plugins": 1.6.4
+  # seroval and seroval-plugins are bumped together: seroval 1.6.5+ drops the
+  # isStream export that seroval-plugins 1.6.4 and earlier import.
+  "seroval-plugins": 1.6.11
+  # graphwise pins zod exactly (4.5.4) as a dependency, and every published graphwise release still does, so the direct zod upgrade cannot reach it. Remove once a graphwise release depends on zod 4.6.6 or later (Mearman/graphwise#42).
+  "graphwise>zod": 4.6.7
   # vitest 5.x is excluded for this repo; 4.1.x is the tested line
-  vitest: 4.1.11
-  "@vitest/coverage-v8": 4.1.11
-  "@vitest/ui": 4.1.11
-  storybook: 10.6.0
-  undici: 7.30.0
+  vitest: 4.1.12
+  "@vitest/coverage-v8": 4.1.12
+  "@vitest/ui": 4.1.12
+  storybook: 10.6.3
+  undici: 7.30.1
   ws: 8.21.0

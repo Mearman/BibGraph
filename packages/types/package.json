@@ -19,12 +19,12 @@
 		"typecheck": "pnpm run _typecheck"
 	},
 	"dependencies": {
-		"zod": "4.5.4"
+		"zod": "4.6.7"
 	},
 	"devDependencies": {
 		"eslint": "10.10.0",
 		"typescript": "6.0.3",
-		"vitest": "4.1.11"
+		"vitest": "4.1.12"
 	},
 	"author": "Joe Mearman",
 	"exports": {
