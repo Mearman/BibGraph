@@ -34,20 +34,20 @@
 		"@bibgraph/types": "workspace:*",
 		"@bibgraph/utils": "workspace:*",
 		"dexie": "4.4.5",
-		"zod": "4.5.4"
+		"zod": "4.6.7"
 	},
 	"devDependencies": {
 		"@testing-library/jest-dom": "7.0.1",
 		"@testing-library/user-event": "14.6.7",
 		"@types/node": "26.4.1",
-		"@vitest/coverage-v8": "4.1.11",
+		"@vitest/coverage-v8": "4.1.12",
 		"eslint": "10.10.0",
 		"fake-indexeddb": "6.2.5",
 		"immer": "11.1.18",
 		"memfs": "4.71.0",
 		"msw": "2.15.0",
 		"typescript": "6.0.3",
-		"vitest": "4.1.11",
+		"vitest": "4.1.12",
 		"vitest-axe": "0.1.0"
 	},
 	"author": "BibGraph",

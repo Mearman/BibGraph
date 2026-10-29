@@ -34,7 +34,7 @@
 		"dexie": "4.4.5",
 		"pako": "3.0.1",
 		"qrcode": "1.5.4",
-		"zod": "4.5.4"
+		"zod": "4.6.7"
 	},
 	"devDependencies": {
 		"@types/react": "19.2.18",
@@ -42,7 +42,7 @@
 		"fake-indexeddb": "6.2.5",
 		"react": "19.2.8",
 		"typescript": "6.0.3",
-		"vitest": "4.1.11"
+		"vitest": "4.1.12"
 	},
 	"peerDependencies": {
 		"@mantine/core": "9.6.0",
