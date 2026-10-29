@@ -1,5 +1,7 @@
 # BibGraph
 
+[![GitHub](https://img.shields.io/badge/GitHub-181717?logo=github&logoColor=white)](https://github.com/Mearman/BibGraph) [![Release](https://img.shields.io/github/v/release/Mearman/BibGraph)](https://github.com/Mearman/BibGraph/releases/latest) [![CI](https://img.shields.io/github/actions/workflow/status/Mearman/BibGraph/ci.yml?branch=main)](https://github.com/Mearman/BibGraph/actions)
+
 > [@.specify/memory/constitution.md](.specify/memory/constitution.md)
 
 Turborepo-managed pnpm monorepo for exploring academic literature via the [OpenAlex API](https://docs.openalex.org/). TypeScript React SPA + CLI tool with multi-tier caching, force-directed graphs, and storage abstraction.
