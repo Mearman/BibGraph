@@ -71,7 +71,7 @@
 		"dexie": "4.4.5",
 		"graphwise": "1.12.4",
 		"idb": "8.0.3",
-		"posthog-js": "1.427.2",
+		"posthog-js": "1.438.12",
 		"qrcode": "1.5.4",
 		"r3f-forcegraph": "1.1.1",
 		"react": "19.2.8",
