@@ -427,8 +427,8 @@ importers:
         specifier: 3.8.1
         version: 3.8.1(eslint@10.10.0(jiti@2.7.0)(supports-color@8.1.1))
       globals:
-        specifier: 17.11.0
-        version: 17.11.0
+        specifier: 17.13.0
+        version: 17.13.0
       husky:
         specifier: 9.1.7
         version: 9.1.7
@@ -6482,8 +6482,8 @@ packages:
     resolution: {integrity: sha512-7ACyT3wmyp3I61S4fG682L0VA2RGD9otkqGJIwNUMF1SWUombIIk+af1unuDYgMm082aHYwD+mzJvv9Iu8dsgg==}
     engines: {node: '>=18'}
 
-  globals@17.11.0:
-    resolution: {integrity: sha512-Z2I8hM+PbJDXQDq3Icgpzv+mPdwr68iZUU9d5WW4FuXfDUQfkZaZuvjMv42/5crNyw154+9+VWXbYrUgDXbxNw==}
+  globals@17.13.0:
+    resolution: {integrity: sha512-RwMTC61u7hrG3ZJMkZQOK4JLJrKS8QtoTii63EmWvFXHqycY9FObBJQCbsLxSO8kjKhWE5kV1GC+Vb1g3RI0Zg==}
     engines: {node: '>=18'}
 
   globalthis@1.0.4:
@@ -14692,7 +14692,7 @@ snapshots:
       '@stylistic/eslint-plugin': 5.10.0(eslint@10.10.0(jiti@2.7.0)(supports-color@8.1.1))
       confusing-browser-globals: 1.0.11
       eslint: 10.10.0(jiti@2.7.0)(supports-color@8.1.1)
-      globals: 17.11.0
+      globals: 17.13.0
 
   eslint-config-xo@2.0.0(@types/eslint@9.6.1)(@typescript-eslint/utils@8.69.0(eslint@10.10.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint-import-resolver-node@0.3.9(supports-color@8.1.1))(eslint-plugin-import@2.32.0)(eslint@10.10.0(jiti@2.7.0)(supports-color@8.1.1))(prettier@3.9.6)(supports-color@8.1.1)(ts-declaration-location@1.0.7(typescript@6.0.3))(typescript@6.0.3):
     dependencies:
@@ -14716,7 +14716,7 @@ snapshots:
       eslint-plugin-prettier: 5.5.6(@types/eslint@9.6.1)(eslint-config-prettier@10.1.8(eslint@10.10.0(jiti@2.7.0)(supports-color@8.1.1)))(eslint@10.10.0(jiti@2.7.0)(supports-color@8.1.1))(prettier@3.9.6)
       eslint-plugin-regexp: 3.2.0(eslint@10.10.0(jiti@2.7.0)(supports-color@8.1.1))
       eslint-plugin-unicorn: 74.0.0(eslint@10.10.0(jiti@2.7.0)(supports-color@8.1.1))
-      globals: 17.11.0
+      globals: 17.13.0
       typescript-eslint: 8.69.0(eslint@10.10.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
     optionalDependencies:
       prettier: 3.9.6
@@ -14984,7 +14984,7 @@ snapshots:
   eslint-plugin-playwright@2.11.0(eslint@10.10.0(jiti@2.7.0)(supports-color@8.1.1)):
     dependencies:
       eslint: 10.10.0(jiti@2.7.0)(supports-color@8.1.1)
-      globals: 17.11.0
+      globals: 17.13.0
 
   eslint-plugin-prefer-arrow-functions@3.10.2(eslint@10.10.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3):
     dependencies:
@@ -15168,7 +15168,7 @@ snapshots:
       bytes: 3.1.2
       eslint: 10.10.0(jiti@2.7.0)(supports-color@8.1.1)
       functional-red-black-tree: 1.0.1
-      globals: 17.11.0
+      globals: 17.13.0
       jsx-ast-utils-x: 0.1.0
       lodash.merge: 4.6.2
       minimatch: 10.2.3
@@ -15216,7 +15216,7 @@ snapshots:
       entities: 8.1.0
       eslint: 10.10.0(jiti@2.7.0)(supports-color@8.1.1)
       find-up-simple: 1.0.1
-      globals: 17.11.0
+      globals: 17.13.0
       indent-string: 5.0.0
       is-builtin-module: 5.0.0
       is-identifier: 1.1.0
@@ -15664,7 +15664,7 @@ snapshots:
 
   globals@15.15.0: {}
 
-  globals@17.11.0: {}
+  globals@17.13.0: {}
 
   globalthis@1.0.4:
     dependencies:
