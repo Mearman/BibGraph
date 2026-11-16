@@ -35,7 +35,7 @@
 	},
 	"devDependencies": {
 		"@testing-library/jest-dom": "7.0.1",
-		"@testing-library/user-event": "14.6.7",
+		"@testing-library/user-event": "14.6.10",
 		"@types/node": "26.4.1",
 		"eslint": "10.10.0",
 		"msw": "2.15.0",
